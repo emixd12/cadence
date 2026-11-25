@@ -147,6 +147,24 @@ describe("briefing configuration", () => {
     expect(JSON.stringify(facts)).not.toContain("updatedAt");
   });
 
+  it("selects the tracked figure from 3 samples even when the intended duration is preferred (Ticket 366)", () => {
+    const select = (sampleCount: number, includeHistoricalAverage = true) => {
+      const context = copy(fixture);
+      Object.assign(context.cadence.occurrences[0], { durationCandidates: {
+        configuredDefault: context.cadence.occurrences[0].duration,
+        historicalAverage: { kind: "known", seconds: 1800, source: "completed_stopped_occurrence_mean", sampleCount, lookbackDays: 90 },
+      } });
+      const config = copy(DEFAULT_BRIEFING_CONFIG);
+      config.scope.includeCalendar = false;
+      config.context.duration.includeHistoricalAverage = includeHistoricalAverage;
+      expect(config.context.duration.preference).toBe("configured_default");
+      return projectBriefingContext(context, config).facts.cadence.occurrences[0];
+    };
+    expect(select(3)).toMatchObject({ duration: { source: "completed_stopped_occurrence_mean", seconds: 1800 } });
+    expect(select(2)).toMatchObject({ duration: { source: "behavior_default" } });
+    expect(select(3, false)).toMatchObject({ duration: { source: "behavior_default" } });
+  });
+
   it("applies duration fallback and filters raw elapsed records to the configured history window", () => {
     const context = copy(fixture) as typeof fixture & { cadence: typeof fixture.cadence & { recordedElapsedDurations?: Array<{ behaviorRef: string; localDate: string; seconds: number }> } };
     Object.assign(context.cadence.occurrences[0], { durationCandidates: {

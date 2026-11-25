@@ -612,10 +612,20 @@ Other devices stop refreshing and clear their local content when they next
 observe the changed connection. Ordinary web sign-out keeps the account-level
 Calendar connection. Desktop account disconnect clears that Mac's Calendar cache.
 
-Timeline planning uses a Behavior's optional positive default duration first.
-Without a default, duration estimates use positive stopped-session totals from at
-least three Completed Occurrences in the previous 90 complete local days. A
-running session is not a finished sample. Missing history remains unknown.
+A Behavior's planning length follows one order (Ticket 366, `docs/DECISIONS.md`,
+2026-11-25, D34):
+
+1. The tracked figure, once the Behavior has 3 tracked completions.
+2. The intended duration the person set (`default_duration_minutes`).
+3. The tracked figure from 1 or 2 tracked completions.
+4. A description estimate (Ticket 188).
+
+A tracked completion is a Completed Occurrence before today with a positive
+stopped-session total. The tracked figure is the median of the 10 most recent tracked
+completions. A running session is not a finished sample. Missing history remains
+unknown. When the tracked figure decides, the intended duration is kept and shown
+beside it, and it no longer changes the length. Moves use the same order on finished
+time sessions (`docs/DATETIME_STRATEGY.md`, "Moves").
 Tracked-time records and measured averages stay independent from the default.
 Possible-overlap cues are advisory. They use half-open timed intervals and exclude
 all-day events. They never prove availability or change a schedule or status.
@@ -1159,7 +1169,7 @@ deferred and inherits this contract without implementation here.
 
 ## Behavior planning fields (Tickets 142–143)
 
-Behaviors optionally store a default duration in whole minutes (1–1,440) and an end date. The default supplies Timeline planning duration; measured time and averages remain independent. The end date is the first archived local day. Automatic archive preserves history and produces a durable in-app notification. Web processes due dates through its existing scheduled and foreground lifecycle. Desktop catches up on launch, resume, and day change without a background helper.
+Behaviors optionally store a default duration in whole minutes (1–1,440) and an end date. The duration is the person's intended duration: it supplies the planning length until the Behavior has 3 tracked completions, then the tracked figure does (Ticket 366). The end date is the first archived local day. Automatic archive preserves history and produces a durable in-app notification. Web processes due dates through its existing scheduled and foreground lifecycle. Desktop catches up on launch, resume, and day change without a background helper.
 
 ## Historical completion times in Daily Brief
 

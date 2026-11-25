@@ -672,7 +672,8 @@ it("renders optional planning inputs separately from measured time", () => {
   expect(html).toContain('type="number"');
   expect(html).toContain('name="end_on"');
   expect(html).toContain('type="date"');
-  expect(html).toContain("Tracked time and averages stay separate.");
+  expect(html).toContain("Intended duration (minutes)");
+  expect(html).toContain("until the Behavior has 3 tracked completions, then with your tracked time.");
   expect(html).toContain("The last day it runs.");
   expect(html).not.toContain("Archives at the start of this date");
 });

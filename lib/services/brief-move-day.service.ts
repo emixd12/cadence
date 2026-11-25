@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartInstant, zonedInstant } from "@cadence/core/resolvers/time.resolver";
-import { loggedAverageSeconds } from "@cadence/core/resolvers/move.resolver";
+import { resolveLoggedLength } from "@cadence/core/resolvers/move.resolver";
 import { resolveBriefMoveLength, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
 import { alongsideGuessWanted, alongsideQuestionOpen, resolveAlongside } from "@cadence/core/resolvers/alongside.resolver";
 import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, resolveEffectiveWhere, type EffectiveWhere, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
@@ -184,9 +184,11 @@ export async function readBriefMoveDay(
     const behavior = behaviors.get(row.behavior_id);
     if (!behavior) continue;
     const estimate = estimateByBehavior.get(behavior.id);
+    const logged = resolveLoggedLength(sessionsByBehavior.get(behavior.id) ?? []);
     const length = resolveBriefMoveLength({
       behaviorDefaultMinutes: behavior.defaultDurationMinutes,
-      loggedAverageSeconds: loggedAverageSeconds(sessionsByBehavior.get(behavior.id) ?? []),
+      loggedAverageSeconds: logged?.seconds ?? null,
+      loggedSampleCount: logged?.sampleCount ?? 0,
       estimateMinutes: estimate?.minutes ?? null,
     });
     const alongside = resolveAlongside({ setting: personSetting ? behavior.alongside : null, guess: estimate?.alongside ?? null });

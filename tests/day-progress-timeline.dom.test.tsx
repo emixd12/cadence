@@ -14,6 +14,7 @@ import type { TimelineView } from "@/lib/types/timeline";
 import { leaveReminderTripDigest } from "@cadence/core/services/leave-reminder-plan";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import type { TravelResolvedLegEvidence } from "@cadence/core/types/travel";
+import type { BehaviorDurationEstimate } from "@cadence/core/types/day-progress";
 
 const action = vi.fn(async () => ({ status: "idle" as const, message: "" }));
 let container: HTMLDivElement;
@@ -178,13 +179,13 @@ describe("DayProgressTimeline", () => {
   it("distinguishes repeated DST clock times and exposes duration context without duplicate unknown text", () => {
     const event = validateExternalEventSnapshot(snapshotFixture).events[0]!;
     expect(eventTimeLabel(event, "America/New_York")).toBe("1:30 AM EDT–1:30 AM EST");
-    expect(container.textContent).toContain("No duration yet — track time below or set a default.");
+    expect(container.textContent).toContain("No duration yet — track time below or set an intended duration.");
     expect(container.textContent).not.toContain("Duration unknown");
   });
 
-  it("shows AI description duration estimates and opens the inline default duration form", async () => {
+  it("shows AI description duration estimates and opens the inline intended duration form", async () => {
     const input = props();
-    const saveDuration = vi.fn(async () => ({ status: "success" as const, message: "Default duration saved.", minutes: 25 }));
+    const saveDuration = vi.fn(async () => ({ status: "success" as const, message: "Intended duration saved.", minutes: 25 }));
     await act(() => root.render(
       <RefreshProvider onRefresh={() => {}}>
         <DayProgressTimeline
@@ -207,12 +208,35 @@ describe("DayProgressTimeline", () => {
       </RefreshProvider>,
     ));
     expect(container.textContent).toContain("About 20m 0s · Estimated from description");
-    const setDefaultButton = [...container.querySelectorAll("button")].find((item) => item.textContent === "Set default");
+    const setDefaultButton = [...container.querySelectorAll("button")].find((item) => item.textContent === "Set intended duration");
     expect(setDefaultButton).toBeDefined();
     await act(() => setDefaultButton!.click());
     const minutesInput = container.querySelector<HTMLInputElement>('input[name="default_duration_minutes"]');
     expect(minutesInput).not.toBeNull();
     expect(minutesInput?.value).toBe("20");
+  });
+
+  it("shows the intended duration beside the tracked figure and offers no action once 3 tracked completions decide (Ticket 366)", async () => {
+    const input = props();
+    const saveDuration = vi.fn(async () => ({ status: "success" as const, message: "Intended duration saved.", minutes: 25 }));
+    const tracked = { kind: "known" as const, seconds: 1320, durationLabel: "22m 0s", lookbackDays: null, provenance: "completed_stopped_occurrence_mean" as const };
+    const render = (estimate: BehaviorDurationEstimate) => act(() => root.render(
+      <RefreshProvider onRefresh={() => {}}>
+        <DayProgressTimeline {...input} defaultDurationAction={saveDuration}
+          context={{ ...input.context, durationEstimates: { "behavior-1": estimate } }} />
+      </RefreshProvider>,
+    ));
+    const durationButton = () => [...container.querySelectorAll("button")]
+      .find((item) => item.textContent === "Set intended duration" || item.textContent === "Change");
+
+    await render({ ...tracked, sampleCount: 10, intendedSeconds: 1800 });
+    expect(container.textContent).toContain("Usually 22m 0s · Based on 10 tracked completions · Intended 30m 0s");
+    expect(durationButton()).toBeUndefined();
+
+    await render({ ...tracked, sampleCount: 2 });
+    expect(container.textContent).toContain("Usually 22m 0s · Based on 2 tracked completions");
+    expect(container.textContent).not.toContain("· Intended");
+    expect(durationButton()?.textContent).toBe("Set intended duration");
   });
 
   it("accepts a running mutation between display-clock ticks", async () => {

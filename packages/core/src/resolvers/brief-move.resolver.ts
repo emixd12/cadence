@@ -13,6 +13,7 @@ import {
 import { alongsideMayOverlap, resolveRoutineBlockAlongside, type AlongsideSource } from "./alongside.resolver";
 import type { EffectiveWhere } from "./effective-where.resolver";
 import { localDateAt, localDayBounds } from "./time.resolver";
+import { trackedDurationWins } from "./time-tracking.resolver";
 
 /**
  * Advisor Phase 3A1: the one free-slot rule. The Daily Brief's lines, Other time,
@@ -165,16 +166,24 @@ export type BriefMoveSlotCheck =
   | Readonly<{ ok: true }>
   | Readonly<{ ok: false; reason: "slot_taken" | "too_close" | "calendar_busy" | "travel_busy"; ref: string }>;
 
-/** The length order. `minutes` values below one minute are ignored. */
+/**
+ * The length order (Ticket 366, D34): the logged figure once it rests on 3 samples,
+ * then the intended duration the person set, then the logged figure from fewer
+ * samples, then a model estimate. `minutes` values below one minute are ignored.
+ */
 export function resolveBriefMoveLength(input: Readonly<{
   behaviorDefaultMinutes: number | null;
   loggedAverageSeconds: number | null;
+  /** How many samples the logged figure rests on. Omitted counts as fewer than 3. */
+  loggedSampleCount?: number | null;
   estimateMinutes: number | null;
 }>): BriefMoveLength {
   const made = (minutes: number, source: BriefMoveLengthSource): BriefMoveLength =>
     ({ minutes: Math.min(Math.max(1, Math.round(minutes)), 1440), source, assumed: source === "model_estimate" || source === "fallback" });
+  const logged = input.loggedAverageSeconds && input.loggedAverageSeconds >= 60 ? made(input.loggedAverageSeconds / 60, "logged_average") : null;
+  if (logged && trackedDurationWins(input.loggedSampleCount ?? 0)) return logged;
   if (input.behaviorDefaultMinutes && input.behaviorDefaultMinutes >= 1) return made(input.behaviorDefaultMinutes, "behavior_duration");
-  if (input.loggedAverageSeconds && input.loggedAverageSeconds >= 60) return made(input.loggedAverageSeconds / 60, "logged_average");
+  if (logged) return logged;
   if (input.estimateMinutes && input.estimateMinutes >= 1) return made(input.estimateMinutes, "model_estimate");
   return made(BRIEF_MOVE_FALLBACK_MINUTES, "fallback");
 }

@@ -1502,7 +1502,7 @@ are not applicable; future mobile implementation remains deferred.
 
 ## Behavior planning inputs (Tickets 142–143)
 
-The shared create/edit form places optional Default duration (minutes) and End date inputs under Schedule. Use native number/date controls and the existing line-led styling. Explain that duration is separate from tracked averages and archiving starts at midnight on the chosen date. Timeline details label Default duration separately from measured Estimated duration. Timeline and Behaviors show an accessible persistent notification for automatically archived Behaviors, with history preserved. Restore clears an expired end date and the current notification.
+The shared create/edit form places optional Intended duration (minutes) and End date inputs under Schedule. Use native number/date controls and the existing line-led styling. Explain that Cadence plans with the intended duration until the Behavior has 3 tracked completions and with tracked time after that, and that archiving starts at midnight on the chosen date. Timeline details show one duration line (Ticket 366): "Intended: 30m" with Change; "Usually 5m · Based on 2 tracked completions" with Set intended duration; "About 20m · Estimated from description" with Set intended duration; and, from 3 tracked completions, "Usually 22m · Based on 10 tracked completions · Intended 30m" with no action. The intended part appears only when one is set. Timeline and Behaviors show an accessible persistent notification for automatically archived Behaviors, with history preserved. Restore clears an expired end date and the current notification.
 
 
 ### Daily Brief recipe workbench (Tickets 156–158)

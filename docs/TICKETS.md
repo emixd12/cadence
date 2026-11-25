@@ -20318,3 +20318,40 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
 
 Messaging impact: `P-093`.
+
+## Ticket 366: Tracked time decides a Behavior's length from 3 tracked completions
+
+Status: in_progress
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Tracked time decides a Behavior's length from 3 tracked completions (D34)".
+
+Dependencies: none.
+
+Goal: Plan with measured time once there is enough of it, and stop asking the person for a duration Cadence already measures.
+
+Requirements:
+
+- One length order in `@cadence/core`: the tracked figure from 3 tracked completions, then the intended duration (`default_duration_minutes`), then the tracked figure from 1 or 2, then a description estimate.
+- The tracked figure is the median of the 10 most recent tracked completions. It replaces the mean.
+- The same order applies to the Timeline estimate, day load, travel timing, the Opportunity pool, the Daily Brief's selected duration and its `duration` field, and move lengths (on finished time sessions).
+- The Timeline row shows the intended duration beside the tracked figure when the tracked figure decides, and offers no "Set intended duration" action then.
+- The UI says "Intended duration" in the Behavior form, the Timeline row and the saved notice. The column, sync, export and MCP field names do not change.
+- No schema change. Stored names `completed_stopped_occurrence_mean` and `logged_average` stay; they now name a median.
+
+Out of scope, each needing its own ticket:
+
+- Wording for the Daily Brief, coach and Chat to compare tracked and intended time. The brief's model input still carries one selected duration per item.
+- A length the person corrects in the Daily Brief is saved as the intended duration, so from 3 tracked completions it no longer changes the length.
+- The length tip that proposes setting the duration to the tracked median (`lib/services/behavior-change-proposals.service.ts`).
+- A Chat move keeps using the intended duration when the item has no end.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/resolvers/timeline-context.resolver.ts`, `time-tracking.resolver.ts`, `move.resolver.ts`, `brief-move.resolver.ts`, `packages/core/src/services/briefing-config.ts`, `components/timeline/InlineDurationControl.tsx`, `components/behaviors/BehaviorForm.tsx`. |
+| Desktop | Same resolvers and components; ships in the next Mac release. Installed check with that release. |
+| Marketing | Not applicable: no public claim names the duration order. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers. |
+
+Messaging impact: `P-094`.

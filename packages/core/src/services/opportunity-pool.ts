@@ -94,6 +94,8 @@ function lengthFor(behaviorId: string, defaultMinutes: number | null, timeline: 
   return resolveBriefMoveLength({
     behaviorDefaultMinutes: defaultMinutes,
     loggedAverageSeconds: estimate?.kind === "known" ? estimate.seconds : null,
+    // A default or a description estimate carries no samples, so it never outranks the setting here.
+    loggedSampleCount: estimate?.kind === "known" ? estimate.sampleCount : 0,
     estimateMinutes: null,
   });
 }

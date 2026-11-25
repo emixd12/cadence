@@ -64,7 +64,8 @@ export function briefingFixture(id: BriefingFixtureId, config: BriefingConfig): 
           ? { kind: "unknown", reason: "insufficient_samples", sampleCount: 0, lookbackDays: 90 }
           : incomplete
           ? { kind: "unknown", reason: "history_limit_exceeded", sampleCount: 0, lookbackDays: 90 }
-          : { kind: "known", seconds: 1800, source: "completed_stopped_occurrence_mean", sampleCount: 3, lookbackDays: 90 },
+          // Two samples: below the Ticket 366 floor of 3, so the 20-minute intended duration these fixtures are timed around still decides.
+          : { kind: "known", seconds: 1800, source: "completed_stopped_occurrence_mean", sampleCount: 2, lookbackDays: 90 },
       },
     })),
       ...(config.context.includeHistoricalCompletionTimes ? { historicalCompletionTimes: {

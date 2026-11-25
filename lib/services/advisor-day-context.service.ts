@@ -5,7 +5,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
 import type { User } from "@supabase/supabase-js";
 import { runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
-import { loggedAverageSeconds } from "@cadence/core/resolvers/move.resolver";
+import { resolveLoggedLength } from "@cadence/core/resolvers/move.resolver";
 import { isBehaviorInOpportunityPool } from "@cadence/core/resolvers/opportunity.resolver";
 
 import {
@@ -41,7 +41,7 @@ import {
   type AdvisorSourceFailureCode,
 } from "@cadence/core/types/advisor-day-context";
 import type { BehaviorDurationHistoryOccurrence } from "@cadence/core/types/day-progress";
-import { resolveBehaviorDurationSources } from "@cadence/core/resolvers/timeline-context.resolver";
+import { resolveBehaviorDurationSources, selectBehaviorDuration } from "@cadence/core/resolvers/timeline-context.resolver";
 import { normalizeOccurrenceStatus } from "@cadence/core/services/occurrence.service";
 import {
   readAdvisorCadenceRevision,
@@ -323,7 +323,7 @@ async function assembleDayContexts(
       scheduleKind: scheduleKind as "exact" | "range",
       scheduleStartTime: occurrence.scheduleStartTime,
       scheduleEndTime: occurrence.scheduleEndTime,
-      duration: sources.configuredDefault ?? sources.historicalAverage,
+      duration: selectBehaviorDuration(sources) ?? sources.historicalAverage,
       durationCandidates: {
         configuredDefault: sources.configuredDefault ? {
           kind: "known" as const,
@@ -815,13 +815,15 @@ export async function readAdvisorOpportunityPool(supabase: AppSupabaseClient, in
   const day = Temporal.PlainDate.from(input.localDate);
   return pool.map((row) => {
     const last = lastCompleted.get(row.id);
+    const logged = resolveLoggedLength(sessionsBy.get(row.id) ?? []);
     return {
       behaviorId: row.id,
       title: row.title,
       behaviorRevision: row.updated_at,
       timezone: row.timezone,
       defaultDurationMinutes: row.default_duration_minutes,
-      loggedAverageSeconds: loggedAverageSeconds(sessionsBy.get(row.id) ?? []),
+      loggedAverageSeconds: logged?.seconds ?? null,
+      loggedSampleCount: logged?.sampleCount ?? 0,
       whereKind: row.where_kind === "anywhere" || row.where_kind === "home" || row.where_kind === "place" ? row.where_kind : null,
       daysSinceLastCompleted: last ? Math.max(0, Temporal.PlainDate.from(last).until(day, { largestUnit: "days" }).days) : null,
       onToday: onToday.has(row.id),

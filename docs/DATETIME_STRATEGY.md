@@ -179,8 +179,10 @@ from the Occurrence menu.
   revision. A Behavior timezone change clears effective time; the records stay.
 - **Service.** `lib/services/occurrence-move.service.ts` is the one path every
   caller takes (web actions, MCP tools, the advisor). It picks the length a moved
-  item keeps (`resolveMoveDuration`: the Behavior's duration, then the person's
-  logged average of at least two sessions, then 30 minutes; a second move keeps
+  item keeps (the logged figure once it rests on 3 finished sessions, then the
+  Behavior's intended duration, then the logged figure from fewer sessions, then
+  30 minutes; the logged figure is the median of the 10 most recent finished
+  sessions, Ticket 366; a second move keeps
   the length it already has), checks the slot against the day's other Unresolved
   items at their effective times and, when the caller holds them, today's calendar
   events (`slot_taken`, `calendar_busy`), offers up to three free starts on a
@@ -223,8 +225,10 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
 - **One free-slot rule.** Brief lines, Yes, Accept all, Other time, Re-plan and the
   Timeline's "Move for today" all ask the same resolver whether a time is free, so a
   time the brief offers is not refused at Yes on the same data.
-- **Every item has a length.** The Behavior's duration, then the logged average,
-  then a cached model estimate, then 30 minutes. The estimate is stored per Behavior
+- **Every item has a length.** The logged figure once it rests on 3 finished
+  sessions, then the Behavior's intended duration, then the logged figure from fewer
+  sessions, then a cached model estimate, then 30 minutes (Ticket 366). The stored
+  source name `logged_average` is unchanged; the figure is a median. The estimate is stored per Behavior
   and asked again only when its title, description or kind of place changes. A Yes applies
   the length the line showed. A correction from the person becomes the Behavior's
   default length.
