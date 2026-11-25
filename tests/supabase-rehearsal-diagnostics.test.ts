@@ -1,11 +1,14 @@
-import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const modulePath = "../scripts/supabase-rehearsal-diagnostics.mjs";
-const { classifyRehearsalOutput, readRehearsalDiagnostics, pullRetryDelay, REHEARSAL_IMAGES, REHEARSAL_REGISTRY, MAX_DIAGNOSTIC_BYTES } = await import(modulePath);
+const {
+  classifyRehearsalOutput, readRehearsalDiagnostics, pullRetryDelay, REHEARSAL_IMAGES, REHEARSAL_REGISTRY, MAX_DIAGNOSTIC_BYTES,
+  parseIntegrationAllowlist, checkIntegrationReport, integrationEnvironment,
+} = await import(modulePath);
 const directories: string[] = [];
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }); });
 
@@ -63,6 +66,129 @@ describe("private Supabase startup diagnostics", () => {
   it("reports a fixed diagnostic error without exposing the private path", () => {
     const output = execFileSync(process.execPath, ["scripts/supabase-rehearsal-diagnostics.mjs", "inspect", "/missing/private-path", "1", "start"], { encoding: "utf8" });
     expect(output).toBe('{"category":"diagnostics_unavailable"}\n');
+  });
+});
+
+describe("database-backed local integration tests in the rehearsal", () => {
+  const allowlistPath = "scripts/supabase-rehearsal-integration-tests.json";
+  const readAllowlist = async () => JSON.parse(await readFile(allowlistPath, "utf8"));
+  const root = "/repo";
+  const report = (entries: [string, string[]][]) => ({
+    testResults: entries.map(([file, statuses]) => ({
+      name: `${root}/${file}`, status: statuses.includes("failed") ? "failed" : "passed",
+      assertionResults: statuses.map((status) => ({ status })),
+    })),
+  });
+  const statusEnv = [
+    'API_URL="http://127.0.0.1:55321"', 'DB_URL="postgresql://postgres:postgres@127.0.0.1:55322/postgres"',
+    'PUBLISHABLE_KEY="sb_publishable_fixture"', 'SERVICE_ROLE_KEY="eyJ.fixture.service"', 'SECRET_KEY="sb_secret_fixture"',
+  ].join("\n");
+  const signingKeys = JSON.stringify([{ kty: "EC", crv: "P-256", alg: "ES256", kid: "fixture-kid", d: "private-d", x: "x", y: "y" }]);
+
+  it("classifies every local integration test file exactly once, and every run entry exists", async () => {
+    const { run, excluded } = parseIntegrationAllowlist(await readAllowlist());
+    const files = (await readdir("tests")).filter((name) => /\.local-integration\.test\.(?:ts|mjs)$/.test(name)).map((name) => `tests/${name}`).sort();
+    expect([...run, ...excluded].sort()).toEqual(files);
+    // The run list must keep real coverage. coach-signals (the d13b715e case) returns once its failing test is fixed.
+    expect(run).toContain("tests/integration-write.local-integration.test.ts");
+  });
+
+  it("rejects an allowlist with a duplicate, an unknown need, a non-test path or a missing reason", async () => {
+    const valid = await readAllowlist();
+    const first = valid.run[0].file;
+    expect(() => parseIntegrationAllowlist({ ...valid, run: [...valid.run, valid.run[0]] })).toThrow(/listed twice/);
+    expect(() => parseIntegrationAllowlist({ ...valid, excluded: { ...valid.excluded, [first]: "Needs an app server to run." } })).toThrow(/listed twice/);
+    expect(() => parseIntegrationAllowlist({ ...valid, run: [{ file: first, needs: "app-server" }] })).toThrow(/needs one or more/);
+    expect(() => parseIntegrationAllowlist({ ...valid, run: [{ file: "tests/*.local-integration.test.ts", needs: "database" }] })).toThrow(/not a tests/);
+    expect(() => parseIntegrationAllowlist({ ...valid, excluded: { "tests/x.local-integration.test.ts": "" } })).toThrow(/needs a reason/);
+    expect(() => parseIntegrationAllowlist({ ...valid, run: [] })).toThrow(/non-empty run/);
+  });
+
+  it("accepts a report where every listed file passed all of its tests", () => {
+    const files = ["tests/a.local-integration.test.ts", "tests/b.local-integration.test.mjs"];
+    const result = checkIntegrationReport(report([[files[0], ["passed", "passed"]], [files[1], ["passed"]]]), files, root);
+    expect(result.problems).toEqual([]);
+    expect(result.summary).toEqual([`${files[0]}: 2 passed, 0 failed, 0 skipped`, `${files[1]}: 1 passed, 0 failed, 0 skipped`]);
+  });
+
+  it("fails a listed file that skipped, ran nothing, failed or is missing from the report", () => {
+    const files = ["tests/skip.local-integration.test.ts", "tests/partial.local-integration.test.ts", "tests/fail.local-integration.test.ts", "tests/missing.local-integration.test.ts"];
+    const { problems } = checkIntegrationReport(report([
+      [files[0], ["skipped", "skipped"]],
+      // Like tests/integration-idempotency: pure tests pass while the database tests skip.
+      [files[1], ["passed", "skipped", "todo"]],
+      [files[2], ["passed", "failed"]],
+    ]), files, root);
+    expect(problems).toEqual([
+      `${files[0]}: ran zero tests; its environment check probably skipped. Export the variables it reads or move it to excluded with a reason.`,
+      `${files[0]}: skipped 2 test(s); a skipped test proves nothing. Export the variables it reads or move it to excluded with a reason.`,
+      `${files[1]}: skipped 2 test(s); a skipped test proves nothing. Export the variables it reads or move it to excluded with a reason.`,
+      `${files[2]}: 1 failed test(s); read the vitest output above.`,
+      `${files[3]}: missing from the vitest report; check that the file exists and loads.`,
+    ]);
+    expect(checkIntegrationReport(null, [files[0]], root).problems).toHaveLength(1);
+  });
+
+  it("maps supabase status output and the generated key to the variables the tests read", () => {
+    expect(integrationEnvironment(statusEnv, signingKeys)).toEqual({
+      CADENCE_LOCAL_SUPABASE_URL: "http://127.0.0.1:55321",
+      CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture",
+      CADENCE_LOCAL_SUPABASE_SERVICE_KEY: "eyJ.fixture.service",
+      CADENCE_LOCAL_SUPABASE_DB_URL: "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
+      CADENCE_LOCAL_SUPABASE_DB_PORT: "55322",
+      CADENCE_LOCAL_INTEGRATION_SIGNING_KEY: signingKeys,
+    });
+  });
+
+  it.each([
+    ["a missing service key", statusEnv.replace(/^SERVICE_ROLE_KEY=.*$/m, ""), signingKeys, /omitted SERVICE_ROLE_KEY/],
+    ["a non-loopback API URL", statusEnv.replace("127.0.0.1:55321", "db.example.supabase.co"), signingKeys, /API_URL is not/],
+    ["a non-loopback database", statusEnv.replace("127.0.0.1:55322", "10.0.0.5:5432"), signingKeys, /DB_URL is not/],
+    ["a random string instead of a JWK", statusEnv, "c2VjcmV0LWtleQ", /not JSON/],
+    ["a public key without d", statusEnv, JSON.stringify([{ kty: "EC", crv: "P-256", alg: "ES256", kid: "k", x: "x", y: "y" }]), /exactly one private ES256 JWK/],
+    ["two keys", statusEnv, JSON.stringify([JSON.parse(signingKeys)[0], JSON.parse(signingKeys)[0]]), /exactly one private ES256 JWK/],
+  ])("refuses %s without echoing any value", (_label, status, keys, message) => {
+    let error: unknown;
+    try { integrationEnvironment(status, keys); } catch (caught) { error = caught; }
+    expect(String(error)).toMatch(message);
+    expect(String(error)).not.toMatch(/fixture|private-d|c2VjcmV0/);
+  });
+
+  it("writes the environment only to a new private file and prints variable names only", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "cadence-rehearsal-integration-"));
+    directories.push(directory);
+    await writeFile(join(directory, "status.env"), statusEnv, { mode: 0o600 });
+    await writeFile(join(directory, "keys.json"), signingKeys, { mode: 0o600 });
+    const out = join(directory, "integration.env");
+    const run = () => spawnSync(process.execPath, ["scripts/supabase-rehearsal-diagnostics.mjs", "integration-env", join(directory, "status.env"), join(directory, "keys.json"), out], { encoding: "utf8" });
+    const first = run();
+    expect(first.status).toBe(0);
+    expect(first.stdout + first.stderr).not.toMatch(/fixture|private-d/);
+    expect((await stat(out)).mode & 0o777).toBe(0o600);
+    const exported = execFileSync("bash", ["-c", 'source "$1" && printf "%s|%s" "$CADENCE_LOCAL_SUPABASE_DB_PORT" "$CADENCE_LOCAL_INTEGRATION_SIGNING_KEY"', "bash", out], { encoding: "utf8" });
+    expect(exported).toBe(`55322|${signingKeys}`);
+    // An existing file is never overwritten.
+    expect(run().status).toBe(1);
+  });
+
+  it("prints the allowlist and fails the report command on a skipped file", async () => {
+    const listed = execFileSync(process.execPath, ["scripts/supabase-rehearsal-diagnostics.mjs", "integration-tests"], { encoding: "utf8" }).trim().split("\n");
+    expect(listed).toEqual(parseIntegrationAllowlist(await readAllowlist()).run);
+    const directory = await mkdtemp(join(tmpdir(), "cadence-rehearsal-report-"));
+    directories.push(directory);
+    const path = join(directory, "report.json");
+    const absolute = (file: string) => join(process.cwd(), file);
+    await writeFile(path, JSON.stringify({ testResults: listed.map((file, index) => ({
+      name: absolute(file), status: "passed", assertionResults: [{ status: index === 0 ? "skipped" : "passed" }],
+    })) }));
+    const failing = spawnSync(process.execPath, ["scripts/supabase-rehearsal-diagnostics.mjs", "integration-report", path], { encoding: "utf8" });
+    expect(failing.status).toBe(1);
+    expect(failing.stderr).toContain(`::error::${listed[0]}: ran zero tests`);
+    await writeFile(path, JSON.stringify({ testResults: listed.map((file) => ({ name: absolute(file), status: "passed", assertionResults: [{ status: "passed" }] })) }));
+    expect(spawnSync(process.execPath, ["scripts/supabase-rehearsal-diagnostics.mjs", "integration-report", path], { encoding: "utf8" }).status).toBe(0);
+    const missing = spawnSync(process.execPath, ["scripts/supabase-rehearsal-diagnostics.mjs", "integration-report", join(directory, "absent.json")], { encoding: "utf8" });
+    expect(missing.status).toBe(1);
+    expect(missing.stderr).toContain("The vitest JSON report is missing or unreadable");
   });
 });
 
