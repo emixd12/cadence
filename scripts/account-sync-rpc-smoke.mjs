@@ -1,9 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+import { FILES as CONTRACT_FILES, parseAccountSyncContract } from "./check-contract-numbers.mjs";
 import { buildSmokePassword, cleanupTemporaryUsers, readLocalSmokeConfig, readSmokeConfig } from "./supabase-rls-smoke.mjs";
 
 // Contract 8 (Behaviors of Opportunity) is also the writer floor: contracts 1-7 read but cannot write.
 const CURRENT_CONTRACT = 8;
+// The first contract the server does not know. Read from ACCOUNT_SYNC_CONTRACT so it cannot lag a contract bump.
+const UNKNOWN_CONTRACT = parseAccountSyncContract(readFileSync(new URL(`../${CONTRACT_FILES.resolver}`, import.meta.url), "utf8")) + 1;
 const config = process.argv.includes("--local") ? readLocalSmokeConfig() : readSmokeConfig();
 const admin = createClient(config.url, config.serviceRoleKey, { auth: { persistSession: false } });
 const password = buildSmokePassword(randomUUID().slice(0, 8));
@@ -124,12 +128,12 @@ try {
   assert(c9.entities.filter((row) => row.kind === "behavior").every((row) => row.value.parent_behavior_id === null
     && row.value.sub_behavior_sort_order === 0 && row.value.inherit_parent_schedule === false), "contract 9 behaviors carry the sub-behavior fields");
   assert(c9.fingerprint === entityDigest(c9.entities), "contract 9 fingerprint covers its projection");
-  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 10 }), "unknown read contract");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: UNKNOWN_CONTRACT }), "unknown read contract");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
   const c1Request = (writes, key) => { const value = payload(legacy, writes, entityDigest(c1Merged), key); delete value.contract; return value; };
-  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c9c9".repeat(16)), contract: 10 } }), "unknown apply contract");
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c9c9".repeat(16)), contract: UNKNOWN_CONTRACT } }), "unknown apply contract");
   // Builds before contract 8 write end_date or omit the opportunity fields, so the writer floor refuses them.
   const c1Refused = await clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
     [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) });
