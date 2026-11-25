@@ -23,6 +23,9 @@ import {
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
 import { withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
 import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
+import { CHAT_PLANNING_READS, chatPlanningBehaviorIds, withChatPlanning } from "./chat-planning";
+import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 
 /**
  * Advisor plan Phase 5 (5A): the live executor. Cadence tools run through
@@ -212,8 +215,25 @@ export function createLiveChatExecutor(input: Readonly<{
     const calendarBusy = name === "move_occurrence_for_day" || exactAdd ? await busyToday() : undefined;
     const result = await executeMcpOperation(name as IntegrationOperationName, input.context, operationInput, calendarBusy ? { calendarBusy } : {});
     if (!result.ok) return { ok: false, error: { code: result.error.code, message: result.error.message } };
-    return { ok: true, result: input.sources.notes ? result.value : withoutNotes(result.value) };
+    const planned = await withPlanningFacts(name, result.value, input.context, input.today());
+    return { ok: true, result: input.sources.notes ? planned : withoutNotes(planned) };
   };
+}
+
+/**
+ * Ticket 359: timeline and Behavior reads carry each item's effective alongside value and
+ * Where kind while `CADENCE_ALONGSIDE` is on (chat-planning.ts). Off, or when the facts
+ * cannot be read, the MCP result passes through unchanged.
+ */
+export async function withPlanningFacts(name: string, value: unknown, context: Pick<IntegrationContext, "supabase" | "userId">, today: string,
+  env: Readonly<Record<string, string | undefined>> = process.env): Promise<unknown> {
+  if (!CHAT_PLANNING_READS.has(name) || !alongsideEnabled(env)) return value;
+  try {
+    const facts = await readBehaviorPlanningFacts(context.supabase, context.userId, chatPlanningBehaviorIds(value), today, { env });
+    return withChatPlanning(value, facts);
+  } catch {
+    return value;
+  }
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

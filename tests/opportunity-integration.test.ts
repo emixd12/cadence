@@ -8,7 +8,7 @@ import type { IntegrationContext } from "@/lib/integrations/request-context";
 // through opportunity.service.ts against a mocked database function.
 
 const mocks = vi.hoisted(() => ({
-  getBehaviorById: vi.fn(), getOccurrenceById: vi.fn(), readBriefMoveDay: vi.fn(),
+  getBehaviorById: vi.fn(), getOccurrenceById: vi.fn(), readBriefMoveDay: vi.fn(), readBehaviorPlanningFacts: vi.fn(),
   beginIdempotentWrite: vi.fn(), completeIdempotentWrite: vi.fn(), releaseIdempotentWrite: vi.fn(), recordIntegrationActivity: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -16,7 +16,7 @@ vi.mock("@/lib/cache/stable-user-data.cache", () => ({ invalidateBehaviorData: v
 vi.mock("@/lib/db/behaviors.repo", async (importOriginal) => ({ ...(await importOriginal<object>()), getBehaviorById: mocks.getBehaviorById }));
 vi.mock("@/lib/db/occurrences.repo", async (importOriginal) => ({ ...(await importOriginal<object>()), getOccurrenceById: mocks.getOccurrenceById }));
 vi.mock("@/lib/db/profiles.repo", () => ({ getProfileSettings: vi.fn().mockResolvedValue({ timezone: "America/New_York" }) }));
-vi.mock("@/lib/services/brief-move-day.service", () => ({ readBriefMoveDay: mocks.readBriefMoveDay }));
+vi.mock("@/lib/services/brief-move-day.service", () => ({ readBriefMoveDay: mocks.readBriefMoveDay, readBehaviorPlanningFacts: mocks.readBehaviorPlanningFacts }));
 vi.mock("@/lib/services/reminder.service", () => ({ syncReminderDeliveriesForBehavior: vi.fn() }));
 vi.mock("@/lib/db/integration.repo", () => ({
   beginIdempotentWrite: mocks.beginIdempotentWrite, completeIdempotentWrite: mocks.completeIdempotentWrite,
@@ -68,6 +68,8 @@ beforeEach(() => {
   mocks.beginIdempotentWrite.mockResolvedValue({ state: "started" });
   mocks.completeIdempotentWrite.mockResolvedValue(true);
   mocks.readBriefMoveDay.mockResolvedValue({ items: [] });
+  // CADENCE_ALONGSIDE off: no planning facts.
+  mocks.readBehaviorPlanningFacts.mockResolvedValue(new Map());
 });
 
 describe("add_opportunity_occurrence", () => {
@@ -98,6 +100,22 @@ describe("add_opportunity_occurrence", () => {
     const alternatives = result.ok ? result.value.refusal!.alternatives : [];
     expect(alternatives.length).toBeGreaterThan(0);
     for (const item of alternatives) expect(item.start_time < "14:50" || item.start_time >= "16:10").toBe(true);
+  });
+
+  it("Ticket 359: an alongside Behavior added at a calendar event's time follows the same-place rule", async () => {
+    const busy = { start: Temporal.Instant.from("2026-11-21T20:00:00Z"), end: Temporal.Instant.from("2026-11-21T21:00:00Z") };
+    // A pill taken anywhere may share the meeting's time: the event's place is unknown.
+    mocks.readBehaviorPlanningFacts.mockResolvedValue(new Map([[BEHAVIOR_ID, {
+      alongside: { value: true, source: "person" }, where: { kind: "anywhere", source: "person" } }]]));
+    const { rpc, context: ctx } = context("chat", added(occurrence({ added_by: "chat", schedule_start_time: "15:15:00" })));
+    const result = await writeOperationHandlers.add_opportunity_occurrence(ctx, { behavior_id: BEHAVIOR_ID, start_time: "15:15" }, { calendarBusy: [busy] });
+    expect(rpc).toHaveBeenCalledWith("add_opportunity_occurrence", expect.objectContaining({ planned_start_time: "15:15" }));
+    expect(result).toMatchObject({ ok: true, value: { outcome: "added" } });
+    // Not alongside: the same request is refused, as before.
+    mocks.readBehaviorPlanningFacts.mockResolvedValue(new Map([[BEHAVIOR_ID, {
+      alongside: { value: false, source: "person" }, where: { kind: "elsewhere", source: "guess" } }]]));
+    const refused = await writeOperationHandlers.add_opportunity_occurrence(context("chat").context, { behavior_id: BEHAVIOR_ID, start_time: "15:15" }, { calendarBusy: [busy] });
+    expect(refused).toMatchObject({ ok: true, value: { outcome: "refused", refusal: { reason: "calendar_busy" } } });
   });
 
   it("keys the new Occurrence id to the idempotency key and replays without a second add", async () => {

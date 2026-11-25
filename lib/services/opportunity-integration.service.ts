@@ -9,7 +9,9 @@ import { integrationContractOptions } from "@/lib/services/integration-contract-
 import { noticeText, type NoticeId } from "@cadence/core/notices";
 import { zonedInstant } from "@cadence/core/resolvers/time.resolver";
 import { MOVE_ALTERNATIVES_LIMIT, type MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
-import { briefMoveFreeStarts, briefMoveItemBlocks, checkBriefMoveSlot, type BriefMoveBlock } from "@cadence/core/resolvers/brief-move.resolver";
+import {
+  briefMoveBlocksForSubject, briefMoveFreeStarts, briefMoveItemBlocks, checkBriefMoveSlot, type BriefMoveBlock,
+} from "@cadence/core/resolvers/brief-move.resolver";
 import { BRIEF_MOVE_FALLBACK_MINUTES } from "@cadence/core/types/brief-moves";
 import type { OpportunityAddedBy } from "@cadence/core/types/database";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
@@ -18,7 +20,7 @@ import { getOccurrenceById } from "@/lib/db/occurrences.repo";
 import { getProfileSettings } from "@/lib/db/profiles.repo";
 import { beginIdempotentWrite, completeIdempotentWrite, recordIntegrationActivity, releaseIdempotentWrite } from "@/lib/db/integration.repo";
 import { invalidateBehaviorData } from "@/lib/cache/stable-user-data.cache";
-import { readBriefMoveDay } from "@/lib/services/brief-move-day.service";
+import { readBehaviorPlanningFacts, readBriefMoveDay } from "@/lib/services/brief-move-day.service";
 import { integrationInstant, serializeIntegrationOccurrence } from "@/lib/services/integration-read-serialization";
 import { integrationWriteHash } from "@/lib/services/integration-write.service";
 import {
@@ -188,12 +190,18 @@ async function slotRefusal(
   const localDate = caller.now.toZonedDateTimeISO(behavior.timezone).toPlainDate().toString();
   let start: Temporal.Instant;
   try { start = zonedInstant(localDate, startTime, behavior.timezone); } catch { return null; }
-  const day = await readBriefMoveDay(caller.supabase, caller.userId, localDate);
+  const [day, planning] = await Promise.all([
+    readBriefMoveDay(caller.supabase, caller.userId, localDate),
+    // Ticket 359: the added Behavior's own side of the same-place rule, only while CADENCE_ALONGSIDE is on.
+    readBehaviorPlanningFacts(caller.supabase, caller.userId, [behavior.id], localDate),
+  ]);
+  const facts = planning.get(behavior.id);
+  const subject = facts ? { alongside: facts.alongside.value, where: facts.where } : undefined;
   const lengthSeconds = (behavior.default_duration_minutes ?? BRIEF_MOVE_FALLBACK_MINUTES) * 60;
-  const blocks: BriefMoveBlock[] = [
-    ...briefMoveItemBlocks(day.items, null),
+  const blocks: BriefMoveBlock[] = briefMoveBlocksForSubject([
+    ...briefMoveItemBlocks(day.items, null, new Map(), subject),
     ...calendarBusy.map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
-  ];
+  ], subject);
   const check = checkBriefMoveSlot({ interval: { start, end: start.add({ seconds: lengthSeconds }) }, blocks });
   if (check.ok) return null;
   const reason = check.reason === "calendar_busy" ? "calendar_busy" : "slot_taken";
