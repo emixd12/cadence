@@ -402,14 +402,14 @@ it("cancels an in-flight attempt on sign-out", async () => {
 });
 
 
-it("signals whole-day travel only after a brief is ready", async () => {
+it("does not signal Timeline REST travel when a brief is ready (Path 3 closure)", async () => {
   const listener = vi.fn();
   window.addEventListener("cadence:brief-travel", listener);
   try {
     await act(() => root.render(<DailyBriefLauncher client={client("travel-owner")} travelAccountId="travel-owner" />));
-    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).not.toHaveBeenCalled();
     await act(() => window.dispatchEvent(new Event("focus")));
-    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).not.toHaveBeenCalled();
   } finally { window.removeEventListener("cadence:brief-travel", listener); }
 });
 it("drops pending output when a connected source is excluded in Settings (Tickets 239 and 306)", async () => {
@@ -456,36 +456,27 @@ describe("Ticket 272: the first brief waits up to 5 seconds for its travel concl
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it("waits for the first travel result and sends its signed conclusions, routing the day once", async () => {
+  it("does not wait for Timeline REST travel or attach REST travelConclusions (Path 3 closure)", async () => {
     let answer!: (value: TravelRoutesView) => void;
     const routes = vi.fn<TravelClient["routes"]>(() => new Promise((resolve) => { answer = resolve; }));
-    const requestBrief = vi.fn<DailyBriefClient["requestBrief"]>(async () => ready("Brief with travel", 3_600_000));
+    const requestBrief = vi.fn<DailyBriefClient["requestBrief"]>(async () => ready("Brief without REST travel", 3_600_000));
     await act(() => root.render(<><TravelTimeline client={travelClient(routes)} /><DailyBriefLauncher client={client("owner", requestBrief)} travelAccountId="owner" /></>));
-    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
-    expect(routes).toHaveBeenCalledOnce();
-    expect(requestBrief).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Preparing today’s brief");
-    await act(async () => { answer(travelView()); await vi.advanceTimersByTimeAsync(0); });
-    expect(requestBrief).toHaveBeenCalledWith(expect.objectContaining({ travelConclusions: "signed.token", retry: false }), expect.any(AbortSignal));
-    // Model input is unchanged: the request carries only the opaque signed token, never the
-    // travel block's leave times, durations or places (L-001).
-    const sent = requestBrief.mock.calls[0]![0];
-    expect(Object.keys(sent).sort()).toEqual(["installationId", "retry", "travelConclusions"]);
-    expect(JSON.stringify(sent)).not.toMatch(/Leave|arrive|Home|Dentist|walking|\d{1,2}:\d{2}/);
     await flush();
-    expect(container.textContent).toContain("Brief with travel");
-    // The delivered brief needs no second whole-day request: the first one served it.
+    expect(requestBrief).toHaveBeenCalledOnce();
+    const sent = requestBrief.mock.calls[0]![0];
+    expect(sent).not.toHaveProperty("travelConclusions");
+    expect(container.textContent).toContain("Brief without REST travel");
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(routes).toHaveBeenCalledOnce();
+    await act(async () => { answer(travelView()); await vi.advanceTimersByTimeAsync(0); });
     expect(routes).toHaveBeenCalledOnce();
   });
 
-  it("gives up after 5 seconds and sends the brief without conclusions", async () => {
+  it("sends the brief immediately without waiting when Timeline REST travel is pending (Path 3 closure)", async () => {
     const routes = vi.fn<TravelClient["routes"]>(() => new Promise(() => {}));
     const requestBrief = vi.fn<DailyBriefClient["requestBrief"]>(async () => ready("Brief on time", 3_600_000));
     await act(() => root.render(<><TravelTimeline client={travelClient(routes)} /><DailyBriefLauncher client={client("owner", requestBrief)} travelAccountId="owner" /></>));
-    await act(async () => { await vi.advanceTimersByTimeAsync(4_900); });
-    expect(requestBrief).not.toHaveBeenCalled();
-    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    await flush();
     expect(requestBrief).toHaveBeenCalledOnce();
     expect(requestBrief.mock.calls[0]![0]).not.toHaveProperty("travelConclusions");
   });

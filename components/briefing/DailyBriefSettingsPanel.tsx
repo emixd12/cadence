@@ -5,6 +5,7 @@ import type { DailyBriefConnectedSource, DailyBriefSettings, DailyBriefSourceSta
 import { NO_DAILY_BRIEF_SOURCES } from "@cadence/core/services/daily-brief-sources";
 
 import { createWebDailyBriefClient, type AiSettingsInput, type DailyBriefClient, type DailyBriefPreferenceInput, type DailyBriefSettingsUpdate } from "@/lib/ui/daily-brief";
+import { webGoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 import {
   AI_FEATURE_COPY, AI_FEATURES_TITLE, AI_PROVIDER_LINE, AI_SETTINGS_APPROVE_LABEL, AI_SOURCE_COPY, AI_SOURCES_HEADING,
   AI_UNANSWERED_LINE, AI_DECLINE_LABEL, aiOffLine, type AiFeatureCopyKey,
@@ -22,8 +23,7 @@ import { getLocalStorage } from "@/lib/ui/browser-storage";
 const SOURCES = [
   {
     key: "googleCalendar", id: "daily-brief-google-disclosure", title: "Google Calendar", calendar: true,
-    // Ticket 307: the Timeline connection and its selected calendars.
-    detail: "Event times, availability and your response for the calendars you selected for Timeline. Chat also reads event titles and locations.",
+    detail: "Event times, availability and your response for the calendars you selected for AI features. Chat also reads event titles and locations.",
   },
   {
     key: "outlookCalendar", id: "daily-brief-outlook-disclosure", title: "Outlook Calendar", calendar: true,
@@ -75,23 +75,55 @@ function sourceState(settings: DailyBriefSettings, source: (typeof SOURCES)[numb
  * choice also answers the AI features question. The export keeps its Ticket 306
  * name because the web and the Mac both mount it.
  */
-export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ client?: DailyBriefClient | null; desktop?: boolean }>) {
+export function DailyBriefSettingsPanel({
+  client,
+  desktop = false,
+  onConnectGoogleCalendarAi,
+}: Readonly<{
+  client?: DailyBriefClient | null;
+  desktop?: boolean;
+  onConnectGoogleCalendarAi?: () => Promise<void> | void;
+}>) {
   const resolvedClient = useMemo(() => client === undefined ? createWebDailyBriefClient() : client, [client]);
   const [settings, setSettings] = useState<DailyBriefSettings>();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [connectingAiCalendar, setConnectingAiCalendar] = useState(false);
   // Ticket 301: the drawer shows this state while closed. A failed save keeps the loaded settings.
   useReportSettingsSection(resolvedClient ? dailyBriefSectionState(settingsSectionLoad(settings, error !== "")) : null);
 
   useEffect(() => {
     if (!resolvedClient) return;
-    const controller = new AbortController();
-    void resolvedClient.preferences(controller.signal).then((value) => {
-      if (!controller.signal.aborted) setSettings(value);
-    }).catch(() => {
-      if (!controller.signal.aborted) setError("AI settings could not load. Reload Settings to try again.");
-    });
-    return () => controller.abort();
+    let active = true;
+    let controller = new AbortController();
+    const load = (reportError: boolean) => {
+      controller.abort();
+      controller = new AbortController();
+      const signal = controller.signal;
+      void resolvedClient.preferences(signal).then((value) => {
+        if (active && !signal.aborted) setSettings(value);
+      }).catch(() => {
+        if (reportError && active && !signal.aborted) setError("AI settings could not load. Reload Settings to try again.");
+      });
+    };
+    load(true);
+    const onAiCalendarChanged = () => load(false);
+    const onDailyBriefSettings = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail as Partial<DailyBriefSettings> | null : null;
+      if (detail && typeof detail.accountRef === "string" && typeof detail.revision === "number") {
+        setSettings(detail as DailyBriefSettings);
+      } else {
+        load(false);
+      }
+    };
+    window.addEventListener("cadence:google-calendar-ai-changed", onAiCalendarChanged);
+    window.addEventListener("cadence:daily-brief-settings", onDailyBriefSettings);
+    return () => {
+      active = false;
+      controller.abort();
+      window.removeEventListener("cadence:google-calendar-ai-changed", onAiCalendarChanged);
+      window.removeEventListener("cadence:daily-brief-settings", onDailyBriefSettings);
+    };
   }, [resolvedClient]);
 
   if (!resolvedClient || (desktop && !navigator.onLine)) {
@@ -136,6 +168,12 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
       excludedSources: change.exclude ? { ...excluded, [change.exclude.source]: change.exclude.excluded } : excluded,
       includeReminderHistory: change.includeReminderHistory ?? settings.includeReminderHistory === true,
       includeNotes: change.includeNotes ?? settings.includeNotes === true,
+      ...(change.longitudinalCalendarReviewEnabled !== undefined || change.longitudinalCalendarReviewCadence !== undefined || settings.longitudinalCalendarReviewEnabled !== undefined
+        ? {
+            longitudinalCalendarReviewEnabled: change.longitudinalCalendarReviewEnabled ?? settings.longitudinalCalendarReviewEnabled ?? false,
+            longitudinalCalendarReviewCadence: change.longitudinalCalendarReviewCadence ?? settings.longitudinalCalendarReviewCadence ?? "weekly",
+          }
+        : {}),
     });
   };
 
@@ -164,6 +202,21 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
       </label>
       <p id={id} className="max-w-2xl pl-7 text-muted-readable">{on ? copy.does : aiOffLine(copy.without)}</p>
     </div>;
+  };
+
+  const handleConnectAiCalendar = async () => {
+    const connect = onConnectGoogleCalendarAi
+      ?? (webGoogleCalendarCoordinator.ai ? () => webGoogleCalendarCoordinator.ai!.beginConnect() : null);
+    if (!connect) return;
+    setConnectingAiCalendar(true);
+    setError("");
+    try {
+      await connect();
+    } catch {
+      setError("Google Calendar for AI could not start connecting. Try again.");
+    } finally {
+      setConnectingAiCalendar(false);
+    }
   };
 
   return (
@@ -204,10 +257,64 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
                   onChange={(event) => save({ exclude: { source: item.key, excluded: !event.target.checked } })} />
                 <span>{item.title}</span>
               </label>
-              <p id={item.id} className="max-w-2xl pl-7 text-muted-readable">{item.detail}{sourceState(settings, item)}</p>
+              <p id={item.id} className="max-w-2xl pl-7 text-muted-readable">
+                {item.detail}{sourceState(settings, item)}
+                {item.key === "googleCalendar" ? <>{" "}<a href="#connector-google_calendar" className="underline underline-offset-2">Manage in Connected sources</a></> : null}
+              </p>
             </div>)}
           </div>
         </details> : null}
+        {settings.timelineGoogleCalendarConnected && statusOf(settings, "googleCalendar") === "not_connected" ? (
+          <div className="flex flex-wrap items-center gap-3 pl-7" data-testid="ai-connect-google-calendar-shortcut">
+            <span className="text-muted-readable">Google Calendar is connected for Timeline, not yet for AI features.</span>
+            <button
+              type="button"
+              disabled={connectingAiCalendar}
+              onClick={() => { void handleConnectAiCalendar(); }}
+              className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold"
+            >
+              {connectingAiCalendar ? "Opening Google Calendar for AI…" : "Connect Google Calendar for AI"}
+            </button>
+          </div>
+        ) : null}
+        {settings.ai ? (
+          <div className="grid gap-2 border-t border-line pt-3" data-testid="longitudinal-calendar-review-section">
+            <label className="flex min-h-11 items-center gap-3">
+              <input
+                type="checkbox"
+                checked={settings.longitudinalCalendarReviewEnabled === true}
+                disabled={saving}
+                aria-describedby="longitudinal-calendar-review-detail"
+                onChange={(event) => save({
+                  longitudinalCalendarReviewEnabled: event.target.checked,
+                  longitudinalCalendarReviewCadence: settings.longitudinalCalendarReviewCadence ?? "weekly",
+                })}
+              />
+              <span>Longitudinal calendar-load review</span>
+            </label>
+            <p id="longitudinal-calendar-review-detail" className="max-w-2xl pl-7 text-muted-readable">
+              Optional periodic summary of calendar load and schedule patterns. Runs only when you have been recently active; Google Calendar inputs older than 30 days are discarded immediately after the summary is computed.
+            </p>
+            {settings.longitudinalCalendarReviewEnabled ? (
+              <div className="flex items-center gap-3 pl-7">
+                <label htmlFor="longitudinal-review-cadence" className="text-muted-readable">Cadence</label>
+                <select
+                  id="longitudinal-review-cadence"
+                  value={settings.longitudinalCalendarReviewCadence ?? "weekly"}
+                  disabled={saving}
+                  onChange={(event) => save({
+                    longitudinalCalendarReviewEnabled: true,
+                    longitudinalCalendarReviewCadence: event.target.value === "monthly" ? "monthly" : "weekly",
+                  })}
+                  className="min-h-11 border border-line bg-background px-3 py-2"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <p className="max-w-2xl pt-2 text-muted-readable">{AI_PROVIDER_LINE} <a className="underline underline-offset-2" href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noreferrer">OpenAI data retention may apply.</a></p>
         {desktop ? <p className="max-w-2xl text-muted-readable">Hosted context does not include unsynchronized or local-only desktop data.</p> : null}
         {error ? <p role="alert" className="text-accent">{error}</p> : null}

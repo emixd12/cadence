@@ -1,15 +1,33 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { IntegrationOperationName } from "@cadence/core/integration";
+import { resolveDailyCalendarLoad } from "@cadence/core/resolvers/calendar-load.resolver";
+import {
+  mergeLongitudinalLayers,
+  resolveFirstPartyLongitudinalPatterns,
+  type LongitudinalOccurrenceOutcomeRecord,
+  type LongitudinalProposalOutcomeRecord,
+} from "@cadence/core/resolvers/longitudinal-patterns.resolver";
 import type { MoveCalendarBusy } from "@cadence/core/resolvers/move.resolver";
+import {
+  resolveChatTravelHorizon,
+  type ChatTravelHorizonOccurrenceInput,
+  type ChatTravelHorizonTripInput,
+} from "@cadence/core/resolvers/travel-horizon.resolver";
+import type { ChatTravelUiCard } from "@cadence/core/types/chat-travel";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { executeMcpOperation } from "@/lib/integrations/operations/execute";
-import { getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
+import { getCalendarConnection, getCalendarEventsForAdvisor, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
+import { screenExternalCalendarTextWithModelArmor } from "@/lib/services/model-armor.service";
+import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { assertTravelProviderReady, readTravelProviderConfig } from "@/lib/services/travel-provider";
+import type { TravelRouteDisplay } from "@/lib/services/travel-display.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { searchAdviceCards } from "./chat-advice";
 import { getPersistedHevyActivities } from "@/lib/services/recorded-activity-sync.service";
+import { listTimeSessionsByOccurrenceIds } from "@/lib/db/timeSessions.repo";
 import {
   CALENDAR_LOAD_MAX_QUERY_DAYS,
   getDailyCalendarLoadForUser,
@@ -34,7 +52,10 @@ import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
  */
 
 export type ChatCalendarSource = "googleCalendar" | "outlookCalendar" | "icloudCalendar";
-export type ChatSourceReport = Readonly<{ source: ChatCalendarSource | "hevy"; state: "read" | "partial" | "off" | "not_connected" | "no_calendars" | "failed" }>;
+export type ChatSourceReport = Readonly<{
+  source: ChatCalendarSource | "hevy";
+  state: "read" | "partial" | "off" | "not_connected" | "no_calendars" | "failed" | "unavailable";
+}>;
 
 export type ChatCalendarEvent = Readonly<{
   title: string;
@@ -51,12 +72,57 @@ export type ChatConnectorReads = Readonly<{
   calendarEvents: (start: string, end: string) => Promise<Readonly<{ events: ChatCalendarEvent[]; sources: ChatSourceReport[] }>>;
   calendarLoad?: (start: string, end: string) => Promise<Readonly<{ days: DailyCalendarLoadSummary[]; sources: ChatSourceReport[] }>>;
   workouts: (start: string, end: string) => Promise<Readonly<{ workouts: unknown[]; sources: ChatSourceReport[] }>>;
+  travelHorizonData?: (horizonDays: number) => Promise<Readonly<{
+    trips: readonly ChatTravelHorizonTripInput[];
+    occurrences: readonly ChatTravelHorizonOccurrenceInput[];
+    sources?: readonly ChatSourceReport[];
+  }>>;
+  longitudinalData?: (windowDays: number) => Promise<Readonly<{
+    proposalOutcomes: readonly LongitudinalProposalOutcomeRecord[];
+    occurrences: readonly LongitudinalOccurrenceOutcomeRecord[];
+  }>>;
+}>;
+
+export type LiveChatConnectorReadsOptions = Readonly<{
+  today?: () => string;
+  timezone?: string;
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>;
+  /**
+   * One local day's route estimates, or null when travel is off or cannot run. Defaults
+   * to the Timeline's own refresh (`refreshTravelRoutes`): the person's travel consent,
+   * Home, remembered places, the spend budget and the reused-route cache all apply.
+   */
+  travelRouteEvidence?: (localDate: string) => Promise<TravelRouteDisplay | null>;
 }>;
 
 const CALENDAR_READ_MS = 12_000;
+const EPHEMERAL_LOAD_PERSISTED_DAYS = 30;
+const EPHEMERAL_LOAD_MAX_CHUNKS = 6;
+
+function isGracefulDegradationCode(code: string): boolean {
+  return code === "rate_limited" || code === "mcp_daily_budget_exceeded" || code === "not_configured";
+}
+
+function extractGrantGeneration(read: unknown): number | null {
+  if (!read || typeof read !== "object") return null;
+  const record = read as Record<string, unknown>;
+  const connection = record.connection && typeof record.connection === "object"
+    ? (record.connection as Record<string, unknown>)
+    : null;
+  const candidate = connection?.generation ?? record.grantGeneration ?? record.connectionGeneration;
+  return typeof candidate === "number" && Number.isSafeInteger(candidate) ? candidate : null;
+}
 
 /** Live connector reads for one signed-in person. */
-export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSourceFlags, signal: AbortSignal): ChatConnectorReads {
+export function liveChatConnectorReads(
+  caller: CalendarCaller,
+  sources: ChatSourceFlags,
+  signal: AbortSignal,
+  readOptions: LiveChatConnectorReadsOptions = {},
+): ChatConnectorReads {
+  const timezone = readOptions.timezone ?? DEFAULT_TIMEZONE;
+  const getToday = readOptions.today ?? (() => Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString());
+
   const readSource = async (source: ChatCalendarSource, start: string, end: string): Promise<Readonly<{ events: ChatCalendarEvent[]; report: ChatSourceReport }>> => {
     if (!sources[source]) return { events: [], report: { source, state: "off" } };
     const options = { signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]), allowPastDates: true };
@@ -64,12 +130,28 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
       const read = source === "googleCalendar" ? await getCalendarEventsForAdvisor(caller, start, end, options)
         : source === "outlookCalendar" ? await getOutlookCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true })
           : await getIcloudCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true });
+      if (
+        source === "googleCalendar" &&
+        read.result.ok &&
+        Array.isArray(read.result.snapshot.requestedRange?.selectedCalendarIds) &&
+        read.result.snapshot.requestedRange.selectedCalendarIds.length === 0
+      ) {
+        return { events: [], report: { source, state: "no_calendars" } };
+      }
+      if (source === "googleCalendar") {
+        await readOptions.onGoogleCalendarRead?.(extractGrantGeneration(read));
+      }
       if (!read.result.ok) logConnectorRead("chat_source_read_partial", source, read.result.error.code, null);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      const events = (snapshot.events as readonly NormalizedExternalEvent[]).flatMap((event) => projectEvent(event, source));
+      const projected = (snapshot.events as readonly NormalizedExternalEvent[]).flatMap((event) => projectEvent(event, source));
+      const events = await screenCalendarEvents(projected, signal);
       return { events, report: { source, state: read.result.ok ? "read" : "partial" } };
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (source === "googleCalendar" && isGracefulDegradationCode(code)) {
+        logConnectorRead("chat_source_read_unavailable", source, code, error);
+        return { events: [], report: { source, state: "unavailable" } };
+      }
       const notConnected = code === "reconnect_required" || code === "not_connected" || code === "same_account_required" || code === "not_configured";
       if (!notConnected && code === "invalid_request" && await connectedWithNoCalendars(caller, source)) {
         return { events: [], report: { source, state: "no_calendars" } };
@@ -107,7 +189,44 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
           sources: enabledSources,
           signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
         });
-        return { days: result.days, sources: reports };
+        let mergedDays = result.days;
+        const hasPersistedGoogle = result.days.some((day) => day.sources.includes("google_calendar"));
+        if (hasPersistedGoogle) {
+          const rows = Array.isArray((result as { rows?: unknown }).rows)
+            ? (result as { rows: ReadonlyArray<{ source?: string; connection_generation?: number | null }> }).rows
+            : [];
+          const googleRows = rows.filter((row) => row.source === "google_calendar");
+          const generation = googleRows.find((r) => typeof r.connection_generation === "number")?.connection_generation ?? null;
+          await readOptions.onGoogleCalendarRead?.(generation);
+        }
+        if (sources.googleCalendar) {
+          const ephemeral = await computeEphemeralGoogleCalendarLoad(
+            caller,
+            start,
+            end,
+            getToday(),
+            timezone,
+            signal,
+            readOptions.onGoogleCalendarRead,
+          );
+          if (ephemeral.days.length > 0) {
+            mergedDays = mergeCalendarLoadSummaries(mergedDays, ephemeral.days);
+          }
+          if (ephemeral.unavailable) {
+            for (let i = 0; i < reports.length; i += 1) {
+              if (reports[i]?.source === "googleCalendar") {
+                reports[i] = { source: "googleCalendar", state: "unavailable" };
+              }
+            }
+          } else if (ephemeral.partial) {
+            for (let i = 0; i < reports.length; i += 1) {
+              if (reports[i]?.source === "googleCalendar") {
+                reports[i] = { source: "googleCalendar", state: "partial" };
+              }
+            }
+          }
+        }
+        return { days: mergedDays, sources: reports };
       } catch (error) {
         logConnectorRead("chat_calendar_load_failed", "googleCalendar", "provider_unavailable", error);
         return { days: [], sources: reports.map((r) => r.state === "read" ? { ...r, state: "failed" as const } : r) };
@@ -129,7 +248,245 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
         return { workouts: [], sources: [{ source: "hevy", state: code === "reconnect_required" || code === "not_connected" ? "not_connected" : "failed" }] };
       }
     },
+    travelHorizonData: async (horizonDays) => {
+      const clampedDays = Math.max(1, Math.min(7, Math.trunc(horizonDays)));
+      const startDate = getToday();
+      const endDate = Temporal.PlainDate.from(startDate).add({ days: clampedDays - 1 }).toString();
+      const reads = await Promise.all(
+        (["googleCalendar", "outlookCalendar", "icloudCalendar"] as const).map((source) =>
+          readSource(source, startDate, endDate),
+        ),
+      );
+      const events = reads.flatMap((read) => read.events).sort((a, b) => a.start.localeCompare(b.start));
+      const located: Array<Readonly<{ event: ChatCalendarEvent; localDate: string }>> = [];
+      for (const event of events) {
+        if (event.all_day || !event.busy || !event.location || !event.location.trim()) continue;
+        try {
+          const localDate = Temporal.Instant.from(event.start).toZonedDateTimeISO(timezone).toPlainDate().toString();
+          located.push({ event, localDate });
+        } catch {
+          // Skip malformed event timestamps
+        }
+      }
+      // Route estimates for the days that have a located event. A day that fails or has
+      // travel off keeps its trips without estimates (null leave-by and duration).
+      const routeEvidence = readOptions.travelRouteEvidence ?? ((localDate: string) => defaultTravelRouteEvidence(caller, localDate));
+      const estimatesByDay = new Map<string, ReadonlyMap<number, ChatTripRouteEstimate>>();
+      await Promise.all([...new Set(located.map((item) => item.localDate))].map(async (localDate) => {
+        try {
+          const evidence = await routeEvidence(localDate);
+          if (evidence) estimatesByDay.set(localDate, tripEstimatesByStart(evidence));
+        } catch {
+          // Travel off, not configured, over budget or changed: no estimates for this day.
+        }
+      }));
+      const trips: ChatTravelHorizonTripInput[] = located.map(({ event, localDate }) => {
+        const estimate = estimatesByDay.get(localDate)?.get(Temporal.Instant.from(event.start).epochMilliseconds) ?? null;
+        return {
+          localDate,
+          tripLabel: event.title,
+          destinationLabel: event.location!.trim(),
+          mode: estimate?.mode ?? "driving",
+          departureAt: estimate?.departureAt ?? null,
+          arrivalAt: estimate?.arrivalAt ?? event.start,
+          durationSeconds: estimate?.durationSeconds ?? null,
+          bufferMinutes: CHAT_TRIP_BUFFER_MINUTES,
+          ...(estimate?.late ? { late: true } : {}),
+        };
+      });
+      let occurrences: ChatTravelHorizonOccurrenceInput[] = [];
+      try {
+        const { data } = await caller.client
+          .from("occurrences")
+          .select("id, behavior_id, local_date, scheduled_for, effective_start_at, effective_end_at, status, schedule_kind")
+          .eq("user_id", caller.user.id)
+          .gte("local_date", startDate)
+          .lte("local_date", endDate)
+          .eq("status", "unresolved");
+        occurrences = (data ?? []).flatMap((row) => {
+          const startAt = row.effective_start_at ?? row.scheduled_for;
+          if (!startAt) return [];
+          let durationMinutes: number | null = null;
+          if (row.effective_end_at) {
+            try {
+              const sec = Temporal.Instant.from(startAt).until(Temporal.Instant.from(row.effective_end_at)).total({ unit: "seconds" });
+              if (sec > 0) durationMinutes = Math.round(sec / 60);
+            } catch {
+              durationMinutes = null;
+            }
+          }
+          return [{
+            occurrenceRef: row.id,
+            behaviorId: row.behavior_id,
+            localDate: row.local_date,
+            startAt,
+            endAt: row.effective_end_at ?? null,
+            durationMinutes,
+            flexible: row.schedule_kind === "exact",
+          }];
+        });
+      } catch {
+        occurrences = [];
+      }
+      return {
+        trips,
+        occurrences,
+        sources: reads.map((read) => read.report).filter((report) => report.state !== "not_connected"),
+      };
+    },
+    longitudinalData: async (windowDays) => {
+      const clampedDays = Math.max(7, Math.min(90, Math.trunc(windowDays)));
+      const endDate = Temporal.PlainDate.from(getToday());
+      const startDate = endDate.subtract({ days: clampedDays - 1 });
+      const startStr = startDate.toString();
+      const endStr = endDate.toString();
+
+      let occurrences: LongitudinalOccurrenceOutcomeRecord[] = [];
+      try {
+        const { data } = await caller.client
+          .from("occurrences")
+          .select("id, behavior_id, local_date, status")
+          .eq("user_id", caller.user.id)
+          .gte("local_date", startStr)
+          .lte("local_date", endStr);
+        const rows = data ?? [];
+        // Tracked time comes from finished time sessions only, never from the planned or
+        // moved time: no finished session means no tracked duration.
+        const trackedMinutes = await trackedMinutesByOccurrence(caller, rows.map((row) => row.id));
+        occurrences = rows.map((row) => {
+          const trackedDurationMinutes = trackedMinutes.get(row.id) ?? null;
+          const status = row.status === "completed" || row.status === "not_completed" ? row.status : "unresolved";
+          return {
+            behaviorId: row.behavior_id,
+            localDate: row.local_date,
+            status,
+            travelMotivatedShift: false,
+            travelDay: false,
+            trackedDurationMinutes,
+          };
+        });
+      } catch {
+        occurrences = [];
+      }
+
+      let proposalOutcomes: LongitudinalProposalOutcomeRecord[] = [];
+      try {
+        const { data: moves } = await caller.client
+          .from("occurrence_moves")
+          .select("kind, reason, local_date, behavior_id")
+          .eq("user_id", caller.user.id)
+          .gte("local_date", startStr)
+          .lte("local_date", endStr);
+        proposalOutcomes = (moves ?? []).flatMap((row) => {
+          const behaviorId = row.behavior_id;
+          if (!behaviorId || !row.local_date) return [];
+          const outcome = row.kind === "revert" ? "undo" : "yes";
+          const travelMotivated = typeof row.reason === "string" && row.reason.toLowerCase().includes("travel");
+          return [{
+            behaviorId,
+            localDate: row.local_date,
+            outcome,
+            travelMotivated,
+          }];
+        });
+      } catch {
+        proposalOutcomes = [];
+      }
+
+      return { proposalOutcomes, occurrences };
+    },
   };
+}
+
+const CHAT_TRIP_BUFFER_MINUTES = 10;
+
+/** Minutes of finished time sessions per Occurrence; an unreadable history gives none. */
+async function trackedMinutesByOccurrence(caller: CalendarCaller, occurrenceIds: readonly string[]): Promise<ReadonlyMap<string, number>> {
+  const minutes = new Map<string, number>();
+  if (occurrenceIds.length === 0) return minutes;
+  let sessions: Awaited<ReturnType<typeof listTimeSessionsByOccurrenceIds>>;
+  try {
+    sessions = await listTimeSessionsByOccurrenceIds(caller.client, { userId: caller.user.id, occurrenceIds: [...occurrenceIds] });
+  } catch {
+    return minutes;
+  }
+  const seconds = new Map<string, number>();
+  for (const session of sessions) {
+    if (!session.stopped_at) continue;
+    try {
+      const length = Temporal.Instant.from(session.started_at).until(Temporal.Instant.from(session.stopped_at)).total({ unit: "seconds" });
+      if (length > 0) seconds.set(session.occurrence_id, (seconds.get(session.occurrence_id) ?? 0) + length);
+    } catch {
+      // A malformed session adds nothing.
+    }
+  }
+  for (const [occurrenceId, total] of seconds) {
+    const rounded = Math.round(total / 60);
+    if (rounded > 0) minutes.set(occurrenceId, rounded);
+  }
+  return minutes;
+}
+
+type ChatTripRouteEstimate = Readonly<{
+  mode: ChatTravelHorizonTripInput["mode"];
+  departureAt: string;
+  arrivalAt: string;
+  durationSeconds: number;
+  late: boolean;
+}>;
+
+/**
+ * Current outbound and onward legs keyed by their destination commitment's start
+ * (epoch milliseconds). The commitment segment carries that start, so a Calendar event
+ * read for chat matches its routed leg by start time without any event id.
+ */
+function tripEstimatesByStart(evidence: TravelRouteDisplay): ReadonlyMap<number, ChatTripRouteEstimate> {
+  const startByRef = new Map<string, number>();
+  for (const segment of evidence.segments) {
+    if (segment.kind !== "commitment") continue;
+    const start = Temporal.Instant.from(segment.startAt).epochMilliseconds;
+    for (const ref of segment.sourceRefs) startByRef.set(ref, start);
+  }
+  const estimates = new Map<number, ChatTripRouteEstimate>();
+  for (const item of evidence.legs) {
+    const ref = item.leg.destinationCommitmentRef;
+    if (item.leg.role === "return" || !ref || item.state !== "current" || !item.estimate) continue;
+    const start = startByRef.get(ref);
+    if (start === undefined || estimates.has(start)) continue;
+    estimates.set(start, {
+      mode: item.leg.mode,
+      departureAt: item.estimate.departureAt,
+      arrivalAt: item.estimate.arrivalAt,
+      durationSeconds: item.estimate.durationSeconds,
+      late: item.late === true,
+    });
+  }
+  return estimates;
+}
+
+/** The Timeline's one-day refresh, or null when the travel provider is not ready. */
+async function defaultTravelRouteEvidence(caller: CalendarCaller, localDate: string): Promise<TravelRouteDisplay | null> {
+  const config = readTravelProviderConfig(process.env, await requestOidcToken());
+  try {
+    assertTravelProviderReady(config);
+  } catch {
+    return null;
+  }
+  const response = await refreshTravelRoutes(
+    caller,
+    { scope: "day", startLocalDate: localDate, endLocalDate: localDate, device: null, corrections: [] },
+    config,
+  );
+  return response.evidence;
+}
+
+async function requestOidcToken(): Promise<string | null> {
+  try {
+    const { headers } = await import("next/headers");
+    return (await headers()).get("x-vercel-oidc-token")?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Source, error code and error class only: never event content, ids or messages. */
@@ -138,8 +495,11 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
  * calendars. Checked only after that refusal, so a normal read costs nothing extra.
  */
 async function connectedWithNoCalendars(caller: CalendarCaller, source: ChatCalendarSource): Promise<boolean> {
-  if (source === "googleCalendar") return false;
   try {
+    if (source === "googleCalendar") {
+      const connection = await getCalendarConnection(caller, "agent");
+      return connection.status === "connected" && connection.preferences.selectedCalendarIds.length === 0;
+    }
     const connection = source === "outlookCalendar" ? await getOutlookCalendarConnection(caller) : await getIcloudCalendarConnection(caller);
     return connection.status === "connected" && connection.preferences.selectedSourceIds.length === 0;
   } catch {
@@ -185,19 +545,35 @@ export function createLiveChatExecutor(input: Readonly<{
   today: () => string;
   /** Person's IANA timezone for local-day cache filtering. */
   timezone?: string;
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>;
+  onTravelCards?: (cards: readonly ChatTravelUiCard[]) => void;
 }>): ChatToolExecutor {
+  const timezone = input.timezone ?? DEFAULT_TIMEZONE;
   const sessionCache = createEphemeralCalendarSessionCache(
     (start, end) => input.reads.calendarEvents(start, end),
-    input.timezone ?? DEFAULT_TIMEZONE,
+    timezone,
   );
-  let todayBusy: Promise<MoveCalendarBusy[]> | null = null;
+  let todayBusy: Promise<Readonly<{ busy: MoveCalendarBusy[]; partial: boolean }>> | null = null;
   const busyToday = () => (todayBusy ??= sessionCache.readSpan(input.today(), input.today())
-    .then((read) => calendarBusyFrom(read.events)).catch(() => []));
+    .then((read) => ({
+      busy: calendarBusyFrom(read.events),
+      partial: read.sources.some((s) => s.state === "partial" || s.state === "failed" || s.state === "unavailable"),
+    }))
+    .catch(() => ({ busy: [], partial: true })));
 
   return async (name: ChatToolName, args, options): Promise<ChatToolResult> => {
     if (name === "list_calendar_events") return calendarTool(sessionCache, args, input.today());
     if (name === "list_calendar_load") return calendarLoadTool(input.reads, args);
     if (name === "list_workouts") return workoutsTool(input.reads, args);
+    if (name === "plan_travel_horizon") {
+      return travelHorizonTool(input.reads, args, input.today(), timezone, input.onTravelCards);
+    }
+    if (name === "get_longitudinal_patterns") {
+      return longitudinalPatternsTool(input.reads, args, input.today());
+    }
+    if (name === "move_occurrence_to_date") {
+      return moveOccurrenceToDateTool(input.context, args, timezone);
+    }
     if (name === "search_advice") {
       if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
       return { ok: true, result: searchAdviceCards(args.query.slice(0, 200)) };
@@ -209,10 +585,20 @@ export function createLiveChatExecutor(input: Readonly<{
     // Adding an opportunity at an exact time passes the same busy times: the handler then
     // checks today's items and events with the shared free-slot rule, as a move does.
     const exactAdd = name === "add_opportunity_occurrence" && typeof args.start_time === "string" && args.end_time === undefined && args.mark_completed !== true;
-    const calendarBusy = name === "move_occurrence_for_day" || exactAdd ? await busyToday() : undefined;
-    const result = await executeMcpOperation(name as IntegrationOperationName, input.context, operationInput, calendarBusy ? { calendarBusy } : {});
+    const busyState = name === "move_occurrence_for_day" || exactAdd ? await busyToday() : undefined;
+    const result = await executeMcpOperation(name as IntegrationOperationName, input.context, operationInput, busyState ? { calendarBusy: busyState.busy } : {});
     if (!result.ok) return { ok: false, error: { code: result.error.code, message: result.error.message } };
-    return { ok: true, result: input.sources.notes ? result.value : withoutNotes(result.value) };
+    const value = input.sources.notes ? result.value : withoutNotes(result.value);
+    if (busyState?.partial && value && typeof value === "object" && !Array.isArray(value)) {
+      return {
+        ok: true,
+        result: {
+          ...(value as Record<string, unknown>),
+          calendar_check_partial: true,
+        },
+      };
+    }
+    return { ok: true, result: value };
   };
 }
 
@@ -298,11 +684,13 @@ function sourceNote(sources: readonly ChatSourceReport[]): string | null {
   const names: Readonly<Record<ChatSourceReport["source"], string>> = {
     googleCalendar: "Google Calendar", outlookCalendar: "Outlook Calendar", icloudCalendar: "iCloud Calendar", hevy: "Hevy",
   };
+  const unavailable = sources.filter((item) => item.state === "unavailable").map((item) => names[item.source]);
   const failed = sources.filter((item) => item.state === "failed").map((item) => names[item.source]);
   const partial = sources.filter((item) => item.state === "partial").map((item) => names[item.source]);
   const off = sources.filter((item) => item.state === "off").map((item) => names[item.source]);
   const unselected = sources.filter((item) => item.state === "no_calendars").map((item) => names[item.source]);
   const lines = [
+    unavailable.length ? `${unavailable.join(" and ")} ${unavailable.length === 1 ? "is" : "are"} temporarily unavailable for AI features.` : null,
     failed.length ? `Could not read ${failed.join(" and ")} just now; do not guess what is there.` : null,
     partial.length ? `Only part of ${partial.join(" and ")} could be read.` : null,
     off.length ? `${off.join(" and ")} ${off.length === 1 ? "is" : "are"} off in Settings.` : null,
@@ -310,4 +698,466 @@ function sourceNote(sources: readonly ChatSourceReport[]): string | null {
     sources.length === 0 ? "No calendar is connected." : null,
   ].filter(Boolean);
   return lines.length ? lines.join(" ") : null;
+}
+
+async function screenCalendarEvents(
+  events: readonly ChatCalendarEvent[],
+  signal: AbortSignal,
+): Promise<ChatCalendarEvent[]> {
+  return Promise.all(
+    events.map(async (event) => {
+      const [screenedTitle, screenedLocation] = await Promise.all([
+        screenExternalCalendarTextWithModelArmor({ text: event.title, signal, emitMonitoringEvent: false }),
+        event.location
+          ? screenExternalCalendarTextWithModelArmor({ text: event.location, signal, emitMonitoringEvent: false })
+          : Promise.resolve(null),
+      ]);
+      return {
+        ...event,
+        title: screenedTitle.text || "(no title)",
+        location: screenedLocation ? (screenedLocation.text || null) : null,
+      };
+    }),
+  );
+}
+
+/**
+ * Q2 Ephemeral >30-day Google Calendar load computation:
+ * Reads older Google Calendar chunks live in memory via MCP (`ephemeralOnly: true`),
+ * computes numeric load via `resolveDailyCalendarLoad`, and discards raw events immediately.
+ */
+async function computeEphemeralGoogleCalendarLoad(
+  caller: CalendarCaller,
+  start: string,
+  end: string,
+  today: string,
+  timezone: string,
+  signal: AbortSignal,
+  onGoogleCalendarRead?: (grantGeneration: number | null) => void | Promise<void>,
+): Promise<Readonly<{ days: DailyCalendarLoadSummary[]; partial: boolean; unavailable: boolean }>> {
+  const cutoff = Temporal.PlainDate.from(today).subtract({ days: EPHEMERAL_LOAD_PERSISTED_DAYS });
+  const startDate = Temporal.PlainDate.from(start);
+  const endDate = Temporal.PlainDate.from(end);
+  if (Temporal.PlainDate.compare(startDate, cutoff) >= 0) {
+    return { days: [], partial: false, unavailable: false };
+  }
+  const ephemeralEnd = Temporal.PlainDate.compare(endDate, cutoff.subtract({ days: 1 })) < 0
+    ? endDate
+    : cutoff.subtract({ days: 1 });
+
+  const days: DailyCalendarLoadSummary[] = [];
+  let cursor = startDate;
+  let chunks = 0;
+  let partial = false;
+  let unavailable = false;
+
+  while (Temporal.PlainDate.compare(cursor, ephemeralEnd) <= 0 && chunks < EPHEMERAL_LOAD_MAX_CHUNKS) {
+    const chunkEndCandidate = cursor.add({ days: MAX_CALENDAR_LIVE_SPAN_DAYS - 1 });
+    const chunkEnd = Temporal.PlainDate.compare(chunkEndCandidate, ephemeralEnd) <= 0
+      ? chunkEndCandidate
+      : ephemeralEnd;
+    chunks += 1;
+    try {
+      const read = await getCalendarEventsForAdvisor(
+        caller,
+        cursor.toString(),
+        chunkEnd.toString(),
+        {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
+          allowPastDates: true,
+          ephemeralOnly: true,
+        } as Parameters<typeof getCalendarEventsForAdvisor>[3],
+      );
+      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+      if (
+        read.result.ok &&
+        Array.isArray(snapshot.requestedRange?.selectedCalendarIds) &&
+        snapshot.requestedRange.selectedCalendarIds.length === 0
+      ) {
+        break;
+      }
+      await onGoogleCalendarRead?.(extractGrantGeneration(read));
+      if (!read.result.ok) partial = true;
+      const computed = resolveDailyCalendarLoad({
+        startLocalDate: cursor.toString(),
+        endLocalDate: chunkEnd.toString(),
+        timezone,
+        events: snapshot.events as readonly NormalizedExternalEvent[],
+      });
+      for (const entry of computed) {
+        days.push({
+          local_date: entry.localDate,
+          busy_minutes: entry.busyMinutes,
+          event_count: entry.eventCount,
+          earliest_start_minute: entry.earliestStartMinute,
+          latest_end_minute: entry.latestEndMinute,
+          has_all_day_busy: entry.hasAllDayBusy,
+          sources: ["google_calendar"],
+        });
+      }
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (isGracefulDegradationCode(code)) {
+        unavailable = true;
+        break;
+      }
+      partial = true;
+    }
+    cursor = chunkEnd.add({ days: 1 });
+  }
+
+  return { days, partial, unavailable };
+}
+
+function mergeCalendarLoadSummaries(
+  persisted: readonly DailyCalendarLoadSummary[],
+  ephemeral: readonly DailyCalendarLoadSummary[],
+): DailyCalendarLoadSummary[] {
+  const byDate = new Map<string, DailyCalendarLoadSummary>();
+  for (const day of persisted) {
+    byDate.set(day.local_date, day);
+  }
+  for (const day of ephemeral) {
+    const existing = byDate.get(day.local_date);
+    if (!existing) {
+      byDate.set(day.local_date, day);
+      continue;
+    }
+    if (existing.sources.includes("google_calendar")) continue;
+    byDate.set(day.local_date, {
+      local_date: existing.local_date,
+      busy_minutes: existing.busy_minutes + day.busy_minutes,
+      event_count: existing.event_count + day.event_count,
+      earliest_start_minute:
+        existing.earliest_start_minute === null
+          ? day.earliest_start_minute
+          : day.earliest_start_minute === null
+            ? existing.earliest_start_minute
+            : Math.min(existing.earliest_start_minute, day.earliest_start_minute),
+      latest_end_minute:
+        existing.latest_end_minute === null
+          ? day.latest_end_minute
+          : day.latest_end_minute === null
+            ? existing.latest_end_minute
+            : Math.max(existing.latest_end_minute, day.latest_end_minute),
+      has_all_day_busy: existing.has_all_day_busy || day.has_all_day_busy,
+      sources: [...existing.sources, "google_calendar"],
+    });
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.local_date.localeCompare(b.local_date));
+}
+
+async function travelHorizonTool(
+  reads: ChatConnectorReads,
+  args: Readonly<Record<string, unknown>>,
+  today: string,
+  timezone: string,
+  onTravelCards?: (cards: readonly ChatTravelUiCard[]) => void,
+): Promise<ChatToolResult> {
+  const requestedDays = typeof args.horizon_days === "number" && Number.isFinite(args.horizon_days)
+    ? Math.max(1, Math.min(7, Math.trunc(args.horizon_days)))
+    : 7;
+  const data = reads.travelHorizonData
+    ? await reads.travelHorizonData(requestedDays)
+    : { trips: [], occurrences: [], sources: [] };
+  const horizon = resolveChatTravelHorizon({
+    now: Temporal.Now.instant(),
+    timezone,
+    todayLocalDate: today,
+    horizonDays: requestedDays,
+    trips: data.trips,
+    occurrences: data.occurrences,
+  });
+  if (horizon.uiCards.length > 0) {
+    onTravelCards?.(horizon.uiCards);
+  }
+  // L-001: Return ONLY `modelSummary` to the LLM; `uiCards` are emitted directly to UI.
+  return {
+    ok: true,
+    result: {
+      travel_horizon: horizon.modelSummary,
+      ui_cards_emitted: horizon.uiCards.length,
+      note: data.sources ? sourceNote(data.sources) : null,
+    },
+    uiTravelCards: horizon.uiCards,
+  };
+}
+
+async function longitudinalPatternsTool(
+  reads: ChatConnectorReads,
+  args: Readonly<Record<string, unknown>>,
+  today: string,
+): Promise<ChatToolResult> {
+  const windowDays = typeof args.window_days === "number" && Number.isFinite(args.window_days)
+    ? Math.max(7, Math.min(180, Math.trunc(args.window_days)))
+    : 30;
+  const data = reads.longitudinalData
+    ? await reads.longitudinalData(windowDays)
+    : { proposalOutcomes: [], occurrences: [] };
+  const firstParty = resolveFirstPartyLongitudinalPatterns({
+    now: Temporal.Now.instant(),
+    proposalOutcomes: data.proposalOutcomes,
+    occurrences: data.occurrences,
+  });
+
+  let rollingCalendarSummary = null;
+  if (reads.calendarLoad) {
+    const endDate = Temporal.PlainDate.from(today);
+    const startDate = endDate.subtract({ days: windowDays - 1 });
+    const load = await reads.calendarLoad(startDate.toString(), endDate.toString());
+    if (load.days.length > 0) {
+      const totalBusy = load.days.reduce((sum, d) => sum + d.busy_minutes, 0);
+      const heavyDayCount = load.days.filter((d) => d.busy_minutes >= 240).length;
+      const weekdayTotals = new Map<number, { sum: number; count: number }>();
+      for (const d of load.days) {
+        const wd = Temporal.PlainDate.from(d.local_date).dayOfWeek;
+        const cur = weekdayTotals.get(wd) ?? { sum: 0, count: 0 };
+        weekdayTotals.set(wd, { sum: cur.sum + d.busy_minutes, count: cur.count + 1 });
+      }
+      const busiestWeekdays = Array.from(weekdayTotals.entries())
+        .sort((a, b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count))
+        .slice(0, 2)
+        .map(([wd]) => wd);
+      rollingCalendarSummary = {
+        windowDays,
+        heavyDayCount,
+        averageBusyMinutes: totalBusy / load.days.length,
+        busiestWeekdays,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    result: mergeLongitudinalLayers(firstParty, rollingCalendarSummary),
+  };
+}
+
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function sameRevision(a: string, b: string): boolean {
+  if (a === b) return true;
+  try {
+    return Temporal.Instant.from(a).equals(Temporal.Instant.from(b));
+  } catch {
+    return false;
+  }
+}
+
+async function moveOccurrenceToDateTool(
+  context: IntegrationContext,
+  args: Readonly<Record<string, unknown>>,
+  defaultTimezone: string,
+): Promise<ChatToolResult> {
+  const occurrenceId = typeof args.occurrence_id === "string" && args.occurrence_id.trim() ? args.occurrence_id.trim() : null;
+  const targetLocalDate = typeof args.target_local_date === "string" && DATE.test(args.target_local_date)
+    ? args.target_local_date
+    : null;
+  const expectedRevision = typeof args.expected_revision === "string" && args.expected_revision.trim()
+    ? args.expected_revision.trim()
+    : null;
+  const startTimeRaw = typeof args.start_time === "string"
+    ? args.start_time
+    : typeof args.target_start_time === "string"
+      ? args.target_start_time
+      : null;
+  const targetStartAtRaw = typeof args.target_start_at === "string" ? args.target_start_at : null;
+
+  if (!occurrenceId || !targetLocalDate || !expectedRevision) {
+    return {
+      ok: false,
+      error: { code: "invalid_input", message: "occurrence_id, target_local_date (YYYY-MM-DD), and expected_revision are required." },
+    };
+  }
+  let parsedTargetDate: Temporal.PlainDate;
+  try {
+    parsedTargetDate = Temporal.PlainDate.from(targetLocalDate);
+  } catch {
+    return { ok: false, error: { code: "invalid_input", message: "Use target_local_date as YYYY-MM-DD." } };
+  }
+  if (startTimeRaw !== null && !HHMM.test(startTimeRaw)) {
+    return { ok: false, error: { code: "invalid_input", message: "Use start_time as HH:MM." } };
+  }
+
+  const { data: occurrence, error: readError } = await context.supabase
+    .from("occurrences")
+    .select("id, behavior_id, local_date, scheduled_for, effective_start_at, effective_end_at, status, updated_at")
+    .eq("id", occurrenceId)
+    .eq("user_id", context.userId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, error: { code: "failed", message: "Could not read that item." } };
+  }
+  if (!occurrence) {
+    return { ok: false, error: { code: "not_found", message: "Occurrence not found." } };
+  }
+  if (occurrence.status !== "unresolved") {
+    return {
+      ok: true,
+      result: {
+        outcome: "refused",
+        refusal: {
+          reason: "already_resolved",
+          message: "That item is already marked, so it cannot be moved.",
+        },
+      },
+    };
+  }
+  if (!sameRevision(occurrence.updated_at, expectedRevision)) {
+    return {
+      ok: true,
+      result: {
+        outcome: "refused",
+        refusal: {
+          reason: "revision_changed",
+          message: "That item changed since it was read.",
+        },
+      },
+    };
+  }
+
+  const { data: behavior } = await context.supabase
+    .from("behaviors")
+    .select("title, timezone, default_duration_minutes")
+    .eq("id", occurrence.behavior_id)
+    .eq("user_id", context.userId)
+    .maybeSingle();
+
+  const behaviorTimezone = typeof behavior?.timezone === "string" && behavior.timezone ? behavior.timezone : defaultTimezone;
+
+  let newStartInstant: Temporal.Instant;
+  try {
+    if (targetStartAtRaw) {
+      newStartInstant = Temporal.Instant.from(targetStartAtRaw);
+    } else if (startTimeRaw) {
+      newStartInstant = parsedTargetDate
+        .toZonedDateTime({ timeZone: behaviorTimezone, plainTime: Temporal.PlainTime.from(startTimeRaw) })
+        .toInstant();
+    } else {
+      const currentStart = Temporal.Instant.from(occurrence.effective_start_at ?? occurrence.scheduled_for)
+        .toZonedDateTimeISO(behaviorTimezone);
+      newStartInstant = parsedTargetDate
+        .toZonedDateTime({ timeZone: behaviorTimezone, plainTime: currentStart.toPlainTime() })
+        .toInstant();
+    }
+  } catch {
+    return { ok: false, error: { code: "invalid_input", message: "Could not compute target start time." } };
+  }
+
+  let durationSeconds: number | null = null;
+  if (occurrence.effective_start_at && occurrence.effective_end_at) {
+    try {
+      const diff = Temporal.Instant.from(occurrence.effective_start_at)
+        .until(Temporal.Instant.from(occurrence.effective_end_at))
+        .total({ unit: "seconds" });
+      if (diff > 0) durationSeconds = Math.round(diff);
+    } catch {
+      durationSeconds = null;
+    }
+  } else if (typeof behavior?.default_duration_minutes === "number" && behavior.default_duration_minutes > 0) {
+    durationSeconds = Math.round(behavior.default_duration_minutes * 60);
+  }
+
+  // The RPC keeps the planned time and writes the target as effective time; a null end
+  // takes the schedule's own length.
+  const targetStartIso = newStartInstant.toString();
+  // Back on the planned day at the planned time (Undo): send no end, so the row follows its plan again.
+  const backToPlan = Temporal.Instant.compare(newStartInstant, Temporal.Instant.from(occurrence.scheduled_for)) === 0;
+  const targetEndIso = durationSeconds !== null && !backToPlan
+    ? newStartInstant.add({ seconds: durationSeconds }).toString()
+    : null;
+
+  type MoveOccurrenceRefusal =
+    | "not_found"
+    | "already_resolved"
+    | "revision_changed"
+    | "start_not_on_day"
+    | "no_change"
+    | "destination_conflict";
+  type MoveOccurrenceRpcResult =
+    | {
+        ok: true;
+        occurrence: {
+          id: string;
+          behavior_id: string;
+          local_date: string;
+          scheduled_for: string;
+          effective_start_at: string | null;
+          effective_end_at: string | null;
+          updated_at: string;
+        };
+        previous: {
+          local_date: string;
+          scheduled_for: string;
+          effective_start_at: string | null;
+          effective_end_at: string | null;
+        };
+      }
+    | { ok: false; reason: MoveOccurrenceRefusal };
+
+  const rpcClient = context.supabase as unknown as {
+    rpc: (
+      fn: "move_occurrence_to_date",
+      params: {
+        p_occurrence_id: string;
+        p_target_local_date: string;
+        p_target_start_at: string;
+        p_target_end_at: string | null;
+        p_expected_revision: string;
+      },
+    ) => Promise<{ data: MoveOccurrenceRpcResult | null; error: unknown }>;
+  };
+
+  const { data: rpcResult, error: rpcError } = await rpcClient.rpc("move_occurrence_to_date", {
+    p_occurrence_id: occurrenceId,
+    p_target_local_date: targetLocalDate,
+    p_target_start_at: targetStartIso,
+    p_target_end_at: targetEndIso,
+    p_expected_revision: expectedRevision,
+  });
+
+  if (rpcError || !rpcResult) {
+    return { ok: false, error: { code: "failed", message: "Could not move that item." } };
+  }
+  if (!rpcResult.ok) {
+    if (rpcResult.reason === "not_found") {
+      return { ok: false, error: { code: "not_found", message: "Occurrence not found." } };
+    }
+    return { ok: true, result: { outcome: "refused", refusal: crossDayMoveRefusal(rpcResult.reason) } };
+  }
+
+  const updated = rpcResult.occurrence;
+  return {
+    ok: true,
+    result: {
+      outcome: "moved",
+      occurrence: {
+        id: updated.id,
+        behavior_id: updated.behavior_id,
+        behavior_title: behavior?.title ?? null,
+        timezone: behaviorTimezone,
+        local_date: updated.local_date,
+        scheduled_for: updated.scheduled_for,
+        effective_start_at: updated.effective_start_at,
+        effective_end_at: updated.effective_end_at,
+        status: "unresolved",
+        updated_at: updated.updated_at,
+        revision: updated.updated_at,
+      },
+      previous: rpcResult.previous,
+    },
+  };
+}
+
+const CROSS_DAY_MOVE_REFUSALS: Readonly<Record<string, string>> = {
+  already_resolved: "That item is already marked, so it cannot be moved.",
+  revision_changed: "That item changed since it was read.",
+  start_not_on_day: "That start time is not on the chosen day.",
+  no_change: "That item is already there.",
+  destination_conflict: "That day already has this item at the same time slot.",
+};
+
+function crossDayMoveRefusal(reason: string): { reason: string; message: string } {
+  return { reason, message: CROSS_DAY_MOVE_REFUSALS[reason] ?? "That item could not be moved." };
 }

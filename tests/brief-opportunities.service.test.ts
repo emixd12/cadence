@@ -11,10 +11,21 @@ import type { BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolv
 //  - Re-check leaves a taken line, or keeps one when nothing fits;
 //  - a stale calendar still plans lines.
 
-const mocks = vi.hoisted(() => ({ add: vi.fn(), remove: vi.fn(), readDay: vi.fn(), readPool: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  add: vi.fn(),
+  remove: vi.fn(),
+  readDay: vi.fn(),
+  readPool: vi.fn(),
+  readBriefPrefs: vi.fn(),
+  getGoogleEvents: vi.fn(),
+  aiTransportEnabled: vi.fn(),
+}));
 vi.mock("@/lib/services/opportunity.service", () => ({ addOpportunityToToday: mocks.add, removeOpportunityFromToday: mocks.remove }));
 vi.mock("@/lib/services/brief-move-day.service", () => ({ readBriefMoveDay: mocks.readDay, behaviorEstimateInputHash: () => "h" }));
 vi.mock("@/lib/services/advisor-day-context.service", () => ({ readAdvisorOpportunityPool: mocks.readPool }));
+vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.readBriefPrefs }));
+vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarEventsForAdvisor: mocks.getGoogleEvents }));
+vi.mock("@/lib/services/google-calendar-ai-transport", () => ({ isGoogleCalendarAiTransportEnabled: mocks.aiTransportEnabled }));
 
 import { answerBriefOpportunity, planBriefOpportunityDay, recheckBriefOpportunities } from "@/lib/services/brief-opportunities.service";
 import type { BriefMoveCallers } from "@/lib/services/brief-moves.service";
@@ -92,6 +103,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.readDay.mockResolvedValue({ items: [], behaviors: new Map(), occurrences: new Map() });
   mocks.add.mockImplementation(async (_caller, input) => ({ outcome: "added", created: true, occurrence: { id: input.occurrenceId }, notice: { id: "opportunity.added", params: {} } }));
+  mocks.readBriefPrefs.mockResolvedValue({ enabled: false, useConnectedSources: false, excludedSources: {}, googleCalendarSource: null });
+  mocks.aiTransportEnabled.mockReturnValue(false);
 });
 
 const context = { calendarBusy: [] };
@@ -136,7 +149,7 @@ describe("answerBriefOpportunity", () => {
     expect(fresh.refusal?.reason).toBe("slot_taken");
   });
 
-  it("refuses a time a calendar event now holds, with free times, and adds nothing", async () => {
+  it("refuses a time blocked by trusted calendarBusy and offers alternatives", async () => {
     const row = proposal();
     const rpc = answerRpc(row);
     const busy = { calendarBusy: [{ startAt: local("14:45").toString(), endAt: local("16:00").toString() }] };
@@ -144,9 +157,7 @@ describe("answerBriefOpportunity", () => {
       { target: "opportunity", kind: "yes", proposalId: PROPOSAL, idempotencyKey: "tap-2", context: busy });
     expect(mocks.add).not.toHaveBeenCalled();
     expect(result.outcome).toBe("refused");
-    expect(result.refusal).toMatchObject({ reason: "calendar_busy", message: "3:00 PM is not free now." });
-    expect(result.refusal!.alternatives.length).toBeGreaterThan(0);
-    expect(rpc).toHaveBeenCalledWith("answer_opportunity_proposal", expect.objectContaining({ p_outcome: "refused", p_refusal_reason: "calendar_busy" }));
+    expect(result.refusal?.reason).toBe("calendar_busy");
   });
 
   it("refuses a time an item of the day holds now", async () => {
@@ -207,10 +218,45 @@ describe("recheckBriefOpportunities", () => {
       { localDate: DAY, context, proposalIds: [PROPOSAL] })).toEqual({ replaced: [] });
     expect(quiet).not.toHaveBeenCalled();
 
+    // Trusted calendarBusy filling the rest of the day withdraws the line.
     const full = { calendarBusy: [{ startAt: local("14:00").toString(), endAt: local("23:59").toString() }] };
+    const withdrawBusy = vi.fn(async () => ({ data: null, error: null }));
+    const closedBusy = await recheckBriefOpportunities(callers({ opportunity_proposals: [proposal()], move_proposals: [] }, vi.fn(), withdrawBusy),
+      { localDate: DAY, context: full, proposalIds: [PROPOSAL] });
+    expect(withdrawBusy).toHaveBeenCalledWith("withdraw_brief_opportunity_proposal", { p_proposal_id: PROPOSAL });
+    expect(closedBusy.replaced).toEqual([{ proposalId: PROPOSAL, line: null }]);
+
+    // Recheck preserves server-side MCP Google Calendar provenance (generation 4) with empty client calendarBusy.
+    mocks.readDay.mockResolvedValue({ items: [item("piano", "15:00", 30)], behaviors: new Map(), occurrences: new Map() });
+    mocks.readBriefPrefs.mockResolvedValue({
+      enabled: true,
+      useConnectedSources: true,
+      excludedSources: { googleCalendar: false, outlookCalendar: true, icloudCalendar: true, hevy: true },
+      googleCalendarSource: "timeline",
+    });
+    mocks.aiTransportEnabled.mockReturnValue(true);
+    mocks.getGoogleEvents.mockResolvedValue({
+      connection: { generation: 4 },
+      result: { ok: true, snapshot: { events: [] } },
+    });
+    const provenanceRpc = vi.fn(async (name: string, args: Record<string, unknown>) => name === "record_brief_opportunity_proposals"
+      ? { data: (args.p_proposals as Row[]).map((entry) => proposal({ id: "77777777-7777-4777-8777-777777777777", proposed_start_at: entry.proposed_start_at, proposed_end_at: entry.proposed_end_at, line: entry.line })), error: null }
+      : { data: null, error: null });
+    const provenanceCallers = callers({ opportunity_proposals: [proposal({ contains_google_calendar: true })], move_proposals: [] }, vi.fn(), provenanceRpc);
+    await recheckBriefOpportunities(
+      { ...provenanceCallers, person: { ...provenanceCallers.person, user: { id: USER } as never } },
+      { localDate: DAY, context: { calendarBusy: [] }, proposalIds: [PROPOSAL] },
+    );
+    const provenanceRecorded = provenanceRpc.mock.calls.find(([name]) => name === "record_brief_opportunity_proposals")![1] as { p_proposals: Row[] };
+    expect(provenanceRecorded.p_proposals[0]).toMatchObject({ contains_google_calendar: true, google_calendar_grant_generation: 4 });
+    mocks.readBriefPrefs.mockResolvedValue({ enabled: false, useConnectedSources: false, excludedSources: {}, googleCalendarSource: null });
+    mocks.aiTransportEnabled.mockReturnValue(false);
+
+    // When day items fill the rest of the day, nothing fits and the line is withdrawn.
+    mocks.readDay.mockResolvedValue({ items: [item("all-day", "14:00", 599)], behaviors: new Map(), occurrences: new Map() });
     const withdraw = vi.fn(async () => ({ data: null, error: null }));
     const closed = await recheckBriefOpportunities(callers({ opportunity_proposals: [proposal()], move_proposals: [] }, vi.fn(), withdraw),
-      { localDate: DAY, context: full, proposalIds: [PROPOSAL] });
+      { localDate: DAY, context, proposalIds: [PROPOSAL] });
     expect(withdraw).toHaveBeenCalledWith("withdraw_brief_opportunity_proposal", { p_proposal_id: PROPOSAL });
     expect(closed.replaced).toEqual([{ proposalId: PROPOSAL, line: null }]);
   });

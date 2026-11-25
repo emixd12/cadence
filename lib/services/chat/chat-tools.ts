@@ -15,19 +15,28 @@ import type { ChatOutcomeKind, ChatToolSubject } from "@cadence/core/types/chat"
 
 export const CHAT_CONNECTOR_TOOLS = ["list_calendar_events", "list_calendar_load", "list_workouts"] as const;
 export type ChatConnectorToolName = (typeof CHAT_CONNECTOR_TOOLS)[number];
-/** Chat-only tool over the reviewed advice library (4A); offered whenever chat is on. */
+/** Chat-only tools that do not live in the MCP catalog. */
 export const CHAT_ADVICE_TOOL = "search_advice" as const;
-export type ChatToolName = IntegrationOperationName | ChatConnectorToolName | typeof CHAT_ADVICE_TOOL;
+export const CHAT_TRAVEL_HORIZON_TOOL = "plan_travel_horizon" as const;
+export const CHAT_LONGITUDINAL_PATTERNS_TOOL = "get_longitudinal_patterns" as const;
+export const CHAT_CROSS_DAY_MOVE_TOOL = "move_occurrence_to_date" as const;
+export type ChatToolName =
+  | IntegrationOperationName
+  | ChatConnectorToolName
+  | typeof CHAT_ADVICE_TOOL
+  | typeof CHAT_TRAVEL_HORIZON_TOOL
+  | typeof CHAT_LONGITUDINAL_PATTERNS_TOOL
+  | typeof CHAT_CROSS_DAY_MOVE_TOOL;
 
 /** Writes that run at once when they are the first write of a question (T12). */
 export const CHAT_IMMEDIATE_WRITES = [
   "set_occurrence_status", "set_parent_occurrence_status", "update_occurrence_note", "update_day_note", "move_occurrence_for_day",
   "revert_occurrence_move", "add_opportunity_occurrence", "remove_opportunity_occurrence",
 ] as const satisfies readonly IntegrationOperationName[];
-/** Writes that always wait for a Yes. */
+/** Writes that always wait for a Yes (including cross-day moves and recurring schedule remodeling). */
 export const CHAT_CONFIRM_WRITES = [
-  "create_behavior", "update_behavior", "archive_behavior", "restore_behavior",
-] as const satisfies readonly IntegrationOperationName[];
+  "create_behavior", "update_behavior", "archive_behavior", "restore_behavior", "move_occurrence_to_date",
+] as const;
 export type ChatWriteName = (typeof CHAT_IMMEDIATE_WRITES)[number] | (typeof CHAT_CONFIRM_WRITES)[number];
 
 const WRITES: ReadonlySet<string> = new Set([...CHAT_IMMEDIATE_WRITES, ...CHAT_CONFIRM_WRITES]);
@@ -40,7 +49,7 @@ export function isImmediateWrite(name: string): boolean { return IMMEDIATE.has(n
 
 export const CHAT_OUTCOME_KIND: Readonly<Record<ChatWriteName, ChatOutcomeKind>> = {
   set_occurrence_status: "status", set_parent_occurrence_status: "status", update_occurrence_note: "occurrence_note", update_day_note: "day_note",
-  move_occurrence_for_day: "move", revert_occurrence_move: "move", create_behavior: "create_behavior",
+  move_occurrence_for_day: "move", move_occurrence_to_date: "move", revert_occurrence_move: "move", create_behavior: "create_behavior",
   update_behavior: "update_behavior", archive_behavior: "archive_behavior", restore_behavior: "restore_behavior",
   add_opportunity_occurrence: "opportunity", remove_opportunity_occurrence: "opportunity",
 };
@@ -50,13 +59,13 @@ export const CHAT_TOOL_SUBJECT: Readonly<Record<string, ChatToolSubject>> = {
   get_account_context: "account", list_behaviors: "behaviors", get_behavior: "behaviors", list_categories: "behaviors",
   get_timeline: "timeline", list_occurrences: "occurrences", get_occurrence: "occurrences", list_day_notes: "notes",
   get_adherence_summary: "adherence", search: "search", fetch: "search", list_calendar_events: "calendar", list_calendar_load: "calendar", list_workouts: "workouts",
-  search_advice: "advice",
+  search_advice: "advice", plan_travel_horizon: "travel", get_longitudinal_patterns: "patterns",
 };
 
 const SUBJECT_TEXT: Readonly<Record<ChatToolSubject, string>> = {
   timeline: "your Timeline", behaviors: "your Behaviors", occurrences: "your items", notes: "your notes",
   adherence: "how your week went", account: "your account", search: "your records", calendar: "your calendar",
-  workouts: "your Hevy workouts", advice: "Cadence's advice library",
+  workouts: "your Hevy workouts", advice: "Cadence's advice library", travel: "your travel horizon", patterns: "your schedule patterns",
 };
 
 export function chatToolLineText(subject: ChatToolSubject, state: "done" | "failed" | "off"): string {
@@ -125,6 +134,39 @@ const ADVICE_TOOL_SPEC: Readonly<{ description: string; inputSchema: JsonSchemaO
   } as JsonSchemaObject,
 };
 
+const TRAVEL_HORIZON_TOOL_SPEC: Readonly<{ description: string; inputSchema: JsonSchemaObject }> = {
+  description: "Evaluates today plus up to 7 days ahead for travel fit, heavy travel days, coarse free windows, and flexible cross-day move candidates. Returns deterministic fit/conflict conclusions only (no exact route durations or leave-by times); Cadence renders the exact travel cards inline for the person automatically.",
+  inputSchema: {
+    type: "object", additionalProperties: false,
+    properties: {
+      horizon_days: { type: "integer", minimum: 1, maximum: 7, description: "Number of days to evaluate starting today (1 to 7, default 7)." },
+    },
+  } as JsonSchemaObject,
+};
+
+const LONGITUDINAL_PATTERNS_TOOL_SPEC: Readonly<{ description: string; inputSchema: JsonSchemaObject }> = {
+  description: "Computes Cadence's two-layer longitudinal behavioral patterns: proposal acceptance (Yes/Other time/No/Undo), post-travel-shift completion rates, per-Behavior tracked durations, home vs. away location affinity, recurring schedule-remodeling suggestions, and optional rolling calendar busy-load.",
+  inputSchema: {
+    type: "object", additionalProperties: false,
+    properties: {
+      window_days: { type: "integer", minimum: 7, maximum: 180, description: "Number of past days to analyze (default 30)." },
+    },
+  } as JsonSchemaObject,
+};
+
+const CROSS_DAY_MOVE_TOOL_SPEC: Readonly<{ description: string; inputSchema: JsonSchemaObject }> = {
+  description: "Proposes moving a flexible occurrence to a different local date (cross-day move). Always requires the person's Yes confirmation before changing anything.",
+  inputSchema: {
+    type: "object", additionalProperties: false, required: ["occurrence_id", "target_local_date", "start_time"],
+    properties: {
+      occurrence_id: { type: "string", minLength: 1, description: "The occurrence id to move." },
+      target_local_date: { ...LOCAL_DATE, description: "Target local date (YYYY-MM-DD)." },
+      start_time: { type: "string", pattern: "^\\d{2}:\\d{2}$", description: "Target local start time (HH:MM)." },
+      expected_revision: { type: "string", description: "Current occurrence revision." },
+    },
+  } as JsonSchemaObject,
+};
+
 export type ChatToolDefinition = Readonly<{ name: ChatToolName; description: string; inputSchema: JsonSchemaObject }>;
 
 /**
@@ -139,7 +181,14 @@ export function buildChatToolDefinitions(sources: ChatSourceFlags): ChatToolDefi
   const connectors = CHAT_CONNECTOR_TOOLS
     .filter((name) => name === "list_workouts" ? sources.hevy : anyCalendar)
     .map((name) => ({ name, ...CONNECTOR_TOOL_SPECS[name] }));
-  return [...cadence, ...connectors, { name: CHAT_ADVICE_TOOL, ...ADVICE_TOOL_SPEC }];
+  return [
+    ...cadence,
+    ...connectors,
+    { name: CHAT_TRAVEL_HORIZON_TOOL, ...TRAVEL_HORIZON_TOOL_SPEC },
+    { name: CHAT_LONGITUDINAL_PATTERNS_TOOL, ...LONGITUDINAL_PATTERNS_TOOL_SPEC },
+    { name: CHAT_CROSS_DAY_MOVE_TOOL, ...CROSS_DAY_MOVE_TOOL_SPEC },
+    { name: CHAT_ADVICE_TOOL, ...ADVICE_TOOL_SPEC },
+  ];
 }
 
 /** AI SDK tools without `execute`, in a fixed order so the prompt prefix caches. */

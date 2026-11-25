@@ -42,7 +42,7 @@ export type DailyBriefAgentRun = Readonly<{
    */
   finish: (
     result: Readonly<{
-      ok: true; briefing: unknown; calendarDerived: boolean; linkedProposalIds?: readonly string[];
+      ok: true; briefing: unknown; calendarDerived: boolean; googleCalendarDerived?: boolean; linkedProposalIds?: readonly string[];
       /** Set when the brief was shown with Cadence's stock words because the model call failed; the run records that failure. */
       wordsError?: unknown;
     }> | Readonly<{ ok: false; error: unknown }>,
@@ -153,10 +153,12 @@ export async function beginDailyBriefAgentRun(options: BeginDailyBriefAgentRunOp
       for (const [seq, item] of inputs.entries()) {
         if (signal?.aborted) return;
         await storeAgentRunContent(client, { runId, kind: "input", seq, calendarDerived: result.calendarDerived,
+          ...(result.googleCalendarDerived !== undefined ? { googleCalendarDerived: result.googleCalendarDerived } : {}),
           body: { instructions_sha256: item.instructionsSha256, facts: item.facts } }, signal);
       }
       if (signal?.aborted) return;
       await storeAgentRunContent(client, { runId, kind: "output", calendarDerived: result.calendarDerived,
+        ...(result.googleCalendarDerived !== undefined ? { googleCalendarDerived: result.googleCalendarDerived } : {}),
         body: JSON.parse(JSON.stringify(result.briefing ?? null)) as Json }, signal);
     } catch {
       // A lost content row only shortens replay coverage.

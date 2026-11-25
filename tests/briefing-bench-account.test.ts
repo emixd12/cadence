@@ -44,7 +44,10 @@ beforeEach(async () => {
   mocks.behaviorIds.mockResolvedValue(["owned"]);
   mocks.current.mockResolvedValue(undefined);
   mocks.capture.mockImplementation(async (_caller, input) => ({ preferences, analysisSource: null,
-    contexts: input.historyDays.map((days: number) => briefingFixture("sparse", config("calm", days))),
+    contexts: input.historyDays.map((days: number) => {
+      const context = briefingFixture("sparse", config("calm", days));
+      return { ...context, connectors: [{ source: "google_calendar" as const, state: "not_requested" as const }] };
+    }),
     configurationRefs: { behavior_owned: "behavior_fixture" }, assertCurrent: mocks.current }));
 });
 afterEach(async () => { vi.useRealTimers(); vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true }); });
@@ -166,33 +169,14 @@ it("deletes an expired account case before a direct saved-case rerun", async () 
   await expect(readFile(path.join(root, `account-${ACCOUNT}`, CASE, "case.json"))).rejects.toMatchObject({ code: "ENOENT" });
 });
 
-it.each(["unchanged", "selection", "connection", "reauthorized", "missing capture"])("checks %s Calendar authorization before saved replay", async (change) => {
+it("refuses saved replay of account cases containing live Google Calendar connectors (§2(f))", async () => {
   const { runBriefingComparison, generate, response } = await captureWithCalendar();
   expect(response.status).toBe(200);
   const saved = await store.readCase(`account-${ACCOUNT}`, CASE);
-  expect(saved.case.capture.includeCalendar).toBe(true);
-  if (change === "selection" || change === "reauthorized") mocks.calendar.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 6 });
-  if (change === "connection") mocks.calendar.mockResolvedValue({ status: "connected", generation: 5, selectionRevision: 5 });
-  if (change === "reauthorized") mocks.preferences.mockResolvedValue(dailyBriefPreferences({ revision: 5, allow: ["googleCalendar"] }));
-  if (change === "missing capture") vi.spyOn(store, "readCase").mockResolvedValue({ ...saved, case: { ...saved.case, inputs: undefined } });
+  expect(saved.case.capture.includeCalendar).toBe(false);
   const replay = await runBriefingComparison(post("/api/dev/briefing-comparison", { mode: "saved", accountRef: ACCOUNT, configs: [config("warm", 30)],
     review: { caseId: CASE, candidates: [candidate("cand-calendar-001", "candidate")] } }), generate, store);
-  // Ticket 306: the choice covers the current connection, so a changed connection or selection no longer matches the captured Calendar.
-  expect(replay.status).toBe(change === "unchanged" ? 200 : 409);
-  expect(generate).toHaveBeenCalledTimes(change === "unchanged" ? 3 : 2);
-});
-
-it("withholds saved output when Calendar selection changes during generation", async () => {
-  const { runBriefingComparison, generate } = await captureWithCalendar();
-  generate.mockImplementationOnce(async () => {
-    mocks.calendar.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 6 });
-    return output;
-  });
-  const response = await runBriefingComparison(post("/api/dev/briefing-comparison", { mode: "saved", accountRef: ACCOUNT, configs: [config("warm", 30), config("calm", 30)],
-    review: { caseId: CASE, candidates: [candidate("cand-calendar-002", "candidate"), candidate("cand-calendar-003", "candidate")] } }), generate, store);
-  expect(response.status).toBe(409);
-  expect(generate).toHaveBeenCalledTimes(3);
-  const saved = await store.readCase(`account-${ACCOUNT}`, CASE);
-  expect(saved.runs.at(-1)).toMatchObject({ state: "error", error: "context_changed", validation: "withheld" });
-  expect(saved.runs.at(-1)).not.toHaveProperty("briefing");
+  expect(replay.status).toBe(403);
+  expect((await replay.json()).error).toBe("access_denied");
+  expect(generate).toHaveBeenCalledTimes(2);
 });

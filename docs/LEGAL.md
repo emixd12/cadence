@@ -17,7 +17,7 @@ Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHAN
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
-1. Give a new entry the next ID (`L-026` is next). Never reuse an ID.
+1. Give a new entry the next ID (`L-028` is next). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
 4. Record an owner decision only from the owner's own words, with its date.
@@ -70,6 +70,10 @@ Risk levels:
 | [L-020](#l-020-provider-marks-as-connected-source-icons) | Provider marks as connected-source icons | open | low | 301, 302 |
 | [L-021](#l-021-one-daily-brief-choice-for-every-connected-source) | One Daily Brief choice for every connected source | open | medium | 306, 307 |
 | [L-023](#l-023-hevy-terms-for-background-reads-and-stored-workout-data) | Hevy terms for background reads and stored workout data | open | low | 310, 311, 321, 323 |
+| [L-024](#l-024-apples-rules-for-sign-in-with-apple) | Apple's rules for Sign in with Apple | owner decided: keep the glyph | low | 333, 336, 337 |
+| [L-025](#l-025-apple-token-revocation-when-an-account-is-deleted) | Apple token revocation when an account is deleted | open | low | 333, 334, 337 |
+| [L-026](#l-026-google-calendar-limited-use-for-derived-daily-busy-load-rollups-and-past-live-drill-down) | Google Calendar Limited Use for derived daily busy-load rollups and past live drill-down | open (reconciled with L-027, Nov 25) | low | 354, 355 |
+| [L-027](#l-027-google-workspace-ai-tools-addendum-mandatory-calendar-mcp-and-derived-data-retention) | Google Workspace AI Tools Addendum, mandatory Calendar MCP, and derived-data retention | open (owner plan locked Nov 25) | high until migrated; low once migrated | 187, 245, 246, 307, 354, 355, Advisor Phases 3 & 5 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -149,6 +153,15 @@ part of L-002.
 - **Open point (still unresolved after the October 29 reply):** a yes/no fit
   conclusion can bound route duration from one side. Example: a run ending 1:30 PM
   plus an event at 3:00 PM plus "fits: yes" implies the trip takes under 90 minutes.
+- **Update 2026-11-25 (hybrid Chat travel UI & routing provider follow-up):** Under the
+  November 25, 2026 decisions (`docs/DECISIONS.md`, Q1), Advisor Chat's new 7-day
+  travel-organizing tools follow the exact same `L-001` conclusions-only regime: the LLM
+  receives only Cadence's deterministic fit/conflict conclusions and free windows (never raw
+  Google Routes durations, distances, leave-by times, or addresses), while Cadence renders
+  structured exact leave-by and duration travel cards inline beside the reply. A follow-up to
+  evaluate an AI-friendly routing provider (such as OpenStreetMap/Valhalla or Google Maps
+  Grounding Lite) for future prose-level duration/mode reasoning is logged in
+  `docs/FUTURE_UPDATES.md` ("AI-friendly routing provider for prose-level travel reasoning").
   The October 23 owner decision held this point for Google's reply. That reply does
   not settle it. The options remain asking for an authoritative answer or sending
   only day-level conclusions (for example "travel day"); Ticket 219 should weigh
@@ -610,6 +623,7 @@ part of L-002.
   November 10, 2026: "One choice should cover every connected source".
 - **Status:** open.
 - **Next action:** read the three policies when convenient and record the clauses.
+- **Update 2026-11-25:** Google's November 24, 2026 Workspace AI Tools Addendum (effective February 1, 2027) supersedes the single-client Google Calendar assumption for AI features: Daily Brief and Advisor Chat must access Google Calendar through Google's Calendar MCP server (`calendarmcp.googleapis.com`) using the separate agent-classified OAuth client (`cadence-calendar-agent-prod`), and anti-circumvention terms prohibit disguising AI traffic behind `cadence-calendar-498717`. See **L-027** and `docs/DECISIONS.md` (2026-11-25). Outlook, iCloud, and Hevy remain covered by the single-choice model.
 
 ## L-022: Storing a reverse-geocoded address as Home
 
@@ -790,6 +804,131 @@ part of L-002.
   the user-requested AI turn.
 - **Risk level:** low.
 - **Owner decision or risk acceptance:** approved 2026-11-24 (`docs/DECISIONS.md`).
+  **Reconciled 2026-11-25 (with L-027):** for **Google Calendar only**, persisted
+  `daily_calendar_load` rows are now populated strictly from AI MCP reads (no Timeline REST
+  write-through or Timeline-save backfill), capped at **≤30 days** (to satisfy Addendum
+  §2(b) on derived findings), and hard-deleted atomically on AI disconnect/revocation.
+  Chat's `list_calendar_load` computes missing >30-day Google spans ephemerally in memory via
+  Calendar MCP and discards them immediately after the turn (never persisted). Outlook and
+  iCloud keep full 366-day rollups unchanged.
 - **Status:** open.
-- **Next action:** include `daily_calendar_load` and past live drill-down in the Google OAuth
-  verification narrative (Ticket 245) and pre-launch Privacy pass (Ticket 246).
+- **Next action:** include `daily_calendar_load`, the Google ≤30-day cap, ephemeral >30-day
+  MCP lookbacks, and opted-in longitudinal reviews in the Google OAuth verification narrative
+  (Ticket 245) and pre-launch Privacy pass (Ticket 246).
+
+## L-027: Google Workspace AI Tools Addendum, mandatory Calendar MCP, and derived-data retention
+
+- **Question:** What do Google's November 24, 2026 Workspace AI Tools Addendum (effective
+  February 1, 2027) and updated User Data Policy require for Cadence's AI features and
+  intermediate data paths that read or store Google Calendar data (Daily Brief, Advisor Chat,
+  `daily_calendar_load`, Travel signed tokens into Daily Brief, client-relayed `calendarBusy`,
+  and `.local/briefing-bench/`)?
+- **Affected:** Tickets 187, 245, 246, 307, 354, 355; Advisor Plan Phases 3 & 5. Files:
+  `lib/services/google-calendar.service.ts`, `lib/services/google-calendar-oauth.ts`,
+  `lib/services/google-calendar-provider.ts`, `lib/services/google-calendar-mcp-provider.ts`,
+  `lib/services/model-armor.service.ts`, `lib/services/advisor-day-context.service.ts`,
+  `lib/services/daily-brief.service.ts`, `lib/services/daily-brief-agent-run.ts`,
+  `lib/services/brief-moves.service.ts`, `lib/services/brief-opportunities.service.ts`,
+  `lib/services/briefing-account-context.service.ts`, `lib/services/chat/chat-executor.ts`,
+  `lib/services/chat/chat-turn.ts`, `lib/db/chat.repo.ts`,
+  `lib/services/travel-calendar-sources.ts`, `lib/services/travel-conclusions-token.ts`,
+  `lib/services/travel-times-token.ts`, `lib/services/daily-calendar-load.service.ts`,
+  `lib/services/day-load.service.ts`, `lib/services/briefing-workbench.service.ts`,
+  `lib/services/briefing-history.service.ts`, `lib/services/briefing-sequence.service.ts`.
+  Related: L-001, L-016, L-021, L-026, P-010, P-035, P-060, P-065, P-066, P-088, P-089, P-090.
+  Plan: `docs/plans/2026-11-25-google-workspace-mcp-migration.md`.
+- **Provider, clause, source and check date:** Google Workspace / Google Cloud, checked
+  2026-11-24 to 2026-11-25 from primary pages and Google's November 24, 2026 notice naming
+  `cadence-calendar-498717`, `cadence-calendar-agent-prod`, and `cadence-qa-498717`:
+  - **Workspace AI Tools Addendum** (`https://workspace.google.com/terms/ai-tools/`, last
+    modified 2026-11-24, effective 2027-02-01):
+    - `"GWS Access Tool"`: *"any AI Agent, AI Harness, software, application, AI model, service
+      employing an AI model, or other tool that can be used to obtain or access user data via a
+      GWS Access Point."*
+    - `"Google Technical Information"`: *"information related to the GWS Service(s) obtained or
+      derived from access to or interaction with the GWS Access Point(s) (including vector
+      embeddings, memory indexes, user profiles, organizational graphs, and findings) or from
+      failure patterns established from calls to GWS Access Points. **Google Technical
+      Information does not include any user data.**"*
+    - **Section 1 (MCP mandate & anti-circumvention):** *"The GWS Access Tool must use a
+      Google MCP where the GWS Access Tool is or is driven by an AI Agent, an AI Harness or an
+      AI model or service employing an AI model. You may not obfuscate or otherwise allow any
+      GWS Access Tool to avoid classification as a GWS Access Tool or to circumvent this
+      requirement to use a Google MCP."*
+    - **Section 2(a) & 2(c):** Do not store user data in a manner prohibited by GWS API Policies
+      or process user data or Google Technical Information *"for any purpose other than to
+      fulfill active, user-authorized tasks."*
+    - **Section 2(b):** Do not *"Store any Google Technical Information for more than 30 days."*
+      *(Applies to Google Technical Information, not user data.)*
+    - **Section 2(d):** Do not *"Retain any user data obtained via GWS Access Tools or any
+      Google Technical Information after you have disconnected the GWS Access Tool or revoked
+      its access to the GWS Access Point(s)."*
+    - **Section 2(f):** Do not *"Use any user data or Google Technical Information for model
+      training, fine-tuning, evaluation dataset building, or model distillation."*
+    - **Section 3:** Google may *"immediately"* restrict/remove access or suspend/terminate
+      access if it reasonably believes §2(a)–(g) were violated.
+  - **Usage tiers and quotas** (`https://developers.google.com/workspace/guides/quota-usage-tiers`,
+    updated 2026-11-24): technical enforcement begins February 1, 2027; Google may audit
+    adherence to user data policies.
+  - **Configure Google Workspace MCP servers & security**
+    (`https://developers.google.com/workspace/guides/configure-mcp-servers`,
+    `https://developers.google.com/workspace/guides/configure-mcp-security`, updated
+    2026-11-24): user-delegated OAuth clients calling MCP must have *"Use this client for an
+    AI-powered agent"* checked; developers *"must screen prompts and responses for malicious
+    content or prompt injection attacks"* via Google Model Armor or a documented in-app
+    solution that users accept.
+  - **Google Workspace User Data and Developer Policy**
+    (`https://developers.google.com/workspace/workspace-api-user-data-developer-policy`,
+    updated 2026-09-03, checked 2026-11-24): requires prompt-injection protection; Calendar
+    scopes remain Sensitive (standard OAuth verification, no CASA audit).
+- **Current reading:**
+  1. **Four REST-to-AI paths hit Section 1:** All four paths feeding REST-read Google
+     Calendar data (`cadence-calendar-498717`) into AI must be migrated or severed before
+     February 1, 2027: (a) direct Daily Brief and Chat reads (`getCalendarEventsForAdvisor`),
+     (b) `daily_calendar_load` rollups written from Timeline REST reads and read by Chat,
+     (c) Travel signed conclusions and travel-times tokens passed into Daily Brief, and
+     (d) client-relayed Timeline `calendarBusy` intervals accepted by Brief move/opportunity
+     endpoints. Latent `day_loads` (`lib/services/day-load.service.ts`) is fenced as well.
+     Non-AI Timeline display, Travel display, and Leave Reminders stay on REST.
+  2. **Important legal distinction (§2(b) vs. §2(a)/§2(d)):** §2(b)'s 30-day cap applies to
+     **Google Technical Information** (derived findings/profiles/summaries: Google
+     `daily_calendar_load`, `chat_conversations.summary`, `agent_run_contents`, and opted-in
+     longitudinal review outputs). **User data** is governed by §2(a) (active, user-authorized
+     tasks) and §2(d) (atomic hard-delete on disconnect/revocation across `chat_*`,
+     `daily_brief_days`, `move_proposals`, `opportunity_proposals`, `agent_run_contents`,
+     Google `daily_calendar_load`, and longitudinal review rows).
+  3. **Workbench eval gap (§2(f)):** The two stale Oct 16 and Oct 23 live Google Calendar
+     captures under `.local/briefing-bench/` were deleted on November 25, 2026; all live
+     Google Calendar capture/replay paths are blocked in code while synthetic fixtures remain.
+  4. **Prompt-injection screening & immediate Chat writes:** Google Cloud Model Armor
+     (`INSPECT_AND_BLOCK`, Cloud Logging OFF) on `cadence-calendar-agent-prod` plus Cadence's
+     in-app sanitization/framing satisfy Google's MCP security rule. Immediate single-record
+     Chat writes with Undo (`lib/services/chat/chat-turn.ts`, T12) stay enabled; a
+     confirmation gate on Calendar-informed Chat writes is tracked as a deferred hardening
+     item in `docs/FUTURE_UPDATES.md`.
+  5. **Hybrid Chat travel UI (`L-001` alignment):** Chat travel tools send only Cadence's
+     deterministic fit/conflict conclusions and free windows to the model; structured exact
+     travel cards (leave-by time & duration) render directly in the UI from Cadence's server
+     data (zero raw Google Maps durations/distances/leave-by times in model input). An
+     AI-friendly routing provider investigation is logged in `docs/FUTURE_UPDATES.md`.
+- **Risk level:** high after February 1, 2027 without migration; low once migrated onto
+  `cadence-calendar-agent-prod` + `calendarmcp.googleapis.com` with atomic disconnect cleanup,
+  ≤30-day derived-finding caps, workbench guards, Model Armor screening, and verified scopes.
+- **Owner decision or risk acceptance (2026-11-25, Q1–Q8 locked in `docs/DECISIONS.md`):**
+  - Migrate all AI Google Calendar reads to `calendarmcp.googleapis.com` (Option B: rebuild AI
+    Google-event travel fit from MCP events with provenance-safe short-TTL MCP/Routes caching;
+    Feb 1 fallback disables Google Calendar in AI if verification slips).
+  - Cap persisted Google `daily_calendar_load` at ≤30 days (MCP-only writes) with ephemeral
+    >30-day live MCP lookbacks in Chat and an explicit opted-in, activity-gated weekly/monthly
+    longitudinal review (discarding >30-day Google inputs immediately).
+  - Delete Calendar-touched Chat conversations atomically on disconnect/revocation only
+    (§2(d)), keeping threads until disconnect while capping `chat_conversations.summary` at
+    ≤30 days (§2(b)), backfilling Nov 19+ Calendar-touched chats, and deleting local captures.
+  - Enable Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging OFF) and keep T12 immediate
+    single-record Chat writes with Undo (confirmation gate deferred in `docs/FUTURE_UPDATES.md`).
+  - Stay on Standard Tier ($0) with 3,500 req/day alert, 40 req/user/day cap, and graceful
+    degradation (never falling back to REST).
+- **Status:** open (implementation underway).
+- **Next action:** complete Phases 0–4 implementation, bundle Mac `0.1.16`, submit Ticket 245
+  data-access verification for `cadence-calendar-agent-prod` by mid-December 2026, and cut
+  production over before February 1, 2027.

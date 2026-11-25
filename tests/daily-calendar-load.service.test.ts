@@ -59,7 +59,23 @@ describe("daily-calendar-load.service", () => {
     expect(onUpsert).not.toHaveBeenCalled();
   });
 
-  it("persists numeric rollup rows without titles for complete snapshots", async () => {
+  it("blocks standard Timeline Google Calendar writes and persists agent_mcp Google writes with <=30-day expiry", async () => {
+    const onStandardUpsert = vi.fn();
+    const standardWritten = await persistCalendarLoadFromSnapshot(
+      fakeSupabase({ onUpsert: onStandardUpsert }),
+      "user-1",
+      "google_calendar",
+      2,
+      {
+        completeness: "complete",
+        requestedRange: { startLocalDate: "2026-11-24", endLocalDate: "2026-11-24", timezone: "America/New_York" },
+        events: [],
+      },
+      "2026-11-24T12:00:00Z",
+    );
+    expect(standardWritten).toBe(0);
+    expect(onStandardUpsert).not.toHaveBeenCalled();
+
     let captured: unknown = null;
     const written = await persistCalendarLoadFromSnapshot(
       fakeSupabase({ onUpsert: (payload) => { captured = payload; } }),
@@ -72,6 +88,7 @@ describe("daily-calendar-load.service", () => {
         events: [],
       },
       "2026-11-24T12:00:00Z",
+      { grantPurpose: "agent_mcp" },
     );
     expect(written).toBe(1);
     expect(captured).toEqual([
@@ -86,6 +103,8 @@ describe("daily-calendar-load.service", () => {
         has_all_day_busy: false,
         connection_generation: 2,
         synced_at: "2026-11-24T12:00:00Z",
+        grant_purpose: "agent_mcp",
+        expires_at: "2026-12-24T12:00:00Z",
       },
     ]);
   });

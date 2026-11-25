@@ -8,7 +8,7 @@ import {
 import { finishAgentRun, reserveAgentSpend, settleAgentSpend, startAgentRun } from "@/lib/db/agent-runs.repo";
 import {
   ChatStorageError, chatStopRequested, claimChatConfirm, claimChatUndo, releaseChatConfirm, finishChatConfirm, finishChatReply, finishChatUndo, listChatConversations,
-  readChatConversation, readChatHistory, saveChatActions, requestChatStop, saveChatConfirm, startChatQuestion, updateChatMessageParts,
+  markChatConversationGoogleCalendarTouched, readChatConversation, readChatHistory, saveChatActions, requestChatStop, saveChatConfirm, startChatQuestion, updateChatMessageParts,
 } from "@/lib/db/chat.repo";
 import { agentCallerConfigured, createAgentContext } from "@/lib/integrations/agent-caller";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
@@ -42,6 +42,58 @@ export class ChatRequestError extends Error {
 
 /** False until this server instance has run a turn, so the timing log can mark cold starts. */
 let warmInstance = false;
+
+/** Maximum retention window (30 days) for Google Calendar data in chat history/summaries (§2(b)/§2(d)). */
+const GOOGLE_CALENDAR_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+
+/**
+ * Excludes any message marked `contains_google_calendar` whose `createdAt` is older than
+ * 30 days (`<= nowMs - 30d`), preventing expired Google Calendar content from re-entering
+ * LLM context or being resurrected into rolling summaries.
+ */
+export function filterChatHistoryForRetention<T extends Readonly<{ id: string; createdAt: string }>>(
+  messages: readonly T[],
+  googleCalendarMessageIds: ReadonlySet<string>,
+  nowMs: number = Date.now(),
+): T[] {
+  const cutoffMs = nowMs - GOOGLE_CALENDAR_RETENTION_MS;
+  return messages.filter((msg) => {
+    if (!googleCalendarMessageIds.has(msg.id)) return true;
+    const createdMs = Date.parse(msg.createdAt);
+    if (Number.isNaN(createdMs)) return true;
+    return createdMs > cutoffMs;
+  });
+}
+
+/**
+ * Computes `summary_google_calendar_expires_at` for a rolling summary built from `earlier`.
+ * If any older message contributing to `summary` touched Google Calendar, returns
+ * `min(now + 30d, oldestContributingGoogleMessageCreatedAt + 30d)`; otherwise `null`.
+ */
+export function computeSummaryGoogleCalendarExpiresAt(
+  earlier: readonly Readonly<{ id: string; createdAt: string }>[],
+  googleCalendarMessageIds: ReadonlySet<string>,
+  summary: string | null,
+  historyLimit: number = CHAT_LIMITS.historyMessages,
+  nowMs: number = Date.now(),
+): string | null {
+  if (!summary) return null;
+  const olderCount = Math.max(0, earlier.length - historyLimit);
+  if (olderCount === 0) return null;
+  const older = earlier.slice(0, olderCount);
+  let oldestGoogleMs: number | null = null;
+  for (const msg of older) {
+    if (!googleCalendarMessageIds.has(msg.id)) continue;
+    const createdMs = Date.parse(msg.createdAt);
+    if (Number.isNaN(createdMs)) continue;
+    if (oldestGoogleMs === null || createdMs < oldestGoogleMs) {
+      oldestGoogleMs = createdMs;
+    }
+  }
+  if (oldestGoogleMs === null) return null;
+  const expiresMs = Math.min(nowMs + GOOGLE_CALENDAR_RETENTION_MS, oldestGoogleMs + GOOGLE_CALENDAR_RETENTION_MS);
+  return new Date(expiresMs).toISOString();
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** The whole turn, including storage after the model; the route's maxDuration is above it. */
@@ -154,6 +206,7 @@ function partEvent(part: ChatPart): ChatEvent {
     case "refusal": return { type: "refusal", refusal: part.refusal };
     case "notice": return { type: "notice", notice: part.notice };
     case "alert": return { type: "alert", alert: part.alert };
+    case "travel_card": return { type: "travel_card", card: part.card };
   }
 }
 
@@ -181,8 +234,26 @@ async function runAndStore(input: Readonly<{
   const now = localNow(timezone);
   const tools = buildChatToolDefinitions(sources);
   const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources) });
-  const reads = liveChatConnectorReads(caller, sources, signal);
-  const executor = createLiveChatExecutor({ context, sources, reads, today: () => localNow(timezone).today, timezone });
+  const onGoogleCalendarRead = async (grantGeneration: number | null) => {
+    await markChatConversationGoogleCalendarTouched(client, {
+      conversationId: input.conversationId,
+      replyId: input.replyId,
+      grantGeneration,
+    }).catch(() => undefined);
+  };
+  const reads = liveChatConnectorReads(caller, sources, signal, {
+    today: () => localNow(timezone).today,
+    timezone,
+    onGoogleCalendarRead,
+  });
+  const executor = createLiveChatExecutor({
+    context,
+    sources,
+    reads,
+    today: () => localNow(timezone).today,
+    timezone,
+    onGoogleCalendarRead,
+  });
 
   let firstTextMs: number | null = null;
   const usage: AgentModelUsage[] = [];
@@ -207,7 +278,12 @@ async function runAndStore(input: Readonly<{
     return { ok: true, settle: async (actual) => { await settleAgentSpend(client, { reservationId: decision.reservationId, actualMicrodollars: actual ?? estimate }); } };
   };
 
-  const earlier = history.messages.filter((message) => message.id !== input.userMessageId);
+  const nowMs = Date.now();
+  const earlier = filterChatHistoryForRetention(
+    history.messages.filter((message) => message.id !== input.userMessageId),
+    history.googleCalendarMessageIds,
+    nowMs,
+  );
   const setupMs = Math.round(performance.now() - startedAt);
 
   let outcome: "success" | "refused_budget" | "model_error" | "timeout" | "error" = "success";
@@ -249,8 +325,22 @@ async function runAndStore(input: Readonly<{
   }
   const total = (pick: (item: AgentModelUsage) => number | null) =>
     usage.reduce<number | null>((sum, item) => { const value = pick(item); return value === null ? sum : (sum ?? 0) + value; }, null);
-  await finishChatReply(client, { conversationId: input.conversationId, replyId: input.replyId, parts, agentRunId: runId,
-    summary: summarizeOlderMessages([...earlier], CHAT_LIMITS.historyMessages) }).catch(() => undefined);
+  const nextSummary = summarizeOlderMessages([...earlier], CHAT_LIMITS.historyMessages);
+  const summaryGoogleCalendarExpiresAt = computeSummaryGoogleCalendarExpiresAt(
+    earlier,
+    history.googleCalendarMessageIds,
+    nextSummary,
+    CHAT_LIMITS.historyMessages,
+    Date.now(),
+  );
+  await finishChatReply(client, {
+    conversationId: input.conversationId,
+    replyId: input.replyId,
+    parts,
+    agentRunId: runId,
+    summary: nextSummary,
+    summaryGoogleCalendarExpiresAt,
+  }).catch(() => undefined);
   await finishAgentRun(client, {
     runId, outcome, errorCode, errorReason, inputHash: createHash("sha256").update(`${CHAT_PROMPT_VERSION}\n${input.message}`).digest("hex"),
     modelCalls, inputTokens: total((item) => item.inputTokens), cachedInputTokens: total((item) => item.cachedInputTokens),
@@ -333,7 +423,26 @@ export async function answerChatConfirm(session: ChatSession, body: Readonly<{ c
     const sources = chatSources(settings);
     const timezone = await profileTimezone(caller);
     const signal = AbortSignal.timeout(TURN_DEADLINE_MS);
-    const executor = createLiveChatExecutor({ context, sources, reads: liveChatConnectorReads(caller, sources, signal), today: () => localNow(timezone).today, timezone });
+    const onGoogleCalendarRead = async (grantGeneration: number | null) => {
+      await markChatConversationGoogleCalendarTouched(client, {
+        conversationId: row.conversationId,
+        replyId: row.messageId,
+        grantGeneration,
+      }).catch(() => undefined);
+    };
+    const reads = liveChatConnectorReads(caller, sources, signal, {
+      today: () => localNow(timezone).today,
+      timezone,
+      onGoogleCalendarRead,
+    });
+    const executor = createLiveChatExecutor({
+      context,
+      sources,
+      reads,
+      today: () => localNow(timezone).today,
+      timezone,
+      onGoogleCalendarRead,
+    });
     run = await runChatConfirm({ confirmId: row.id, writes: row.writes as ChatPendingWrite[], executor, resumed: claim.resumed === true });
     if (run.state !== "expired") {
       await saveChatActions(client, { userId: caller.user.id, conversationId: row.conversationId, messageId: row.messageId,
@@ -396,7 +505,26 @@ export async function undoChatOutcome(session: ChatSession, body: Readonly<{ out
   const sources = chatSources(settings);
   const timezone = await profileTimezone(caller);
   const signal = AbortSignal.timeout(TURN_DEADLINE_MS);
-  const executor = createLiveChatExecutor({ context, sources, reads: liveChatConnectorReads(caller, sources, signal), today: () => localNow(timezone).today });
+  const onGoogleCalendarRead = async (grantGeneration: number | null) => {
+    await markChatConversationGoogleCalendarTouched(client, {
+      conversationId: claim.row.conversationId,
+      replyId: claim.row.messageId,
+      grantGeneration,
+    }).catch(() => undefined);
+  };
+  const reads = liveChatConnectorReads(caller, sources, signal, {
+    today: () => localNow(timezone).today,
+    timezone,
+    onGoogleCalendarRead,
+  });
+  const executor = createLiveChatExecutor({
+    context,
+    sources,
+    reads,
+    today: () => localNow(timezone).today,
+    timezone,
+    onGoogleCalendarRead,
+  });
   const plan = claim.row.undoPlan as ChatUndoPlan | null;
   let outcome: ChatOutcome;
   let alert: ChatAlert | undefined;
@@ -454,6 +582,7 @@ export function recordSentPart(parts: ChatPart[], event: ChatEvent): void {
     case "refusal": parts.push({ type: "refusal", refusal: event.refusal }); return;
     case "notice": parts.push({ type: "notice", notice: event.notice }); return;
     case "alert": parts.push({ type: "alert", alert: event.alert }); return;
+    case "travel_card": parts.push({ type: "travel_card", card: event.card }); return;
     // A confirm is stored only with its pending writes, so a failed turn leaves it out.
     default: return;
   }

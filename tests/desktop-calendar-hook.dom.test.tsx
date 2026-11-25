@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, expect, it, vi } from "vitest";
 import { DesktopCalendarCache } from "../apps/desktop/src/calendar/cache";
-import { DesktopCalendarConnection } from "../apps/desktop/src/calendar/google-calendar";
+import { DesktopAiCalendarConnection, DesktopCalendarConnection } from "../apps/desktop/src/calendar/google-calendar";
 import { DesktopCalendarCoordinator } from "../apps/desktop/src/calendar/coordinator";
 import { useDesktopGoogleCalendar, type DesktopGoogleCalendarHookResult } from "../apps/desktop/src/calendar/use-google-calendar";
 import fixture from "./fixtures/external-event-snapshot.valid.json";
@@ -114,5 +114,46 @@ it.each(["account", "range"] as const)("ignores a late Settings callback after a
     expect(current.snapshot).toEqual(next);
   } finally {
     await act(() => root.unmount()); container.remove();
+  }
+});
+
+it("routes purpose=ai_mcp deep-link callbacks to aiCallbackMessage without overwriting Timeline callbackMessage", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  const snapshot = validateExternalEventSnapshot(fixture);
+  const preferences = { selectedCalendarIds: [...snapshot.requestedRange.selectedCalendarIds], hiddenCalendarIds: [], visible: true, showAllDay: true };
+  const view = { accountId: snapshot.accountId, status: "connected" as const, generation: snapshot.connectionGeneration, selectionRevision: 1, preferences };
+  broker.connection.mockResolvedValue(view);
+  vi.spyOn(DesktopCalendarCache.prototype, "readCurrent").mockResolvedValue(null);
+  vi.spyOn(DesktopCalendarCache.prototype, "clear").mockResolvedValue(undefined);
+  vi.spyOn(DesktopCalendarCoordinator.prototype, "refresh").mockResolvedValue({ snapshot, source: "network", stale: false, refreshError: null });
+  vi.spyOn(DesktopAiCalendarConnection.prototype, "complete").mockResolvedValue({ result: "connected", connection: view });
+
+  const onAiChanged = vi.fn();
+  window.addEventListener("cadence:google-calendar-ai-changed", onAiChanged);
+
+  let current!: DesktopGoogleCalendarHookResult;
+  const client = {} as SupabaseClient;
+  function Probe() {
+    current = useDesktopGoogleCalendar({ client, accountId: snapshot.accountId, timezone: snapshot.requestedRange.timezone,
+      range: snapshot.requestedRange, enabled: true, screen: "settings" });
+    return null;
+  }
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(() => root.render(<Probe />));
+    await act(async () => {
+      deepLink.onOpenUrl.mock.lastCall![0](["cadence://calendar/callback?state=ai-state&result=connected&purpose=ai_mcp"]);
+    });
+    expect(current.aiCallbackMessage).toBe("Google Calendar for AI features is connected.");
+    expect(current.callbackMessage).toBeUndefined();
+    expect(onAiChanged).toHaveBeenCalledTimes(1);
+  } finally {
+    window.removeEventListener("cadence:google-calendar-ai-changed", onAiChanged);
+    await act(() => root.unmount());
+    container.remove();
   }
 });

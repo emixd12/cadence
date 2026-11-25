@@ -50,7 +50,7 @@ describe("brief move request bodies", () => {
     expect(parseBriefMoveAnswer({ kind: "yes", idempotencyKey: "k1", proposalId: PROPOSAL, expectedRevision: REVISION,
       context: { calendarBusy: [{ startAt: "2026-11-18T15:00:00Z", endAt: "2026-11-18T16:00:00Z", title: " Team sync " }], travelTimes: "a.b" } }))
       .toEqual({ kind: "yes", idempotencyKey: "k1", proposalId: PROPOSAL, expectedRevision: REVISION,
-        context: { calendarBusy: [{ startAt: "2026-11-18T15:00:00Z", endAt: "2026-11-18T16:00:00Z", title: "Team sync" }], travelTimes: "a.b" } });
+        context: { calendarBusy: [], travelTimes: "a.b" } });
     expect(parseBriefMoveAnswer({ kind: "no", idempotencyKey: "k2", proposalId: PROPOSAL })).toMatchObject({ kind: "no" });
     expect(parseBriefMoveAnswer({ kind: "accept_all", idempotencyKey: "k3", lines: [{ proposalId: PROPOSAL, expectedRevision: REVISION }] }))
       .toMatchObject({ kind: "accept_all", context: { calendarBusy: [] } });

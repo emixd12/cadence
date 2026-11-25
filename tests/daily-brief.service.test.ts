@@ -47,6 +47,7 @@ beforeEach(() => {
   mocks.begin.mockResolvedValue({ state: "acquired", leaseToken: "lease", localDate: fixture.localDate, refresh: false, refreshesUsed: 0 });
   mocks.finish.mockResolvedValue(true);
   mocks.saveBrief.mockResolvedValue(true);
+  mocks.calendar.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedCalendarIds: [] } });
   mocks.timezone.mockResolvedValue(fixture.timezone);
   mocks.current.mockResolvedValue(undefined);
   mocks.prepare.mockImplementation(async (_caller, options) => ({
@@ -184,10 +185,10 @@ describe("first-party daily briefing service", () => {
     await expect(requestInAppDailyBrief(caller, { ...input, refresh: "yes" }, { generate, now })).rejects.toMatchObject({ code: "invalid_request" });
   });
 
-  it("accepts the screen's calendar events for this request only and rejects malformed ones", async () => {
+  it("ignores client-supplied calendarBusy (Path 4 closure) and rejects malformed ones", async () => {
     const busy = [{ startAt: "2026-09-20T16:00:00Z", endAt: "2026-09-20T17:00:00Z", title: "Team sync" }];
     await requestInAppDailyBrief(caller, { ...input, calendarBusy: busy, travelTimes: "signed.times" }, { generate, now });
-    expect(mocks.plan).toHaveBeenCalledWith(expect.objectContaining({ planning: { calendarBusy: busy, travelTimes: "signed.times" } }));
+    expect(mocks.plan).toHaveBeenCalledWith(expect.objectContaining({ planning: { calendarBusy: [], travelTimes: "signed.times" } }));
     expect(JSON.stringify(mocks.saveBrief.mock.calls[0]![1].briefing)).not.toContain("signed.times");
     for (const calendarBusy of [[{ startAt: "x", endAt: "y" }], [{ startAt: busy[0].endAt, endAt: busy[0].startAt }], [{ ...busy[0], extra: 1 }], "busy"]) {
       await expect(requestInAppDailyBrief(caller, { ...input, calendarBusy }, { generate, now })).rejects.toMatchObject({ code: "invalid_request" });
@@ -333,15 +334,14 @@ describe("one Daily Brief choice for every connected source (Ticket 306)", () =>
     expect(await getDailyBriefSettings(caller)).toMatchObject({ sourceStatus: { icloudCalendar: "ready" }, includeIcloudCalendar: true });
   });
 
-  it("reads Google Calendar status from the Timeline connection only after the Ticket 307 migration", async () => {
+  it("reads Google Calendar AI status from the agent connection only when googleCalendarSource is set", async () => {
     const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
     mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, allow: ["googleCalendar"] }));
     expect(await getDailyBriefSettings(caller)).toMatchObject({ sourceStatus: { googleCalendar: "ready" }, includeCalendar: true });
-    expect(mocks.calendar).toHaveBeenLastCalledWith(caller);
+    expect(mocks.calendar).toHaveBeenCalledWith(caller, "agent");
     mocks.calendar.mockClear();
     mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, allow: ["googleCalendar"], googleCalendarSource: null }));
     expect(await getDailyBriefSettings(caller)).toMatchObject({ sourceStatus: { googleCalendar: "not_connected" }, includeCalendar: false });
-    expect(mocks.calendar).not.toHaveBeenCalled();
   });
 
   it("reports a calendar with nothing selected, an unreadable status, and nothing used while the choice is off", async () => {

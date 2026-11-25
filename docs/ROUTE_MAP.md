@@ -490,4 +490,4 @@ callbacks that name a purpose.
 
 | Route | Methods | Purpose |
 |---|---|---|
-| `/api/google-calendar/agent-grants/retire` | POST | One-off, unscheduled operator route (Ticket 307). Validates its own `GOOGLE_CALENDAR_AGENT_RETIRE_SECRET` only (not `CRON_SECRET`; returns `503` while unset) and rate-limits auth failures. It calls `google-calendar-agent-retirement.service.ts`, which revokes up to 100 Daily Brief grants at Google per call and then deletes their credentials. Responses carry counts only. Run it before migration `20261110160000`; see `docs/OPERATIONS.md`, "Retiring the Daily Brief Calendar grant (Ticket 307)". |
+| *(retired)* `/api/google-calendar/agent-grants/retire` | — | Removed on 2026-11-25 (WS-1B) when the separate Google Calendar AI MCP grant was reactivated. |

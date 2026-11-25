@@ -119,6 +119,66 @@ describe("planOccurrenceGeneration with per-day moves (advisor Phase 2A)", () =>
   });
 });
 
+describe("planOccurrenceGeneration with cross-day moves (move_occurrence_to_date)", () => {
+  // Planned for 2026-01-03 at 09:00 (14:00Z), moved to 2026-01-05 at 11:00 (16:00Z).
+  const crossDay = (): ExistingOccurrenceForGeneration => ({
+    ...existingOccurrence("cross", "2026-01-03T14:00:00Z", "2026-01-05"),
+    moved: true,
+    effectiveStartAt: "2026-01-05T16:00:00Z",
+    effectiveEndAt: "2026-01-05T16:30:00Z",
+  });
+  const others = (from: string, to: string, skip: readonly string[]) => {
+    const rows: ExistingOccurrenceForGeneration[] = [];
+    for (let day = Temporal.PlainDate.from(from); Temporal.PlainDate.compare(day, Temporal.PlainDate.from(to)) <= 0; day = day.add({ days: 1 })) {
+      const localDate = day.toString();
+      if (skip.includes(localDate)) continue;
+      rows.push(existingOccurrence(`plain-${localDate}`, `${localDate}T14:00:00Z`, localDate));
+    }
+    return rows;
+  };
+
+  it("does not recreate the planned day, keeps the moved row and leaves its plan alone", () => {
+    const plan = planOccurrenceGeneration({
+      behavior: BASE_BEHAVIOR,
+      existingOccurrences: [crossDay(), ...others("2026-01-02", "2026-01-06", ["2026-01-03", "2026-01-05"])],
+      now: NOW,
+      horizonDays: 4,
+    });
+    expect(summarizeCreate(plan)).toEqual([]);
+    expect(deleteIds(plan)).toEqual([]);
+    expect(plan.updateUnresolved).toEqual([]);
+  });
+
+  it("adds no copy on the day the row now sits, so the identity key never collides", () => {
+    const plan = planOccurrenceGeneration({
+      behavior: BASE_BEHAVIOR,
+      existingOccurrences: [crossDay()],
+      now: NOW,
+      horizonDays: 4,
+    });
+    const days = summarizeCreate(plan).map((occurrence) => occurrence.localDate);
+    expect(days).not.toContain("2026-01-03");
+    expect(days).not.toContain("2026-01-05");
+    expect(days).toEqual(["2026-01-02", "2026-01-04", "2026-01-06"]);
+  });
+
+  it("keeps the planned day empty through a schedule edit", () => {
+    const atTen = { ...BASE_BEHAVIOR, scheduleSlots: [{ ...BASE_BEHAVIOR.scheduleSlots[0]!, startTime: "10:00" }] };
+    const plan = planOccurrenceGeneration({ behavior: atTen, existingOccurrences: [crossDay()], now: NOW, horizonDays: 4 });
+    const days = summarizeCreate(plan).map((occurrence) => occurrence.localDate);
+    expect(days).not.toContain("2026-01-03");
+    expect(deleteIds(plan)).toEqual([]);
+    expect(plan.updateUnresolved).toEqual([]);
+  });
+
+  it("treats the row as an ordinary one once Undo puts it back on its planned day", () => {
+    const undone: ExistingOccurrenceForGeneration = { ...existingOccurrence("cross", "2026-01-03T14:00:00Z", "2026-01-03"), moved: false };
+    const plan = planOccurrenceGeneration({ behavior: BASE_BEHAVIOR, existingOccurrences: [undone], now: NOW, horizonDays: 4 });
+    const days = summarizeCreate(plan).map((occurrence) => occurrence.localDate);
+    expect(days).toEqual(["2026-01-02", "2026-01-04", "2026-01-05", "2026-01-06"]);
+  });
+});
+
 describe("planOccurrenceGeneration", () => {
   it("plans today plus the next 30 local days by default", () => {
     const plan = planOccurrenceGeneration({

@@ -34,6 +34,7 @@ beforeEach(() => {
   mocks.readAi.mockResolvedValue(unanswered);
   mocks.saveAi.mockImplementation(async () => allOn);
   mocks.timezone.mockResolvedValue("America/New_York");
+  mocks.calendar.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedCalendarIds: [] } });
 });
 
 describe("AI settings helper", () => {
@@ -73,7 +74,20 @@ describe("AI settings helper", () => {
     const row = { approved_at: null, revision: 0, daily_brief_enabled: false, tips_enabled: false, chat_enabled: true, include_notes: true,
       include_reminder_history: false, use_connected_sources: true,
       excluded_sources: { google_calendar: false, outlook_calendar: true, icloud_calendar: false, hevy: false } };
-    expect(parseAiSettings(row)).toMatchObject({ approvedAt: null, chatEnabled: true, includeNotes: true, excludedSources: { outlookCalendar: true, hevy: false } });
+    expect(parseAiSettings(row)).toMatchObject({
+      approvedAt: null, chatEnabled: true, includeNotes: true, excludedSources: { outlookCalendar: true, hevy: false },
+      googleCalendarSource: "agent_mcp", longitudinalCalendarReviewEnabled: false, longitudinalCalendarReviewCadence: "weekly",
+    });
+    expect(parseAiSettings({
+      ...row,
+      google_calendar_source: "standard",
+      longitudinal_calendar_review_enabled: true,
+      longitudinal_calendar_review_cadence: "monthly",
+    })).toMatchObject({
+      googleCalendarSource: "standard",
+      longitudinalCalendarReviewEnabled: true,
+      longitudinalCalendarReviewCadence: "monthly",
+    });
     expect(() => parseAiSettings({ ...row, chat_enabled: "yes" })).toThrow();
     expect(() => parseAiSettings({ ...row, excluded_sources: { hevy: false } })).toThrow();
     expect(() => parseAiSettings(null)).toThrow();
@@ -112,8 +126,17 @@ describe("saving the AI features answer and Settings", () => {
   });
 
   it("reports the approval and the other features' switches with the settings", async () => {
-    mocks.readAi.mockResolvedValue({ ...allOn, chatEnabled: false });
-    await expect(getDailyBriefSettings(caller)).resolves.toMatchObject({ ai: { approved: true, tipsEnabled: true, chatEnabled: false } });
+    mocks.readAi.mockResolvedValue({
+      ...allOn,
+      chatEnabled: false,
+      longitudinalCalendarReviewEnabled: true,
+      longitudinalCalendarReviewCadence: "monthly",
+    });
+    await expect(getDailyBriefSettings(caller)).resolves.toMatchObject({
+      ai: { approved: true, tipsEnabled: true, chatEnabled: false },
+      longitudinalCalendarReviewEnabled: true,
+      longitudinalCalendarReviewCadence: "monthly",
+    });
     mocks.readAi.mockRejectedValue(new Error("function read_ai_settings does not exist"));
     expect((await getDailyBriefSettings(caller)).ai).toBeUndefined();
   });

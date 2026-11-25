@@ -241,3 +241,31 @@ Consequences the owner accepted with the travel merge:
 Still open: the demo recording and upload, the Data Access justification entry and the
 Verification Center submission; the published Mac 0.1.5 against the 187 server; installed
 desktop consent for the Daily Brief connection.
+
+## Google sensitive-scope verification update: November 25, 2026 (Calendar MCP & Advisor Chat)
+
+Updated for Google's Workspace AI Tools Addendum (effective February 1, 2027) and `P-090` (`docs/MESSAGING_CHANGES.md`).
+
+### Provider readback (November 25, 2026)
+
+- **Project:** `cadence-calendar-agent-prod` (`#855808383971`)
+- **OAuth consent screen:** Branding Verified; Audience External (In production)
+- **MCP API:** `calendarmcp.googleapis.com` enabled on Standard Tier ($0, 5,000 req/day cap; billing off)
+- **Prompt-injection screening:** Google Cloud Model Armor template `projects/habit-tracker-498717/locations/us-east1/templates/cadence-calendar-mcp-screen` active (`INSPECT_AND_BLOCK`, Cloud Logging OFF) and verified live on benign and prompt-injection inputs; hosted on `habit-tracker-498717` so `cadence-calendar-agent-prod` stays unbilled on Standard Tier
+
+### Data Access scope justification draft (927 of 1000 characters)
+
+> Cadence is a personal behavior tracker. This project holds only the AI-agent client for Daily Brief and Advisor Chat, reading Google Calendar strictly via Google's Calendar MCP server (calendarmcp.googleapis.com), separate from Timeline display. Users connect AI features in Settings, pick calendars via calendar.calendarlist.readonly, and separately allow AI access. calendar.events.readonly reads selected events for Daily Brief, Advisor Chat, numeric daily_calendar_load rollups (<=30 days), ephemeral >30-day Chat lookbacks (discarded immediately), and an opted-in weekly/monthly longitudinal review (>30-day inputs discarded immediately; summary <=30 days). Disconnect or revocation atomically deletes Google-Calendar-touched Chat threads, brief records, proposals, rollups, and review summaries. Narrower scopes omit event identity, all-day separation, user response, or subscribed calendars. Cadence never writes events.
+
+### Ticket 245 demo video shot list (`https://app.cadence-me.com`)
+
+Record in English, one continuous take, click indicators on, using the dedicated test account and a test calendar with harmless events today:
+
+1. **0:00–0:15 — Homepage & Privacy link:** Open `https://cadence-me.com`, show the product description and Privacy link.
+2. **0:15–0:30 — Separate Google Sign-in:** Sign in at `https://app.cadence-me.com` and land on Timeline; note sign-in grants no Calendar access.
+3. **0:30–0:50 — Settings → Connected sources → Google Calendar:** Show **Timeline & Travel** connected on its separate project (`cadence-calendar-498717`) and **AI features (Daily Brief & Chat)** disconnected. Click **Connect** for AI features.
+4. **0:50–1:25 — Google OAuth consent screen:** Keep the address bar visible showing `client_id=855808383971-…`, app name **Cadence**, and both read-only Calendar scopes (`calendar.calendarlist.readonly`, `calendar.events.readonly`). Allow on the test account.
+5. **1:25–1:45 — AI calendar picker:** Back in Settings, select only the test calendar under AI features (`calendar.calendarlist.readonly`).
+6. **1:45–2:20 — Daily Brief & Advisor Chat over Calendar MCP:** Open Timeline to show Daily Brief planning around today's test event, then open Advisor Chat to ask a schedule question (demonstrating `calendar.events.readonly` via `calendarmcp.googleapis.com`).
+7. **2:20–2:45 — Independent Disconnect & atomic purge:** Return to Settings → Connected sources → Google Calendar, disconnect **AI features (Daily Brief & Chat)** (showing the warning that Google-Calendar-touched Chat conversations and derived findings are deleted), and verify **Timeline & Travel** remains connected and Timeline still displays events.
+8. **2:45–3:00 — Privacy Policy:** Open `https://app.cadence-me.com/privacy` at **Optional Google Calendar** and **Retention** (dated November 25, 2026) showing both connections, `calendarmcp.googleapis.com`, Model Armor screening, ≤30-day derived caps, atomic disconnect deletion, and the AI/ML non-training statement.

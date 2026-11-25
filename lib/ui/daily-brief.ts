@@ -3,6 +3,7 @@ import type {
   DailyBriefResponse,
   DailyBriefSettings,
   DailyBriefSourceFlags,
+  LongitudinalReviewCadence,
 } from "@cadence/core/types/daily-brief";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "./daily-brief-moves";
 import { createBriefOpportunityClient, type BriefOpportunityClient } from "./daily-brief-opportunities";
@@ -75,7 +76,12 @@ export type DailyBriefPreferenceInput = Readonly<{
 }>;
 
 /** Advisor 4F: every AI choice at once; source choices are shared by every AI feature. */
-export type AiSettingsInput = DailyBriefPreferenceInput & Readonly<{ tipsEnabled: boolean; chatEnabled: boolean }>;
+export type AiSettingsInput = DailyBriefPreferenceInput & Readonly<{
+  tipsEnabled: boolean;
+  chatEnabled: boolean;
+  longitudinalCalendarReviewEnabled?: boolean;
+  longitudinalCalendarReviewCadence?: LongitudinalReviewCadence;
+}>;
 
 /** Advisor 4F: the answer to the one AI features question. */
 export type AiApprovalInput = Readonly<{ approval: "all_on" | "all_off" }>;

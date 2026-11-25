@@ -96,11 +96,18 @@ export async function finishAgentRun(client: AppSupabaseClient, input: AgentRunF
  */
 export async function storeAgentRunContent(client: AppSupabaseClient, input: Readonly<{
   runId: string; kind: "input" | "output"; seq?: number; body: Json; calendarDerived: boolean;
+  googleCalendarDerived?: boolean;
 }>, signal?: AbortSignal): Promise<boolean> {
-  const request = client.rpc("agent_run_store_content", {
+  const params: Record<string, unknown> = {
     p_run_id: input.runId, p_kind: input.kind, p_seq: input.seq ?? 0, p_body: input.body,
     p_calendar_derived: input.calendarDerived,
-  });
+  };
+  if (input.googleCalendarDerived !== undefined) {
+    params.p_google_calendar_derived = input.googleCalendarDerived;
+  }
+  const request = (client as unknown as {
+    rpc: (fn: string, args: Record<string, unknown>) => ReturnType<AppSupabaseClient["rpc"]>;
+  }).rpc("agent_run_store_content", params);
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   return data === true;
@@ -163,6 +170,17 @@ export async function purgeEndedDailyBriefDays(serviceClient: AppSupabaseClient,
 /** Service role only: the scheduled deletion job. */
 export async function purgeExpiredAgentRunContents(serviceClient: AppSupabaseClient, signal?: AbortSignal): Promise<number> {
   const request = serviceClient.rpc("purge_expired_agent_run_contents");
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  if (typeof data !== "number") throw new AgentRunStorageError("malformed_result");
+  return data;
+}
+
+/** Service role only: <=30-day derived-finding expiry sweep for Google Calendar MCP AI data. */
+export async function purgeExpiredGoogleCalendarAiData(serviceClient: AppSupabaseClient, signal?: AbortSignal): Promise<number> {
+  const request = (serviceClient as unknown as {
+    rpc: (fn: string) => { abortSignal: (s: AbortSignal) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }> } & Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
+  }).rpc("purge_expired_google_calendar_ai_data");
   const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) throw storageError(error);
   if (typeof data !== "number") throw new AgentRunStorageError("malformed_result");

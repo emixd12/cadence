@@ -1,3 +1,5 @@
+import type { ChatTravelUiCard } from "./chat-travel";
+
 /**
  * Advisor plan Phase 5 (5A): the Chat page's wire types. Shared by the chat server
  * (lib/services/chat/), the web Chat page (5B) and Cadence for Mac (5C).
@@ -96,6 +98,7 @@ export type ChatEvent =
   | Readonly<{ type: "refusal"; refusal: ChatRefusal }>
   | Readonly<{ type: "notice"; notice: ChatNotice }>
   | Readonly<{ type: "alert"; alert: ChatAlert }>
+  | Readonly<{ type: "travel_card"; card: ChatTravelUiCard }>
   /** Always last when the stream ends normally. */
   | Readonly<{ type: "done"; messageId: string }>;
 
@@ -109,7 +112,8 @@ export type ChatPart =
   | Readonly<{ type: "confirm"; confirm: ChatConfirm }>
   | Readonly<{ type: "refusal"; refusal: ChatRefusal }>
   | Readonly<{ type: "notice"; notice: ChatNotice }>
-  | Readonly<{ type: "alert"; alert: ChatAlert }>;
+  | Readonly<{ type: "alert"; alert: ChatAlert }>
+  | Readonly<{ type: "travel_card"; card: ChatTravelUiCard }>;
 
 export type ChatMessage = Readonly<{
   id: string;
@@ -148,7 +152,7 @@ export type ChatConversationView = Readonly<{
 
 /** What chat looked at, shown as a small muted line ("Looked at your Timeline"). */
 export const CHAT_TOOL_SUBJECTS = [
-  "timeline", "behaviors", "occurrences", "notes", "adherence", "account", "search", "calendar", "workouts", "advice",
+  "timeline", "behaviors", "occurrences", "notes", "adherence", "account", "search", "calendar", "workouts", "advice", "travel", "patterns",
 ] as const;
 export type ChatToolSubject = (typeof CHAT_TOOL_SUBJECTS)[number];
 

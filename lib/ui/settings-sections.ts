@@ -57,6 +57,30 @@ export function googleCalendarSectionState(load: SettingsSectionLoad<CalendarCon
   }
 }
 
+/**
+ * Q6: Dual-grant status pill for Connected sources → Google Calendar.
+ * Reports Not connected / Timeline only / AI only / Timeline & AI / Needs reconnection.
+ */
+export function googleCalendarDualSectionState(
+  timelineLoad: SettingsSectionLoad<CalendarConnectionView>,
+  aiLoad?: SettingsSectionLoad<CalendarConnectionView> | null,
+): SettingsSectionState {
+  if (!aiLoad) return googleCalendarSectionState(timelineLoad);
+  if (timelineLoad.phase === "loading" || aiLoad.phase === "loading") return SETTINGS_SECTION_CHECKING;
+  if (timelineLoad.phase === "failed") return SETTINGS_SECTION_UNAVAILABLE;
+  const timelineStatus = timelineLoad.value.status;
+  const aiStatus = aiLoad.phase === "loaded" ? aiLoad.value.status : "unavailable";
+  if (timelineStatus === "reconnect_required" || aiStatus === "reconnect_required") return NEEDS_RECONNECTION;
+  const timelineConnected = timelineStatus === "connected";
+  const aiConnected = aiStatus === "connected";
+  if (timelineConnected && aiConnected) return state("Timeline & AI", true);
+  if (timelineConnected) return state("Timeline only", true);
+  if (aiConnected) return state("AI only", true);
+  if (timelineStatus === "not_configured" && (aiStatus === "not_configured" || aiStatus === "unavailable")) return NOT_AVAILABLE;
+  if (timelineStatus === "unavailable") return SETTINGS_SECTION_UNAVAILABLE;
+  return NOT_CONNECTED;
+}
+
 /** Outlook Calendar, iCloud Calendar and Hevy. Hevy is recorded activity, so it counts no calendars. */
 export function connectorSectionState(load: SettingsSectionLoad<ConnectorConnectionView>): SettingsSectionState {
   if (load.phase === "loading") return SETTINGS_SECTION_CHECKING;

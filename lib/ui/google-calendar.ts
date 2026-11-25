@@ -18,6 +18,20 @@ export type CalendarEventRange = Readonly<{
   timezone?: string;
 }>;
 
+export type GoogleCalendarAiConnectionView = CalendarConnectionView & Readonly<{
+  /** Number of Google-Calendar-touched Chat conversations that disconnect will delete (Q4). */
+  affectedChatCount?: number;
+}>;
+
+export type GoogleCalendarAiCoordinator = Readonly<{
+  getConnection: () => Promise<GoogleCalendarAiConnectionView>;
+  beginConnect: () => Promise<void>;
+  listCalendars: () => Promise<readonly CalendarListEntry[]>;
+  savePreferences: (preferences: CalendarPreferences) => Promise<CalendarConnectionView>;
+  syncFromTimeline: () => Promise<Readonly<{ view: CalendarConnectionView; hiddenCalendarsSkipped: number }>>;
+  disconnect: () => Promise<Readonly<{ view: CalendarConnectionView; revocationFailed: boolean }>>;
+}>;
+
 export type GoogleCalendarCoordinator = Readonly<{
   getConnection: () => Promise<CalendarConnectionView>;
   beginConnect: () => Promise<void>;
@@ -25,6 +39,8 @@ export type GoogleCalendarCoordinator = Readonly<{
   savePreferences: (preferences: CalendarPreferences) => Promise<CalendarConnectionView>;
   refreshEvents: (range: CalendarEventRange, options?: Readonly<{ force?: boolean }>) => Promise<ExternalEventSnapshotV1>;
   disconnect: () => Promise<Readonly<{ view: CalendarConnectionView; revocationFailed: boolean }>>;
+  /** Optional AI MCP grant coordinator (Q3/Q6 two-grant Settings home). */
+  ai?: GoogleCalendarAiCoordinator;
 }>;
 
 export type WebCalendarTimelineState = Readonly<{
@@ -103,6 +119,39 @@ export const webGoogleCalendarCoordinator: GoogleCalendarCoordinator = {
     const result = await request<CalendarConnectionView & { revocationFailed: boolean }>("/api/google-calendar/connection", { method: "DELETE" });
     clearAccount(result.accountId);
     return { view: result, revocationFailed: result.revocationFailed };
+  },
+  ai: {
+    async getConnection() {
+      return request<GoogleCalendarAiConnectionView>("/api/google-calendar/connection?purpose=ai_mcp");
+    },
+    async beginConnect() {
+      const result = await request<{ url: string }>("/api/google-calendar/connection?purpose=ai_mcp", {
+        method: "POST",
+        body: JSON.stringify({ target: "web" }),
+      });
+      window.location.assign(result.url);
+    },
+    async listCalendars() {
+      const result = await request<{ calendars: CalendarListEntry[] }>("/api/google-calendar/calendars?purpose=ai_mcp");
+      return result.calendars;
+    },
+    async savePreferences(preferences) {
+      return request<CalendarConnectionView>("/api/google-calendar/calendars?purpose=ai_mcp", {
+        method: "PUT",
+        body: JSON.stringify(preferences),
+      });
+    },
+    async syncFromTimeline() {
+      return request<{ view: CalendarConnectionView; hiddenCalendarsSkipped: number }>("/api/google-calendar/calendars?purpose=ai_mcp", {
+        method: "POST",
+      });
+    },
+    async disconnect() {
+      const result = await request<CalendarConnectionView & { revocationFailed: boolean }>("/api/google-calendar/connection?purpose=ai_mcp", {
+        method: "DELETE",
+      });
+      return { view: result, revocationFailed: result.revocationFailed };
+    },
   },
 };
 

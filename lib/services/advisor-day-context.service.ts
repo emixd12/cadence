@@ -366,7 +366,7 @@ async function assembleDayContexts(
   if (currentRevision !== cadenceSnapshot.revision) throw new AdvisorDayContextServiceError("context_changed", true);
   assertNotAborted(signal);
   if (input.includeGoogleCalendar && authorization.calendar) {
-    const currentCalendar = await getCalendarConnection(input.caller);
+    const currentCalendar = await getCalendarConnection(input.caller, "agent");
     if (currentCalendar.status !== "connected" || currentCalendar.generation !== authorization.calendar.connectionGeneration || currentCalendar.selectionRevision !== authorization.calendar.selectionRevision) {
       throw new AdvisorDayContextServiceError("context_changed", true);
     }

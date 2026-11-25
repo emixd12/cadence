@@ -48,6 +48,8 @@
     "lib/services/briefing-history.service.ts": 3,
     "lib/services/briefing-pipeline.ts": 1,
     "lib/services/chat-eval/fake-tools.ts": 1,
+    "lib/services/chat/chat-executor.ts": 8,
+    "lib/services/chat/chat-writes.ts": 1,
     "lib/services/connector-completion-job.service.ts": 1,
     "lib/services/imported-intervention-promotion.service.ts": 1,
     "lib/services/integration-read-serialization.ts": 2,
@@ -69,7 +71,7 @@
     "packages/core/src/resolvers/export.resolver.ts": 12,
     "packages/core/src/resolvers/native-reminder.resolver.ts": 1,
     "packages/core/src/resolvers/note-suggestion.resolver.ts": 2,
-    "packages/core/src/resolvers/occurrence.resolver.ts": 22,
+    "packages/core/src/resolvers/occurrence.resolver.ts": 25,
     "packages/core/src/resolvers/place-label.resolver.ts": 2,
     "packages/core/src/resolvers/recurrence.resolver.ts": 5,
     "packages/core/src/resolvers/reminder.resolver.ts": 7,
@@ -104,6 +106,9 @@
     "apps/desktop/src-tauri/src/local_store/sync_apply.rs": "The ninth line is a contract 8 sync fixture for an added opportunity Occurrence; scheduled_for is a synced field.",
     "apps/desktop/src/local-opportunity.service.ts": "Writes the planned time of a new opportunity Occurrence.",
     "lib/services/brief-opportunities.service.ts": "Selects the column for effectiveStartInstant; the read goes through the time helper.",
+    "lib/services/chat/chat-executor.ts": "Reads effective_start_at ?? scheduled_for for travel-horizon occurrences, and compares the target start with the planned time so a cross-day move_occurrence_to_date Undo returns the row to its plan.",
+    "lib/services/chat/chat-writes.ts": "Reads previous.effective_start_at ?? previous.scheduled_for to restore the original start time on cross-day move_occurrence_to_date undo.",
+    "packages/core/src/resolvers/occurrence.resolver.ts": "Three lines read the planned time to find a cross-day move's planned day (isCrossDayMove), so generation never recreates or rewrites it.",
     "packages/core/src/services/opportunity-pool.ts": "Reads TimelineOccurrenceView.scheduledFor, which timeline.service sets from effectiveStartAt."
   }
 }

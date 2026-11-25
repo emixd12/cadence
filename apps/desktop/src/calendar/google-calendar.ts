@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ExternalEventSnapshotV1 } from "@cadence/core/types/external-event";
 import type { CalendarConnectionView, CalendarListEntry, CalendarPreferences } from "@/lib/types/google-calendar";
+import type { GoogleCalendarAiConnectionView, GoogleCalendarAiCoordinator, GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 import type { CalendarCacheRequest } from "./cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DesktopCalendarCoordinator } from "./coordinator";
@@ -8,7 +9,11 @@ import { DesktopCalendarCoordinator } from "./coordinator";
 declare global { interface ImportMetaEnv { readonly VITE_CALENDAR_BROKER_ORIGIN?: string; } }
 
 export const DESKTOP_CALENDAR_CALLBACK = "cadence://calendar/callback";
+export const DESKTOP_AI_CALENDAR_PURPOSE = "ai_mcp";
+export const DESKTOP_CALENDAR_PENDING_KEY = "pending-calendar-state";
+export const DESKTOP_AI_CALENDAR_PENDING_KEY = "pending-ai-calendar-state";
 const MAX_CALLBACK_AGE_MS = 5 * 60_000;
+export type DesktopCalendarCallbackResult = "connected" | "cancelled" | "error" | "same_account_required";
 type PendingCalendarConnection = Readonly<{ accountId: string; state: string; createdAt: number }>;
 
 export function readDesktopCalendarBrokerOrigin(value = import.meta.env.VITE_CALENDAR_BROKER_ORIGIN): string | null {
@@ -54,6 +59,27 @@ export class DesktopCalendarBroker {
     return this.request(`/api/google-calendar/events?${query}`);
   }
 
+  aiConnection(): Promise<GoogleCalendarAiConnectionView> {
+    return this.request(`/api/google-calendar/connection?purpose=${DESKTOP_AI_CALENDAR_PURPOSE}`);
+  }
+  aiCalendars(): Promise<CalendarListEntry[]> {
+    return this.request<{ calendars: CalendarListEntry[] }>(`/api/google-calendar/calendars?purpose=${DESKTOP_AI_CALENDAR_PURPOSE}`).then((value) => value.calendars);
+  }
+  aiConnect(clientState: string): Promise<{ url: string }> {
+    return this.request(`/api/google-calendar/connection?purpose=${DESKTOP_AI_CALENDAR_PURPOSE}`, { method: "POST", body: JSON.stringify({ target: "desktop", clientState }) });
+  }
+  async aiDisconnect(): Promise<{ view: CalendarConnectionView; revocationFailed: boolean }> {
+    const result = await this.request<CalendarConnectionView & { revocationFailed: boolean }>(`/api/google-calendar/connection?purpose=${DESKTOP_AI_CALENDAR_PURPOSE}`, { method: "DELETE" });
+    const { revocationFailed, ...view } = result;
+    return { view, revocationFailed };
+  }
+  aiUpdatePreferences(preferences: CalendarPreferences): Promise<CalendarConnectionView> {
+    return this.request(`/api/google-calendar/calendars?purpose=${DESKTOP_AI_CALENDAR_PURPOSE}`, { method: "PUT", body: JSON.stringify(preferences) });
+  }
+  aiSyncFromTimeline(): Promise<{ view: CalendarConnectionView; hiddenCalendarsSkipped: number }> {
+    return this.request(`/api/google-calendar/calendars?purpose=${DESKTOP_AI_CALENDAR_PURPOSE}`, { method: "POST" });
+  }
+
   /** Authenticated hosted-broker request; Ticket 238 connector clients reuse this transport. */
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = await this.accessToken();
@@ -79,14 +105,32 @@ export function createDesktopCalendarBroker(client: SupabaseClient, origin = rea
 
 export type CalendarEventRange = Readonly<{ startLocalDate: string; endLocalDate: string }>;
 
-export class DesktopGoogleCalendarPanelCoordinator {
+export class DesktopGoogleCalendarPanelCoordinator implements GoogleCalendarCoordinator {
+  readonly ai: GoogleCalendarAiCoordinator;
+
   constructor(
     private readonly broker: DesktopCalendarBroker,
     private readonly timezone: () => string,
     private readonly snapshots = new DesktopCalendarCoordinator(broker),
     private readonly connectionFlow = new DesktopCalendarConnection(broker),
     private readonly changed?: (view: CalendarConnectionView | null, snapshot?: ExternalEventSnapshotV1) => void,
-  ) {}
+    private readonly aiConnectionFlow = new DesktopAiCalendarConnection(broker),
+  ) {
+    this.ai = {
+      getConnection: () => this.broker.aiConnection(),
+      beginConnect: async () => {
+        const view = await this.broker.aiConnection();
+        await this.aiConnectionFlow.begin(view.accountId);
+      },
+      listCalendars: () => this.broker.aiCalendars(),
+      savePreferences: (preferences) => this.broker.aiUpdatePreferences(preferences),
+      syncFromTimeline: () => this.broker.aiSyncFromTimeline(),
+      disconnect: async () => {
+        await this.aiConnectionFlow.cancel();
+        return this.broker.aiDisconnect();
+      },
+    };
+  }
 
   getConnection(): Promise<CalendarConnectionView> { return this.broker.connection(); }
   listCalendars(): Promise<readonly CalendarListEntry[]> { return this.broker.calendars(); }
@@ -150,7 +194,7 @@ const native: CalendarConnectionNative = {
 export class DesktopCalendarConnection {
   constructor(private readonly broker: DesktopCalendarBroker, private readonly io: CalendarConnectionNative = native) {}
 
-  private readonly pendingKey = "pending-calendar-state";
+  private readonly pendingKey = DESKTOP_CALENDAR_PENDING_KEY;
 
   async begin(accountId: string): Promise<void> {
     const state = randomState();
@@ -162,8 +206,8 @@ export class DesktopCalendarConnection {
     } catch (error) { await this.io.remove(this.pendingKey); throw error; }
   }
 
-  async complete(value: string, accountId: string, now = Date.now()): Promise<{ result: "connected" | "cancelled" | "error" | "same_account_required"; connection: CalendarConnectionView } | null> {
-    // Ticket 307: a callback naming a purpose belongs to the retired Daily Brief grant.
+  async complete(value: string, accountId: string, now = Date.now()): Promise<{ result: DesktopCalendarCallbackResult; connection: CalendarConnectionView } | null> {
+    // Standard Timeline callbacks carry no purpose; purpose=ai_mcp belongs to DesktopAiCalendarConnection and retired purpose=agent is ignored.
     if (!isDesktopCalendarCallback(value) || new URL(value).searchParams.has("purpose")) return null;
     const stored = await this.io.get(this.pendingKey);
     if (!stored) throw new Error("This Calendar connection callback was already used or cancelled.");
@@ -177,12 +221,46 @@ export class DesktopCalendarConnection {
   cancel(): Promise<void> { return this.io.remove(this.pendingKey); }
 }
 
+export class DesktopAiCalendarConnection {
+  constructor(private readonly broker: DesktopCalendarBroker, private readonly io: CalendarConnectionNative = native) {}
+
+  private readonly pendingKey = DESKTOP_AI_CALENDAR_PENDING_KEY;
+
+  async begin(accountId: string): Promise<void> {
+    const state = randomState();
+    const pending: PendingCalendarConnection = { accountId, state, createdAt: Date.now() };
+    await this.io.set(this.pendingKey, JSON.stringify(pending));
+    try {
+      const { url } = await this.broker.aiConnect(state);
+      await this.io.open(url);
+    } catch (error) { await this.io.remove(this.pendingKey); throw error; }
+  }
+
+  async complete(value: string, accountId: string, now = Date.now()): Promise<{ result: DesktopCalendarCallbackResult; connection: GoogleCalendarAiConnectionView } | null> {
+    if (!isDesktopAiCalendarCallback(value)) return null;
+    const stored = await this.io.get(this.pendingKey);
+    if (!stored) throw new Error("This AI Calendar connection callback was already used or cancelled.");
+    await this.io.remove(this.pendingKey);
+    let pending: PendingCalendarConnection;
+    try { pending = JSON.parse(stored) as PendingCalendarConnection; } catch { throw new Error("The pending AI Calendar connection is invalid."); }
+    const result = parseDesktopAiCalendarCallback(value, pending, accountId, now);
+    return { result, connection: await this.broker.aiConnection() };
+  }
+
+  cancel(): Promise<void> { return this.io.remove(this.pendingKey); }
+}
+
 export function isDesktopCalendarCallback(value: string): boolean {
   try { const url = new URL(value); return `${url.protocol}//${url.host}${url.pathname}` === DESKTOP_CALENDAR_CALLBACK; }
   catch { return false; }
 }
 
-export function parseDesktopCalendarCallback(value: string, pending: PendingCalendarConnection, accountId: string, now: number): "connected" | "cancelled" | "error" | "same_account_required" {
+export function isDesktopAiCalendarCallback(value: string): boolean {
+  if (!isDesktopCalendarCallback(value)) return false;
+  return new URL(value).searchParams.get("purpose") === DESKTOP_AI_CALENDAR_PURPOSE;
+}
+
+export function parseDesktopCalendarCallback(value: string, pending: PendingCalendarConnection, accountId: string, now: number): DesktopCalendarCallbackResult {
   const url = new URL(value);
   if (!isDesktopCalendarCallback(value) || !pending || pending.accountId !== accountId
     || typeof pending.state !== "string" || !pending.state || !Number.isFinite(pending.createdAt)
@@ -191,6 +269,17 @@ export function parseDesktopCalendarCallback(value: string, pending: PendingCale
     || url.searchParams.get("state") !== pending.state) throw new Error("Cadence rejected an invalid Calendar connection callback.");
   const result = url.searchParams.get("result");
   if (result !== "connected" && result !== "cancelled" && result !== "error" && result !== "same_account_required") throw new Error("Cadence rejected an invalid Calendar connection result.");
+  return result;
+}
+
+export function parseDesktopAiCalendarCallback(value: string, pending: PendingCalendarConnection, accountId: string, now: number): DesktopCalendarCallbackResult {
+  const url = new URL(value);
+  if (!isDesktopAiCalendarCallback(value) || !pending || pending.accountId !== accountId
+    || typeof pending.state !== "string" || !pending.state || !Number.isFinite(pending.createdAt)
+    || now < pending.createdAt || now - pending.createdAt > MAX_CALLBACK_AGE_MS
+    || url.searchParams.get("state") !== pending.state) throw new Error("Cadence rejected an invalid AI Calendar connection callback.");
+  const result = url.searchParams.get("result");
+  if (result !== "connected" && result !== "cancelled" && result !== "error" && result !== "same_account_required") throw new Error("Cadence rejected an invalid AI Calendar connection result.");
   return result;
 }
 
