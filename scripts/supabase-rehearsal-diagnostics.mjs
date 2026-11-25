@@ -1,4 +1,4 @@
-import { open } from "node:fs/promises";
+import { open, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stripVTControlCharacters } from "node:util";
@@ -82,9 +82,135 @@ export async function readRehearsalDiagnostics(path, exitCode, phase) {
   }
 }
 
+// Database-backed tests the rehearsal runs (scripts/supabase-rehearsal-integration-tests.json).
+export const INTEGRATION_TESTS_PATH = fileURLToPath(new URL("./supabase-rehearsal-integration-tests.json", import.meta.url));
+const INTEGRATION_FILE = /^tests\/[a-z0-9-]+\.local-integration\.test\.(?:ts|mjs)$/;
+const INTEGRATION_NEEDS = new Set(["url-keys", "signing-key", "database"]);
+
+/** Validate the allowlist shape. Every listed path appears once, in run or excluded. */
+export function parseIntegrationAllowlist(value) {
+  const fail = (message) => { throw new Error(`${message} Fix scripts/supabase-rehearsal-integration-tests.json.`); };
+  if (!value || typeof value !== "object" || !Array.isArray(value.run) || value.run.length === 0) fail("The allowlist needs a non-empty run array.");
+  if (!value.excluded || typeof value.excluded !== "object" || Array.isArray(value.excluded)) fail("The allowlist needs an excluded object.");
+  const seen = new Set();
+  const run = value.run.map((entry) => {
+    const file = entry?.file;
+    if (typeof file !== "string" || !INTEGRATION_FILE.test(file)) fail(`Run entry ${JSON.stringify(file)} is not a tests/*.local-integration.test.* path.`);
+    const needs = typeof entry.needs === "string" ? entry.needs.split(",") : [];
+    if (needs.length === 0 || !needs.every((need) => INTEGRATION_NEEDS.has(need))) fail(`Run entry ${file} needs one or more of ${[...INTEGRATION_NEEDS].join(", ")}.`);
+    if (seen.has(file)) fail(`${file} is listed twice.`);
+    seen.add(file);
+    return file;
+  });
+  for (const [file, reason] of Object.entries(value.excluded)) {
+    if (!INTEGRATION_FILE.test(file)) fail(`Excluded entry ${JSON.stringify(file)} is not a tests/*.local-integration.test.* path.`);
+    if (typeof reason !== "string" || reason.trim().length < 10) fail(`Excluded entry ${file} needs a reason.`);
+    if (seen.has(file)) fail(`${file} is listed twice.`);
+    seen.add(file);
+  }
+  return { run, excluded: Object.keys(value.excluded) };
+}
+
+/**
+ * Check a vitest JSON report. Each allowlisted file must have run at least one
+ * test, skipped none and failed none: a file whose environment check silently
+ * skipped would otherwise pass. Messages carry file names and counts only.
+ */
+export function checkIntegrationReport(report, files, root) {
+  const results = new Map((Array.isArray(report?.testResults) ? report.testResults : []).map((result) => [result?.name, result]));
+  const problems = [];
+  const summary = [];
+  for (const file of files) {
+    const result = results.get(resolve(root, file));
+    if (!result) { problems.push(`${file}: missing from the vitest report; check that the file exists and loads.`); continue; }
+    const counts = { passed: 0, failed: 0, skipped: 0 };
+    for (const assertion of Array.isArray(result.assertionResults) ? result.assertionResults : []) {
+      const status = assertion?.status;
+      if (status === "passed") counts.passed += 1;
+      else if (status === "failed") counts.failed += 1;
+      else counts.skipped += 1;
+    }
+    summary.push(`${file}: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped`);
+    if (counts.failed > 0 || result.status === "failed") problems.push(`${file}: ${counts.failed} failed test(s); read the vitest output above.`);
+    if (counts.passed + counts.failed === 0) problems.push(`${file}: ran zero tests; its environment check probably skipped. Export the variables it reads or move it to excluded with a reason.`);
+    if (counts.skipped > 0) problems.push(`${file}: skipped ${counts.skipped} test(s); a skipped test proves nothing. Export the variables it reads or move it to excluded with a reason.`);
+  }
+  return { problems, summary };
+}
+
+const loopbackUrl = (value, protocols) => {
+  try {
+    const url = new URL(value);
+    return protocols.includes(url.protocol) && url.hostname === "127.0.0.1" && /^\d+$/.test(url.port) ? url : null;
+  } catch { return null; }
+};
+
+/**
+ * Map `supabase status -o env` output and the generated signing key file to the
+ * variables the allowlisted tests read. Errors name variables, never values.
+ */
+export function integrationEnvironment(statusText, signingKeysText) {
+  const values = {};
+  for (const line of String(statusText).split(/\r?\n/)) {
+    const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+    if (!match) continue;
+    let raw = match[2].trim();
+    if (raw.startsWith('"') && raw.endsWith('"')) {
+      try { raw = JSON.parse(raw); } catch { raw = raw.slice(1, -1); }
+    }
+    values[match[1]] = raw;
+  }
+  for (const name of ["API_URL", "DB_URL", "PUBLISHABLE_KEY", "SERVICE_ROLE_KEY"]) {
+    if (!values[name]) throw new Error(`Local Supabase status omitted ${name}.`);
+  }
+  if (!loopbackUrl(values.API_URL, ["http:"])) throw new Error("Local Supabase status API_URL is not a 127.0.0.1 HTTP URL.");
+  const database = loopbackUrl(values.DB_URL, ["postgresql:", "postgres:"]);
+  if (!database) throw new Error("Local Supabase status DB_URL is not a 127.0.0.1 Postgres URL.");
+  let keys;
+  try { keys = JSON.parse(signingKeysText); } catch { throw new Error("The rehearsal signing key file is not JSON."); }
+  const key = Array.isArray(keys) && keys.length === 1 ? keys[0] : null;
+  if (!key || key.kty !== "EC" || key.crv !== "P-256" || key.alg !== "ES256" || typeof key.d !== "string" || typeof key.kid !== "string") {
+    throw new Error("The rehearsal signing key file must hold exactly one private ES256 JWK.");
+  }
+  const environment = {
+    CADENCE_LOCAL_SUPABASE_URL: values.API_URL,
+    CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY: values.PUBLISHABLE_KEY,
+    CADENCE_LOCAL_SUPABASE_SERVICE_KEY: values.SERVICE_ROLE_KEY,
+    CADENCE_LOCAL_SUPABASE_DB_URL: values.DB_URL,
+    CADENCE_LOCAL_SUPABASE_DB_PORT: database.port,
+    CADENCE_LOCAL_INTEGRATION_SIGNING_KEY: JSON.stringify(keys),
+  };
+  for (const [name, value] of Object.entries(environment)) {
+    if (/['\r\n\0]/.test(value)) throw new Error(`${name} contains a character the rehearsal cannot export.`);
+  }
+  return environment;
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command, path, exitCode, phaseOrAttempt, remainingSeconds] = process.argv.slice(2);
-  if (command === "images" && process.argv.length === 3) {
+  const projectRoot = fileURLToPath(new URL("..", import.meta.url));
+  const allowlist = async () => parseIntegrationAllowlist(JSON.parse(await readFile(INTEGRATION_TESTS_PATH, "utf8")));
+  if (command === "integration-tests" && process.argv.length === 3) {
+    console.info((await allowlist()).run.join("\n"));
+  } else if (command === "integration-env" && process.argv.length === 6) {
+    // Writes a private file for `source`; nothing secret reaches stdout or stderr.
+    try {
+      const environment = integrationEnvironment(await readFile(path, "utf8"), await readFile(exitCode, "utf8"));
+      const lines = Object.entries(environment).map(([name, value]) => `export ${name}='${value}'\n`).join("");
+      await writeFile(phaseOrAttempt, lines, { mode: 0o600, flag: "wx" });
+      console.info(`Exported ${Object.keys(environment).join(", ")}.`);
+    } catch (error) {
+      console.error(error instanceof Error && /^(Local Supabase status|The rehearsal signing key|CADENCE_)/.test(error.message) ? error.message : "Could not prepare the integration test environment.");
+      process.exitCode = 1;
+    }
+  } else if (command === "integration-report" && process.argv.length === 4) {
+    let report = null;
+    try { report = JSON.parse(await readFile(path, "utf8")); } catch { console.error("::error::The vitest JSON report is missing or unreadable; vitest stopped before writing it."); }
+    const { problems, summary } = checkIntegrationReport(report, (await allowlist()).run, projectRoot);
+    for (const line of summary) console.info(line);
+    for (const problem of problems) console.error(`::error::${problem}`);
+    if (problems.length > 0) process.exitCode = 1;
+  } else if (command === "images" && process.argv.length === 3) {
     console.info(REHEARSAL_IMAGES.join("\n"));
   } else if (command === "registry" && process.argv.length === 3) {
     console.info(REHEARSAL_REGISTRY);
