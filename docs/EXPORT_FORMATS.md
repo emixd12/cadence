@@ -1212,6 +1212,50 @@ unchanged: the new keys are Cadence extensions.
 - **Legacy bundles** without the keys import and restore as standalone Behaviors
   (`null`, `0`, `false`).
 
+## Alongside (Ticket 364, D33)
+
+The person's answer to "Can this be done alongside other things?" (`behaviors.alongside`:
+`true`, `false` or `null` for unanswered). Every rule here applies only while the server
+flag `CADENCE_ALONGSIDE` is `on`. With it off, the web export reads no alongside value
+and every format is byte-for-byte what it was before Ticket 364
+(`tests/export-import-restore-alongside.test.ts` pins a digest), and import and restore
+ignore the key.
+
+- **Full JSON:** each Behavior record carries `alongside` (`true`, `false` or `null`).
+  Configuration snapshots do not carry it until Ticket 363 adds it to configuration
+  history.
+- **JSONL:** each `behavior` event carries `alongside`. Occurrence events are unchanged.
+- **CSV:** one `alongside` column is appended after every other column, including the
+  time-tracking columns: `true`, `false`, or an empty cell when unanswered. It holds the
+  Occurrence's Behavior's answer.
+- **BehaviorLog:** `data/behaviors.jsonl` stores `alongside` under
+  `extensions.app.cadence`, and so does the `extensions` column of `csv/behaviors.csv`.
+  `BEHAVIORLOG_SCHEMA_VERSION` is unchanged: the key is a Cadence extension.
+- **Never exported:** the model's guess (`behavior_advisor_estimates.alongside`) and the
+  source of the effective value. Only the person's answer leaves Cadence.
+- **Import:** the plan carries `cadenceAlongside` when the bundle has the key; a created
+  Behavior stores it. A bundle without the key creates an unanswered Behavior. Any value
+  other than `true`, `false` or `null` is the error `cadence_alongside_invalid`.
+- **Restore:** a different answer makes the Behavior `replace`, and the restore payload
+  carries `alongside` only when the bundle has the key. A bundle without it keeps the
+  stored answer.
+- **Mac app:** the desktop export, import and restore do not read the setting until
+  Ticket 363 adds the SQLite column.
+
+### Gap for the standard
+
+BehaviorLog Bundle `0.3.0-draft` (the vendored snapshot in
+`packages/core/src/behaviorlog.schema.json`, checked against
+`https://github.com/emixd12/BehaviorLog-Bundle` on November 25, 2026) has no Behavior
+field for whether a behavior can be done concurrently with other activity. Its Behavior
+record holds identity, category, success definition, `expected_duration_minutes`,
+timestamps, source, sensitivity and `extensions`. Cadence therefore writes the answer as
+the Cadence extension above and does not invent a core field. Proposal for the standard:
+an optional Behavior field, for example `concurrency` with values `exclusive`,
+`concurrent` or `null` (unanswered), with the rule that a producer records only the
+person's own answer, never an inferred one. Until the standard adopts a field, other
+readers see it only as Cadence extension data.
+
 ## Note shortcut privacy (Tickets 126–128)
 
 Shortcut records, proposals, dismissed keys, evidence hashes, exclusions, and

@@ -2548,8 +2548,15 @@ be done alongside other things?". Null means unanswered. Migration:
   on the Mac starts unanswered. The configuration snapshot and `changed_fields` do not
   include it yet either, because configuration history is synced; changing the answer
   writes no configuration event. Ticket 363 adds the column to the Mac's SQLite, the
-  sync contract and configuration history together. Export, BehaviorLog restore and the
-  MCP contract carry it under Ticket 364.
+  sync contract and configuration history together.
+- **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
+  and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
+  import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
+  `20261125180000_alongside_mcp_and_portability.sql` (additive function patches) keeps
+  it in MCP write receipts, `cadence_private.apply_behaviorlog_import` (from the plan
+  row's `cadenceAlongside`) and `apply_behaviorlog_restore_product_writes` (changed only
+  when the restored record carries the key). The cached guess is never exported or
+  returned. See `docs/EXPORT_FORMATS.md` and `docs/MCP_CONTRACT.md`, "Alongside".
 
 ## Note shortcut state (Tickets 126–128)
 

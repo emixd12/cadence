@@ -20264,7 +20264,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 364: Alongside in the MCP contract, exports and BehaviorLog
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migrations `20261125140000` and `20261125180000` pending. Contract 1.8.0 is a flag-selected edition of the published 1.7.0 registry (`docs/MCP_CONTRACT.md`, "Alongside"); folding it into the registry and the public developer reference waits for the Production flag (Ticket 365). BehaviorLog has no fitting field, so the setting is a Cadence extension and the gap is recorded in `docs/EXPORT_FORMATS.md`, "Alongside".
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
