@@ -16,7 +16,9 @@ which scheduled Occurrences to mark.
    Occurrence before today; it is not a stored status. Never infer Not Completed
    from elapsed time or silence. A routine with steps appears in `parent_groups`
    with derived progress such as `2/3`; show the routine with its steps under it.
-   That progress is derived, never a stored status.
+   That progress is derived, never a stored status. From contract 1.8.0 an
+   Occurrence's `alongside` repeats its Behavior's setting; it is not a status and
+   never changes what to mark.
 3. Ask which Occurrences the user wants marked Completed, Not Completed, or
    returned to Unresolved. Resolve ambiguous dates or repeated Behavior names.
    Present the exact proposed changes and obtain the user's confirmation before
