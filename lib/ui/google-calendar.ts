@@ -18,6 +18,20 @@ export type CalendarEventRange = Readonly<{
   timezone?: string;
 }>;
 
+export type GoogleCalendarAiConnectionView = CalendarConnectionView & Readonly<{
+  /** Number of Google-Calendar-touched Chat conversations that disconnect will delete (Q4). */
+  affectedChatCount?: number;
+}>;
+
+export type GoogleCalendarAiCoordinator = Readonly<{
+  getConnection: () => Promise<GoogleCalendarAiConnectionView>;
+  beginConnect: () => Promise<void>;
+  listCalendars: () => Promise<readonly CalendarListEntry[]>;
+  savePreferences: (preferences: CalendarPreferences) => Promise<CalendarConnectionView>;
+  syncFromTimeline: () => Promise<Readonly<{ view: CalendarConnectionView; hiddenCalendarsSkipped: number }>>;
+  disconnect: () => Promise<Readonly<{ view: CalendarConnectionView; revocationFailed: boolean }>>;
+}>;
+
 export type GoogleCalendarCoordinator = Readonly<{
   getConnection: () => Promise<CalendarConnectionView>;
   beginConnect: () => Promise<void>;
@@ -25,6 +39,8 @@ export type GoogleCalendarCoordinator = Readonly<{
   savePreferences: (preferences: CalendarPreferences) => Promise<CalendarConnectionView>;
   refreshEvents: (range: CalendarEventRange, options?: Readonly<{ force?: boolean }>) => Promise<ExternalEventSnapshotV1>;
   disconnect: () => Promise<Readonly<{ view: CalendarConnectionView; revocationFailed: boolean }>>;
+  /** Optional AI MCP grant coordinator (Q3/Q6 two-grant Settings home). */
+  ai?: GoogleCalendarAiCoordinator;
 }>;
 
 export type WebCalendarTimelineState = Readonly<{
