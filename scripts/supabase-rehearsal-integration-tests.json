@@ -1,0 +1,88 @@
+{
+  "$comment": "Local Supabase rehearsal: every tests/*.local-integration.test.* file is listed once, under run or excluded. scripts/supabase-rehearsal.sh runs the run list against the disposable stack and fails when a listed file skips a test or runs none. tests/supabase-rehearsal-diagnostics.test.ts enforces the classification.",
+  "run": [
+    {
+      "file": "tests/behavior-where.local-integration.test.ts",
+      "needs": "url-keys"
+    },
+    {
+      "file": "tests/place-labels.local-integration.test.ts",
+      "needs": "url-keys"
+    },
+    {
+      "file": "tests/travel-habits.local-integration.test.ts",
+      "needs": "url-keys"
+    },
+    {
+      "file": "tests/brief-moves.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/integration-read.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/integration-request-context.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/integration-sub-behaviors.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/integration-write.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/leave-reminder-caller.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/leave-reminder-store.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/occurrence-move.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/tips-one-tap.local-integration.test.ts",
+      "needs": "signing-key"
+    },
+    {
+      "file": "tests/agent-caller.local-integration.test.ts",
+      "needs": "signing-key,database"
+    },
+    {
+      "file": "tests/coach-signals.local-integration.test.ts",
+      "needs": "signing-key,database"
+    },
+    {
+      "file": "tests/integration-idempotency.local-integration.test.ts",
+      "needs": "database"
+    },
+    {
+      "file": "tests/oauth-claude-web.local-integration.test.ts",
+      "needs": "database"
+    }
+  ],
+  "excluded": {
+    "tests/acceptance-oauth-driver.local-integration.test.mjs": "Needs CADENCE_ACCEPT_248_LOCAL=1 and a running app server with its own issuer, CA file and app log.",
+    "tests/apple-sign-in.local-integration.test.ts": "Needs an app server (CADENCE_APPLE_SIGN_IN_E2E_URL), the Apple stub and CADENCE_SIGN_IN_APPLE.",
+    "tests/auth-callback-rate-limit.local-integration.test.ts": "Needs an app server (CADENCE_CALLBACK_E2E_URL) and a rate-limit gateway.",
+    "tests/behavior-configuration-events.local-integration.test.ts": "Needs CADENCE_LOCAL_HISTORY_USER_ID: a user pre-seeded with 1,001 configuration events, which the rehearsal does not create.",
+    "tests/calendar-google-sign-in.local-integration.test.ts": "Needs an app server (CADENCE_CALENDAR_SIGN_IN_E2E_URL) and Google Calendar sign-in settings.",
+    "tests/desktop-sign-in.local-integration.test.ts": "Needs an app server (CADENCE_DESKTOP_SIGN_IN_E2E_URL) and Chrome.",
+    "tests/email-sign-in-rate-limit.local-integration.test.ts": "Needs an app server (CADENCE_RATE_LIMIT_E2E_URL) and a rate-limit gateway.",
+    "tests/email-sign-in.local-integration.test.ts": "Needs an app server (CADENCE_EMAIL_SIGN_IN_E2E_URL) and CADENCE_SIGN_IN_EMAIL.",
+    "tests/mcp-fixture-archive-partial.local-integration.test.mjs": "Needs CADENCE_MCP_ARCHIVE_REHEARSAL=1 and its own isolated MCP project.",
+    "tests/mcp-fixture-cleanup-client-creations.local-integration.test.mjs": "Needs CADENCE_ACCEPT_CLEANUP_LOCAL=1 and CADENCE_LOCAL_DB_CONTAINER for docker exec, which the rehearsal's Docker proxy refuses.",
+    "tests/mcp-hosted-fixtures.local-integration.test.mjs": "Needs CADENCE_MCP_FIXTURE_REHEARSAL=1, a rehearsal receipt and its own isolated MCP project.",
+    "tests/mcp-hosted-isolation.local-integration.test.mjs": "Needs CADENCE_MCP_HOSTED_ISOLATION_LOCAL=1 and the cadence-mcp-232 project on ports 56120-56129.",
+    "tests/mcp-server.local-integration.test.ts": "Reads its database on a hard-coded port 56922 (a separate isolated project), not the rehearsal's 55322.",
+    "tests/mcp-session-broker.local-integration.test.mjs": "Needs CADENCE_QA_BROKER_LOCAL=1 and the QA session broker.",
+    "tests/oauth-maintenance.local-integration.test.ts": "Needs CADENCE_OAUTH_MAINTENANCE_LOCAL=1 and the cadence-mcp-232 project (container and port 56121 are hard-coded), and runs docker exec.",
+    "tests/session-refresh-rate-limit.local-integration.test.ts": "Needs an app server (CADENCE_REFRESH_E2E_URL) and a rate-limit gateway.",
+    "tests/sign-in-methods.local-integration.test.ts": "Needs an app server (CADENCE_SIGN_IN_METHODS_E2E_URL) and the sign-in flags."
+  }
+}
