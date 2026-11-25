@@ -34,16 +34,22 @@
   /* Focus outline color: the same hue as Rust Signal on the default surface. */
   --theme-focus: var(--theme-accent);
 
+  /* Main app background, aliased from the active theme base token. */
   --background: var(--theme-background);
+  /* Secondary panel, empty state, and inline note surface, aliased from the active theme base token. */
   --surface: var(--theme-surface);
 
   /* Card background and text: the same as the page background and default foreground. */
   --card: var(--background);
   --card-foreground: var(--foreground);
 
+  /* Monolith Blue fill for selected states and completed rows, aliased from the active theme base token. */
   --primary: var(--theme-primary);
+  /* Text and icons on Monolith Blue fills, aliased from the active theme base token. */
   --primary-foreground: var(--theme-primary-foreground);
+  /* Rust Signal fill for Not Completed decisions and caution states, aliased from the active theme base token. */
   --accent: var(--theme-accent);
+  /* Text and icons on Rust Signal fills, aliased from the active theme base token. */
   --accent-foreground: var(--theme-accent-foreground);
 
   /* Calendar overlap magenta: the next trip's marker and span on the Timeline. */

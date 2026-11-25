@@ -40,14 +40,14 @@
       "table": 57,
       "term": 287,
       "test": 159,
-      "token": 93
+      "token": 101
     },
     "links": {
-      "aliases (asserted)": 28,
+      "aliases (asserted)": 42,
       "belongs-to (asserted)": 211,
       "calls (derived)": 667,
       "contains (asserted)": 588,
-      "defined-in (asserted)": 631,
+      "defined-in (asserted)": 639,
       "explained-in (asserted)": 251,
       "follows (asserted)": 17,
       "implemented-in (asserted)": 1016,
@@ -58,7 +58,7 @@
       "renders (derived)": 239,
       "shown-by (asserted)": 179,
       "shows (derived)": 172,
-      "styled-by (derived)": 515,
+      "styled-by (derived)": 513,
       "tested-by (asserted)": 596,
       "uses (derived)": 1819
     }
@@ -15908,15 +15908,23 @@
       "id": "token:--accent",
       "kind": "token",
       "name": "--accent",
-      "value": "oklch(57.69% 0.1656 33.1)",
-      "meaning": "Rust Signal: explicit Not Completed decisions and rare destructive or caution states.",
+      "value": "var(--theme-accent)",
+      "meaning": "Rust Signal fill for Not Completed decisions and caution states, aliased from the active theme base token.",
       "source": "packages/ui/tokens.css#--accent"
+    },
+    {
+      "id": "token:--accent-foreground",
+      "kind": "token",
+      "name": "--accent-foreground",
+      "value": "var(--theme-accent-foreground)",
+      "meaning": "Text and icons on Rust Signal fills, aliased from the active theme base token.",
+      "source": "packages/ui/tokens.css#--accent-foreground"
     },
     {
       "id": "token:--alert-foreground",
       "kind": "token",
       "name": "--alert-foreground",
-      "value": "var(--foreground)",
+      "value": "var(--theme-foreground)",
       "meaning": "Advisor plan Phase 1C: the shared alert notice (DESIGN.md, \"Alert notice\"). Errors use these, never the advice styles.",
       "source": "packages/ui/tokens.css#--alert-foreground"
     },
@@ -15924,7 +15932,7 @@
       "id": "token:--alert-signal",
       "kind": "token",
       "name": "--alert-signal",
-      "value": "var(--accent)",
+      "value": "var(--theme-accent)",
       "meaning": "Advisor plan Phase 1C: the shared alert notice (DESIGN.md, \"Alert notice\"). Errors use these, never the advice styles.",
       "source": "packages/ui/tokens.css#--alert-signal"
     },
@@ -15932,8 +15940,8 @@
       "id": "token:--background",
       "kind": "token",
       "name": "--background",
-      "value": "oklch(99.16% 0.0017 67.8)",
-      "meaning": "Bleached Newsprint: the main app background.",
+      "value": "var(--theme-background)",
+      "meaning": "Main app background, aliased from the active theme base token.",
       "source": "packages/ui/tokens.css#--background"
     },
     {
@@ -15957,7 +15965,7 @@
       "kind": "token",
       "name": "--card",
       "value": "var(--background)",
-      "meaning": "Card background and text: the same as the page background and Ink Black.",
+      "meaning": "Card background and text: the same as the page background and default foreground.",
       "source": "packages/ui/tokens.css#--card"
     },
     {
@@ -15965,7 +15973,7 @@
       "kind": "token",
       "name": "--card-foreground",
       "value": "var(--foreground)",
-      "meaning": "Card background and text: the same as the page background and Ink Black.",
+      "meaning": "Card background and text: the same as the page background and default foreground.",
       "source": "packages/ui/tokens.css#--card-foreground"
     },
     {
@@ -16108,8 +16116,8 @@
       "id": "token:--focus",
       "kind": "token",
       "name": "--focus",
-      "value": "oklch(57.69% 0.1656 33.1)",
-      "meaning": "Focus outline color: the same hue as Rust Signal.",
+      "value": "var(--theme-focus)",
+      "meaning": "Advisor plan Phase 1C: the shared alert notice (DESIGN.md, \"Alert notice\"). Errors use these, never the advice styles.",
       "source": "packages/ui/tokens.css#--focus"
     },
     {
@@ -16202,8 +16210,8 @@
       "id": "token:--foreground",
       "kind": "token",
       "name": "--foreground",
-      "value": "oklch(14.89% 0.0027 248.1)",
-      "meaning": "Ink Black: main text, icons and hard text hierarchy. Outcome notices use it in italic.",
+      "value": "var(--theme-foreground)",
+      "meaning": "Surface-scoped semantic ink and border roles. Containers with a colored fill declare `data-surface=\"primary\"` or `data-surface=\"accent\"`, and nested default-background islands (such as inputs or textareas) reset with `data-surface=\"default\"`.",
       "source": "packages/ui/tokens.css#--foreground"
     },
     {
@@ -16245,8 +16253,8 @@
       "id": "token:--line",
       "kind": "token",
       "name": "--line",
-      "value": "oklch(83% 0.006 248)",
-      "meaning": "Ash Line: the single border color for dividers, controls, rows and inputs.",
+      "value": "var(--theme-line)",
+      "meaning": "Surface-scoped semantic ink and border roles. Containers with a colored fill declare `data-surface=\"primary\"` or `data-surface=\"accent\"`, and nested default-background islands (such as inputs or textareas) reset with `data-surface=\"default\"`.",
       "source": "packages/ui/tokens.css#--line"
     },
     {
@@ -16268,15 +16276,15 @@
       "kind": "token",
       "name": "--muted-foreground",
       "value": "var(--muted-readable)",
-      "meaning": "Muted text: an alias of Readable Ash.",
+      "meaning": "Surface-scoped semantic ink and border roles. Containers with a colored fill declare `data-surface=\"primary\"` or `data-surface=\"accent\"`, and nested default-background islands (such as inputs or textareas) reset with `data-surface=\"default\"`.",
       "source": "packages/ui/tokens.css#--muted-foreground"
     },
     {
       "id": "token:--muted-readable",
       "kind": "token",
       "name": "--muted-readable",
-      "value": "oklch(52.59% 0.0187 245.3)",
-      "meaning": "Readable Ash: secondary text that must stay readable. Note-style notices use it at text-xs.",
+      "value": "var(--theme-muted-readable)",
+      "meaning": "Surface-scoped semantic ink and border roles. Containers with a colored fill declare `data-surface=\"primary\"` or `data-surface=\"accent\"`, and nested default-background islands (such as inputs or textareas) reset with `data-surface=\"default\"`.",
       "source": "packages/ui/tokens.css#--muted-readable"
     },
     {
@@ -16290,16 +16298,16 @@
       "id": "token:--primary",
       "kind": "token",
       "name": "--primary",
-      "value": "#3572b3",
-      "meaning": "Monolith Blue: selected states, completed Timeline rows and completed heatmap cells.",
+      "value": "var(--theme-primary)",
+      "meaning": "Monolith Blue fill for selected states and completed rows, aliased from the active theme base token.",
       "source": "packages/ui/tokens.css#--primary"
     },
     {
       "id": "token:--primary-foreground",
       "kind": "token",
       "name": "--primary-foreground",
-      "value": "oklch(99.16% 0.0017 67.8)",
-      "meaning": "Text on Monolith Blue fills, such as a completed Timeline row.",
+      "value": "var(--theme-primary-foreground)",
+      "meaning": "Text and icons on Monolith Blue fills, aliased from the active theme base token.",
       "source": "packages/ui/tokens.css#--primary-foreground"
     },
     {
@@ -16342,15 +16350,15 @@
       "kind": "token",
       "name": "--ring",
       "value": "var(--focus)",
-      "meaning": "Focus ring: an alias of the focus outline color.",
+      "meaning": "Focus ring: an alias of the active surface's focus outline color.",
       "source": "packages/ui/tokens.css#--ring"
     },
     {
       "id": "token:--surface",
       "kind": "token",
       "name": "--surface",
-      "value": "oklch(96.97% 0.0017 247.8)",
-      "meaning": "Cold Surface: secondary panels, empty states, inline note areas and inactive heatmap cells.",
+      "value": "var(--theme-surface)",
+      "meaning": "Secondary panel, empty state, and inline note surface, aliased from the active theme base token.",
       "source": "packages/ui/tokens.css#--surface"
     },
     {
@@ -16569,33 +16577,92 @@
       "source": "packages/ui/tokens.css#--text-xs--line-height"
     },
     {
+      "id": "token:--theme-accent",
+      "kind": "token",
+      "name": "--theme-accent",
+      "value": "oklch(57.69% 0.1656 33.1)",
+      "meaning": "Rust Signal: explicit Not Completed decisions and rare destructive or caution states.",
+      "source": "packages/ui/tokens.css#--theme-accent"
+    },
+    {
+      "id": "token:--theme-accent-foreground",
+      "kind": "token",
+      "name": "--theme-accent-foreground",
+      "value": "oklch(99.16% 0.0017 67.8)",
+      "meaning": "Text on Rust Signal fills, such as a Not Completed Timeline row.",
+      "source": "packages/ui/tokens.css#--theme-accent-foreground"
+    },
+    {
+      "id": "token:--theme-background",
+      "kind": "token",
+      "name": "--theme-background",
+      "value": "oklch(99.16% 0.0017 67.8)",
+      "meaning": "Bleached Newsprint: the main app background.",
+      "source": "packages/ui/tokens.css#--theme-background"
+    },
+    {
+      "id": "token:--theme-focus",
+      "kind": "token",
+      "name": "--theme-focus",
+      "value": "var(--theme-accent)",
+      "meaning": "Focus outline color: the same hue as Rust Signal on the default surface.",
+      "source": "packages/ui/tokens.css#--theme-focus"
+    },
+    {
+      "id": "token:--theme-foreground",
+      "kind": "token",
+      "name": "--theme-foreground",
+      "value": "oklch(14.89% 0.0027 248.1)",
+      "meaning": "Ink Black: main text, icons and hard text hierarchy. Outcome notices use it in italic.",
+      "source": "packages/ui/tokens.css#--theme-foreground"
+    },
+    {
+      "id": "token:--theme-line",
+      "kind": "token",
+      "name": "--theme-line",
+      "value": "oklch(83% 0.006 248)",
+      "meaning": "Ash Line: the single border color for dividers, controls, rows and inputs.",
+      "source": "packages/ui/tokens.css#--theme-line"
+    },
+    {
+      "id": "token:--theme-muted-readable",
+      "kind": "token",
+      "name": "--theme-muted-readable",
+      "value": "oklch(52.59% 0.0187 245.3)",
+      "meaning": "Readable Ash: secondary text that must stay readable. Note-style notices use it at text-xs.",
+      "source": "packages/ui/tokens.css#--theme-muted-readable"
+    },
+    {
+      "id": "token:--theme-primary",
+      "kind": "token",
+      "name": "--theme-primary",
+      "value": "#3572b3",
+      "meaning": "Monolith Blue: selected states, completed Timeline rows and completed heatmap cells.",
+      "source": "packages/ui/tokens.css#--theme-primary"
+    },
+    {
+      "id": "token:--theme-primary-foreground",
+      "kind": "token",
+      "name": "--theme-primary-foreground",
+      "value": "oklch(99.16% 0.0017 67.8)",
+      "meaning": "Text on Monolith Blue fills, such as a completed Timeline row.",
+      "source": "packages/ui/tokens.css#--theme-primary-foreground"
+    },
+    {
+      "id": "token:--theme-surface",
+      "kind": "token",
+      "name": "--theme-surface",
+      "value": "oklch(96.97% 0.0017 247.8)",
+      "meaning": "Cold Surface: secondary panels, empty states, inline note areas and inactive heatmap cells.",
+      "source": "packages/ui/tokens.css#--theme-surface"
+    },
+    {
       "id": "token:--timeline-completed-hover",
       "kind": "token",
       "name": "--timeline-completed-hover",
       "value": "#2f669f",
       "meaning": "Completed Row Hover: hover for Completed Timeline rows.",
       "source": "packages/ui/tokens.css#--timeline-completed-hover"
-    },
-    {
-      "id": "token:--timeline-detail-error",
-      "kind": "token",
-      "name": "--timeline-detail-error",
-      "value": "var(--accent)",
-      "source": "app/globals.css#--timeline-detail-error"
-    },
-    {
-      "id": "token:--timeline-detail-muted",
-      "kind": "token",
-      "name": "--timeline-detail-muted",
-      "value": "var(--muted-readable)",
-      "source": "app/globals.css#--timeline-detail-muted"
-    },
-    {
-      "id": "token:--timeline-detail-strong",
-      "kind": "token",
-      "name": "--timeline-detail-strong",
-      "value": "var(--foreground)",
-      "source": "app/globals.css#--timeline-detail-strong"
     },
     {
       "id": "token:--timeline-needs-decision-hover",
@@ -18151,7 +18218,7 @@
     {
       "from": "component:composite.note-editor",
       "type": "styled-by",
-      "to": "token:--accent",
+      "to": "token:--color-alert-signal",
       "grade": "derived",
       "source": "scan:components/notes/NoteEditor.tsx"
     },
@@ -18180,13 +18247,6 @@
       "from": "component:composite.note-editor",
       "type": "styled-by",
       "to": "token:--color-muted-readable",
-      "grade": "derived",
-      "source": "scan:components/notes/NoteEditor.tsx"
-    },
-    {
-      "from": "component:composite.note-editor",
-      "type": "styled-by",
-      "to": "token:--foreground",
       "grade": "derived",
       "source": "scan:components/notes/NoteEditor.tsx"
     },
@@ -18292,13 +18352,6 @@
       "from": "component:composite.occurrence-row",
       "type": "styled-by",
       "to": "token:--color-primary",
-      "grade": "derived",
-      "source": "scan:components/timeline/OccurrenceRow.tsx"
-    },
-    {
-      "from": "component:composite.occurrence-row",
-      "type": "styled-by",
-      "to": "token:--color-primary-foreground",
       "grade": "derived",
       "source": "scan:components/timeline/OccurrenceRow.tsx"
     },
@@ -20993,7 +21046,7 @@
     {
       "from": "component:module.status-buttons",
       "type": "styled-by",
-      "to": "token:--color-accent",
+      "to": "token:--color-alert-signal",
       "grade": "derived",
       "source": "scan:components/timeline/StatusButtons.tsx"
     },
@@ -73009,6 +73062,13 @@
     },
     {
       "from": "token:--accent",
+      "type": "aliases",
+      "to": "token:--theme-accent",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--accent/value"
+    },
+    {
+      "from": "token:--accent",
       "type": "defined-in",
       "to": "file:apps/marketing/src/styles/global.css",
       "grade": "asserted",
@@ -73022,9 +73082,37 @@
       "source": "packages/ui/tokens.css#--accent"
     },
     {
+      "from": "token:--accent-foreground",
+      "type": "aliases",
+      "to": "token:--theme-accent-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--accent-foreground/value"
+    },
+    {
+      "from": "token:--accent-foreground",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--accent-foreground"
+    },
+    {
       "from": "token:--alert-foreground",
       "type": "aliases",
-      "to": "token:--foreground",
+      "to": "token:--theme-accent-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--alert-foreground/value"
+    },
+    {
+      "from": "token:--alert-foreground",
+      "type": "aliases",
+      "to": "token:--theme-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--alert-foreground/value"
+    },
+    {
+      "from": "token:--alert-foreground",
+      "type": "aliases",
+      "to": "token:--theme-primary-foreground",
       "grade": "asserted",
       "source": "packages/ui/tokens.css#--alert-foreground/value"
     },
@@ -73033,12 +73121,26 @@
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--alert-foreground"
+      "source": "packages/ui/tokens.css#--alert-foreground@[data-surface=\"default\"]"
     },
     {
       "from": "token:--alert-signal",
       "type": "aliases",
-      "to": "token:--accent",
+      "to": "token:--theme-accent",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--alert-signal/value"
+    },
+    {
+      "from": "token:--alert-signal",
+      "type": "aliases",
+      "to": "token:--theme-accent-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--alert-signal/value"
+    },
+    {
+      "from": "token:--alert-signal",
+      "type": "aliases",
+      "to": "token:--theme-primary-foreground",
       "grade": "asserted",
       "source": "packages/ui/tokens.css#--alert-signal/value"
     },
@@ -73047,7 +73149,14 @@
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--alert-signal"
+      "source": "packages/ui/tokens.css#--alert-signal@[data-surface=\"default\"]"
+    },
+    {
+      "from": "token:--background",
+      "type": "aliases",
+      "to": "token:--theme-background",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--background/value"
     },
     {
       "from": "token:--background",
@@ -73338,10 +73447,31 @@
     },
     {
       "from": "token:--focus",
+      "type": "aliases",
+      "to": "token:--theme-accent-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--focus/value"
+    },
+    {
+      "from": "token:--focus",
+      "type": "aliases",
+      "to": "token:--theme-focus",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--focus/value"
+    },
+    {
+      "from": "token:--focus",
+      "type": "aliases",
+      "to": "token:--theme-primary-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--focus/value"
+    },
+    {
+      "from": "token:--focus",
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--focus"
+      "source": "packages/ui/tokens.css#--focus@[data-surface=\"default\"]"
     },
     {
       "from": "token:--font-mono",
@@ -73436,10 +73566,31 @@
     },
     {
       "from": "token:--foreground",
+      "type": "aliases",
+      "to": "token:--theme-accent-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--foreground/value"
+    },
+    {
+      "from": "token:--foreground",
+      "type": "aliases",
+      "to": "token:--theme-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--foreground/value"
+    },
+    {
+      "from": "token:--foreground",
+      "type": "aliases",
+      "to": "token:--theme-primary-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--foreground/value"
+    },
+    {
+      "from": "token:--foreground",
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--foreground"
+      "source": "packages/ui/tokens.css#--foreground@[data-surface=\"default\"]"
     },
     {
       "from": "token:--ink",
@@ -73478,10 +73629,17 @@
     },
     {
       "from": "token:--line",
+      "type": "aliases",
+      "to": "token:--theme-line",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--line/value"
+    },
+    {
+      "from": "token:--line",
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--line"
+      "source": "packages/ui/tokens.css#--line@[data-surface=\"default\"]"
     },
     {
       "from": "token:--line-strong",
@@ -73509,14 +73667,21 @@
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--muted-foreground"
+      "source": "packages/ui/tokens.css#--muted-foreground@[data-surface=\"default\"]"
+    },
+    {
+      "from": "token:--muted-readable",
+      "type": "aliases",
+      "to": "token:--theme-muted-readable",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--muted-readable/value"
     },
     {
       "from": "token:--muted-readable",
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
-      "source": "packages/ui/tokens.css#--muted-readable"
+      "source": "packages/ui/tokens.css#--muted-readable@[data-surface=\"default\"]"
     },
     {
       "from": "token:--page-gutter",
@@ -73527,10 +73692,24 @@
     },
     {
       "from": "token:--primary",
+      "type": "aliases",
+      "to": "token:--theme-primary",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--primary/value"
+    },
+    {
+      "from": "token:--primary",
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
       "source": "packages/ui/tokens.css#--primary"
+    },
+    {
+      "from": "token:--primary-foreground",
+      "type": "aliases",
+      "to": "token:--theme-primary-foreground",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--primary-foreground/value"
     },
     {
       "from": "token:--primary-foreground",
@@ -73587,6 +73766,13 @@
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
       "source": "packages/ui/tokens.css#--ring"
+    },
+    {
+      "from": "token:--surface",
+      "type": "aliases",
+      "to": "token:--theme-surface",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--surface/value"
     },
     {
       "from": "token:--surface",
@@ -73785,67 +73971,88 @@
       "source": "packages/ui/tokens.css#--text-xs--line-height"
     },
     {
+      "from": "token:--theme-accent",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-accent"
+    },
+    {
+      "from": "token:--theme-accent-foreground",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-accent-foreground"
+    },
+    {
+      "from": "token:--theme-background",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-background"
+    },
+    {
+      "from": "token:--theme-focus",
+      "type": "aliases",
+      "to": "token:--theme-accent",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-focus/value"
+    },
+    {
+      "from": "token:--theme-focus",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-focus"
+    },
+    {
+      "from": "token:--theme-foreground",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-foreground"
+    },
+    {
+      "from": "token:--theme-line",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-line"
+    },
+    {
+      "from": "token:--theme-muted-readable",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-muted-readable"
+    },
+    {
+      "from": "token:--theme-primary",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-primary"
+    },
+    {
+      "from": "token:--theme-primary-foreground",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-primary-foreground"
+    },
+    {
+      "from": "token:--theme-surface",
+      "type": "defined-in",
+      "to": "file:packages/ui/tokens.css",
+      "grade": "asserted",
+      "source": "packages/ui/tokens.css#--theme-surface"
+    },
+    {
       "from": "token:--timeline-completed-hover",
       "type": "defined-in",
       "to": "file:packages/ui/tokens.css",
       "grade": "asserted",
       "source": "packages/ui/tokens.css#--timeline-completed-hover"
-    },
-    {
-      "from": "token:--timeline-detail-error",
-      "type": "aliases",
-      "to": "token:--accent",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-error/value"
-    },
-    {
-      "from": "token:--timeline-detail-error",
-      "type": "aliases",
-      "to": "token:--primary-foreground",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-error/value"
-    },
-    {
-      "from": "token:--timeline-detail-error",
-      "type": "defined-in",
-      "to": "file:app/globals.css",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-error@.timeline-occurrence-row"
-    },
-    {
-      "from": "token:--timeline-detail-muted",
-      "type": "aliases",
-      "to": "token:--muted-readable",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-muted/value"
-    },
-    {
-      "from": "token:--timeline-detail-muted",
-      "type": "defined-in",
-      "to": "file:app/globals.css",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-muted@.timeline-occurrence-row"
-    },
-    {
-      "from": "token:--timeline-detail-strong",
-      "type": "aliases",
-      "to": "token:--foreground",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-strong/value"
-    },
-    {
-      "from": "token:--timeline-detail-strong",
-      "type": "aliases",
-      "to": "token:--primary-foreground",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-strong/value"
-    },
-    {
-      "from": "token:--timeline-detail-strong",
-      "type": "defined-in",
-      "to": "file:app/globals.css",
-      "grade": "asserted",
-      "source": "app/globals.css#--timeline-detail-strong@.timeline-occurrence-row"
     },
     {
       "from": "token:--timeline-needs-decision-hover",
@@ -73924,9 +74131,6 @@
     "token descriptions": [
       "app/globals.css: --font-mono has no description comment",
       "app/globals.css: --font-sans has no description comment",
-      "app/globals.css: --timeline-detail-error has no description comment",
-      "app/globals.css: --timeline-detail-muted has no description comment",
-      "app/globals.css: --timeline-detail-strong has no description comment",
       "apps/marketing/src/styles/global.css: --ink has no description comment",
       "apps/marketing/src/styles/global.css: --ink-line has no description comment",
       "apps/marketing/src/styles/global.css: --ink-muted has no description comment",
