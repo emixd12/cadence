@@ -23,6 +23,7 @@ import { readCachedProfileTimezone, readCachedUserBehaviors } from "@/lib/cache/
 import type { ExportPageData, ExportBundle } from "@/lib/types/export";
 import type { OccurrenceSyncState } from "@/lib/types/database";
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 
 export type ExportDownloadFormat = "jsonl" | "csv" | "json" | "behaviorlog" | "markdown";
 
@@ -168,6 +169,8 @@ export async function getUserExportBundle(
     reminderDeliveries: exportRead.reminderDeliveries, timeSessions,
     finalBehaviors: finalRead.behaviors,
     importRuns, importMappings, importedNotes, importedInterventions, dayNotes, occurrenceMoves,
+    // Ticket 364: the person's alongside answer, only while CADENCE_ALONGSIDE is on.
+    includeAlongside: alongsideEnabled(),
   });
 }
 

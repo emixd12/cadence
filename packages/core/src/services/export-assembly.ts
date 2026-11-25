@@ -43,6 +43,12 @@ export type ExportAssemblyInput = ExportOptions & ExportImportedHistory & {
   occurrenceMoves?: ExportOccurrenceMoveInput[];
   /** Day note rows (Ticket 292); exported only when notes are included. */
   dayNotes?: ReadonlyArray<{ id: string; local_date: string; note: string | null; created_at: string; updated_at: string }>;
+  /**
+   * Ticket 364: carry the person's alongside answer (`behaviors.alongside`). The web app
+   * sets it while CADENCE_ALONGSIDE is on; the Mac export leaves it off until Ticket 363.
+   * Off, the column is not read and the export bytes are unchanged.
+   */
+  includeAlongside?: boolean;
 };
 
 export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
@@ -62,7 +68,7 @@ export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
       reminderChannel: input.nativeReminders === undefined ? "browser_push" : "other",
     },
     categories: exportRead.categories.map(toExportCategoryInput),
-    behaviors: cachedBehaviors.map(toExportBehaviorInput),
+    behaviors: cachedBehaviors.map((behavior) => toExportBehaviorInput(behavior, input.includeAlongside === true)),
     behaviorDefinitionEvents: behaviorDefinitionEvents.map(
       toExportBehaviorDefinitionEventInput,
     ),
@@ -90,6 +96,7 @@ export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
     includeArchived: options.includeArchived,
     includeNotes: options.includeNotes,
     includeTimeTracking: options.includeTimeTracking,
+    includeAlongside: input.includeAlongside === true,
   });
 }
 
@@ -448,6 +455,7 @@ function toExportCategoryInput(
 
 function toExportBehaviorInput(
   behavior: BehaviorGraphRecord,
+  includeAlongside: boolean,
 ): ExportBehaviorInput {
   // Null only on an unscheduled opportunity Behavior (Behaviors of Opportunity).
   const recurrenceRule = storedRecurrenceRuleOrNull(behavior);
@@ -468,6 +476,7 @@ function toExportBehaviorInput(
     recurrenceRule,
     scheduledTime,
     ...(behavior.is_opportunity === undefined ? {} : { isOpportunity: behavior.is_opportunity }),
+    ...(includeAlongside ? { alongside: typeof behavior.alongside === "boolean" ? behavior.alongside : null } : {}),
     schedules,
     scheduleSlots: schedules.flatMap((schedule) => schedule.timeEntries),
     timezone: behavior.timezone || DEFAULT_TIMEZONE,
