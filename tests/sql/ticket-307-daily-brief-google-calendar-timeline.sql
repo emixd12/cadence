@@ -83,7 +83,8 @@ begin
 end;
 $$;
 
--- The retired grant: no rows, no service-role or client access to its functions.
+-- Agent grant RPCs were reactivated for Google Workspace MCP on 2026-11-25 (WS-1B):
+-- service_role has EXECUTE; authenticated/anon/public remain blocked.
 do $$
 begin
   if exists (select 1 from public.google_calendar_agent_connections) or exists (select 1 from public.google_calendar_agent_preferences)
@@ -91,16 +92,16 @@ begin
   then
     raise exception 'Daily Brief grant rows remain.';
   end if;
-  if has_function_privilege('service_role', 'public.calendar_agent_begin_attempt(uuid,text,text,text,bigint,text,text,text)', 'EXECUTE')
-    or has_function_privilege('service_role', 'public.calendar_agent_install_credential(uuid,text,bigint,text,text,text)', 'EXECUTE')
-    or has_function_privilege('service_role', 'public.calendar_agent_consume_attempt(text)', 'EXECUTE')
-    or has_function_privilege('service_role', 'public.calendar_agent_read_credential(uuid,text,bigint)', 'EXECUTE')
-    or has_function_privilege('service_role', 'public.calendar_agent_disconnect(uuid,text,bigint,text)', 'EXECUTE')
+  if not has_function_privilege('service_role', 'public.calendar_agent_begin_attempt(uuid,text,text,text,bigint,text,text,text)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.calendar_agent_install_credential(uuid,text,bigint,text,text,text)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.calendar_agent_consume_attempt(text)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.calendar_agent_read_credential(uuid,text,bigint)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.calendar_agent_disconnect(uuid,text,bigint,text)', 'EXECUTE')
     or has_function_privilege('authenticated', 'public.calendar_agent_read_credential(uuid,text,bigint)', 'EXECUTE')
     or has_schema_privilege('authenticated', 'cadence_calendar_agent_private', 'USAGE')
     or has_table_privilege('authenticated', 'public.google_calendar_agent_connections', 'INSERT')
   then
-    raise exception 'The retired grant is still reachable.';
+    raise exception 'Agent grant privilege boundary is invalid.';
   end if;
   if has_function_privilege('authenticated', 'cadence_advisor_private.map_daily_brief_google_calendar_to_timeline()', 'EXECUTE')
     or has_function_privilege('service_role', 'cadence_advisor_private.map_daily_brief_google_calendar_to_timeline()', 'EXECUTE')
@@ -118,10 +119,10 @@ declare
   preference jsonb := public.read_daily_brief_preferences();
   decision jsonb;
 begin
-  if preference ->> 'google_calendar_source' <> 'timeline' or (preference ->> 'include_calendar')::boolean
+  if preference ->> 'google_calendar_source' <> 'agent_mcp' or (preference ->> 'include_calendar')::boolean
     or (preference -> 'excluded_sources' ->> 'google_calendar')::boolean
   then
-    raise exception 'The read must report Google Calendar through the Timeline connection: %', preference;
+    raise exception 'The read must report Google Calendar through the agent MCP grant: %', preference;
   end if;
   -- The stored fence reads no grant; a run starts on the current Timeline connection.
   decision := public.begin_daily_brief('30700000-0000-4000-8000-000000000102', false, 5);

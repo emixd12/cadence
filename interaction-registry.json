@@ -13834,7 +13834,6 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts",
           "tests/calendar-google-sign-in.local-integration.test.ts"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
@@ -13939,8 +13938,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts"
+          "tests/google-calendar-panel.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },
@@ -14034,7 +14032,6 @@
         "level": "direct",
         "references": [
           "tests/google-calendar-client.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts",
           "tests/google-calendar-panel.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
@@ -14135,8 +14132,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx",
-          "tests/google-calendar-agent-retirement.test.ts"
+          "tests/google-calendar-panel.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 307 retires the separate Daily Brief grant; Daily Brief reads this connection. Provider and installed-desktop acceptance remain open."
       },

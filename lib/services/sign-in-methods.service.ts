@@ -203,9 +203,16 @@ export async function removeSignInMethod(identityId: unknown): Promise<
   // account's row lock, so a Calendar connect finishing at the same moment cannot slip past.
   const calendarUses = async () => {
     if (plan.methodId !== "google") return false;
-    const calendar = await readCalendarConnection(supabase, account.userId).catch(() => undefined);
-    if (calendar === undefined) return null;
-    return calendar?.status === "connected" && calendar.googleSubject === googleIdentitySubject(identity);
+    const subject = googleIdentitySubject(identity);
+    const [standard, agent] = await Promise.all([
+      readCalendarConnection(supabase, account.userId, "standard").catch(() => undefined),
+      readCalendarConnection(supabase, account.userId, "agent").catch(() => undefined),
+    ]);
+    if (standard === undefined || agent === undefined) return null;
+    return (
+      (standard?.status === "connected" && standard.googleSubject === subject)
+      || (agent?.status === "connected" && agent.googleSubject === subject)
+    );
   };
   const usedBeforehand = await calendarUses();
   if (usedBeforehand === null) return { result: "remove_failed", methodId: plan.methodId };
