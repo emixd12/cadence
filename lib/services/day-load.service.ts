@@ -7,8 +7,11 @@ import type { Json } from "@/lib/db/database.types";
 import { listUserBehaviors, type AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { readAllPostgrestRows } from "@/lib/db/paginated-read";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
+import type { CalendarConnectionView } from "@/lib/types/google-calendar";
 import type { CalendarReadCaller } from "@/lib/services/google-calendar.service";
-import { readTravelCalendarConnections, readTravelCalendarEvents, travelCalendarSourcesTakingPart } from "@/lib/services/travel-calendar-sources";
+import { getIcloudCalendarConnection } from "@/lib/services/icloud-calendar.service";
+import { getOutlookCalendarConnection } from "@/lib/services/outlook-calendar.service";
+import { readTravelCalendarEvents, travelCalendarSourcesTakingPart, type TravelCalendarConnections } from "@/lib/services/travel-calendar-sources";
 
 // Advisor plan Phase 4, workstream 4G (Emi, D8): the stored day load.
 //
@@ -88,7 +91,23 @@ export function createHostedDayLoadReads(caller: CalendarReadCaller): DayLoadRea
       userId, startLocalDate: start, endLocalDate: end, includeArchived: true, throughStartedAt: through,
     }),
     async calendarEvents(localDate) {
-      const connections = await readTravelCalendarConnections(caller);
+      // Coach day loads must never read Google Calendar via Travel's standard REST client.
+      // Only Outlook and iCloud remain readable here.
+      const [outlook, icloud] = await Promise.all([
+        getOutlookCalendarConnection(caller),
+        getIcloudCalendarConnection(caller),
+      ]);
+      const connections: TravelCalendarConnections = {
+        google: {
+          accountId: userId,
+          status: "disconnected",
+          generation: 0,
+          selectionRevision: 0,
+          preferences: { selectedCalendarIds: [] },
+        } as unknown as CalendarConnectionView,
+        outlook,
+        icloud,
+      };
       const takingPart = travelCalendarSourcesTakingPart(connections).length;
       if (takingPart === 0) return null;
       const events = await readTravelCalendarEvents(caller, connections, { scope: "day", startLocalDate: localDate, endLocalDate: localDate });

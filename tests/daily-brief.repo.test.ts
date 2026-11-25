@@ -54,10 +54,14 @@ describe("Daily Brief repository", () => {
     });
   });
 
-  it("reports Google Calendar through the Timeline connection only after the Ticket 307 migration", async () => {
+  it("tolerates timeline, agent_mcp, null, undefined, and unknown google_calendar_source values without throwing", async () => {
     const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
     await expect(read({ ...preferences, google_calendar_source: "timeline" })).resolves.toMatchObject({ googleCalendarSource: "timeline" });
-    await expect(read({ ...preferences, google_calendar_source: "agent" })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, google_calendar_source: "agent_mcp" })).resolves.toMatchObject({ googleCalendarSource: "agent_mcp" });
+    await expect(read({ ...preferences, google_calendar_source: null })).resolves.toMatchObject({ googleCalendarSource: null });
+    await expect(read({ ...preferences, google_calendar_source: undefined })).resolves.toMatchObject({ googleCalendarSource: null });
+    await expect(read({ ...preferences, google_calendar_source: "agent" })).resolves.toMatchObject({ googleCalendarSource: null });
+    await expect(read({ ...preferences, google_calendar_source: "unknown_future_value" })).resolves.toMatchObject({ googleCalendarSource: null });
   });
 
   it("rejects a malformed choice, and since advisor 4F keeps source choices while Daily Brief is off", async () => {
