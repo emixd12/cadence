@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { noticeText } from "@cadence/core/notices";
 import { dayNotePreview } from "@cadence/core/resolvers/day-note.resolver";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 
@@ -37,6 +38,7 @@ export function OccurrenceNoteForm({
   const [optimisticOverride, setOptimisticOverride] = useState<{ base: string; value: string } | null>(null);
   const [showClosedSaved, setShowClosedSaved] = useState(false);
   const [focusSignal, setFocusSignal] = useState(0);
+  const userOpeningRef = useRef(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const optimisticNote = optimisticOverride && optimisticOverride.base === note ? optimisticOverride.value : note;
@@ -66,17 +68,24 @@ export function OccurrenceNoteForm({
       open={isOpen}
       onToggle={(event) => {
         const nextOpen = event.currentTarget.open;
+        const shouldFocus = userOpeningRef.current;
+        userOpeningRef.current = false;
         setIsOpen(nextOpen);
         if (nextOpen) {
           clearSavedTimer();
           setShowClosedSaved(false);
-          setFocusSignal((signal) => signal + 1);
+          if (shouldFocus) {
+            setFocusSignal((signal) => signal + 1);
+          }
         }
       }}
       className="occurrence-note group text-sm"
       data-occurrence-note={occurrenceId}
     >
       <summary
+        onClick={() => {
+          if (!isOpen) userOpeningRef.current = true;
+        }}
         className="inline-flex min-h-11 max-w-full cursor-pointer list-none items-center gap-2 py-1 font-bold text-foreground hover:text-foreground focus-visible:text-foreground sm:min-h-8 [&::-webkit-details-marker]:hidden"
         aria-label={optimisticNote ? "Edit note" : "Add note"}
       >
@@ -87,8 +96,12 @@ export function OccurrenceNoteForm({
           </span>
         ) : null}
         {!isOpen && showClosedSaved ? (
-          <span className="shrink-0 text-xs font-normal text-muted-readable" data-note-saved="true">
-            Saved
+          <span
+            className="shrink-0 text-xs font-normal text-muted-readable"
+            data-notice="timeline.note-saved"
+            data-note-saved="true"
+          >
+            {noticeText("timeline.note-saved")}
           </span>
         ) : null}
       </summary>

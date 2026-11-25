@@ -157,6 +157,55 @@ describe("Day note control", () => {
     }
   });
 
+  it("queues a reverted edit made while an auto-save is in flight so the final draft persists", async () => {
+    vi.useFakeTimers();
+    let stored = "A";
+    let finishFirst: ((state: { status: "success"; message: string }) => void) | undefined;
+    const submissions: Array<{ expected: string; note: string }> = [];
+    const action: OccurrenceFormAction = async (_state, form) => {
+      const expected = String(form.get("expected_note"));
+      const next = String(form.get("note")).trim();
+      submissions.push({ expected, note: next });
+      if (submissions.length === 1) {
+        return new Promise((resolve) => {
+          finishFirst = (result) => {
+            stored = next;
+            resolve(result);
+          };
+        });
+      }
+      stored = next;
+      return { status: "success", message: "Day note saved." };
+    };
+    const view = await render(<DayNoteControl localDate="2026-11-10" dayLabel="Tuesday" note="A" action={action} />);
+    try {
+      await act(async () => view.container.querySelector("summary")!.click());
+      const textarea = view.container.querySelector("textarea")!;
+      await act(async () => setTextareaValue(textarea, "B"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(NOTE_AUTO_SAVE_DELAY_MS);
+      });
+      expect(submissions).toEqual([{ expected: "A", note: "B" }]);
+      expect(finishFirst).toBeDefined();
+
+      // Revert back to "A" while "B" is still in flight.
+      await act(async () => setTextareaValue(textarea, "A"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(NOTE_AUTO_SAVE_DELAY_MS);
+      });
+
+      // Completing "B" automatically flushes the queued revert to "A".
+      await act(async () => finishFirst!({ status: "success", message: "Day note saved." }));
+      expect(submissions).toEqual([
+        { expected: "A", note: "B" },
+        { expected: "B", note: "A" },
+      ]);
+      expect(stored).toBe("A");
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it("shows a one-line preview and an edit label when the day has a note", async () => {
     const view = await render(<DayNoteControl localDate="2026-11-09" dayLabel="Monday, November 9" note={"Sick\n\nRested all day"} action={idle} />);
     try {

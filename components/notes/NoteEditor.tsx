@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { noticeText } from "@cadence/core/notices";
 import { resolveNoteUpdate } from "@cadence/core/resolvers/status.resolver";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 
@@ -265,13 +266,19 @@ export function NoteEditor({
     onDoneRef.current?.({ saved: hadSaved });
   }, [cancelDebounce, state.status, submitCurrentDraft]);
 
+  const activeBaseline = useCallback(() => (
+    isPendingRef.current && submittedDraftRef.current
+      ? canonicalNoteValue(submittedDraftRef.current.value)
+      : expectedNoteRef.current
+  ), []);
+
   const handleBlur = (event: FocusEvent<HTMLTextAreaElement>) => {
     if (!autoSave) return;
     if (event.relatedTarget instanceof Node && formRef.current?.contains(event.relatedTarget)) {
       return;
     }
     cancelDebounce();
-    if (canonicalNoteValue(draftValueRef.current) !== expectedNoteRef.current) {
+    if (canonicalNoteValue(draftValueRef.current) !== activeBaseline()) {
       submitCurrentDraft();
     }
   };
@@ -392,10 +399,10 @@ export function NoteEditor({
             setDraftValue(nextValue);
             draftRevisionRef.current += 1;
             cancelDebounce();
-            if (autoSave && canonicalNoteValue(nextValue) !== expectedNoteRef.current) {
+            if (autoSave && canonicalNoteValue(nextValue) !== activeBaseline()) {
               debounceTimerRef.current = setTimeout(() => {
                 debounceTimerRef.current = null;
-                if (canonicalNoteValue(draftValueRef.current) !== expectedNoteRef.current) {
+                if (canonicalNoteValue(draftValueRef.current) !== activeBaseline()) {
                   submitCurrentDraft();
                 }
               }, NOTE_AUTO_SAVE_DELAY_MS);
@@ -487,13 +494,18 @@ function NoteStatusMessage({
   isDirty: boolean;
 }>) {
   const isError = state.status === "error" && Boolean(state.message);
+  const noticeId = isError
+    ? undefined
+    : isPending
+      ? "timeline.note-saving"
+      : state.status === "success" && !isDirty
+        ? "timeline.note-saved"
+        : undefined;
   const message = isError
     ? state.message
-    : isPending
-      ? "Saving..."
-      : state.status === "success" && !isDirty
-        ? "Saved"
-        : "";
+    : noticeId
+      ? noticeText(noticeId)
+      : "";
 
   if (!message) {
     return null;
@@ -505,6 +517,7 @@ function NoteStatusMessage({
         "text-sm leading-6",
         isError ? "text-alert-signal" : "text-muted-readable",
       ].join(" ")}
+      data-notice={noticeId}
       role={isError ? "alert" : "status"}
     >
       {message}

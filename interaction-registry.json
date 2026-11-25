@@ -1369,7 +1369,7 @@
     {
       "path": "components/timeline/DayNoteControl.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 3,
       "interaction_ids": [
         "INT-TIMELINE-012"
       ]
@@ -1377,7 +1377,7 @@
     {
       "path": "components/timeline/OccurrenceNoteForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 3,
       "interaction_ids": [
         "INT-TIMELINE-008",
         "INT-TIMELINE-011"
