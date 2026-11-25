@@ -5,7 +5,10 @@ import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import { SettingsPanel } from "./SettingsPanels";
 import { useReportSettingsSection } from "./SettingsSections";
 import { settingsSectionLoad, travelSectionState } from "@/lib/ui/settings-sections";
-import { CompletionPlacesSection, PlaceMarkerControl } from "@/components/travel/PlaceLabels";
+import { CompletionPlacesSection, PlaceMarkerControl, usePlaceLabelActions } from "@/components/travel/PlaceLabels";
+import { PlaceAutocomplete } from "@/components/travel/PlaceAutocomplete";
+import type { PlaceSearchCoordinates, PlaceSearchSuggestion } from "@cadence/core/types/place-search";
+import type { PlaceSearchClient } from "@/lib/ui/place-search";
 import { readBrowserForegroundLocation, readBrowserLocationPermission, type ForegroundLocation, type LocationPermission } from "@/lib/ui/foreground-location";
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import { TravelHabitsSection } from "./TravelHabitsSection";
@@ -37,10 +40,12 @@ const RELOAD_HINT = "Try again, or reload Settings if another device changed it.
  * result line.
  */
 export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, readPermission = readBrowserLocationPermission, openLocationSettings, desktop = false,
-  leaveReminderClient = webLeaveReminderClient, readDeviceNotifications, vapidPublicKey = "", homeLookupClient = webHomeLookupClient }: Readonly<{
+  leaveReminderClient = webLeaveReminderClient, readDeviceNotifications, vapidPublicKey = "", homeLookupClient = webHomeLookupClient, placeSearchClient }: Readonly<{
   client?: TravelSettingsClient;
   /** Ticket 308: the hosted Home lookup. Null keeps typing only, as on a Mac in local mode. */
   homeLookupClient?: HomeLookupClient | null;
+  /** Optional override for Home place autocomplete (tests / desktop). */
+  placeSearchClient?: PlaceSearchClient | null;
   /** Ticket 279: the hosted leave reminder switch. Null hides it, as on an unlinked Mac. */
   leaveReminderClient?: LeaveReminderClient | null;
   /** Ticket 279: this device's notification state. Web reads the browser with `vapidPublicKey`. */
@@ -53,12 +58,27 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   desktop?: boolean;
 }>) {
   const id = useId();
+  const placeLabelActions = usePlaceLabelActions();
   const result = useSettingsResult(true);
   const reportResult = result.report;
   /** The last saved settings. The controls below show drafts until each save answers. */
   const [settings, setSettings] = useState<TravelSettings | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [home, setHome] = useState("");
+  type HomeSelection = Readonly<{
+    title: string;
+    address: string;
+    previousHome: string | null;
+    position: PlaceSearchCoordinates | null;
+    saved: boolean;
+    markerSaved: boolean;
+  }>;
+  const [homeSelection, setHomeSelectionState] = useState<HomeSelection | null>(null);
+  const homeSelectionRef = useRef<HomeSelection | null>(null);
+  const setHomeSelection = useCallback((next: HomeSelection | null) => {
+    homeSelectionRef.current = next;
+    setHomeSelectionState(next);
+  }, []);
   const [mode, setMode] = useState<TravelMode | "">("");
   const [saving, setSaving] = useState(0);
   const [location, setLocation] = useState<ForegroundLocation["state"] | null>(null);
@@ -131,6 +151,19 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
         if (change.baseLocationText !== undefined && requestedHome.current === change.baseLocationText) {
           requestedHome.current = next.baseLocationText; setHome(next.baseLocationText ?? "");
         }
+        // If Home was chosen from place autocomplete, save its marker only after Home itself saved.
+        if (change.baseLocationText !== undefined) {
+          const pending = homeSelectionRef.current;
+          if (pending && next.baseLocationText && next.baseLocationText.trim() === pending.address.trim()) {
+            let markerSaved = pending.markerSaved;
+            if (pending.position && placeLabelActions?.enabled && !pending.markerSaved) {
+              markerSaved = await placeLabelActions.recordMarkerFromCoordinates({ kind: "home" }, pending.position);
+            }
+            if (current === sequence.current && homeSelectionRef.current === pending) {
+              setHomeSelection({ ...pending, saved: true, markerSaved });
+            }
+          }
+        }
         // Turning estimates on also checks location; one line carries both outcomes.
         const note = withLocation ? locationNote.current : null;
         result.saved(note ? `${SETTINGS_SAVED}. ${note}` : SETTINGS_SAVED);
@@ -169,6 +202,21 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     if (next === requestedHome.current) return;
     requestedHome.current = next;
     persist({ baseLocationText: next }, `Home could not save. ${RELOAD_HINT}`);
+  };
+  const undoHomeSelection = () => {
+    const active = homeSelectionRef.current;
+    if (!active) return;
+    setHomeSelection(null);
+    const previous = active.previousHome;
+    setHome(previous ?? "");
+    if (!active.saved) return;
+    if (saved.current && previous !== requestedHome.current) {
+      requestedHome.current = previous;
+      persist({ baseLocationText: previous }, `Home could not revert. ${RELOAD_HINT}`);
+    }
+    if (active.markerSaved && placeLabelActions?.enabled) {
+      void placeLabelActions.removeMarker("home");
+    }
   };
   const locate = async () => {
     const current = ++locationSequence.current;
@@ -220,9 +268,29 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
             {!enabled && !mode ? <p className="text-muted-readable">Choose your usual travel to turn on estimates.</p> : null}
           </div>
           <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><HomeCurrentLocation client={homeLookupClient} travelOn={settings.enabled && Boolean(settings.routingConsentAt)} readLocation={readLocation}
-            onAddress={(address) => { setHome(address.slice(0, 500)); homeInput.current?.focus(); }} onLocationRead={refreshPermission}><input ref={homeInput} id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)}
-              onBlur={commitHome} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitHome(); } }}
-              className="min-h-11 min-w-0 flex-1 basis-64 border-0 border-b border-line bg-background" autoComplete="off" /></HomeCurrentLocation><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
+            onAddress={(address) => { setHomeSelection(null); setHome(address.slice(0, 500)); homeInput.current?.focus(); }} onLocationRead={refreshPermission}><PlaceAutocomplete inputRef={homeInput} id={`${id}-home`} maxLength={500} value={home}
+              placeholder="Search an address or place name"
+              searchClient={placeSearchClient}
+              wrapperClassName="flex-1 basis-64"
+              className="min-h-11 w-full min-w-0 border-0 border-b border-line bg-background"
+              onChange={(nextValue) => { setHome(nextValue); setHomeSelection(null); }}
+              onSelect={(suggestion: PlaceSearchSuggestion) => {
+                const previousHome = homeSelectionRef.current ? homeSelectionRef.current.previousHome : saved.current?.baseLocationText ?? null;
+                setHome(suggestion.formatted.slice(0, 500));
+                setHomeSelection({
+                  title: suggestion.title,
+                  address: suggestion.formatted.slice(0, 500),
+                  previousHome,
+                  position: suggestion.position,
+                  saved: false,
+                  markerSaved: false,
+                });
+                homeInput.current?.focus();
+              }}
+              onBlur={commitHome}
+              onEnter={commitHome} /></HomeCurrentLocation>{homeSelection ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" role="status" data-home-selection><span>{homeSelection.saved
+                ? (homeSelection.markerSaved ? "Home and its marker updated from selection." : "Home updated from selection.")
+                : `Selected ${homeSelection.title}. Press Enter or leave the field to save.${homeSelection.position && placeLabelActions?.enabled ? " Its Home marker will save with it." : ""}`}</span><button type="button" className="product-action product-action-secondary" onMouseDown={(event) => event.preventDefault()} onClick={undoHomeSelection}>Undo</button></div> : null}<p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
           <SettingsResultLine channel={result} />
           <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
           {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked Cadence account, a finished sync and an internet connection.</p> : null}

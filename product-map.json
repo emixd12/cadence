@@ -23,7 +23,7 @@
   ],
   "counts": {
     "nodes": {
-      "api": 62,
+      "api": 63,
       "avatar": 11,
       "component": 70,
       "family": 16,
@@ -35,7 +35,7 @@
       "notice": 137,
       "repository": 50,
       "route": 77,
-      "service": 219,
+      "service": 222,
       "surface": 12,
       "table": 57,
       "term": 287,
@@ -58,9 +58,9 @@
       "renders (derived)": 239,
       "shown-by (asserted)": 179,
       "shows (derived)": 172,
-      "styled-by (derived)": 513,
+      "styled-by (derived)": 514,
       "tested-by (asserted)": 596,
-      "uses (derived)": 1819
+      "uses (derived)": 1836
     }
   },
   "nodes": [
@@ -482,6 +482,13 @@
       "kind": "api",
       "name": "/api/travel/place-labels",
       "path": "app/api/travel/place-labels/route.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "api:/api/travel/place-search",
+      "kind": "api",
+      "name": "/api/travel/place-search",
+      "path": "app/api/travel/place-search/route.ts",
       "source": "repository file"
     },
     {
@@ -10866,6 +10873,13 @@
       "source": "repository file"
     },
     {
+      "id": "service:lib/services/geoapify-provider.ts",
+      "kind": "service",
+      "name": "lib/services/geoapify-provider.ts",
+      "path": "lib/services/geoapify-provider.ts",
+      "source": "repository file"
+    },
+    {
       "id": "service:lib/services/google-calendar-agent-retirement.service.ts",
       "kind": "service",
       "name": "lib/services/google-calendar-agent-retirement.service.ts",
@@ -11164,6 +11178,13 @@
       "kind": "service",
       "name": "lib/services/place-labels.service.ts",
       "path": "lib/services/place-labels.service.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "service:lib/services/place-search.service.ts",
+      "kind": "service",
+      "name": "lib/services/place-search.service.ts",
+      "path": "lib/services/place-search.service.ts",
       "source": "repository file"
     },
     {
@@ -11689,6 +11710,13 @@
       "kind": "service",
       "name": "packages/core/src/services/place-labels.ts",
       "path": "packages/core/src/services/place-labels.ts",
+      "source": "repository file"
+    },
+    {
+      "id": "service:packages/core/src/services/place-search.ts",
+      "kind": "service",
+      "name": "packages/core/src/services/place-search.ts",
+      "path": "packages/core/src/services/place-search.ts",
       "source": "repository file"
     },
     {
@@ -17663,6 +17691,34 @@
       "source": "scan:app/api/travel/place-labels/route.ts#lib/services/place-labels.service.ts"
     },
     {
+      "from": "api:/api/travel/place-search",
+      "type": "uses",
+      "to": "service:lib/services/geoapify-provider.ts",
+      "grade": "derived",
+      "source": "scan:app/api/travel/place-search/route.ts#lib/services/geoapify-provider.ts"
+    },
+    {
+      "from": "api:/api/travel/place-search",
+      "type": "uses",
+      "to": "service:lib/services/google-calendar-oauth.ts",
+      "grade": "derived",
+      "source": "scan:app/api/travel/place-search/route.ts#lib/services/google-calendar-oauth.ts"
+    },
+    {
+      "from": "api:/api/travel/place-search",
+      "type": "uses",
+      "to": "service:lib/services/google-calendar-request.ts",
+      "grade": "derived",
+      "source": "scan:app/api/travel/place-search/route.ts#lib/services/google-calendar-request.ts"
+    },
+    {
+      "from": "api:/api/travel/place-search",
+      "type": "uses",
+      "to": "service:lib/services/place-search.service.ts",
+      "grade": "derived",
+      "source": "scan:app/api/travel/place-search/route.ts#lib/services/place-search.service.ts"
+    },
+    {
       "from": "api:/api/travel/routes",
       "type": "uses",
       "to": "service:lib/services/google-calendar-request.ts",
@@ -21352,6 +21408,13 @@
       "source": "scan:components/settings/TravelSettingsPanel.tsx"
     },
     {
+      "from": "component:module.travel-settings-panel",
+      "type": "styled-by",
+      "to": "token:--text-xs",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx"
+    },
+    {
       "from": "component:module.trust-and-legal-panel",
       "type": "belongs-to",
       "to": "family:module.settings-controls",
@@ -24607,6 +24670,13 @@
       "source": "scan:app/(app)/behaviors/page.tsx#packages/core/src/services/behavior-views.ts"
     },
     {
+      "from": "file:app/(app)/behaviors/page.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:app/(app)/behaviors/page.tsx#packages/core/src/services/place-search.ts"
+    },
+    {
       "from": "file:app/(app)/chat/page.tsx",
       "type": "renders",
       "to": "component:layout.cadence-page-banner",
@@ -26649,6 +26719,13 @@
       "to": "service:lib/services/source-links.service.ts",
       "grade": "derived",
       "source": "scan:apps/desktop/src/behaviors-screen.tsx#lib/services/source-links.service.ts"
+    },
+    {
+      "from": "file:apps/desktop/src/behaviors-screen.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/behaviors-screen.tsx#packages/core/src/services/place-search.ts"
     },
     {
       "from": "file:apps/desktop/src/calendar/connector-broker.ts",
@@ -29516,6 +29593,13 @@
     {
       "from": "file:apps/desktop/src/product.tsx",
       "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:apps/desktop/src/product.tsx#packages/core/src/services/place-search.ts"
+    },
+    {
+      "from": "file:apps/desktop/src/product.tsx",
+      "type": "uses",
       "to": "service:packages/core/src/services/recorded-activity-refresh.ts",
       "grade": "derived",
       "source": "scan:apps/desktop/src/product.tsx#packages/core/src/services/recorded-activity-refresh.ts"
@@ -30228,6 +30312,13 @@
       "source": "scan:components/behaviors/BehaviorForm.tsx#packages/core/src/services/behavior.service.ts"
     },
     {
+      "from": "file:components/behaviors/BehaviorForm.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorForm.tsx#packages/core/src/services/place-search.ts"
+    },
+    {
       "from": "file:components/behaviors/BehaviorList.tsx",
       "type": "calls",
       "to": "api:/api/advisor/coach/schedule-proposal",
@@ -30331,6 +30422,13 @@
       "to": "service:packages/core/src/services/behavior-values.ts",
       "grade": "derived",
       "source": "scan:components/behaviors/BehaviorList.tsx#packages/core/src/services/behavior-values.ts"
+    },
+    {
+      "from": "file:components/behaviors/BehaviorList.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:components/behaviors/BehaviorList.tsx#packages/core/src/services/place-search.ts"
     },
     {
       "from": "file:components/behaviors/BehaviorRunControls.tsx",
@@ -32260,6 +32358,13 @@
     {
       "from": "file:components/settings/TravelSettingsPanel.tsx",
       "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:components/settings/TravelSettingsPanel.tsx#packages/core/src/services/place-search.ts"
+    },
+    {
+      "from": "file:components/settings/TravelSettingsPanel.tsx",
+      "type": "uses",
       "to": "service:packages/core/src/services/travel-habits.ts",
       "grade": "derived",
       "source": "scan:components/settings/TravelSettingsPanel.tsx#packages/core/src/services/travel-habits.ts"
@@ -33124,6 +33229,13 @@
       "to": "service:packages/core/src/services/departure-phrases.ts",
       "grade": "derived",
       "source": "scan:components/timeline/TravelWeather.tsx#packages/core/src/services/departure-phrases.ts"
+    },
+    {
+      "from": "file:components/travel/PlaceLabels.tsx",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:components/travel/PlaceLabels.tsx#packages/core/src/services/place-search.ts"
     },
     {
       "from": "file:components/travel/PlaceLabels.tsx",
@@ -62904,6 +63016,20 @@
       "source": "scan:lib/services/export.service.ts#packages/core/src/services/export-download.ts"
     },
     {
+      "from": "service:lib/services/geoapify-provider.ts",
+      "type": "uses",
+      "to": "service:lib/services/provider-call-timeout.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/geoapify-provider.ts#lib/services/provider-call-timeout.ts"
+    },
+    {
+      "from": "service:lib/services/geoapify-provider.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/geoapify-provider.ts#packages/core/src/services/place-search.ts"
+    },
+    {
       "from": "service:lib/services/google-calendar-agent-retirement.service.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviors.repo.ts",
@@ -64654,6 +64780,27 @@
       "source": "scan:lib/services/place-labels.service.ts#packages/core/src/services/travel-place-key.ts"
     },
     {
+      "from": "service:lib/services/place-search.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/geoapify-provider.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/place-search.service.ts#lib/services/geoapify-provider.ts"
+    },
+    {
+      "from": "service:lib/services/place-search.service.ts",
+      "type": "uses",
+      "to": "service:lib/services/google-calendar.service.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/place-search.service.ts#lib/services/google-calendar.service.ts"
+    },
+    {
+      "from": "service:lib/services/place-search.service.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/place-search.ts",
+      "grade": "derived",
+      "source": "scan:lib/services/place-search.service.ts#packages/core/src/services/place-search.ts"
+    },
+    {
       "from": "service:lib/services/push-subscription.service.ts",
       "type": "uses",
       "to": "repository:lib/db/behaviors.repo.ts",
@@ -66199,6 +66346,13 @@
       "to": "service:packages/core/src/services/travel-settings.ts",
       "grade": "derived",
       "source": "scan:packages/core/src/services/place-labels.ts#packages/core/src/services/travel-settings.ts"
+    },
+    {
+      "from": "service:packages/core/src/services/place-search.ts",
+      "type": "uses",
+      "to": "service:packages/core/src/services/travel-place-key.ts",
+      "grade": "derived",
+      "source": "scan:packages/core/src/services/place-search.ts#packages/core/src/services/travel-place-key.ts"
     },
     {
       "from": "service:packages/core/src/services/recorded-activity-refresh.ts",
