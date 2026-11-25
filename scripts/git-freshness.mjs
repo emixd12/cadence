@@ -7,7 +7,10 @@
 //     Turns on the versioned Git hooks in .githooks for this clone, fetches
 //     origin, fast-forwards local main, deletes local branches whose remote
 //     branch is gone after a merge, and prints what still needs a decision.
-//     Prints nothing when everything is current.
+//     It rewrites an absolute core.hooksPath that points at this repository's
+//     .githooks to the relative form, so each worktree runs its own hooks, and
+//     prompts for a separate STATUS.md archive PR when origin/main's STATUS.md
+//     nears the agents:check limit. Prints nothing when everything is current.
 //
 // Agent session-start hooks (.claude/settings.json, .codex/hooks.json) call
 // this same command. It exits 0 on every error so a Git problem never blocks a
@@ -22,6 +25,9 @@ const BASE = "origin/main";
 const HOOKS_PATH = ".githooks";
 const FETCH_TIMEOUT_MS = 15_000;
 const STALE_DAYS = 14;
+const STATUS_LIMIT_BYTES = 40_000; // scripts/check-agents.mjs fails above this.
+const STATUS_ARCHIVE_PROMPT_BYTES = 34_000;
+const STATUS_ARCHIVE_BRANCH = "chore/status-archive";
 
 // ---------------------------------------------------------------------------
 // Report (pure)
@@ -33,6 +39,8 @@ export function formatReport(state) {
     lines.push(`- \`git fetch origin\` failed (${state.fetchError}). ${BASE} may be stale.`);
   }
   if (state.mainUpdate) lines.push(`- ${state.mainUpdate}`);
+  const archive = formatStatusArchive(state.statusArchive);
+  if (archive) lines.push(`- ${archive}`);
   if (state.current && state.current.branch !== "main" && state.current.behind > 0) {
     lines.push(
       `- This checkout's branch \`${state.current.branch ?? "(detached)"}\` is ${state.current.behind} ` +
@@ -67,6 +75,44 @@ export function formatReport(state) {
   }
   if (lines.length === 0) return "";
   return [`Git freshness (start new branches from ${BASE}):`, ...lines].join("\n");
+}
+
+/**
+ * One line when STATUS.md on origin/main nears the agents:check limit. The
+ * archive move runs once, on a fixed branch, in its own docs-only PR, so it
+ * never hides inside a feature commit. A second session that also acts on the
+ * prompt collides on the branch name instead of archiving twice.
+ */
+export function formatStatusArchive(statusArchive) {
+  if (!statusArchive || statusArchive.bytes <= STATUS_ARCHIVE_PROMPT_BYTES) return "";
+  const size =
+    `STATUS.md on ${BASE} is ${statusArchive.bytes.toLocaleString("en-US")} bytes ` +
+    `of the ${STATUS_LIMIT_BYTES.toLocaleString("en-US")} limit`;
+  if (statusArchive.inProgress) {
+    return (
+      `${size}; \`origin/${STATUS_ARCHIVE_BRANCH}\` exists, so the archive is in progress. ` +
+      `Do not run \`npm run status:archive\` in a feature branch.`
+    );
+  }
+  return (
+    `${size}; before feature work, run \`npm run status:archive\` on a branch named ` +
+    `\`${STATUS_ARCHIVE_BRANCH}\` from ${BASE} and merge it as its own docs-only PR.`
+  );
+}
+
+/**
+ * What to do with core.hooksPath. `repoRoots` are the main checkout and every
+ * worktree of this repository. An absolute path to the .githooks directory of
+ * any of them is rewritten to the relative `.githooks`, so each worktree runs
+ * its own copy of the hooks. Any other value belongs to the owner.
+ */
+export function hooksPathAction(current, repoRoots, resolve = path.resolve) {
+  if (!current) return "set";
+  if (current === HOOKS_PATH) return "keep";
+  if (!path.isAbsolute(current)) return "foreign";
+  const target = resolve(current);
+  const ours = repoRoots.some((root) => resolve(path.join(root, HOOKS_PATH)) === target);
+  return ours ? "rewrite" : "foreign";
 }
 
 // ---------------------------------------------------------------------------
@@ -112,16 +158,40 @@ function relative(root, target) {
   return !rel.startsWith("..") && !path.isAbsolute(rel) ? rel : target;
 }
 
-function installHooks(topLevel) {
+function realPath(target) {
+  try {
+    return fs.realpathSync(target);
+  } catch {
+    return path.resolve(target);
+  }
+}
+
+function installHooks(topLevel, repoRoots) {
   if (!fs.existsSync(path.join(topLevel, HOOKS_PATH, "reference-transaction"))) return null;
   const current = git(["config", "--get", "core.hooksPath"]).out;
-  if (current === HOOKS_PATH) return null;
-  if (current) {
+  const action = hooksPathAction(current, repoRoots, realPath);
+  if (action === "keep") return null;
+  if (action === "foreign") {
     return `core.hooksPath is \`${current}\`, so the branch guard in ${HOOKS_PATH} is off. Tell the owner.`;
   }
-  return git(["config", "core.hooksPath", HOOKS_PATH]).ok
-    ? `Turned on the Git hooks in ${HOOKS_PATH} for this clone (branch guard).`
+  const set = git(["config", "core.hooksPath", HOOKS_PATH]).ok;
+  if (action === "rewrite") {
+    return set
+      ? `Rewrote core.hooksPath from \`${current}\` to \`${HOOKS_PATH}\`, so each worktree runs its own hooks.`
+      : `core.hooksPath is \`${current}\`; rewriting it to \`${HOOKS_PATH}\` failed.`;
+  }
+  return set
+    ? `Turned on the Git hooks in ${HOOKS_PATH} for this clone (branch guard, pre-push checks).`
     : `Could not set core.hooksPath to ${HOOKS_PATH}.`;
+}
+
+function statusArchiveState() {
+  const size = git(["cat-file", "-s", `${BASE}:STATUS.md`]);
+  if (!size.ok) return null;
+  return {
+    bytes: Number(size.out) || 0,
+    inProgress: git(["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${STATUS_ARCHIVE_BRANCH}`]).ok,
+  };
 }
 
 export function collectState() {
@@ -129,6 +199,7 @@ export function collectState() {
     hooks: null,
     fetchError: null,
     mainUpdate: null,
+    statusArchive: null,
     current: null,
     deleted: [],
     mergedWorktrees: [],
@@ -143,14 +214,14 @@ export function collectState() {
   const mainRoot = path.dirname(commonDir);
   const here = path.resolve(topLevel.out);
 
-  state.hooks = installHooks(here);
+  git(["worktree", "prune"]);
+  const worktrees = parseWorktrees(git(["worktree", "list", "--porcelain"]).out);
+  state.hooks = installHooks(here, [mainRoot, here, ...worktrees.map((entry) => entry.path)]);
 
   const fetch = git(["fetch", "origin", "--prune", "--quiet"], { timeout: FETCH_TIMEOUT_MS });
   if (!fetch.ok) state.fetchError = fetch.err.split("\n")[0] || "timed out";
   if (!git(["rev-parse", "--verify", "--quiet", BASE]).ok) return state;
-
-  git(["worktree", "prune"]);
-  const worktrees = parseWorktrees(git(["worktree", "list", "--porcelain"]).out);
+  state.statusArchive = statusArchiveState();
   const checkedOut = new Set(worktrees.map((entry) => entry.branch).filter(Boolean));
   const currentBranch = git(["symbolic-ref", "--quiet", "--short", "HEAD"]).out || null;
 
