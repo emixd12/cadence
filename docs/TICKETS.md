@@ -20079,7 +20079,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 358: Alongside in the Behavior form and on the Timeline (web)
 
-Status: not_started
+Status: complete (November 25, 2026; behind `CADENCE_ALONGSIDE`, off)
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 

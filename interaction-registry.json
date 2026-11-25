@@ -598,7 +598,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 66,
+      "interaction_marker_count": 70,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -620,7 +620,9 @@
         "INT-BEHAVIOR-037",
         "INT-BEHAVIOR-038",
         "INT-BEHAVIOR-039",
-        "INT-BEHAVIOR-040"
+        "INT-BEHAVIOR-040",
+        "INT-BEHAVIOR-046",
+        "INT-BEHAVIOR-047"
       ]
     },
     {
@@ -1637,6 +1639,12 @@
       "name": "Behaviors of Opportunity",
       "meaning": "Behaviors available to add to today when there is a chance, with or without a fixed schedule: the Opportunity Basket, Done now and Remove.",
       "spec": "docs/RECURRENCE_RULES.md#behaviors-of-opportunity"
+    },
+    {
+      "id": "alongside-behaviors",
+      "name": "Alongside Behaviors",
+      "meaning": "A Behavior setting for things done during other things at the same place, with Cadence's guess shown as a guess until the person answers (D33).",
+      "spec": "docs/DECISIONS.md#2026-11-25-alongside-behaviors-and-the-guessed-where-d33"
     },
     {
       "id": "review-and-adherence",
@@ -18774,7 +18782,7 @@
           "control": "Review Where"
         }
       ],
-      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1.",
+      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form.",
       "success_result": "Opens Details and Settings with Where filled in and a note to save; the Behavior changes only when the user saves.",
       "failure_result": "No change is stored.",
       "effects": [
@@ -18793,7 +18801,8 @@
         "references": [
           "tests/place-labels.dom.test.tsx",
           "tests/place-labels.service.test.ts",
-          "tests/place-label.resolver.test.ts"
+          "tests/place-label.resolver.test.ts",
+          "tests/alongside-ui.dom.test.tsx"
         ],
         "notes": "DOM tests prove the suggestion is not applied by itself and carries its rule version."
       },
@@ -18869,7 +18878,7 @@
         }
       ],
       "availability": "On an active Behavior with a suggestion.",
-      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies.",
+      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies. Ticket 358: dismissing a guessed Where stores the same dismissal and hides that guess; planning keeps using the guess.",
       "failure_result": "Keeps the suggestion visible.",
       "effects": [
         "database_write",
@@ -18885,7 +18894,8 @@
         "references": [
           "tests/place-labels.dom.test.tsx",
           "tests/place-labels.service.test.ts",
-          "tests/place-label.resolver.test.ts"
+          "tests/place-label.resolver.test.ts",
+          "tests/alongside-ui.dom.test.tsx"
         ],
         "notes": "DOM, resolver and service tests cover the dismissal and its return rule."
       },
@@ -21442,6 +21452,177 @@
             "tests/desktop-sub-behaviors.test.ts"
           ],
           "reason": "Sub-behaviors Mac parity: the shared BehaviorList runs with subBehaviorsEnabled on the Mac."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-046",
+      "name": "Answer whether a Behavior can be done alongside other things",
+      "feature": "alongside-behaviors",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#save-reset-or-update-a-behavior-draft"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "intent": "Say whether a Behavior can happen during other things at the same place, or leave it unanswered.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Can be done alongside other things"
+        }
+      ],
+      "availability": "In the create and edit forms on the hosted web app while CADENCE_ALONGSIDE is on. Not answered, Yes or No.",
+      "success_result": "Save stores behaviors.alongside (Yes true, No false, Not answered null) through the Behavior definition service. Timeline rows then show Alongside, and planning uses the answer instead of the guess.",
+      "failure_result": "Any other value is refused with a field error; the draft stays.",
+      "effects": [
+        "form_draft",
+        "database_write"
+      ],
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx#AlongsideField",
+        "lib/services/behavior-form.ts#parseAlongsideAnswer",
+        "lib/services/alongside-view.service.ts",
+        "packages/core/src/resolvers/alongside.resolver.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/alongside-ui.dom.test.tsx",
+          "tests/behavior-form.test.ts",
+          "tests/alongside.resolver.test.ts",
+          "tests/alongside-view.service.test.ts"
+        ],
+        "notes": "DOM tests cover the three states and the absent field without alongside data; parser tests cover each value and the flag-off case."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx",
+            "lib/services/behavior-form.ts",
+            "lib/services/alongside-view.service.ts"
+          ],
+          "evidence": [
+            "tests/alongside-ui.dom.test.tsx",
+            "tests/behavior-form.test.ts",
+            "tests/alongside.resolver.test.ts",
+            "tests/alongside-view.service.test.ts"
+          ],
+          "reason": "Behind CADENCE_ALONGSIDE, off in production until Ticket 365's acceptance passes."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 363. The shared form shows no alongside field until the Mac passes alongside data."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BEHAVIOR-047",
+      "name": "Use Cadence's alongside guess",
+      "feature": "alongside-behaviors",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/behaviors-and-review.md#save-reset-or-update-a-behavior-draft"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "intent": "Accept Cadence's guess for an unanswered alongside setting in one tap.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Use the guess"
+        }
+      ],
+      "availability": "In the edit form while the setting is Not answered and a current model guess exists, with CADENCE_ALONGSIDE on.",
+      "success_result": "Fills the field with the guess (Yes or No) and hides the guess line; Save stores it like every other field.",
+      "failure_result": "Nothing is saved until the person saves the form.",
+      "effects": [
+        "form_draft"
+      ],
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx#AlongsideField",
+        "packages/core/src/resolvers/alongside.resolver.ts#alongsideFormView"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/alongside-ui.dom.test.tsx",
+          "tests/behavior-form.test.ts",
+          "tests/alongside.resolver.test.ts",
+          "tests/alongside-view.service.test.ts"
+        ],
+        "notes": "DOM test accepts the guess, checks the posted field, and shows the guess again after Not answered."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx"
+          ],
+          "evidence": [
+            "tests/alongside-ui.dom.test.tsx",
+            "tests/behavior-form.test.ts",
+            "tests/alongside.resolver.test.ts",
+            "tests/alongside-view.service.test.ts"
+          ],
+          "reason": "Behind CADENCE_ALONGSIDE, off in production until Ticket 365's acceptance passes."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 363. The shared form shows no alongside field until the Mac passes alongside data."
         },
         "marketing": {
           "applicability": "not_applicable",
