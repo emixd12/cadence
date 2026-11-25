@@ -9,6 +9,7 @@ import {
   type BriefMoveRoutine,
   type BriefMoveTravel,
 } from "../types/brief-moves";
+import { resolveRoutineBlockAlongside, type AlongsideSource } from "./alongside.resolver";
 import { localDateAt, localDayBounds } from "./time.resolver";
 
 /**
@@ -20,7 +21,8 @@ import { localDateAt, localDayBounds } from "./time.resolver";
  *     cached model estimate, then 30 minutes.
  *   - An exact-time item blocks its own length; a range item blocks only its own
  *     length, placed at the earliest point in its range that is free.
- *   - An "alongside" item (a pill, a device) blocks nothing.
+ *   - An "alongside" item (a pill, a device) blocks nothing. Whether an item is
+ *     alongside comes from alongside.resolver.ts (the person's answer, the guess, false).
  *   - Items and calendar events keep a 10-minute gap on each side. Travel spans
  *     already include their own margins, so they keep none.
  *   - The moved item's own travel (when known) pads its interval before and after.
@@ -50,7 +52,10 @@ export type BriefMoveDayItem = Readonly<{
   /** Exact items: effective end (moved) or start + length. Range items: the range end. */
   end: Temporal.Instant;
   length: BriefMoveLength;
+  /** From `resolveAlongside` (alongside.resolver.ts). */
   alongside: boolean;
+  /** Where `alongside` came from. Absent on items built before Ticket 356 (fixtures). */
+  alongsideSource?: AlongsideSource;
   revision: string;
   behaviorRevision: string;
   /** Set for a sub-behavior's step (depth 1). */
@@ -117,13 +122,15 @@ export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): B
     if (!block) { out.push(item); continue; }
     if (block.members[0]!.occurrenceId !== item.occurrenceId) continue;
     const timed = block.members.filter((member) => !member.alongside);
+    const alongside = resolveRoutineBlockAlongside(block.members);
     const minutes = Math.min(1440, Math.max(1, timed.reduce((sum, member) => sum + member.length.minutes, 0)));
     const end = item.start.add({ minutes });
     out.push({
       ...item,
       title: block.title,
       end,
-      alongside: timed.length === 0,
+      alongside: alongside.value,
+      ...(item.alongsideSource ? { alongsideSource: alongside.source } : {}),
       length: {
         minutes,
         source: timed.every((member) => member.length.source === item.length.source) ? item.length.source : timed[0]?.length.source ?? item.length.source,
