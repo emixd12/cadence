@@ -26,7 +26,6 @@ function makeView(overrides: Partial<GoogleCalendarAiConnectionView> = {}): Goog
     generation: 2,
     selectionRevision: 3,
     preferences: BASE_PREFS,
-    connectedAt: "2026-11-25T10:00:00Z",
     affectedChatCount: 4,
     ...overrides,
   };
@@ -51,7 +50,7 @@ describe("DesktopCalendarBroker purpose=ai_mcp endpoints", () => {
   it("calls ?purpose=ai_mcp endpoints with Bearer auth while keeping standard methods untouched", async () => {
     const calls: Array<{ url: string; method: string; auth: string | null; body?: string }> = [];
     const calendars: CalendarListEntry[] = [
-      { id: "primary", summary: "Primary", primary: true, selected: true, hidden: false },
+      { id: "primary", name: "Primary", timezone: "America/New_York", primary: true, selected: true, accessRole: "owner" },
     ];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

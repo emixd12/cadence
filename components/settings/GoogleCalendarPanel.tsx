@@ -69,7 +69,8 @@ export function GoogleCalendarPanel({
   const [aiPending, setAiPending] = useState<"connect" | "sync" | "disconnect" | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(() => aiCallbackMessage ?? null);
   const [aiLoadFailed, setAiLoadFailed] = useState(false);
-  const [hiddenSkipped, setHiddenSkipped] = useState<number>(aiHiddenSkipped);
+  const [syncedHiddenSkipped, setSyncedHiddenSkipped] = useState<number | null>(null);
+  const hiddenSkipped = syncedHiddenSkipped ?? aiHiddenSkipped;
 
   // Q6: single status pill for Connected sources → Google Calendar.
   const sectionState = aiCoordinator
@@ -119,10 +120,6 @@ export function GoogleCalendarPanel({
   const cancelAiAutosave = aiAutosave.cancel;
 
   useEffect(() => {
-    setHiddenSkipped(aiHiddenSkipped);
-  }, [aiHiddenSkipped]);
-
-  useEffect(() => {
     let active = true;
     cancelAutosave();
     void coordinator.getConnection().then(async (view) => {
@@ -152,7 +149,7 @@ export function GoogleCalendarPanel({
       setAiPreferences(view.preferences);
       savedAiPreferences.current = view.preferences;
       if (view.hiddenCalendarsSkipped && view.hiddenCalendarsSkipped > 0) {
-        setHiddenSkipped(view.hiddenCalendarsSkipped);
+        setSyncedHiddenSkipped(view.hiddenCalendarsSkipped);
       }
       if (view.status === "connected") {
         try { const list = await aiCoordinator.listCalendars(); if (active) setAiCalendars(list); }
@@ -222,7 +219,7 @@ export function GoogleCalendarPanel({
       setAiConnection((prev) => ({ ...prev, ...result.view }));
       setAiPreferences(result.view.preferences);
       savedAiPreferences.current = result.view.preferences;
-      setHiddenSkipped(result.hiddenCalendarsSkipped);
+      setSyncedHiddenSkipped(result.hiddenCalendarsSkipped);
       setAiMessage("AI calendar selection synced from Timeline.");
       onAiConnectionChange?.();
     } catch {
@@ -240,7 +237,7 @@ export function GoogleCalendarPanel({
       setAiPreferences(result.view.preferences);
       setAiCalendars([]);
       savedAiPreferences.current = result.view.preferences;
-      setHiddenSkipped(0);
+      setSyncedHiddenSkipped(0);
       setAiMessage(result.revocationFailed
         ? "Google Calendar for AI disconnected. Google could not confirm grant revocation; remove Cadence in Google account permissions if needed."
         : "Google Calendar for AI disconnected. Timeline stays connected.");
