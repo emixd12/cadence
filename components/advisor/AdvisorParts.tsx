@@ -6,20 +6,21 @@ import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core
 
 import {
   TIP_REACTION_OUTCOME,
+  advisorBubbleTeaser,
   audienceLabel,
-  briefLineText,
   evidenceKindLabel,
   evidenceStrengthLabel,
-  proposalShortLine,
 } from "@/lib/ui/advisor";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
 import { AdvisorAvatar } from "./AdvisorAvatar";
 import { useAdvisor, useAdvisorBriefTarget } from "./AdvisorProvider";
+import windowStyles from "./advisor-window.module.css";
 
 /**
- * Advisor plan Phase 4 (4E), placement K: the window horse at the top, the one line
- * under today's date and the advisor panel. Text-like per DESIGN.md: actions are
- * underlined text, outcomes italic, small notes grey, errors one red line.
+ * Advisor plan Phase 4 (4E) + November 24, 2026 speech-pill revision: the window horse
+ * straddling the top wave banner (with a speech pill when something waits) and the advisor
+ * panel. Text-like per DESIGN.md: actions are underlined text, outcomes italic, small notes
+ * grey, errors one red line.
  */
 
 const LINK = "underline underline-offset-2 disabled:no-underline disabled:opacity-60";
@@ -36,35 +37,69 @@ export function AdvisorHorse({ size }: Readonly<{ size: number }>) {
 }
 
 /**
- * Top centre of the page, staying there on scroll: 48px on desktop and the Mac, 40px in
- * the middle of the phone top bar. "Advisor · 1 new" when something waits.
+ * Advisor header straddling the top wave banner, scrolling naturally with the page:
+ * 72px on desktop and the Mac (speech pill side-by-side to the right), 60px on phones
+ * (speech pill stacked directly below). When nothing waits (or the panel is open), the
+ * speech pill disappears and the quiet "Advisor" label sits under the horse.
  */
 export function AdvisorWindow() {
   const advisor = useAdvisor();
   if (!advisor) return null;
-  const { hasNew, panelOpen, openPanel, closePanel } = advisor;
-  const label = hasNew ? "Advisor · 1 new" : "Advisor";
-  const button = (size: number) => (
-    <button type="button" onClick={panelOpen ? closePanel : openPanel} aria-expanded={panelOpen}
-      aria-label={hasNew ? "Open the advisor, 1 new" : panelOpen ? "Close the advisor" : "Open the advisor"}
-      className="pointer-events-auto flex flex-col items-center" data-advisor-window>
-      <AdvisorHorse size={size} />
-      <span className="bg-background px-1 text-xs leading-4">{label}</span>
-    </button>
-  );
-  return (
-    <>
-      {/* Phones and narrow windows: the middle of the top bar. */}
-      <div className="pointer-events-none fixed inset-x-0 top-0.5 z-50 flex items-start justify-center lg:hidden">{button(40)}</div>
-      {/* Desktop and the Mac: top centre of the page column, kept in view on scroll. */}
-      <div className="pointer-events-none sticky top-3 z-30 hidden h-0 items-start justify-center overflow-visible lg:flex">{button(48)}</div>
-    </>
-  );
-}
+  const { hasNew, item, panelOpen, openPanel, closePanel } = advisor;
+  const teaser = hasNew && item && !panelOpen ? advisorBubbleTeaser(item) : null;
+  const ariaLabel = teaser
+    ? `Open the advisor: ${teaser}`
+    : panelOpen
+      ? "Close the advisor"
+      : "Open the advisor";
+  const toggle = panelOpen ? closePanel : openPanel;
 
-/** Space under the banner so the horse and its label never cover the date. */
-export function AdvisorWindowSpacer() {
-  return useAdvisor() ? <div aria-hidden="true" className="h-12 sm:h-14" /> : null;
+  return (
+    <div className="relative z-10 -mt-7 flex justify-center px-4 pb-2 sm:-mt-9 lg:-mt-11">
+      {/* Phones and narrow windows: 60px horse centered, speech pill stacked below. */}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={panelOpen}
+        aria-label={ariaLabel}
+        className={[windowStyles.trigger, "flex flex-col items-center gap-2 lg:hidden"].join(" ")}
+        data-advisor-window
+      >
+        <AdvisorHorse size={60} />
+        {teaser ? (
+          <span className={[windowStyles.pill, windowStyles.tailTop].join(" ")} data-advisor-bubble={item!.kind}>
+            <span>{teaser}</span>
+            <span aria-hidden="true" className={windowStyles.arrow}>→</span>
+          </span>
+        ) : (
+          <span className="bg-background px-1 text-xs leading-4 text-muted-readable">Advisor</span>
+        )}
+      </button>
+
+      {/* Desktop and the Mac: 72px horse, speech pill side-by-side to the right when waiting. */}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={panelOpen}
+        aria-label={ariaLabel}
+        className={[
+          windowStyles.trigger,
+          teaser ? "hidden items-center gap-3 lg:flex" : "hidden flex-col items-center gap-1 lg:flex",
+        ].join(" ")}
+        data-advisor-window
+      >
+        <AdvisorHorse size={72} />
+        {teaser ? (
+          <span className={[windowStyles.pill, windowStyles.tailLeft].join(" ")} data-advisor-bubble={item!.kind}>
+            <span>{teaser}</span>
+            <span aria-hidden="true" className={windowStyles.arrow}>→</span>
+          </span>
+        ) : (
+          <span className="bg-background px-1 text-xs leading-4 text-muted-readable">Advisor</span>
+        )}
+      </button>
+    </div>
+  );
 }
 
 function Dot() {
@@ -208,39 +243,6 @@ function TipQuestion({ view }: Readonly<{ view: Extract<ScheduleProposalView, { 
 
 const PROPOSAL_ANSWERS = [["try", "Try for two weeks"], ["for_good", "Change for good"], ["no", "No"]] as const;
 const CHECK_IN_ANSWERS = [["keep", "Keep"], ["go_back", "Go back"]] as const;
-
-/** The one line under today's date, with no avatar. A day with nothing shows no line. */
-export function AdvisorDayLine() {
-  const advisor = useAdvisor();
-  const item = advisor?.item;
-  if (!advisor || !item || advisor.panelOpen) return null;
-  const proposal = advisor.proposal;
-  let body: ReactNode;
-  if (item.kind === "brief") {
-    body = <p>{briefLineText(item.openMoves)} <button type="button" className={LINK} onClick={advisor.openPanel}>Open</button></p>;
-  } else if (item.kind === "proposal") {
-    body = (
-      <>
-        <p>{proposalShortLine(item.view)}{proposal?.outcome ? null : <> <button type="button" className={LINK} onClick={advisor.openPanel}>Answer</button></>}</p>
-        <ProposalOutcome />
-      </>
-    );
-  } else if (item.kind === "check_in") {
-    body = (
-      <>
-        <p>{item.view.question}</p>
-        {proposal?.outcome ? <Outcome>{proposal.outcome}</Outcome> : <ProposalAnswers answers={CHECK_IN_ANSWERS} />}
-        {proposal?.outcome ? null : <p className="text-xs leading-5 text-muted-readable">Your two-week try ends today.</p>}
-        <ErrorLine text={proposal?.error ?? null} />
-      </>
-    );
-  } else if (item.kind === "notice") {
-    body = <p>{item.view.text}</p>;
-  } else {
-    body = <TipBlock full={false} />;
-  }
-  return <div className="pt-3 text-sm leading-6" data-advisor-line={item.kind}>{body}</div>;
-}
 
 function Section({ heading, children }: Readonly<{ heading?: string; children: ReactNode }>) {
   return (

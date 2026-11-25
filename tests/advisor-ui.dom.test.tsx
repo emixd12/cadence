@@ -5,9 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RefreshProvider } from "@cadence/ui/runtime";
 import { AdvisorTimelineFrame } from "@/components/advisor/AdvisorTimelineFrame";
-import { AdvisorDayLine } from "@/components/advisor/AdvisorParts";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
-import { advisorLineItem, behaviorEditHref, parseBehaviorEditTarget, proposalShortLine, type AdvisorClient } from "@/lib/ui/advisor";
+import { advisorBubbleTeaser, advisorLineItem, behaviorEditHref, parseBehaviorEditTarget, proposalShortLine, type AdvisorClient } from "@/lib/ui/advisor";
 import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import {
@@ -22,7 +21,7 @@ import {
 } from "@/app/design-system/advisor-fixtures";
 import { BRIEF_MOVE_FIXTURE_BRIEFING, fixtureBriefMoveClient } from "@/app/design-system/brief-move-fixtures";
 
-// Advisor plan Phase 4 (4E): placement K on the web and the Mac (shared components).
+// Advisor plan Phase 4 (4E) + November 24, 2026 speech-pill revision on the web and the Mac.
 
 let container: HTMLDivElement;
 let root: Root;
@@ -43,7 +42,7 @@ async function render(advisor: AdvisorClient | null, brief?: DailyBriefClient, o
       <RefreshProvider onRefresh={refresh}>
         <AdvisorTimelineFrame client={advisor} onOpenLink={onOpenLink} banner={<p>wave banner</p>} fallbackBanner={<p>horse banner</p>}>
           {brief ? <DailyBriefLauncher client={brief} sessionKey="test" /> : null}
-          <section data-today><h2>Thursday</h2><AdvisorDayLine /></section>
+          <section data-today><h2>Thursday</h2></section>
         </AdvisorTimelineFrame>
       </RefreshProvider>,
     );
@@ -51,16 +50,22 @@ async function render(advisor: AdvisorClient | null, brief?: DailyBriefClient, o
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 
-const line = () => document.querySelector<HTMLElement>("[data-advisor-line]");
+const bubble = () => document.querySelector<HTMLElement>("[data-advisor-bubble]");
 const panel = () => document.querySelector<HTMLElement>("[data-advisor-panel]");
-const horseLabel = () => document.querySelector<HTMLElement>("[data-advisor-window]")?.textContent;
+const horseButton = () => document.querySelector<HTMLButtonElement>("[data-advisor-window]");
+const horseLabel = () => horseButton()?.textContent;
 async function click(label: string, scope: ParentNode = document) {
   const button = Array.from(scope.querySelectorAll<HTMLButtonElement>("button")).find((item) => item.textContent?.trim() === label);
   if (!button) throw new Error(`No button ${label}`);
   await act(async () => { button.click(); await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
+async function openAdvisor() {
+  const button = horseButton();
+  if (!button) throw new Error("No advisor window button");
+  await act(async () => { button.click(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+}
 
-describe("advisor line order", () => {
+describe("advisor priority order and speech pill teasers", () => {
   const none = { kind: "none" } as const;
   it("puts the unopened brief first, then a question, then the tip", () => {
     const brief = { kind: "ready", key: "a:2026-11-19", openMoves: 2 } as const;
@@ -77,42 +82,56 @@ describe("advisor line order", () => {
     expect(advisorLineItem({ brief: none, briefSeen: false, proposal: null, tip, tipAnsweredHere: true })?.kind).toBe("tip");
   });
 
-  it("shortens a schedule question for the line", () => {
+  it("shortens a schedule question and builds concise speech pill teasers", () => {
     expect(proposalShortLine(ADVISOR_FIXTURE_PROPOSAL)).toBe("Try Gym at 6:30 PM every Tuesday?");
+    expect(advisorBubbleTeaser({ kind: "brief", openMoves: 2 })).toBe("2 moves suggested for today");
+    expect(advisorBubbleTeaser({ kind: "brief", openMoves: 0 })).toBe("Today’s brief is ready");
+    expect(advisorBubbleTeaser({ kind: "proposal", view: ADVISOR_FIXTURE_PROPOSAL })).toBe("Try Gym at 6:30 PM every Tuesday?");
+    expect(advisorBubbleTeaser({ kind: "check_in", view: ADVISOR_FIXTURE_CHECK_IN })).toBe("Keep Gym at 6:30 PM every Tuesday?");
+    expect(advisorBubbleTeaser({ kind: "tip", tip: ADVISOR_FIXTURE_TIP })).toBe(
+      "Morning journal was done 11 days running, then missed Tuesday and Wednesday",
+    );
   });
 });
 
-describe("advisor placement K", () => {
+describe("advisor speech pill and panel", () => {
   it("shows nothing of the advisor without a client (a Mac with no account)", async () => {
     await render(null);
     expect(container.textContent).toContain("horse banner");
-    expect(document.querySelector("[data-advisor-window]")).toBeNull();
-    expect(line()).toBeNull();
+    expect(horseButton()).toBeNull();
+    expect(bubble()).toBeNull();
   });
 
   it("gives the avatar the resolver's state: waiting with a tip, attending with the panel open", async () => {
     await render(fixtureAdvisorClient());
     const state = () => document.querySelector<HTMLElement>("[data-advisor-window] [data-advisor-avatar]")?.dataset.advisorAvatar;
     expect(state()).toBe("state.waiting");
-    await act(async () => { document.querySelector<HTMLButtonElement>("[data-advisor-window]")!.click(); });
+    await openAdvisor();
     expect(state()).toBe("state.attending");
   });
 
-  it("shows today's tip under the date and saves Helpful as an italic outcome", async () => {
+  it("shows a speech pill instead of the Advisor label when a tip waits, and saves Helpful in the panel", async () => {
     const client = fixtureAdvisorClient();
     const react = vi.spyOn(client, "react");
     await render(client);
     expect(container.textContent).toContain("wave banner");
-    expect(horseLabel()).toContain("Advisor · 1 new");
-    expect(line()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
-    // "Don't suggest this again" is only in the panel.
-    expect(line()?.textContent).not.toContain("Don’t suggest this again");
-    await click("Why this?", line()!);
-    expect(line()?.querySelector("[data-advisor-card]")?.textContent).toContain(ADVISOR_FIXTURE_TIP.research.claim);
-    await click("Helpful", line()!);
+    expect(bubble()?.dataset.advisorBubble).toBe("tip");
+    expect(bubble()?.textContent).toContain("Morning journal was done 11 days running, then missed Tuesday and Wednesday");
+    expect(horseLabel()).not.toContain("Advisor");
+    // No inline line under today's date.
+    expect(document.querySelector("[data-advisor-line]")).toBeNull();
+
+    await openAdvisor();
+    expect(bubble()).toBeNull();
+    expect(panel()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
+    await click("Why this?", panel()!);
+    expect(panel()?.querySelector("[data-advisor-card]")?.textContent).toContain(ADVISOR_FIXTURE_TIP.research.claim);
+    await click("Helpful", panel()!);
     expect(react).toHaveBeenCalledWith(ADVISOR_FIXTURE_TIP.id, "helpful");
-    const outcome = line()?.querySelector("p.italic");
-    expect(outcome?.textContent).toBe("Saved as helpful.");
+    expect(panel()?.querySelector("p.italic")?.textContent).toBe("Saved as helpful.");
+
+    await click("Close", panel()!);
+    expect(bubble()).toBeNull();
     expect(horseLabel()).toBe("Advisor");
   });
 
@@ -123,12 +142,12 @@ describe("advisor placement K", () => {
     expect(nextTip).toHaveBeenCalledTimes(1);
     await act(async () => { window.dispatchEvent(new Event("focus")); await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(nextTip).toHaveBeenCalledTimes(2);
-    expect(line()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
+    expect(bubble()?.dataset.advisorBubble).toBe("tip");
   });
 
   it("opens the panel with the full tip, the trial and a Past tips drill-down, and closes it", async () => {
     await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_TRIAL }));
-    await click("Advisor · 1 new");
+    await openAdvisor();
     expect(panel()).not.toBeNull();
     const text = panel()!.textContent ?? "";
     expect(text).toContain("Today’s tip");
@@ -137,8 +156,8 @@ describe("advisor placement K", () => {
     expect(text).toContain("Read at 9:00 PM every day");
     expect(text).toContain("See past tips (2)");
     expect(text).not.toContain("Saved as helpful.");
-    // The line under the date steps aside while the panel is open.
-    expect(line()).toBeNull();
+    // The speech pill hides while the panel is open.
+    expect(bubble()).toBeNull();
 
     // Open the Past tips drill-down, verify focus moves to Back, expand a research card, and return with Escape and Back.
     await click("See past tips (2)", panel()!);
@@ -175,7 +194,9 @@ describe("advisor placement K", () => {
   it("shows Past tips even without a tip today and follows a past tip's action link", async () => {
     const opened = vi.fn<(link: AdvisorTipLink) => void>();
     await render(fixtureAdvisorClient({ tip: null, recent: [ADVISOR_FIXTURE_LINK_TIP] }), undefined, opened);
-    await click("Advisor");
+    expect(bubble()).toBeNull();
+    expect(horseLabel()).toBe("Advisor");
+    await openAdvisor();
     expect(panel()!.textContent).toContain("See past tips (1)");
     await click("See past tips (1)", panel()!);
     await click("Set a length", panel()!);
@@ -183,25 +204,28 @@ describe("advisor placement K", () => {
     expect(panel()).toBeNull();
   });
 
-  it("answers a check-in on the line and refreshes the Timeline after a schedule change", async () => {
+  it("announces a check-in in the speech pill and answers it in the panel", async () => {
     await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_CHECK_IN }));
-    expect(line()?.textContent).toContain("Keep Gym at 6:30 PM every Tuesday?");
-    await click("Go back", line()!);
-    expect(line()?.querySelector("p.italic")?.textContent).toBe("Gym is back at 7:00 AM every Tuesday.");
+    expect(bubble()?.dataset.advisorBubble).toBe("check_in");
+    expect(bubble()?.textContent).toContain("Keep Gym at 6:30 PM every Tuesday?");
+    await openAdvisor();
+    await click("Go back", panel()!);
+    expect(panel()?.querySelector("p.italic")?.textContent).toBe("Gym is back at 7:00 AM every Tuesday.");
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it("shows a refused answer as one red Not changed line", async () => {
     await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_PROPOSAL, refuseWith: "held_today" }));
-    expect(line()?.textContent).toContain("Try Gym at 6:30 PM every Tuesday?");
-    await click("Answer", line()!);
+    expect(bubble()?.dataset.advisorBubble).toBe("proposal");
+    expect(bubble()?.textContent).toContain("Try Gym at 6:30 PM every Tuesday?");
+    await openAdvisor();
     await click("Try for two weeks", panel()!);
     const alert = panel()!.querySelector("[data-alert-kind=write_refused]");
     expect(alert?.textContent).toBe("Not changed. It would move one of today’s items, so it waits until tomorrow.");
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("puts the brief in the panel and names its open moves on the line until it is opened", async () => {
+  it("puts the brief in the panel and names its open moves in the speech pill until it is opened", async () => {
     const brief: DailyBriefClient = {
       preferences: async () => ({ accountRef: "acct", available: true, enabled: true, revision: 1, localDate: "2026-11-18", timezone: "America/New_York", includeCalendar: false }),
       updatePreferences: async () => { throw new Error("unused"); },
@@ -211,25 +235,28 @@ describe("advisor placement K", () => {
     await render(fixtureAdvisorClient(), brief);
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
     const open = BRIEF_MOVE_FIXTURE_BRIEFING.moves!.lines.filter((item) => item.status === "proposed").length;
-    expect(line()?.textContent).toContain(`${open} moves suggested for today.`);
+    expect(bubble()?.dataset.advisorBubble).toBe("brief");
+    expect(bubble()?.textContent).toContain(`${open} moves suggested for today`);
     // The brief is not on the Timeline itself.
     expect(document.querySelector("[data-daily-brief-state]")).toBeNull();
-    await click("Open", line()!);
+    await openAdvisor();
     const embedded = panel()!.querySelector("[data-daily-brief-embedded]");
     expect(embedded?.textContent).toContain(BRIEF_MOVE_FIXTURE_BRIEFING.text);
     await click("Close", panel()!);
-    // Opened once, the line moves on to the tip.
-    expect(line()?.textContent).toContain(ADVISOR_FIXTURE_TIP.text);
+    // Opened once, the speech pill moves on to the tip.
+    expect(bubble()?.dataset.advisorBubble).toBe("tip");
+    expect(bubble()?.textContent).toContain("Morning journal was done 11 days running, then missed Tuesday and Wednesday");
   });
 });
 
 describe("tips with one-tap changes", () => {
-  it("shows the tip's question on the line, answers Change for good in the panel, then Undo", async () => {
+  it("shows the tip's question in the speech pill, answers Change for good in the panel, then Undo", async () => {
     const client = fixtureAdvisorClient({ tip: ADVISOR_FIXTURE_QUESTION_TIP, proposal: ADVISOR_FIXTURE_TIP_QUESTION });
     const answer = vi.spyOn(client, "answerProposal");
     await render(client);
-    expect(line()?.textContent).toContain("Set Gym to 6:30 PM every day?");
-    await click("Answer", line()!);
+    expect(bubble()?.dataset.advisorBubble).toBe("proposal");
+    expect(bubble()?.textContent).toContain("Set Gym to 6:30 PM every day?");
+    await openAdvisor();
     const question = panel()!.querySelector("[data-advisor-tip-question]");
     expect(question?.textContent).toContain(ADVISOR_FIXTURE_TIP_QUESTION.tip!.text);
     // The tip is shown once, inside its question, not again as today's tip.
@@ -244,16 +271,15 @@ describe("tips with one-tap changes", () => {
     expect(refresh).toHaveBeenCalledTimes(2);
   });
 
-  it("puts a tip's link first and follows it, closing the panel", async () => {
+  it("puts a tip's link first in the panel and follows it, closing the panel", async () => {
     const opened = vi.fn<(link: AdvisorTipLink) => void>();
     await render(fixtureAdvisorClient({ tip: ADVISOR_FIXTURE_LINK_TIP }), undefined, opened);
-    const first = line()!.querySelector("button");
+    await openAdvisor();
+    const tipBlock = panel()!.querySelector<HTMLElement>("[data-advisor-tip]")!;
+    const first = tipBlock.querySelector("button");
     expect(first?.textContent).toBe("Set a length");
-    await click("Set a length", line()!);
-    expect(opened).toHaveBeenCalledWith(ADVISOR_FIXTURE_LINK_TIP.link);
-    await click(horseLabel()!.trim());
     await click("Set a length", panel()!);
-    expect(opened).toHaveBeenCalledTimes(2);
+    expect(opened).toHaveBeenCalledWith(ADVISOR_FIXTURE_LINK_TIP.link);
     expect(panel()).toBeNull();
   });
 

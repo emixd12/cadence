@@ -6,13 +6,13 @@ import { defaultWebDailyBriefClient } from "@/lib/ui/daily-brief";
 import type { AdvisorTipLink } from "@cadence/core/types/advisor-tips";
 import type { AdvisorClient } from "@/lib/ui/advisor";
 import { AdvisorProvider, useAdvisor } from "./AdvisorProvider";
-import { AdvisorPanel, AdvisorWindow, AdvisorWindowSpacer } from "./AdvisorParts";
+import { AdvisorPanel, AdvisorWindow } from "./AdvisorParts";
 
 /**
- * Advisor plan Phase 4 (4E), placement K, for the Timeline on the web and the Mac:
- * the window horse at the top, the banner (without its horse), the page and the panel.
- * Without a client (a Mac not linked to an account) the page shows `fallbackBanner` and
- * nothing of the advisor.
+ * Advisor plan Phase 4 (4E) + November 24, 2026 speech-pill revision, for the Timeline
+ * on the web and the Mac: the wave banner, the advisor horse + speech pill straddling it
+ * (scrolling naturally with the page), the page and the panel. Without a client (a Mac
+ * not linked to an account) the page shows `fallbackBanner` and nothing of the advisor.
  */
 export function AdvisorTimelineFrame({
   client,
@@ -25,7 +25,7 @@ export function AdvisorTimelineFrame({
   client: AdvisorClient | null | undefined;
   /** How a tip's link opens (the Mac goes to its Behaviors screen); the web loads the Behaviors page. */
   onOpenLink?: (link: AdvisorTipLink) => void;
-  /** The banner's wave line with no horse; the horse lives at the top centre now. */
+  /** The banner's wave line with no horse; the advisor horse straddles it. */
   banner: ReactNode;
   /** The old banner with its horse, for a page with no advisor. */
   fallbackBanner?: ReactNode;
@@ -44,9 +44,8 @@ function AdvisorColumn({ banner, children }: Readonly<{ banner: ReactNode; child
   const advisor = useAdvisor();
   return (
     <div className={["flex w-full flex-col", advisor?.panelOpen ? "xl:pr-[26rem]" : ""].join(" ")} data-advisor-column>
-      <AdvisorWindow />
       {banner}
-      <AdvisorWindowSpacer />
+      <AdvisorWindow />
       {children}
     </div>
   );
