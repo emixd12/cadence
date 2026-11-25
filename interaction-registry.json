@@ -598,7 +598,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 63,
+      "interaction_marker_count": 66,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -1155,7 +1155,7 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 11,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002",
@@ -1172,6 +1172,16 @@
       "interaction_marker_count": 2,
       "interaction_ids": [
         "INT-TRAVEL-014"
+      ]
+    },
+    {
+      "path": "components/travel/PlaceAutocomplete.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-TRAVEL-002",
+        "INT-TRAVEL-005",
+        "INT-PLACE-006"
       ]
     },
     {
