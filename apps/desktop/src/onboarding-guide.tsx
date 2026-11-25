@@ -17,6 +17,7 @@ import type {
 } from "@/lib/types/onboarding";
 import { readTravelRoutingReport } from "@/lib/ui/travel";
 import type { DesktopScreen } from "./desktop-app";
+import { readLocalItem, writeLocalItem } from "@/lib/ui/browser-storage";
 import type {
   NativeNotificationPermission,
   NativeSettingsCoverage,
@@ -71,14 +72,7 @@ export function DesktopOnboardingGuide({
 }: DesktopOnboardingGuideProps) {
   const [dismissed, setDismissed] = useState(() => {
     if (forceOpen) return false;
-    try {
-      return (
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(STORAGE_KEY) === "true"
-      );
-    } catch {
-      return false;
-    }
+    return readLocalItem(STORAGE_KEY) === "true";
   });
   const [deviceTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || null,
@@ -140,11 +134,8 @@ export function DesktopOnboardingGuide({
   if (!visible) return null;
 
   function dismiss() {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, "true");
-    } catch {
-      /* Dismissal still works for this session. */
-    }
+    // A refused write is fine: dismissal still works for this session.
+    writeLocalItem(STORAGE_KEY, "true");
     setDismissed(true);
     onDismiss?.();
   }

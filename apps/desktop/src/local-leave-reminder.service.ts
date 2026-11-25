@@ -5,6 +5,7 @@ import {
 } from "@cadence/core/services/mac-leave-reminder-plan";
 import type { DepartureStop, DepartureTrip } from "@cadence/core/types/departure";
 import { notifications } from "./native-spike";
+import { getLocalStorage } from "@/lib/ui/browser-storage";
 
 /**
  * Ticket 280 (decisions D3 and D15): native leave reminders from the Mac's last estimate. They
@@ -37,7 +38,7 @@ const STORAGE_KEY = "cadence.leave-reminders.v1";
 const EMPTY: Stored = { version: 1, accountId: null, enabled: null, records: [] };
 
 function storage(): Storage | null {
-  try { return globalThis.localStorage ?? null; } catch { return null; }
+  return getLocalStorage();
 }
 
 export function readLeaveReminderMemory(): Stored {
