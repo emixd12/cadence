@@ -1,9 +1,11 @@
 import {
   COACH_SIGNAL_THRESHOLDS,
-  COACH_SIGNAL_VERSION,
+  coachSignalVersion,
   resolveCoachSignals,
   type CoachSignal,
 } from "@cadence/core/resolvers/coach-signals.resolver";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
+import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 import { Temporal } from "@js-temporal/polyfill";
 
 import { finishAgentRun, startAgentRun } from "@/lib/db/agent-runs.repo";
@@ -113,6 +115,11 @@ export function hostedDueCoachAccounts(serviceRole: AppSupabaseClient) {
 export type CoachVisitPort = Readonly<{
   startRun(): Promise<Readonly<{ runId: string; localDate: string }>>;
   reads: CoachSignalReads;
+  /**
+   * Ticket 359: each Behavior's effective alongside value, present only while
+   * `CADENCE_ALONGSIDE` is on. With it the visit computes and stores signal version 4.
+   */
+  alongside?: (behaviorIds: readonly string[], today: string) => Promise<ReadonlyMap<string, boolean>>;
   record(runId: string, signals: readonly CoachSignal[]): Promise<number>;
   finishRun(runId: string, outcome: "success" | "error", errorCode: string | null): Promise<void>;
 }>;
@@ -134,7 +141,10 @@ export async function visitCoachAccount(port: CoachVisitPort): Promise<CoachVisi
       port.reads.reminders(addDays(today, -T.reminderDecisionDays), today),
       port.reads.sessions(addDays(today, -T.reminderDecisionDays), today),
     ]);
-    const signals = resolveCoachSignals({ today, behaviors, occurrences, decisions, moves, answers: answers.rows, reminders, sessions });
+    // Version 4 (flag on): every Behavior carries its effective alongside value.
+    const alongside = port.alongside ? await port.alongside(behaviors.map((behavior) => behavior.id), today) : null;
+    const read = alongside ? behaviors.map((behavior) => ({ ...behavior, alongside: alongside.get(behavior.id) === true })) : behaviors;
+    const signals = resolveCoachSignals({ today, behaviors: read, occurrences, decisions, moves, answers: answers.rows, reminders, sessions });
     const stored = await port.record(run.runId, signals);
     await port.finishRun(run.runId, "success", null);
     return { signals: stored, answersSource: answers.source };
@@ -150,14 +160,22 @@ export function createHostedCoachVisitPort(userId: string, options: CreateAgentC
   return createCoachVisitPort(client, userId);
 }
 
-export function createCoachVisitPort(client: AppSupabaseClient, userId: string): CoachVisitPort {
+export function createCoachVisitPort(client: AppSupabaseClient, userId: string,
+  env: Readonly<Record<string, string | undefined>> = process.env): CoachVisitPort {
+  const alongside = alongsideEnabled(env);
+  // coach-signals-4 while CADENCE_ALONGSIDE is on (Ticket 359); coach-signals-3 otherwise.
+  const version = coachSignalVersion(alongside);
   return {
     async startRun() {
-      const run = await startAgentRun(client, { trigger: "scheduled", model: null, promptVersion: COACH_SIGNAL_VERSION });
+      const run = await startAgentRun(client, { trigger: "scheduled", model: null, promptVersion: version });
       return { runId: run.runId, localDate: run.localDate };
     },
     reads: createCoachSignalReads(client, userId),
-    record: (runId, signals) => recordCoachSignals(client, { runId, signalVersion: COACH_SIGNAL_VERSION, signals }),
+    ...(alongside ? { alongside: async (behaviorIds: readonly string[], today: string) => {
+      const facts = await readBehaviorPlanningFacts(client, userId, behaviorIds, today, { env });
+      return new Map([...facts].map(([id, item]) => [id, item.alongside.value]));
+    } } : {}),
+    record: (runId, signals) => recordCoachSignals(client, { runId, signalVersion: version, signals }),
     async finishRun(runId, outcome, errorCode) {
       await finishAgentRun(client, {
         runId, outcome, errorCode, errorReason: null, inputHash: null, modelCalls: 0,

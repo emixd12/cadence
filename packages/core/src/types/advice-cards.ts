@@ -115,7 +115,8 @@ export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly str
   day_shape: ["pattern", "bad_days", "missed_total", "miss_share_on_bad_days"],
   unmarked_items: ["unmarked", "oldest_days"],
   marking_time: ["decisions", "median_lag_hours", "median_mark_time", "same_day_share"],
-  done_together: ["other_behavior_id", "pattern", "together_days", "either_days"],
+  // `alongside` and `other_alongside` (booleans) appear from coach-signals-4 (Ticket 359, CADENCE_ALONGSIDE on).
+  done_together: ["other_behavior_id", "pattern", "together_days", "either_days", "alongside", "other_alongside"],
   crowded_hour: ["hour", "items_in_hour", "hour_rate", "other_rate", "hour_resolved"],
   setup_gaps: ["missing_length", "missing_place", "without_length", "without_place", "active_behaviors"],
   reminder_response: ["reminded_marked", "within_30_min", "later", "quick_share", "median_minutes_after"],
