@@ -140,6 +140,21 @@ npm run smoke:account-sync:local
 CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
 ```
 
+Last, it runs the database-backed `tests/*.local-integration.test.*` files listed
+under `run` in `scripts/supabase-rehearsal-integration-tests.json`, one file at a
+time, with a 6-minute limit. Before the stack starts, the rehearsal generates a
+fresh ES256 key in the private workdir and enables `signing_keys_path` in its
+config copy. The CLI passes the key to Auth as container environment, not as a
+mount. The helper maps `supabase status -o env` and that key to the
+`CADENCE_LOCAL_*` variables in a private file used only by that vitest run. The
+run fails if a listed file skips any test or runs none, from vitest's JSON
+report. Every other local integration file is under `excluded` with its reason,
+usually an app server, a separate opt-in flag or its own isolated project. A unit
+test fails when a new `*.local-integration.test.*` file is in neither list. The
+tests delete their own users; the final `auth.users` check confirms it. Type drift
+(`supabase gen types --local`) is not checked here: the rehearsal excludes
+`postgres-meta`, which that command needs.
+
 Registry evidence, October 27, 2026: authenticated GHCR
 [run 40561396997](https://github.com/emixd12/cadence/actions/runs/40561396997)
 failed the isolated `postgres:17.6.1.132` pull with the fixed
