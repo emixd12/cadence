@@ -1,28 +1,56 @@
 :root {
+  /*
+   * Theme-level base tokens.
+   * A future dark/night mode only overrides this layer (e.g. on :root[data-theme="dark"]).
+   * Surface scopes below derive from these tokens so nested surfaces and light/dark themes compose cleanly.
+   */
   /* Bleached Newsprint: the main app background. */
-  --background: oklch(99.16% 0.0017 67.8);
-
-  /* Ink Black: main text, icons and hard text hierarchy. Outcome notices use it in italic. */
-  --foreground: oklch(14.89% 0.0027 248.1);
+  --theme-background: oklch(99.16% 0.0017 67.8);
 
   /* Cold Surface: secondary panels, empty states, inline note areas and inactive heatmap cells. */
-  --surface: oklch(96.97% 0.0017 247.8);
+  --theme-surface: oklch(96.97% 0.0017 247.8);
 
-  /* Card background and text: the same as the page background and Ink Black. */
+  /* Ink Black: main text, icons and hard text hierarchy. Outcome notices use it in italic. */
+  --theme-foreground: oklch(14.89% 0.0027 248.1);
+
+  /* Readable Ash: secondary text that must stay readable. Note-style notices use it at text-xs. */
+  --theme-muted-readable: oklch(52.59% 0.0187 245.3);
+
+  /* Ash Line: the single border color for dividers, controls, rows and inputs. */
+  --theme-line: oklch(83% 0.006 248);
+
+  /* Monolith Blue: selected states, completed Timeline rows and completed heatmap cells. */
+  --theme-primary: #3572b3;
+
+  /* Text on Monolith Blue fills, such as a completed Timeline row. */
+  --theme-primary-foreground: oklch(99.16% 0.0017 67.8);
+
+  /* Rust Signal: explicit Not Completed decisions and rare destructive or caution states. */
+  --theme-accent: oklch(57.69% 0.1656 33.1);
+
+  /* Text on Rust Signal fills, such as a Not Completed Timeline row. */
+  --theme-accent-foreground: oklch(99.16% 0.0017 67.8);
+
+  /* Focus outline color: the same hue as Rust Signal on the default surface. */
+  --theme-focus: var(--theme-accent);
+
+  --background: var(--theme-background);
+  --surface: var(--theme-surface);
+
+  /* Card background and text: the same as the page background and default foreground. */
   --card: var(--background);
   --card-foreground: var(--foreground);
 
-  /* Monolith Blue: selected states, completed Timeline rows and completed heatmap cells. */
-  --primary: #3572b3;
+  --primary: var(--theme-primary);
+  --primary-foreground: var(--theme-primary-foreground);
+  --accent: var(--theme-accent);
+  --accent-foreground: var(--theme-accent-foreground);
 
   /* Calendar overlap magenta: the next trip's marker and span on the Timeline. */
   --calendar-overlap: #DA3278;
 
   /* Ticket 270 (D13): the same magenta, darker, for small text such as the next trip's leader label (5.4:1 on the background). */
   --calendar-overlap-text: #C0286A;
-
-  /* Text on Monolith Blue fills, such as a completed Timeline row. */
-  --primary-foreground: oklch(99.16% 0.0017 67.8);
 
   /* Timeline Row Hover: unresolved and Not Completed row hover, and the current navigation route. */
   --timeline-row-hover: #eef6ff;
@@ -33,26 +61,7 @@
   /* Completed Row Hover: hover for Completed Timeline rows. */
   --timeline-completed-hover: #2f669f;
 
-  /* Readable Ash: secondary text that must stay readable. Note-style notices use it at text-xs. */
-  --muted-readable: oklch(52.59% 0.0187 245.3);
-
-  /* Muted text: an alias of Readable Ash. */
-  --muted-foreground: var(--muted-readable);
-
-  /* Rust Signal: explicit Not Completed decisions and rare destructive or caution states. */
-  --accent: oklch(57.69% 0.1656 33.1);
-
-  /* Ash Line: the single border color for dividers, controls, rows and inputs. */
-  --line: oklch(83% 0.006 248);
-
-  /* Focus outline color: the same hue as Rust Signal. */
-  --focus: oklch(57.69% 0.1656 33.1);
-
-  /* Advisor plan Phase 1C: the shared alert notice (DESIGN.md, "Alert notice"). Errors use these, never the advice styles. */
-  --alert-signal: var(--accent);
-  --alert-foreground: var(--foreground);
-
-  /* Focus ring: an alias of the focus outline color. */
+  /* Focus ring: an alias of the active surface's focus outline color. */
   --ring: var(--focus);
 
   /* Shift Tailwind's default type scale down one step for product UI. */
@@ -93,4 +102,47 @@
   --font-weight-bold: 400;
   --font-weight-extrabold: 400;
   --font-weight-black: 400;
+}
+
+/*
+ * Surface-scoped semantic ink and border roles.
+ * Containers with a colored fill declare `data-surface="primary"` or `data-surface="accent"`,
+ * and nested default-background islands (such as inputs or textareas) reset with `data-surface="default"`.
+ */
+:root,
+[data-surface="default"] {
+  --foreground: var(--theme-foreground);
+  --muted-readable: var(--theme-muted-readable);
+  --muted-foreground: var(--muted-readable);
+  --line: var(--theme-line);
+  /* Advisor plan Phase 1C: the shared alert notice (DESIGN.md, "Alert notice"). Errors use these, never the advice styles. */
+  --alert-signal: var(--theme-accent);
+  --alert-foreground: var(--theme-foreground);
+  --focus: var(--theme-focus);
+}
+
+[data-surface="default"] {
+  color: var(--foreground);
+}
+
+[data-surface="primary"] {
+  --foreground: var(--theme-primary-foreground);
+  --muted-readable: color-mix(in srgb, var(--theme-primary-foreground) 82%, var(--theme-primary));
+  --muted-foreground: var(--muted-readable);
+  --line: color-mix(in srgb, var(--theme-primary-foreground) 34%, var(--theme-primary));
+  --alert-signal: var(--theme-primary-foreground);
+  --alert-foreground: var(--theme-primary-foreground);
+  --focus: var(--theme-primary-foreground);
+  color: var(--foreground);
+}
+
+[data-surface="accent"] {
+  --foreground: var(--theme-accent-foreground);
+  --muted-readable: color-mix(in srgb, var(--theme-accent-foreground) 85%, var(--theme-accent));
+  --muted-foreground: var(--muted-readable);
+  --line: color-mix(in srgb, var(--theme-accent-foreground) 34%, var(--theme-accent));
+  --alert-signal: var(--theme-accent-foreground);
+  --alert-foreground: var(--theme-accent-foreground);
+  --focus: var(--theme-accent-foreground);
+  color: var(--foreground);
 }
