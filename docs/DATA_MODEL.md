@@ -2551,6 +2551,31 @@ be done alongside other things?". Null means unanswered. Migration:
   sync contract and configuration history together. Export, BehaviorLog restore and the
   MCP contract carry it under Ticket 364.
 
+## Effective Where (Ticket 357, D33)
+
+Migration `20261125150000_advisor_estimate_where_guess.sql` (additive) adds
+`behavior_advisor_estimates.where_guess text`, checked to `home`, `anywhere`,
+`elsewhere` or `unknown`. Null means no guess. It never holds a place name, coordinate
+or place key. Ticket 357 adds only the column and its read path: nothing writes it until
+Ticket 359 makes the estimate call return it, so every row stays null.
+
+- **Effective Where.** `resolveEffectiveWhere` in
+  `packages/core/src/resolvers/effective-where.resolver.ts` returns
+  `{ kind: home | anywhere | elsewhere | place | unknown, placeKey?, source }`. Order:
+  the Behavior's `where_kind` (`person`; a place carries the one-way key of its
+  `location_text`); else `completion_place_labels` in the 60 days ending on the planned
+  day, when at least 6 exist and one label holds at least 80% of them (`evidence`; the
+  same thresholds as the Where suggestion rules); else the cached `where_guess` while the
+  estimate's `input_hash` is current, `unknown` counting as no guess (`guess`); else
+  `unknown` (`none`).
+- **Readers.** Only `lib/services/brief-move-day.service.ts`, while `CADENCE_ALONGSIDE` is
+  on. It then also reads `behaviors.location_text` and the Behaviors' labels (label and
+  local date only). With the flag off none of these is read.
+- **Planning only.** The free-slot rule uses it for the same-place overlap rule
+  (`docs/DATETIME_STRATEGY.md`, "Brief moves"). Travel, departure and leave-reminder code
+  reads `where_kind` alone, and `tests/effective-where.boundary.test.ts` pins that. A
+  dismissed Where suggestion does not change it.
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its
