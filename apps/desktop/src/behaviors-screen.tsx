@@ -5,6 +5,7 @@ import {
   type RuntimeLinkProps,
 } from "@cadence/ui/runtime";
 
+import { collectSavedBehaviorPlaces } from "@cadence/core/services/place-search";
 import { BehaviorCreateSection } from "@/components/behaviors/BehaviorCreateSection";
 import { BehaviorList } from "@/components/behaviors/BehaviorList";
 import { parentChoices } from "@/components/behaviors/behavior-list-state";
@@ -54,6 +55,7 @@ export function BehaviorsScreen({
               reminderRuntime="desktop"
               sourceLinkCoordinator={sourceLinkCoordinator}
               parentOptions={parentChoices(null, [...listProps.activeBehaviors, ...listProps.archivedBehaviors]).options}
+              savedPlaces={collectSavedBehaviorPlaces([...listProps.activeBehaviors, ...listProps.archivedBehaviors])}
             />
             <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator}
               createAction={createAction} subBehaviorsEnabled />

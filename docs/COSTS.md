@@ -70,6 +70,7 @@ implement most of it in source; it is not deployed yet.
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
 | Sign-in email (Ticket 332, D31) | One email per email sign-in request, plus one per "Send a new email". Estimate: about 1 per person per new device or expired session. Supabase allows one per address per 60 s. Project limit: 30 an hour since November 13, 2026, 21:24Z, with Turnstile on every request (3 an hour before CAPTCHA; 2 with the built-in sender). 30 an hour is a ceiling, not expected use: sustained, it would spend the free 2,500 in about 3.5 days | The free plan's 2,500 emails a month cover reminders and sign-in together; volume not measured | US$0 on the free plan | Production acceptance passed November 13, 2026 (`docs/qa/2026-11-13-ticket-332-production-acceptance.md`), 8 Supabase emails; go-live run 7 more and one test reminder. Live since November 13, 2026, 21:35Z (`CADENCE_SIGN_IN_EMAIL` on; SMTP through Sequenzy as `login@cadence-me.com`). Cloudflare Turnstile is free (not rechecked); since November 14, 2026 Cadence's server also calls Turnstile's free siteverify once per email request (Ticket 338), and the Ticket 338 go-live run sent 9 more sign-in emails. Measure the volume in the first week after launch; if it nears the monthly cap, lower the limit or upgrade |
 | Apple sign-in (Ticket 333, D31) | US$0 | US$0 | US$0 | Planned, not shipped. Uses the Apple Developer Program membership in fixed costs. No per-call charge assumed; not checked |
+| Place & Home autocomplete (Geoapify, OSM) | US$0 | US$0 | US$0 | Implemented in source (`GEOAPIFY_API_KEY`). Free tier: 3,000 credits/day (~90,000/mo, commercial OK). With 350 ms debounce, 3-char minimum, local saved-place matching first, and 5-min caching: ~15 / ~60 / ~120 calls/user/mo (assumed), covering ~1,500 typical users at US$0 before a paid plan (~US$49/mo) |
 
 ### Per-user total at 100 users
 
@@ -809,3 +810,13 @@ while the flag was off. Owner rule (`docs/DECISIONS.md`, 2026-11-12): after one 
 measure the job's Vercel usage; if it projects over US$5/month above that baseline, turn
 the flag off and tell the owner. Measurement: pending, due after November 14, 2026,
 04:30 UTC.
+
+## Place and Home autocomplete (Geoapify, checked November 25, 2026)
+
+Provider: [Geoapify Address Autocomplete](https://www.geoapify.com/pricing/) (OpenStreetMap/ODbL),
+selected November 25, 2026. Free tier allows 3,000 credits/day (~90,000/month, commercial use
+permitted). With instant local saved-place matching, 350 ms debounce, 3-character minimum,
+5-minute client and server normalized-query caching, and per-account rate limits (30/min,
+200/hr), assumed usage is ~15 / ~60 / ~120 calls/month per light / typical / heavy user
+(covering ~1,500 typical users at US$0 before paid plans starting around US$49/month).
+Per-user totals at 100 users remain unchanged (US$0).
