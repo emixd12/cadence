@@ -198,6 +198,8 @@ export function parseSelect(text) {
     for (;;) {
       const item = parseItem();
       if (item) items.push(item);
+      // Whitespace may follow an item, for example a newline after the last embed.
+      while (position < text.length && /\s/.test(text[position])) position += 1;
       if (position >= text.length) {
         if (nested) throw new SelectParseError("missing closing parenthesis");
         return items;

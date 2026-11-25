@@ -125,6 +125,13 @@ describe("parseSelect", () => {
     expect(parseSelect("\"odd, name\"")).toEqual([{ kind: "field", alias: null, name: "odd, name", cast: null, json: null }]);
   });
 
+  it("accepts whitespace after an embed", () => {
+    for (const text of ["id, behaviors(id) ", "id, behaviors(id) , title", "id,\n  behaviors(id)\n", "a(b(id) ) "]) {
+      expect(() => parseSelect(text), text).not.toThrow();
+    }
+    expect(parseSelect("id, behaviors(id) , title")).toHaveLength(3);
+  });
+
   it("rejects malformed text", () => {
     for (const text of ["a(id", "a)", "a,,b", "a!(id)", "(id)"]) {
       expect(() => parseSelect(text), text).toThrow(SelectParseError);
