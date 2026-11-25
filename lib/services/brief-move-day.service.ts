@@ -78,8 +78,11 @@ export function behaviorEstimateInputHash(
   return createHash("sha256").update(JSON.stringify(options.alongsideAsked === false ? { ...inputs, alongside: "not_asked" } : inputs)).digest("hex");
 }
 
-/** The cached estimate's guess when it is still current for `behavior`, null when current without a guess, undefined when stale. */
-function currentEstimate(
+/**
+ * The cached estimate's guess when it is still current for `behavior`, null when current without a guess, undefined when stale.
+ * Ticket 358's Behavior form, Timeline label and Where suggestion read guesses through it too.
+ */
+export function currentEstimate(
   cached: Readonly<{ input_hash: string; duration_minutes: number | null; alongside: boolean; where_guess?: string | null }> | undefined,
   behavior: BriefMoveBehaviorFacts,
   personSetting: boolean,

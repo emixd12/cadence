@@ -9,6 +9,7 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useFormStatus } from "react-dom";
 
 import { collectSavedBehaviorPlaces } from "@cadence/core/services/place-search";
+import type { AlongsideFormView } from "@cadence/core/resolvers/alongside.resolver";
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
 import { Notice } from "@/components/feedback/Notice";
 import { BehaviorRunControls } from "@/components/behaviors/BehaviorRunControls";
@@ -97,6 +98,13 @@ type BehaviorListProps = Readonly<{
   createAction?: BehaviorFormAction;
   /** Shows the parent field in edit forms and the sub-behavior manager. Default on for web. */
   subBehaviorsEnabled?: boolean;
+  /**
+   * Ticket 358 (D33): each Behavior's alongside setting and guess, by Behavior id. The
+   * hosted web app passes it only while `CADENCE_ALONGSIDE` is on. With it, edit forms
+   * show the alongside field and, while Details and Settings is open, the Where
+   * suggestion line moves below Where in the form. Without it nothing changes.
+   */
+  alongsideViews?: Readonly<Record<string, AlongsideFormView>> | null;
 }>;
 
 /** The first control of each field a tip's link can open. */
@@ -106,6 +114,9 @@ const EDIT_FIELD_SELECTOR: Readonly<Record<BehaviorEditField, string>> = {
   where: '[name="where_kind"]',
   description: '[name="description"]',
 };
+
+/** Ticket 358: a Behavior the alongside read did not return (just created) starts unanswered. */
+const UNANSWERED_ALONGSIDE: AlongsideFormView = Object.freeze({ answer: "unanswered", guess: null });
 
 const EMPTY_ACTION_STATE: BehaviorActionState = {
   status: "idle",
@@ -172,6 +183,7 @@ export function BehaviorList({
   reorderAction,
   createAction,
   subBehaviorsEnabled = reminderRuntime === "web",
+  alongsideViews = null,
 }: BehaviorListProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -334,6 +346,7 @@ export function BehaviorList({
         parentOptions={choices?.options}
         parentLocked={choices?.locked}
         savedPlaces={savedPlaces}
+        alongside={alongsideViews ? alongsideViews[behavior.id] ?? UNANSWERED_ALONGSIDE : undefined}
         subBehaviorManager={subBehaviorsEnabled && !options.archived && !behavior.parentBehaviorId ? (
           <SubBehaviorManager
             parent={behavior}
@@ -644,6 +657,7 @@ function BehaviorRecord({
   subBehaviorManager = null,
   subBehaviors = null,
   savedPlaces = [],
+  alongside,
 }: Readonly<{
   behavior: BehaviorView;
   /** Drawn inside its parent's Sub-behaviors list. */
@@ -672,6 +686,8 @@ function BehaviorRecord({
   editRequest?: BehaviorEditTarget | null;
   allowOpportunity?: boolean;
   savedPlaces?: readonly string[];
+  /** Ticket 358: present only while `CADENCE_ALONGSIDE` is on. */
+  alongside?: AlongsideFormView;
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -698,6 +714,13 @@ function BehaviorRecord({
     setHasOpenedEdit(true);
     if (settingsRef.current) settingsRef.current.open = true;
   }, [behavior.updatedAt]);
+  // Ticket 358: with the alongside flag on, the one Where suggestion line sits below Where
+  // in the form while Details and Settings is open, and on the record otherwise.
+  const assistInForm = Boolean(alongside) && isSettingsOpen;
+  const placeAssist = (
+    <BehaviorPlaceAssist behaviorId={behavior.id} whereKind={behavior.whereKind ?? null}
+      placeText={behavior.whereKind === "place" ? behavior.locationText ?? null : null} onReview={reviewWhere} />
+  );
   const todayLocalDate = localDateIn(behavior.timezone);
   const notRunning = behavior.active ? notRunningLabel(behavior, todayLocalDate) : null;
   const upcoming = upcomingRunNote(behavior, todayLocalDate);
@@ -752,10 +775,7 @@ function BehaviorRecord({
                 unscheduled={isUnscheduledOpportunity(behavior)} />
           ) : null}
 
-          {behavior.active ? (
-            <BehaviorPlaceAssist behaviorId={behavior.id} whereKind={behavior.whereKind ?? null}
-              placeText={behavior.whereKind === "place" ? behavior.locationText ?? null : null} onReview={reviewWhere} />
-          ) : null}
+          {behavior.active && !assistInForm ? placeAssist : null}
 
           {!behavior.active ? (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -827,6 +847,8 @@ function BehaviorRecord({
                     parentOptions={parentOptions}
                     parentLocked={parentLocked}
                     savedPlaces={savedPlaces}
+                    alongside={alongside}
+                    whereAssist={assistInForm ? placeAssist : null}
                   />
                   {subBehaviorManager}
                   {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}

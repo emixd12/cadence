@@ -38,6 +38,8 @@ const EFFECTIVE_WHERE = /effective-where|EffectiveWhere|resolveEffectiveWhere|wh
 const RESOLVER_IMPORTERS = new Set([
   "lib/resolvers/effective-where.resolver.ts",
   "lib/services/brief-move-day.service.ts",
+  // Ticket 358: shows the same values planning uses (form guess, row label, Where guess line).
+  "lib/services/alongside-view.service.ts",
   "packages/core/src/resolvers/alongside.resolver.ts",
   "packages/core/src/resolvers/brief-move.resolver.ts",
 ]);
@@ -46,6 +48,8 @@ const GUESS_READERS = new Set([
   "lib/db/database.types.ts",
   "packages/core/src/resolvers/effective-where.resolver.ts",
   "lib/services/brief-move-day.service.ts",
+  // Ticket 358: reads the guess only to show it as a guess; it never requests a route.
+  "lib/services/alongside-view.service.ts",
 ]);
 
 describe("effective Where boundary", () => {
