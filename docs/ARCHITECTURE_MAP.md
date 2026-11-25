@@ -276,10 +276,13 @@ Gotchas:
   `scripts/supabase-rls-smoke.mjs`.
 - A PostgREST embed between two tables with more than one foreign key needs a
   `!fk_name` hint, or every call fails with PGRST201 (commit `d13b715e`).
+  `npm run resolvers:check` enforces this.
 - `tests/sql/*.sql` run only in the `Local Supabase rehearsal` workflow or by hand with
   `psql` against port 55322. `npm run test` does not run them.
 - `tests/*.local-integration.test.*` skip unless `CADENCE_LOCAL_SUPABASE_*` variables
-  are set. No workflow runs them.
+  are set. The `Local Supabase rehearsal` workflow runs the 16 database-only files
+  listed in `scripts/supabase-rehearsal-integration-tests.json`; the other 17 need an
+  app server or other setup and run only by hand.
 
 ## 5. Cadence for Mac (`apps/desktop`)
 
@@ -417,7 +420,11 @@ Dagger checks (`.dagger/modules/cadence/main.dang`): `agents`, `interactions`,
 | The MCP contract | `UPDATE_MCP_CONTRACT_DOC=1 npm run test -- tests/integration-contract.test.ts` and `npm run developers:check -- --write` |
 | A plugin skill | Edit `integrations/skills/`, then copy the file to both plugin folders |
 | A protected page | The `proxy.ts` matcher and `lib/navigation.ts` |
-| `STATUS.md` | Stay under 40,000 bytes. Run `npm run status:archive` when close |
+| `STATUS.md` | Stay under 40,000 bytes. Archive only on branch `chore/status-archive`, as its own docs-only PR |
+| A `*.local-integration.test.*` file | `scripts/supabase-rehearsal-integration-tests.json`, under run or excluded with a reason |
+| A new ticket, decision, messaging, legal, sync contract or SQLite schema number | Run `npm run ids:next` first |
+| Code that reads `localStorage` or `sessionStorage` | Use `lib/ui/browser-storage.ts`; ESLint rejects direct access |
+| A select that embeds a table linked by more than one foreign key | A `!<foreign_key>` hint; `npm run resolvers:check` fails without it (`node scripts/check-postgrest-embeds.mjs --list` prints the pairs) |
 
 Generated files. Do not edit them by hand:
 
@@ -430,9 +437,17 @@ Generated files. Do not edit them by hand:
 | The index block in `docs/status/README.md` | `npm run status:archive -- --index` |
 | Avatar `.webp` renditions | `npm run avatar:build` |
 
-`product-map.json` and `docs/PRODUCT_MAP.md` are listed in `.gitignore` and tracked
-anyway. `map:check` does not compare them with a fresh build. See
-`docs/git-friction-audit.md`, Pattern 4.
+`product-map.json` and `docs/PRODUCT_MAP.md` are gitignored build output. Never
+commit them; `npm run agents:check` fails on any tracked file that `.gitignore`
+matches. `npm run map:check` also fails when a ratcheted warning category grows past
+`scripts/product-map-warning-baseline.json`; `npm run map:build` lowers that baseline
+and never raises it.
+
+`docs/TICKETS.md` and `docs/DECISIONS.md` merge with `merge=union` (`.gitattributes`):
+two branches that each add an entry merge without a conflict. `agents:check` fails on
+a repeated ticket heading. `agents:check` also runs
+`scripts/check-contract-numbers.mjs`, which compares the sync contract and desktop
+migration numbers copied into tests with their sources.
 
 ## 10. Words and strings the checks reject
 

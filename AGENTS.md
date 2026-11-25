@@ -120,10 +120,19 @@ Footguns that cost a second commit most often:
 - A new MCP tool, a sync contract bump and a desktop SQLite migration each touch a
   fixed list of files. Follow `docs/ARCHITECTURE_MAP.md`, "Edits that must happen
   together".
-- Before you allocate a ticket, decision or messaging number, or a sync contract or
-  SQLite schema number, check `origin/main` and open branches for the highest one.
-- `STATUS.md` must stay under 40,000 bytes. Run `npm run status:archive` when an entry
-  would cross it.
+- Before you allocate a ticket, decision, messaging or legal number, or a sync
+  contract or SQLite schema number, run `npm run ids:next`. It reads `origin/main` and
+  every remote branch and names the branch that holds the highest number.
+- `STATUS.md` must stay under 40,000 bytes. Run `npm run status:archive` only on a
+  branch named `chore/status-archive`, as its own docs-only PR, never inside a feature
+  commit. `npm run git:fresh` says when it is due.
+- Web and Mac code reads `localStorage` and `sessionStorage` only through
+  `lib/ui/browser-storage.ts`. ESLint rejects direct access.
+- A Supabase select that embeds a table linked by more than one foreign key needs a
+  `!<foreign_key>` hint. `npm run resolvers:check` fails without it.
+- `.githooks/pre-push` runs the four fast checks, a short list of governance tests and
+  `vitest related` before every push. Skip it with `CADENCE_SKIP_PRE_PUSH=1` and say
+  why in the PR.
 - The retired email provider's name fails `npm run agents:check` in these documents,
   as a substring. Write "send again" for the verb.
 

@@ -494,6 +494,31 @@ timeout --kill-after=5s 10m npx vitest run tests/*.local-integration.test.ts --r
 
 Not verified: the JSON key names of `supabase status` at CLI 2.105.0, the format the signing key needs, and whether every one of the 27 files passes against a bare `db reset`. `docs/OPERATIONS.md` and `docs/qa/mcp-server.md` describe the local run and should supply the exact values. The script ends by asserting that `auth.users` is empty, so the tests must clean up or run before a final reset.
 
+## Implementation status (2026-11-25)
+
+Each automation is implemented on its own local branch from `origin/main` (`568df087`). A second model reviewed the plan first; its findings changed several designs, noted below. All seven branches merged cleanly into one test branch, where the eight required commands and `npm run desktop:build` passed (7,364 tests passed, 206 skipped).
+
+| Rank | Automation | Branch | Result |
+|---|---|---|---|
+| 1 | Untrack the product map; tracked-but-ignored check | `chore/ledger-merge-and-ignored-check` | Done |
+| 2 | `merge=union`; duplicate-ticket check | same branch | Done for `docs/TICKETS.md` and `docs/DECISIONS.md` only. Union would bring back archived `STATUS.md` entries and duplicate the "is next" counters in `docs/MESSAGING_CHANGES.md` and `docs/LEGAL.md`. Conflict-marker check now covers all five ledgers. |
+| 3 | `scripts/check-contract-numbers.mjs` | `chore/contract-number-check-and-next-id` | Done. `tests/sql/sub-behaviors-smoke.sql` is excluded: it tests fixed contracts on purpose. |
+| 4 | `.githooks/pre-push` | `chore/pre-push-hook-and-archive-prompt` | Done. Measured 7 s for a docs-only change and 45 s for one component under heavy load. |
+| 5 | Local-integration tests in the rehearsal | `ci/rehearsal-local-integration-tests` | Done for 16 of 33 files, with a run-time ES256 signing key. Not run against a database yet; the first GitHub run proves it. |
+| 6 | `scripts/check-postgrest-embeds.mjs` | `chore/postgrest-embed-check` | Done, with the TypeScript compiler API instead of a regex. 220 select calls analysed; none ambiguous at HEAD. |
+| 7 | `scripts/next-id.mjs` (`npm run ids:next`) | `chore/contract-number-check-and-next-id` | Done |
+| 8 | Storage helper and ESLint rule | `chore/browser-storage-helper` | Done. 18 files migrated; all three access forms banned. |
+| 9 | Warning ratchet in `map:check` | `chore/map-warning-ratchet` | Done. The `design-system.usage.json differences` category stays a warning: its fix needs a tool outside CI. |
+| 10 | Archive `STATUS.md` in its own change | `chore/pre-push-hook-and-archive-prompt` | Changed. `npm run git:fresh` prompts for a `chore/status-archive` PR above 34,000 bytes. A scheduled workflow would need a GitHub App token so that CI runs on its PR. |
+| 11 | Type drift check in the rehearsal | none | Not done. The rehearsal excludes the `postgres-meta` image, which `gen types --local` needs. |
+
+Open follow-ups:
+
+- `tests/sql/account-sync-contract-write-smoke.sql` line 145: `contract_probe` is still 9 and probably should be 10. The test passes either way. Not changed.
+- The pre-push hook can block a push when the machine is overloaded and a DOM test times out.
+- `core.hooksPath` in the owner's clone is an absolute path, so every worktree runs the main checkout's hooks. `npm run git:fresh` rewrites it to `.githooks` once the hook branch is merged.
+- Whether GitHub's server-side merge honors `merge=union` is still not verified.
+
 ## Not worth automating
 
 - Mac version bumps (`301c5832`, `f6a11e8f`, `df71b580`): one line in `tauri.conf.json` each.
