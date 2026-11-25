@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356, 357, 358 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000` and `20261125180000` not pushed); 359–363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 359 next (it writes `where_guess`; 358 shows it); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–359 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed); 360–363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 360 and 361 next; 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -97,6 +97,28 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 359 complete: advisor readers and the Where guess in the estimate call — November 25, 2026
+
+- **Estimate call:** with `CADENCE_ALONGSIDE` on it is estimate recipe 1.3 (schemas
+  `cadence_duration_estimates_v1_3` and `_v1_3_length`): both requests also return
+  `whereGuess` (`home`, `anywhere`, `elsewhere`, `unknown`); no new request. A Behavior whose
+  Where the person set stores none. Model input is unchanged (title and description).
+  Off, instructions and schemas are recipe 1.2, byte for byte (pinned digests).
+- **Migration:** `20261125190000_advisor_estimate_where_guess_writer.sql` (`create or replace`,
+  same signature): the upsert writes `where_guess` and its `ON CONFLICT` update always sets it.
+  Applied locally with every `tests/sql` fixture passing.
+- **Readers (flag on):** `readBehaviorPlanningFacts` feeds the day context's `planning` field,
+  the Daily Brief consumer (places and the person's answer), Chat (`planning` on timeline and
+  Behavior reads, prompt `chat-1.8`, the same-place rule for exact-time opportunity adds) and
+  the coach (`coach-signals-4`: `crowded_hour` leaves alongside items out; `done_together`
+  facts add `alongside` and `other_alongside`).
+- **Evals:** brief fixture `alongside_places` and rule `alongside_other_place`; coach account
+  `alongside_evening`; chat world `alongside`, two scenarios and rule `planning_words`.
+- **Flag off:** prompts, tool results, day context, stored rows and signals unchanged.
+
+Platform impact: web implemented (no UI change); desktop not applicable (hosted routes);
+marketing not applicable; future mobile inherits the server rules. Messaging impact: `P-093`.
 
 ## Ticket 358 complete: alongside in the Behavior form and on the web Timeline — November 25, 2026
 

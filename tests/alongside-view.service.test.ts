@@ -45,7 +45,8 @@ function fakeClient(tables: Readonly<{ behaviors: Row[]; estimates: unknown[]; l
   return { client: client as unknown as AppSupabaseClient, tablesRead };
 }
 
-const hash = (title: string, whereKind: string | null = null) => behaviorEstimateInputHash({ title, description: null, whereKind });
+// With the flag on only recipe 1.3 rows are current (Ticket 359).
+const hash = (title: string, whereKind: string | null = null) => behaviorEstimateInputHash({ title, description: null, whereKind }, { whereAsked: true });
 
 describe("readAlongsideBehaviorFacts", () => {
   it("reads nothing and returns null while the flag is off", async () => {

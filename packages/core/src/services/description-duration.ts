@@ -1,5 +1,6 @@
 import type { AdvisorDayContext, AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
 import { isLaneRecipe, type BriefingConfig } from "../types/briefing-config";
+import { isWhereGuess, type WhereGuess } from "../resolvers/effective-where.resolver";
 
 /** Ticket 188 bounds. Descriptions are untrusted user text; Cadence trims and caps them. */
 export const DESCRIPTION_DURATION_LIMITS = Object.freeze({
@@ -18,7 +19,15 @@ export type DescriptionEstimate = Readonly<{
   basis: "stated" | "inferred";
   /** Recipe 1.2: the activity can usually happen during other activities. */
   alongside?: boolean;
+  /**
+   * Estimate recipe 1.3 (Ticket 359, `CADENCE_ALONGSIDE` on): where the activity usually
+   * happens, coarsely. Never a place name. Planning only.
+   */
+  whereGuess?: WhereGuess;
 }>;
+
+/** Which optional outputs an estimate reply carries. Both off: the Ticket 188 shape. */
+export type DescriptionEstimateOutputs = Readonly<{ alongside?: boolean; whereGuess?: boolean }>;
 
 /**
  * Behaviors that would otherwise have unknown duration today: unresolved, in scope,
@@ -58,24 +67,27 @@ function hasRecordedDuration(occurrence: AdvisorOccurrence, config: BriefingConf
 }
 
 /** Accepts only well-formed estimates for requested Behaviors. Anything else is dropped, not repaired. */
-export function parseDescriptionEstimates(value: unknown, items: readonly DescriptionEstimateItem[], options: Readonly<{ alongside?: boolean }> = {}): DescriptionEstimate[] {
+export function parseDescriptionEstimates(value: unknown, items: readonly DescriptionEstimateItem[], options: DescriptionEstimateOutputs = {}): DescriptionEstimate[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const estimates = (value as Record<string, unknown>).estimates;
   if (!Array.isArray(estimates) || estimates.length > items.length) return [];
   const requested = new Set(items.map((item) => item.behaviorRef));
   const seen = new Set<string>();
   const accepted: DescriptionEstimate[] = [];
+  const keys = ["basis", "behaviorRef", "minutes", ...(options.alongside ? ["alongside"] : []), ...(options.whereGuess ? ["whereGuess"] : [])].sort().join();
   for (const entry of estimates) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const row = entry as Record<string, unknown>;
-    if (Object.keys(row).sort().join() !== (options.alongside ? "alongside,basis,behaviorRef,minutes" : "basis,behaviorRef,minutes")) continue;
+    if (Object.keys(row).sort().join() !== keys) continue;
     if (options.alongside && typeof row.alongside !== "boolean") continue;
+    if (options.whereGuess && !isWhereGuess(row.whereGuess)) continue;
     if (typeof row.behaviorRef !== "string" || !requested.has(row.behaviorRef) || seen.has(row.behaviorRef)) continue;
     if (row.basis !== "stated" && row.basis !== "inferred") continue;
     const minutes = row.minutes;
     if (minutes !== null && !(Number.isInteger(minutes) && (minutes as number) >= DESCRIPTION_DURATION_LIMITS.minMinutes && (minutes as number) <= DESCRIPTION_DURATION_LIMITS.maxMinutes)) continue;
     seen.add(row.behaviorRef);
-    accepted.push({ behaviorRef: row.behaviorRef, minutes: minutes as number | null, basis: row.basis, ...(options.alongside ? { alongside: row.alongside as boolean } : {}) });
+    accepted.push({ behaviorRef: row.behaviorRef, minutes: minutes as number | null, basis: row.basis,
+      ...(options.alongside ? { alongside: row.alongside as boolean } : {}), ...(options.whereGuess ? { whereGuess: row.whereGuess as WhereGuess } : {}) });
   }
   return accepted;
 }

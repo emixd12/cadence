@@ -20110,7 +20110,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 359: Advisor readers and the Where guess in the estimate call
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending (`20261125190000`). Estimate recipe 1.3, Chat prompt `chat-1.8` and coach signals `coach-signals-4` apply only with the flag on. Scope note: an exact-time opportunity add (Chat and MCP) also checks the added Behavior's side of the same-place rule. The in-consumer estimate request (workbench and evals) stays recipe 1.2; only its result now yields to the person's answer.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 

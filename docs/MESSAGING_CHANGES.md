@@ -2562,6 +2562,8 @@ cite has not changed.
   setting and pairing in the user guide and the new field in the MCP docs. Ticket 364:
   with the flag on, MCP contract 1.8.0 and every export format (Full JSON, JSONL, CSV,
   BehaviorLog as a Cadence extension) carry the person's answer, never the guess; the
-  public developer reference stays on 1.7.0 until the flag is on for good.
+  public developer reference stays on 1.7.0 until the flag is on for good. Ticket 359:
+  the estimate call sends only each Behavior's title and description (not its Where), and
+  Chat's answers may say a value is Cadence's guess.
 - **Related:** P-066, P-067, P-082.
 - **Status:** logged.

@@ -29,6 +29,7 @@ import {
   ADVISOR_MOVE_SOURCES,
   type AdvisorMoveDay,
   type AdvisorOccurrenceMove,
+  type AdvisorOccurrencePlanning,
   type AdvisorActivityConnector,
   type AdvisorCalendarConnector,
   type AdvisorCalendarConnectorV1_1,
@@ -63,6 +64,7 @@ import { getPersistedHevySnapshotV1 } from "@/lib/services/recorded-activity-syn
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { ConnectorError } from "@/lib/types/connectors";
+import { readBehaviorPlanningFacts, type BehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 
 /** Ticket 239: each connector read stops at 25 s or the brief's remaining source budget, whichever is sooner. */
 export const ADVISOR_CONNECTOR_READ_DEADLINE_MS = 25_000;
@@ -274,6 +276,11 @@ async function assembleDayContexts(
   const durationHistoryCapped = occurrenceHistoryCapped || cadenceSnapshot.historySessions.length > ADVISOR_DAY_CONTEXT_LIMITS.historySessions;
   const history = durationHistoryCapped ? [] : durationHistory(cadenceSnapshot, authorization.userId);
   const behaviorById = new Map(cadenceSnapshot.behaviors.map((behavior) => [behavior.id, behavior]));
+  // Ticket 359: each Behavior's effective alongside value and Where, only while
+  // CADENCE_ALONGSIDE is on (an empty map, and no read, while it is off).
+  const planningFacts = await readBehaviorPlanningFacts(input.caller.client, authorization.userId,
+    [...new Set(cadenceSnapshot.occurrences.map((occurrence) => occurrence.behaviorId))], localDate);
+  assertNotAborted(signal);
   const durationSources = new Map(cadenceSnapshot.behaviors.map((behavior) => {
     const sources = resolveBehaviorDurationSources({
       behaviorId: behavior.id,
@@ -312,6 +319,7 @@ async function assembleDayContexts(
         by: (ADVISOR_MOVE_SOURCES as readonly string[]).includes(occurrence.movedBy ?? "") ? occurrence.movedBy as AdvisorOccurrenceMove["by"] : null,
       } } : {}),
       ...routineFor(behavior, behaviorById),
+      ...occurrencePlanning(planningFacts.get(occurrence.behaviorId)),
       scheduleKind: scheduleKind as "exact" | "range",
       scheduleStartTime: occurrence.scheduleStartTime,
       scheduleEndTime: occurrence.scheduleEndTime,
@@ -643,6 +651,16 @@ function connectorFailure(error: unknown): { code: AdvisorSourceFailureCode; ret
     return { code, retryable: code === "rate_limited" || code === "timeout" || code === "provider_unavailable", retryAfterSeconds: null };
   }
   return { code: "provider_unavailable", retryable: true, retryAfterSeconds: null };
+}
+
+/** Ticket 359: the day context's planning field. A place key travels only for a `place` Where. */
+function occurrencePlanning(facts: BehaviorPlanningFacts | undefined): Readonly<{ planning?: AdvisorOccurrencePlanning }> {
+  if (!facts) return {};
+  const { kind, source, placeKey } = facts.where;
+  return { planning: {
+    alongside: facts.alongside.value, alongsideSource: facts.alongside.source,
+    where: { kind, source, ...(kind === "place" && placeKey ? { placeKey } : {}) },
+  } };
 }
 
 /**

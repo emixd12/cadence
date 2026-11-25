@@ -246,6 +246,10 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   calendar events do not block it. With the flag off, an alongside item blocks nothing
   and a moved one is blocked like any other item, as before. The effective Where is for
   planning only: routes, departure lines and leave reminders read `where_kind` alone.
+  Since Ticket 359 the same rule covers the Daily Brief consumer's overlap and tight-fit
+  findings with places from the day context's `planning` field, where the person's
+  alongside answer outranks the run's own estimate, and an exact-time opportunity add
+  (Chat and MCP), which checks the added Behavior's own side. Chat's moves already used it.
 - **Calendar and travel on each request.** The device sends today's busy calendar
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it

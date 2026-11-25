@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { validateVersionedAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
-import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorOccurrencePlanning } from "@cadence/core/types/advisor-day-context";
 import { activeBriefingConfig, briefingConfigurationRevision, prepareBriefing, type BriefingAnalysisInput } from "./briefing-pipeline";
 import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
 import { applyDescriptionEstimates, parseDescriptionEstimates, selectDescriptionEstimateItems, type DescriptionEstimate, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
@@ -59,8 +59,12 @@ export type DailyBriefGenerator = (input: Readonly<{
   instructions: string;
   facts: string;
   signal: AbortSignal;
-  /** Recipe 1.2 estimate calls also return `alongside`; the adapter picks the matching schema. */
-  estimateVariant?: "alongside";
+  /**
+   * Recipe 1.2 estimate calls also return `alongside`; the adapter picks the matching schema.
+   * Estimate recipe 1.3 (Ticket 359, `CADENCE_ALONGSIDE` on) adds `whereGuess`:
+   * "alongside_where" for Behaviors not answered alongside, "where" for the rest.
+   */
+  estimateVariant?: "alongside" | "alongside_where" | "where";
   /**
    * Ticket 288: present only when the caller asked for usage. The adapter calls it
    * once per provider response that reports usage. It never changes the request.
@@ -106,8 +110,9 @@ export type DailyBriefPrepareInput = Readonly<{
   /**
    * Ticket 357: each Behavior's effective Where, keyed by behaviorRef, for the same-place
    * rule on overlap and tight-fit findings. Server-side only; it never enters the model
-   * payload. Omitted (or a Behavior missing): that place is unknown, so an alongside
-   * Behavior is never one side of a conflict, as before.
+   * payload. Omitted (or a Behavior missing): the day context's planning facts give it
+   * (Ticket 359, flag on); without those the place is unknown, so an alongside Behavior is
+   * never one side of a conflict, as before.
    */
   alongsidePlaces?: Readonly<Record<string, OverlapPlace>>;
 }>;
@@ -171,7 +176,8 @@ export async function prepareDailyBrief(context: AdvisorDayContext, input: Daily
   input.signal.throwIfAborted();
   const config = parseBriefingConfig(input.config ?? activeBriefingConfig());
   const { planned, report } = await estimateDurations(context, config, input, usageReporter(input.onUsage, "duration_estimate"));
-  const alongside = new Set(report.estimates.filter((item) => item.alongside).map((item) => item.behaviorRef));
+  const planning = contextPlanning(planned);
+  const alongside = alongsideBehaviorRefs(report.estimates, planning);
   const planningNow = input.planningNow ?? input.now().toString();
   const prepared = prepareBriefing(planned, config, planningNow, input.analysis, alongside);
   input.onPrepared?.({ prepared, estimates: report });
@@ -183,7 +189,10 @@ export async function prepareDailyBrief(context: AdvisorDayContext, input: Daily
     connectorSources: "connectorSources" in facts, travel: Boolean(facts.travel) });
   const alongsideRefs = new Set(planned.cadence.occurrences.filter((item) => alongside.has(item.behaviorRef)).map((item) => item.ref));
   const behaviorRefOf = new Map(planned.cadence.occurrences.map((item) => [item.ref, item.behaviorRef]));
-  const placeOf = (ref: string): OverlapPlace => input.alongsidePlaces?.[behaviorRefOf.get(ref) ?? ""];
+  const placeOf = (ref: string): OverlapPlace => {
+    const behaviorRef = behaviorRefOf.get(ref) ?? "";
+    return input.alongsidePlaces?.[behaviorRef] ?? planning.get(behaviorRef)?.where;
+  };
   // Keep detailed rejection diagnostics in the inspector, not the prose inputs.
   const modelPlan = {
     version: plan.version, route: plan.route, outcome: plan.outcome,
@@ -222,6 +231,32 @@ export async function prepareDailyBrief(context: AdvisorDayContext, input: Daily
       analysis: analysis ? { tip: analysis.tip, modelTip: analysis.modelTip, recordFingerprints: analysis.recordFingerprints } : null,
     },
   };
+}
+
+/**
+ * Ticket 359: each Behavior's planning facts from the day context, keyed by behaviorRef.
+ * Present only while `CADENCE_ALONGSIDE` is on; empty otherwise.
+ */
+function contextPlanning(context: AdvisorDayContext): ReadonlyMap<string, AdvisorOccurrencePlanning> {
+  const planning = new Map<string, AdvisorOccurrencePlanning>();
+  for (const occurrence of context.cadence.occurrences) if (occurrence.planning) planning.set(occurrence.behaviorRef, occurrence.planning);
+  return planning;
+}
+
+/**
+ * Ticket 359: which Behaviors are alongside for this brief. The person's answer (from the
+ * day context's planning facts, flag on) wins over this run's estimate; then this run's
+ * estimate; then the cached guess or false the planning facts carry. With the flag off
+ * there are no planning facts and only the estimate's answer counts, as before.
+ */
+function alongsideBehaviorRefs(estimates: readonly DescriptionEstimate[], planning: ReadonlyMap<string, AdvisorOccurrencePlanning>): Set<string> {
+  const estimated = new Map(estimates.filter((item) => typeof item.alongside === "boolean").map((item) => [item.behaviorRef, item.alongside === true]));
+  const refs = new Set([...estimated.keys(), ...planning.keys()]);
+  return new Set([...refs].filter((ref) => {
+    const facts = planning.get(ref);
+    if (facts?.alongsideSource === "person") return facts.alongside;
+    return estimated.get(ref) ?? facts?.alongside ?? false;
+  }));
 }
 
 /**
