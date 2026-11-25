@@ -65,6 +65,80 @@ workspace restructuring remain deferred. The owner
 intends an iPhone app and a Mac App Store listing near launch (D30). Neither has tickets;
 the launch narrative is written for them, and no mobile code starts without a ticket.
 
+## Codebase map
+
+`docs/ARCHITECTURE_MAP.md` holds the full map: flows, per-area gotchas and the table
+of edits that must happen together. Read its section for an area before you first work
+there. It is a navigation aid, not a source-of-truth document. This section is the
+short version.
+
+Where code lives:
+
+| Path | Role |
+|---|---|
+| `app/`, `proxy.ts` | Web app. `proxy.ts` is the request proxy; there is no `middleware.ts`. MCP is `app/mcp/route.ts` (`/mcp`), OAuth is `app/oauth/` |
+| `components/`, `lib/ui`, `lib/types` | UI and client helpers. Cadence for Mac compiles these too |
+| `lib/services`, `lib/db` | I/O services and repositories. `lib/db/database.types.ts` is generated |
+| `packages/core` | `@cadence/core`: pure resolvers, portable services, MCP contract, notices. Import by subpath |
+| `packages/ui` | `runtime.tsx`, `tokens.css`, `fonts.css` only |
+| `apps/desktop` | Tauri app. One IPC command, `local_store`; Rust in `src-tauri/src` |
+| `apps/marketing` | Astro static site |
+| `supabase/migrations`, `tests/sql` | Schema and psql smokes |
+| `scripts/check-*.mjs` | The checks behind the `*:check` commands |
+
+How a web write moves: component form → Server Action beside the page
+(`app/(app)/*/actions.ts`) → `lib/services/*.service.ts` → core planner or resolver →
+repository or database function. Scheduled work starts from the routes in
+`vercel.json`. The Mac replaces Server Actions with `apps/desktop/src/local-actions.ts`
+and the hosted database with SQLite.
+
+Setup facts:
+
+- Use Node 24. A new worktree needs `npm ci` before any check runs.
+- One test file: `npm run test -- tests/x.test.ts`. One test: add `-t "name"`.
+- `npm run typecheck` and `npm run test` do not cover everything. Root `tsc` excludes
+  `apps/**`: run `npm run desktop:build` after changing a component the Mac shares.
+  `tests/sql/*.sql`, `*.local-integration.test.*`, the `desktop-*-contract` tests and
+  `*.live.test.ts` skip or do not run without their own setup.
+
+Footguns that cost a second commit most often:
+
+- Adding or removing a `<button>`, link, form control or `onClick`-style handler changes
+  that file's `interaction_marker_count` in `interaction-registry.json`. Update the
+  count and the interactions that cite the file.
+- A new environment variable needs a line in `.env.example`. A new core resolver needs
+  an entry in `scripts/check-resolvers.mjs`, a paired test and `docs/AGENT_RESOLVERS.md`.
+  A new token in `packages/ui/tokens.css` needs a description comment.
+- A shared component must not import `next/*`, a Server Action or server-only code.
+  Use `RuntimeLink` and `useRefresh` from `@cadence/ui/runtime`.
+- Code in `packages/core` must not read the clock or use names such as `process`,
+  `window`, `fetch` or `document`, even as local variable names (`npm run core:check`).
+- `app/` and `components/` must not contain `.rpc(`, `.upsert(` or recurrence and
+  reminder field names; `npm run resolvers:check` matches the text.
+- Never edit or reformat an existing migration. Later migrations patch function
+  bodies by text match, and tests read migration files.
+- A new MCP tool, a sync contract bump and a desktop SQLite migration each touch a
+  fixed list of files. Follow `docs/ARCHITECTURE_MAP.md`, "Edits that must happen
+  together".
+- Before you allocate a ticket, decision, messaging or legal number, or a sync
+  contract or SQLite schema number, run `npm run ids:next`. It reads `origin/main` and
+  every remote branch and names the branch that holds the highest number.
+- `STATUS.md` must stay under 40,000 bytes. Run `npm run status:archive` only on a
+  branch named `chore/status-archive`, as its own docs-only PR, never inside a feature
+  commit. `npm run git:fresh` says when it is due.
+- Web and Mac code reads `localStorage` and `sessionStorage` only through
+  `lib/ui/browser-storage.ts`. ESLint rejects direct access.
+- A Supabase select that embeds a table linked by more than one foreign key needs a
+  `!<foreign_key>` hint. `npm run resolvers:check` fails without it.
+- `.githooks/pre-push` runs the four fast checks, a short list of governance tests and
+  `vitest related` before every push. Skip it with `CADENCE_SKIP_PRE_PUSH=1` and say
+  why in the PR.
+- The retired email provider's name fails `npm run agents:check` in these documents,
+  as a substring. Write "send again" for the verb.
+
+`docs/git-friction-audit.md` records which of these recurred in recent history and
+the automation proposed for each.
+
 ## Agent operating model
 
 Before implementing a task, read in this order:
