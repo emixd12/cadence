@@ -3171,3 +3171,78 @@ guessed Where.
 Platform impact: web Tickets 356–362 and 364; desktop Ticket 363, in the next Mac
 release; marketing not applicable until the messaging pass; future mobile inherits the
 resolvers in `@cadence/core` and the server rules. Messaging impact: P-093.
+
+## 2026-11-25: Modular iOS blueprint, v1.0 product scope, and every-other-day refresh
+
+The owner completed a three-round product planning pass on November 25, 2026 to turn the
+running iOS plan into a granular, build-ready blueprint that stays continuously aligned
+with web development until activation. No mobile or Mac App Store code or real tickets are
+authorized yet.
+
+1. **Modular structure and every-other-day refresh.** `docs/IOS_PLAN.md` becomes the hub
+   and decision inbox, paired with seven focused modules under `docs/ios-plan/` (port map,
+   iPhone-native features, Apple Watch, accounts/sync/offline, Mac App Store, App Store
+   readiness, and redrawn build phases). The `ios-plan-sync` skill runs on an
+   every-other-day schedule (using Claude Opus 5.5 High), edits only `docs/IOS_PLAN.md`
+   and `docs/ios-plan/`, auto-ports routine web changes using standing mobile-web parity
+   rules, and logs an Open Question for the owner only when a web change affects an
+   iOS-only surface (Live Activities, Widgets, Controls, Siri, Watch, Notifications,
+   Location) or App Store rules. Once iOS activates, the workflow transitions to real-time
+   co-development with web remaining the primary surface.
+2. **Sign-in required, full offline tracking once signed in (v1.0).** The iPhone app
+   requires sign-in on first launch (matching web, no pre-sign-in anonymous mode) and
+   supports full local offline use once signed in for all non-AI tracking features
+   (marking, notes, timers, Behavior edits, local reminders, local export/import), syncing
+   automatically when connectivity returns like a linked Mac. AI features, connectors and
+   live routing require connectivity.
+3. **Screen fidelity.** iPhone mirrors mobile web's five primary screens (Timeline, Chat,
+   Behaviors, Export & Import, Settings) and flows 1:1, translated into native SwiftUI
+   idioms and explicitly sized across compact, standard and Pro Max iPhone widths plus
+   Dynamic Type.
+4. **v1.0 iPhone-native surfaces.** Alongside full web parity, accounts and offline
+   tracking, v1.0 ships:
+   - **Actionable notifications** and **Home/Lock Screen Widgets & Controls** (Small,
+     Medium interactive, Lock Screen, Control Center / Action Button Controls); **iPhone
+     widgets on Mac desktops are disabled** because Cadence for Mac exists.
+   - **Live Activities:** active timers auto-start a Live Activity (elapsed time + Stop
+     and Complete); upcoming/due Behaviors show a Live Activity **by default** before
+     their scheduled time with direct **Completed** and **Not Completed** buttons, paired
+     with both a global Settings switch and a per-Behavior toggle to control clutter;
+     Routines render as one card ("Complete routine" + tap to expand/open steps).
+   - **Full Siri, Shortcuts and Spotlight:** voice/Shortcut commands for Completed/Not
+     Completed (with Undo), Behavior/day Notes, Start/Stop timer, Opportunity Basket
+     add/done, Today / Needs decision queries, read-only Daily Brief summary (tap to open
+     for moves), and Spotlight indexing with a Settings opt-out.
+   - **Location:** "While Using the App" only in v1.0 (matching web/Mac; no background
+     location or geofencing).
+5. **v1.1 fast-follow: dedicated Apple Watch app.** While v1.0 gives Watch users mirrored
+   actionable notifications, Live Activities in the Smart Stack and iPhone Controls
+   automatically, v1.1 adds the native watchOS app: Today's list, Needs decision, offline
+   Completed/Not Completed queue, Start/Stop timer, Watch face complications, Smart Stack
+   cards and **voice-dictated quick Notes**. No Behavior editing, Chat or Settings on
+   Watch.
+6. **Future iPhone-specific roadmap (post-v1).** Tracked in `docs/ios-plan/02-iphone-native.md`:
+   (a) non-cluttered context-collection prompts inside Live Activities (such as "Just now /
+   earlier?", "At Home?", "Alongside?"), (b) deeper Siri + Cadence Agent / Apple
+   Intelligence analysis, and (c) optional always-on location / geofencing to power
+   smarter Agent and Travel features.
+7. **Mac App Store dual distribution.** Keep **both** the Mac App Store (primary easy
+   install on the website) and the notarized direct download DMG (GitHub/power users),
+   built from one codebase with a sandboxed MAS build variant that removes the built-in
+   self-updater.
+8. **App Store and business readiness.** Upgrade the Apple Developer membership to an
+   Organization account (Identity Scaffolding LLC, as Apple requires a legal entity with a
+   D-U-N-S number; "Cadence" would be preferred only if Apple permitted a non-legal org
+   name); scope a distinctive App Store title + subtitle after trademark clearance while
+   keeping "Cadence" under the Home Screen icon; ship v1.0 **US-first** with an **18+ age
+   rating override** and state age-signal gating (China mainland excluded; EU/global after
+   legal/GDPR pass); follow web's unified AI approval covering all Behaviors including
+   Medical and Measurements with a clear "not medical advice" disclaimer in the native AI
+   consent sheet.
+
+Scope is unchanged. Native mobile and Mac App Store implementation stay out of scope in
+`AGENTS.md` until the owner activates the track.
+
+Platform impact: planning process and blueprint docs only. Web, desktop and marketing:
+not applicable. Future mobile: `docs/IOS_PLAN.md` and `docs/ios-plan/`. Messaging impact:
+none.
