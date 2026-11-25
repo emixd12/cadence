@@ -15,7 +15,8 @@ type BehaviorPersistenceField =
   | "is_opportunity"
   | "parent_behavior_id"
   | "sub_behavior_sort_order"
-  | "inherit_parent_schedule";
+  | "inherit_parent_schedule"
+  | "alongside";
 /** recurrence_rule and scheduled_time are null only on an unscheduled opportunity Behavior. */
 export type Behavior = Omit<Tables<"behaviors">, BehaviorPersistenceField> &
   Partial<Pick<Tables<"behaviors">, BehaviorPersistenceField>>;

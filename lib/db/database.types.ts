@@ -536,6 +536,7 @@ export type Database = {
       behaviors: {
         Row: {
           active: boolean
+          alongside: boolean | null
           archive_notes: Json
           archived_at: string | null
           auto_archived_at: string | null
@@ -568,6 +569,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          alongside?: boolean | null
           archive_notes?: Json
           archived_at?: string | null
           auto_archived_at?: string | null
@@ -600,6 +602,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          alongside?: boolean | null
           archive_notes?: Json
           archived_at?: string | null
           auto_archived_at?: string | null

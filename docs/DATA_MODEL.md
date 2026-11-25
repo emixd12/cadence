@@ -363,6 +363,7 @@ create table behaviors (
   scheduled_time time,
   timezone text not null default 'America/New_York',
   is_opportunity boolean not null default false,
+  alongside boolean,
 
   browser_reminder_enabled boolean not null default true,
   email_reminder_enabled boolean not null default false,
@@ -391,6 +392,9 @@ routing destination that only `place` keeps. Both columns are part of the
 Behavior configuration revision and account-sync row. Neither is a provider
 geocode; they never store coordinates or place identifiers. A Where suggestion
 never changes these columns on its own.
+
+`alongside` is the person's answer to whether the Behavior can be done alongside other
+things. Null means unanswered. See "Alongside setting" below.
 
 ### `travel_settings`
 
@@ -2514,6 +2518,38 @@ check (see "Coach signals in shadow").
 
 Hosted state (2026-11-21): the three migrations are not pushed to the hosted database.
 They are additive; push them before this code reaches production.
+
+## Alongside setting (Ticket 356, D33)
+
+`behaviors.alongside boolean` (nullable, no default) is the person's answer to "Can this
+be done alongside other things?". Null means unanswered. Migration:
+`20261125140000_behavior_alongside.sql` (additive).
+
+- **Effective value.** Readers never use the column alone. `resolveAlongside` in
+  `packages/core/src/resolvers/alongside.resolver.ts` returns `{ value, source }`: the
+  person's answer (`person`), else the cached model guess (`guess`), else false
+  (`default`). A routine block is alongside only when every step that follows it is.
+- **The cached guess.** `behavior_advisor_estimates.alongside` holds the model's guess
+  from the Daily Brief estimate call, read only while its `input_hash` matches the
+  Behavior's title, description and Where. With `CADENCE_ALONGSIDE` on, a Behavior the
+  person answered is asked for its length only. That row is stored with a distinct
+  length-only hash and `alongside = false`, so it never reads as a guess; clearing the
+  answer makes the estimate stale and the next brief asks about alongside again.
+- **Writers.** `create_behavior_with_schedule_graph` stores the payload's `alongside`
+  (absent: null). `update_behavior_with_schedule_graph` changes it only when the payload
+  carries the key; JSON null clears it. A change is a revision: the `updated_at` trigger
+  watches the column.
+- **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code reads the column and
+  planners read the cached guess, then false, as before Ticket 356.
+- **Hosted-only until Ticket 363.** Account sync contract 9 does not carry the column:
+  `account_sync_snapshot()` leaves it out of each Behavior row, `apply_account_sync_plan`
+  compares a device's expected row without it, and a synced Behavior write neither
+  inserts nor updates it, so a Mac write keeps the stored answer and a Behavior created
+  on the Mac starts unanswered. The configuration snapshot and `changed_fields` do not
+  include it yet either, because configuration history is synced; changing the answer
+  writes no configuration event. Ticket 363 adds the column to the Mac's SQLite, the
+  sync contract and configuration history together. Export, BehaviorLog restore and the
+  MCP contract carry it under Ticket 364.
 
 ## Note shortcut state (Tickets 126–128)
 
