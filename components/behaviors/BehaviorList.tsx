@@ -5,9 +5,10 @@ import { webSourceLinkCoordinator, type SourceLinkCoordinator } from "@/lib/ui/s
 import type { BehaviorEditField, BehaviorEditTarget } from "@/lib/ui/advisor";
 import { RuntimeLink as Link } from "@cadence/ui/runtime";
 import type { CSSProperties, ReactNode } from "react";
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { collectSavedBehaviorPlaces } from "@cadence/core/services/place-search";
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
 import { Notice } from "@/components/feedback/Notice";
 import { BehaviorRunControls } from "@/components/behaviors/BehaviorRunControls";
@@ -298,6 +299,10 @@ export function BehaviorList({
     } : undefined,
   });
 
+  const savedPlaces = useMemo(
+    () => collectSavedBehaviorPlaces([...activeBehaviors, ...archivedBehaviors]),
+    [activeBehaviors, archivedBehaviors],
+  );
   const renderRecord = (behavior: BehaviorView, options: { archived?: boolean; nested?: boolean }) => {
     const groups = options.archived ? archivedGroups : activeGroups;
     const children = options.nested ? [] : subBehaviorsOf(behavior.id, groups);
@@ -328,6 +333,7 @@ export function BehaviorList({
         editRequest={!options.archived && editTarget?.behaviorId === behavior.id ? editTarget : null}
         parentOptions={choices?.options}
         parentLocked={choices?.locked}
+        savedPlaces={savedPlaces}
         subBehaviorManager={subBehaviorsEnabled && !options.archived && !behavior.parentBehaviorId ? (
           <SubBehaviorManager
             parent={behavior}
@@ -637,6 +643,7 @@ function BehaviorRecord({
   parentLocked = false,
   subBehaviorManager = null,
   subBehaviors = null,
+  savedPlaces = [],
 }: Readonly<{
   behavior: BehaviorView;
   /** Drawn inside its parent's Sub-behaviors list. */
@@ -664,6 +671,7 @@ function BehaviorRecord({
   sourceLinkCoordinator?: SourceLinkCoordinator | null;
   editRequest?: BehaviorEditTarget | null;
   allowOpportunity?: boolean;
+  savedPlaces?: readonly string[];
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -818,6 +826,7 @@ function BehaviorRecord({
                     allowOpportunity={allowOpportunity}
                     parentOptions={parentOptions}
                     parentLocked={parentLocked}
+                    savedPlaces={savedPlaces}
                   />
                   {subBehaviorManager}
                   {sourceLinkCoordinator ? <SourceLinkSettings behaviorId={behavior.id} coordinator={sourceLinkCoordinator} /> : null}
@@ -852,6 +861,7 @@ function BehaviorRecord({
                     behavior={behavior}
                     showActiveToggle={false}
                     allowOpportunity={allowOpportunity}
+                    savedPlaces={savedPlaces}
                   />
                   <ArchiveNoteHistory
                     behavior={behavior}

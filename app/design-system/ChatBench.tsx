@@ -14,6 +14,7 @@ import {
   CHAT_FIXTURE_NOW,
   CHAT_FIXTURE_REFUSAL,
   CHAT_FIXTURE_STOPPED,
+  CHAT_FIXTURE_THINKING,
   CHAT_FIXTURE_TODAY,
   fixtureChatClient,
   type ChatBenchState,
@@ -27,6 +28,7 @@ import {
 const THREADS: Record<Exclude<ChatBenchState, "past">, ChatThreadState> = {
   opening: EMPTY_CHAT_THREAD,
   today: CHAT_FIXTURE_TODAY,
+  thinking: CHAT_FIXTURE_THINKING,
   confirm: CHAT_FIXTURE_CONFIRM,
   refusal: CHAT_FIXTURE_REFUSAL,
   medical: CHAT_FIXTURE_MEDICAL,

@@ -666,6 +666,37 @@ for (const interaction of interactions) {
   }
 }
 
+// Interaction ids whose implementation references (top-level or per platform) name a file.
+const interactionIdsByImplementationFile = new Map();
+for (const interaction of interactions) {
+  if (!isNonEmptyString(interaction?.id)) continue;
+  const references = [
+    ...(Array.isArray(interaction.implementation) ? interaction.implementation : []),
+    ...Object.values(interaction.platforms && typeof interaction.platforms === "object" ? interaction.platforms : {})
+      .flatMap((record) => (Array.isArray(record?.implementation) ? record.implementation : [])),
+  ];
+  for (const reference of references) {
+    if (typeof reference !== "string") continue;
+    const { file } = splitReference(reference);
+    if (!interactionIdsByImplementationFile.has(file)) interactionIdsByImplementationFile.set(file, new Set());
+    interactionIdsByImplementationFile.get(file).add(interaction.id);
+  }
+}
+
+const MARKER_COUNT_ID_LIMIT = 12;
+
+function interactionsTiedToSource(source) {
+  const ids = new Set([
+    ...(Array.isArray(source.interaction_ids) ? source.interaction_ids : []),
+    ...(interactionIdsByImplementationFile.get(source.path) ?? []),
+  ]);
+  const sorted = [...ids].filter((id) => typeof id === "string").sort();
+  if (sorted.length === 0) return "No interaction ids are tied to this file.";
+  const shown = sorted.slice(0, MARKER_COUNT_ID_LIMIT).join(", ");
+  const more = sorted.length > MARKER_COUNT_ID_LIMIT ? ` and ${sorted.length - MARKER_COUNT_ID_LIMIT} more` : "";
+  return `Interactions tied to this file: ${shown}${more}.`;
+}
+
 for (const source of sourceInventory) {
   assert(isNonEmptyString(source.path), "Every source_inventory entry needs a path.");
   assert(!sourcePaths.has(source.path), `Duplicate source_inventory path: ${source.path}.`);
@@ -682,7 +713,7 @@ for (const source of sourceInventory) {
       source.interaction_marker_count === actualMarkerCount,
       `${source.path} interaction marker count changed: registry=${String(
         source.interaction_marker_count,
-      )}, source=${actualMarkerCount}. Review its interaction ids and update the registry count.`,
+      )}, source=${actualMarkerCount}. ${interactionsTiedToSource(source)} A control was added or removed: review those entries' text (name, triggers, effects, platforms), not only the number, then update the registry count.`,
     );
   }
   assert(

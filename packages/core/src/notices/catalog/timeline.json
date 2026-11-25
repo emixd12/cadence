@@ -112,6 +112,18 @@
       "style": "outcome",
       "platforms": ["web"],
       "interactions": ["INT-BEHAVIOR-030"]
+    },
+    "timeline.note-saving": {
+      "meaning": "Shows beside the note editor while a day note or occurrence note is saving.",
+      "text": "Saving...",
+      "style": "note",
+      "interactions": ["INT-TIMELINE-008", "INT-TIMELINE-011", "INT-TIMELINE-012"]
+    },
+    "timeline.note-saved": {
+      "meaning": "Confirms that a day note or occurrence note has saved, both inline in the editor and briefly beside the collapsed one-line summary.",
+      "text": "Saved",
+      "style": "outcome",
+      "interactions": ["INT-TIMELINE-008", "INT-TIMELINE-011", "INT-TIMELINE-012"]
     }
   }
 }

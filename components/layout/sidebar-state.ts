@@ -1,3 +1,5 @@
+import { getLocalStorage } from "@/lib/ui/browser-storage";
+
 export const SIDEBAR_STORAGE_KEY = "sidebar-open";
 export const SIDEBAR_HOVER_DISMISS_DELAY_MS = 160;
 export const SIDEBAR_TRANSITION_DURATION_MS = 180;
@@ -176,12 +178,7 @@ export function readStoredSidebarPreference(
   storageKey = SIDEBAR_STORAGE_KEY,
 ): SidebarDockPreference | null {
   try {
-    const target =
-      storage === undefined
-        ? typeof window !== "undefined"
-          ? window.localStorage
-          : null
-        : storage;
+    const target = storage === undefined ? getLocalStorage() : storage;
 
     if (!target) {
       return null;
@@ -199,12 +196,7 @@ export function writeStoredSidebarPreference(
   storageKey = SIDEBAR_STORAGE_KEY,
 ): void {
   try {
-    const target =
-      storage === undefined
-        ? typeof window !== "undefined"
-          ? window.localStorage
-          : null
-        : storage;
+    const target = storage === undefined ? getLocalStorage() : storage;
 
     if (!target) {
       return;

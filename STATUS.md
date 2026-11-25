@@ -97,6 +97,55 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Note closure redesign: collapsed 1-line summary + auto-save + Done — November 25, 2026
+
+- **Owner's decision:** use a collapsed one-line summary (`Add day note`/`Add note`, or `Day note`/`Note`
+  + single-line preview) and auto-save + **Done** for both Day notes and per-behavior (Occurrence) notes
+  (`docs/DECISIONS.md`, 2026-11-25).
+- **Implemented:** `components/notes/NoteEditor.tsx` (750ms debounced auto-save, immediate shortcut-chip
+  save, flush-on-blur without closing, `Done` / `Cmd+Enter` / `Escape` flush-and-close, `Try again` on
+  conflict/error, `hideLabel` for disclosure callers, `DesktopDraftGuard`),
+  `components/timeline/DayNoteControl.tsx` (controlled disclosure, optimistic preview update, fading
+  2.5s `Saved` indicator), `components/timeline/OccurrenceNoteForm.tsx` (matching one-line disclosure
+  that collapses independently of the parent occurrence row), notice catalog (`timeline.note-saving`,
+  `timeline.note-saved`), docs (`docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, `interaction-registry.json`,
+  `docs/DECISIONS.md`), and UI tests (`tests/day-note-ui.test.tsx`,
+  `tests/occurrence-note-shortcuts-ui.test.tsx`, `tests/timeline-interactions-ui.test.tsx`,
+  `tests/behavior-review-ui.test.tsx`).
+
+Platform impact: web implemented; desktop implemented (shares `NoteEditor`, `DayNoteControl`, and
+`OccurrenceNoteForm`, ships in next Mac release); marketing not applicable; future mobile deferred.
+Messaging impact: none.
+
+## Place and Home autocomplete with Geoapify and safe auto-marker — November 25, 2026
+
+- **Owner's decision:** use Geoapify (OpenStreetMap/ODbL, free 3,000 credits/day) for address
+  and named-place autocomplete on Behavior `Place` and `Settings → Travel → Home`; automatically
+  record completion place markers from selected specific places when Completion places is enabled,
+  with quick Undo and safeguards so wrong or edited coordinates are never stored.
+- **Implemented:** `packages/core/src/types/place-search.ts`,
+  `packages/core/src/services/place-search.ts` (instant local saved-place matching, Geoapify
+  parsing, coarse admin-area coordinate exclusion), `lib/services/geoapify-provider.ts`,
+  `lib/services/place-search.service.ts` (3-char minimum, 5-minute normalized-query cache,
+  per-account 30/min and 200/hr rate limit), `app/api/travel/place-search/route.ts`,
+  `lib/ui/place-search.ts`, `apps/desktop/src/place-search.ts`,
+  `components/travel/PlaceAutocomplete.tsx`, `usePlaceLabelActions` in
+  `components/travel/PlaceLabels.tsx`, `components/behaviors/BehaviorForm.tsx`,
+  `components/behaviors/BehaviorCreateSection.tsx`, `components/behaviors/BehaviorList.tsx`,
+  `components/settings/TravelSettingsPanel.tsx`, `app/(app)/behaviors/page.tsx`,
+  `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/product.tsx`, `.env.example`,
+  `docs/COSTS.md`, `docs/MESSAGING_CHANGES.md` (`P-091`), `tests/place-search.service.test.ts`,
+  and `tests/place-autocomplete.dom.test.tsx`.
+- **Verified live:** `GEOAPIFY_API_KEY` configured in `.env.local` and Vercel Production/Preview;
+  verified `/api/travel/place-search` (401 unauthenticated, 200 for `YMCA Greenpoint` POI and
+  `99 Meserole Ave Brooklyn` address, 0-call short query) and live autocomplete + Undo flows in
+  both Behavior → Where → Place and Settings → Travel → Home.
+
+Platform impact: web implemented; desktop implemented (shares components and wires
+`createDesktopPlaceSearchClient` for linked Macs, local-only Macs fall back to saved places and
+free text; ships in next Mac release); marketing not applicable; future mobile deferred.
+Messaging impact: P-091.
+
 ## Tickets 352–355: Persisted connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down — November 24, 2026
 
 - **Owner's decision:** keep persisted connector activity until disconnect or account deletion;
@@ -175,205 +224,3 @@ applicable; future mobile deferred. Messaging impact: P-086.
 
 Platform impact: web implemented; desktop implemented (shares `DayProgressTimeline`, ships in
 next Mac release); marketing not applicable; future mobile deferred. Messaging impact: P-085.
-
-## Note shortcuts revamp: inline chips, full history, floor of 2, and AI pattern analysis — November 24, 2026
-
-- **Owner's decision:** remove the Day note shortcuts drawer from Settings → General and the
-  static Note shortcuts section from Behavior Details & Settings; show shortcuts inline in
-  `NoteEditor` by default (ranked by frequency + recency, capped at 5) with inline dismiss (`×`);
-  drop the 90-day cutoff (full history up to today), lower the minimum floor from 3 to 2, normalize
-  trailing punctuation and multi-line notes; and layer AI pattern analysis (`openai/gpt-5.6-luna`)
-  gated on `Settings → AI features → Notes` (`docs/DECISIONS.md`, 2026-11-24).
-- **Implemented:**
-  - Step 1: `supabase/migrations/20261124103000_note_shortcuts_min_two_evidence.sql` and Rust
-    validator `apps/desktop/src-tauri/src/local_store/db.rs` (min 2 evidence);
-    `packages/core/src/resolvers/note-suggestion.resolver.ts` (full history, floor 2, trailing
-    punctuation normalization, multi-line matching, `rankInlineNoteShortcuts`);
-    `packages/core/src/services/note-shortcut.service.ts` (`listInlineNoteShortcuts`,
-    `dismissNoteShortcut`); `components/notes/NoteEditor.tsx` (`NoteShortcutDismissProvider`,
-    inline proposed+accepted chips with inline `×` dismiss); removed Day note shortcuts drawer from
-    `app/(app)/settings/page.tsx`, `apps/desktop/src/settings-screen.tsx`, and
-    `apps/desktop/src/product.tsx`, and removed `<NoteShortcutSettings>` from
-    `components/behaviors/BehaviorList.tsx`.
-  - Step 2: `mergeModelNoteSuggestions` in `packages/core/src/resolvers/note-suggestion.resolver.ts`,
-    `note_shortcuts` model config in `lib/services/agent-model.ts`,
-    `lib/services/note-shortcut-ai.service.ts` (gated on `ai.approved && sources.notes`, 12h
-    cooldown, max 40 notes / 500 output tokens), wired into `matchRepeatedNotesAfterNoteSave`, and
-    `docs/COSTS.md` updated.
-- **Hosted migration applied:** `20261124103000_note_shortcuts_min_two_evidence.sql` pushed to
-  hosted Supabase on November 24, 2026 (Local and Remote histories match).
-- **Pending:** merge to `main` (web deploy) and publish Cadence for Mac `0.1.16` (older linked
-  Macs still require ≥ 3 evidence on proposed entries until they update).
-
-Platform impact: web implemented (hosted migration applied); desktop implemented (ships in
-Cadence for Mac `0.1.16`); marketing not applicable; future mobile inherits the same core
-resolver. Messaging impact: none.
-
-## Cadence for Mac 0.1.15 published — November 23, 2026
-
-- **Published November 24, 04:49Z (Nov 23, 23:49 EST)** on the owner's instruction. Version
-  bump PR #370 (`6e468d72`); notarized (`6cd35997-0ad9-4d69-8288-656776dc5a0f`, DMG
-  `67f0672d…`), 14 artifact checks, quarantined download checks, and public readback all
-  passed. Batched Sub-behaviors / SQLite schema 28 / contract 9 (PR #354), Advisor avatar
-  updates (PRs #357, #360, #361, #364), Ticket 341 (PR #359), Ticket 351 auto-stop timer
-  on Completed (PR #368, hosted migration `20261123183000` live), PR #369 duration context
-  + `InlineDurationControl`, and Trust/tooling fixes.
-- **Test Mac (`test-mac`):** `0.1.14` updated through the real updater (**Check for updates**
-  → **Install update** → **Restart Cadence**); schema 27 → 28, integrity `ok`, 0 FK errors,
-  profile kept, 73 Behaviors / 257 Occurrences preserved, launch sync succeeded at
-  `04:48:30Z` with 0 pending (`acceptance-20261124T044832Z.json`).
-- **Release packet:** `docs/qa/2026-11-23-desktop-0.1.15-release-packet.md`.
-
-Platform impact: desktop published (`desktop-stable` and `desktop-preview` feeds, version-free
-`Cadence_aarch64.dmg`); web already live on `main`; marketing download link points at
-`Cadence_aarch64.dmg` (no site rebuild needed); future mobile deferred. Messaging impact: none.
-
-## Ticket 351: Auto-stop running time-tracking session on Completed — November 23, 2026
-
-- **Owner's decision:** transitioning an Occurrence to `completed` (not `not_completed`)
-  atomically stops any running `occurrence_time_sessions` row on that Occurrence at
-  `greatest(started_at, status_marked_at)`; existing completed rows are not backfilled
-  (`docs/DECISIONS.md`, 2026-11-23).
-- **Implemented:** `resolveStopTimeTrackingOnStatusTransition` in
-  `packages/core/src/resolvers/time-tracking.resolver.ts`; Postgres migration
-  `supabase/migrations/20261123183000_auto_stop_time_session_on_completed.sql` updating
-  `apply_occurrence_status_transition` (covering single marks, routine bulk marks, and
-  MCP); desktop SQLite `apps/desktop/src-tauri/src/local_store/occurrence.rs`;
-  `components/timeline/TimeTracker.tsx` server-tracking key sync; unit, DOM, migration,
-  Rust, and rollback SQL smoke tests (`tests/sql/ticket-351-auto-stop-time-session-on-completed.sql`).
-- **Pending:** hosted migration push and next Cadence for Mac release.
-
-Platform impact: web implemented (awaits hosted migration push); desktop implemented
-(ships in next Mac release); marketing not applicable; future mobile deferred. Messaging
-impact: none.
-
-## Advisor avatar: step 2 review 1, breathing softens the drawing — November 22, 2026
-
-- **In review (draft PR, branch `claude/avatar-motion-review`).** The owner returned to the
-  animation step. Measured in the bench: the whole-drawing breathing leaves the avatar at
-  56 to 69% of the still drawing's sharpness; without it, 78 to 94%.
-- **Bench:** `/design-system?preview=advisor-avatar`, "Breathing options", rows A (as
-  shipped), B (no breathing), C (panel only), and "Head and neck movement", four trials.
-- **Product changes in the same PR:** the circle is the page background, not light blue
-  (owner's request); the rig gains a head layer that nothing moves yet; the mane is
-  painted last, which keeps the face sharp while the mane sways.
-- **Waits for the owner's choice.** Findings: `docs/plans/2026-11-21-advisor-avatar.md`,
-  "Step 2 review".
-
-Platform impact: web and desktop share the changed component (desktop in its next
-release); marketing not applicable; future mobile deferred. Messaging impact: none.
-
-## Ticket 350 started: organization transfer and merge queue — November 22, 2026
-
-- **Owner's decision:** move `emixd12/cadence` to a free organization named `cadence-me`
-  so `main` can use a merge queue (`docs/DECISIONS.md`, 2026-11-21).
-- **Prepared:** `CI` runs on `merge_group` (PR #356). The Trust history downloader accepts
-  `https://emixd12.github.io/cadence/trust/` and the older root when the Pages root is
-  `https://cadence-me.github.io/cadence/`. The `emixd12.github.io` archive holds a staged,
-  byte-exact copy of 112 evidence files (commit `e33d350`).
-- **Not started:** the transfer, the URL changes and the queue setting. The organization
-  did not exist on November 22.
-- **Verification:** `tests/public-trust-publication.test.ts`, 51 passed;
-  `dagger check --cadence --progress=report`.
-
-## Advisor avatar: exact-size files (Ticket 343, round 5) — November 22, 2026
-
-- **Owner's choice:** option B of round 5, "Go with B". Same drawing, tone strengths and
-  crop; one file per product size (40, 48, 120) and screen density (1×, 2×, 3×).
-- **Shipped on web:** nine files under `public/brand/advisor/` from `npm run avatar:build`
-  (lossless WebP); the catalog's `art.renditions` with each file's `area` and `pixels`;
-  `AdvisorAvatar` picks the file from the screen's density. `advisor-256.webp` removed.
-- **Measured** in the bench in Chrome at 1×, 2× and 3×: crisper with the still drawing.
-  With motion on, the breathing movement softens the drawing before and after alike.
-  That is step 2's to settle.
-- **Not done:** installed Mac not checked (next Mac release); the circle's colour is
-  unchanged.
-
-Platform impact: web implemented; desktop shares the component and lists the new files in
-`apps/desktop/vite.config.ts`, next release; marketing not applicable; future mobile
-deferred. Messaging impact: none.
-
-## Advisor avatar: Ticket 343 round 4, master confirmed — November 22, 2026
-
-- **Reopened by the owner, then confirmed.** Round 3 was approved in a hurry, so the
-  owner compared the shipped master with the Sunburst render and round 2's pick and kept
-  the master ("go with A"). Unanswered: the 40px and 48px files, the 120px file, the crop.
-- **Round 4** reviews that master and adds no candidate. Sheet:
-  `docs/design-exploration/advisor-avatar/round-4-baseline-review.png`. Findings and the
-  open answers: `docs/plans/2026-11-21-advisor-avatar.md`, "Round 4".
-- **Docs only.** No product file changed; no checks beyond `agents:check` apply.
-
-Platform impact: none (web, desktop, marketing and future mobile unchanged). Messaging
-impact: none.
-
-## Advisor avatar: approved master and motion on web (Tickets 343–346) — November 22, 2026
-
-- **In review (PR #357, branch `claude/eloquent-turing-ua4q6s`), merging on green.** The
-  owner approved the three-tone vector trace as the master and asked for the animations
-  and a quick production deployment.
-- **Shipped:** `assets/advisor-avatar/master.svg`; `npm run avatar:build` and the two
-  files under `public/brand/advisor/`; anchors in the catalog; the resolver
-  (`advisor-avatar.resolver.ts`); `AdvisorAvatar` with 7 states and 4 gestures on the
-  Timeline, the panel and the Chat page; bench `/design-system?preview=advisor-avatar`.
-- **No flag** (DECISIONS, 2026-11-22). Reverting the pull request turns the motion off.
-- **Not done:** brief moves do not reach the avatar; installed Mac not checked; the old
-  trial bench stays.
-- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`,
-  `resolvers:check`, lint (0 errors), typecheck, build and `avatar:check` pass.
-  `npm run test`: 6,844 pass; 1 file fails (`tests/mcp-hosted-fixtures.test.mjs`, shallow
-  clone). Bench screenshots of every state, a blink, two gestures, the Timeline, the panel
-  and Chat.
-
-Platform impact: web implemented; desktop shares the components and files, next release;
-marketing not applicable; future mobile deferred. Messaging impact: none.
-
-## Advisor avatar track scoped (Tickets 343–348) — November 21, 2026
-
-- **In review (draft PR, branch `claude/eloquent-turing-ua4q6s`).** The owner asked for
-  the avatar in three steps: base image, animations on it, then scope and tests. Plan:
-  `docs/plans/2026-11-21-advisor-avatar.md`.
-- **Finding.** The trial's animations target the old side-profile drawing by fixed
-  coordinates, so none apply to the placement K drawing. The small avatar's file is the
-  same drawing with much heavier lines, which is why it reads as a different horse.
-- **Landed.** `packages/core/src/advisor-avatar/catalog.json` (7 states, 4 gestures, all
-  planned; the art block); the product map reads it as `avatar:` items and `map:check`
-  validates it. No product screen changed.
-- **Ticket 343 round 1.** Comparison sheet of four line weights made from the large
-  drawing, beside the current small file. Owner: between A and B.
-- **Owner answers, same day.** The side-profile drawing is the style reference; image
-  model allowed; the preparing arc stays; the advisor appears on Chat; recording interface
-  use is deferred (Tickets 347 and 348).
-- **Ticket 343 round 2.** Three candidates from `gpt-image-2` (one request), the placement
-  K pose in the profile's style, at ink ×1.25 for small sizes. Owner chose candidate 1.
-- **Ticket 343 round 3, November 22.** Candidate 1 re-rendered by `gpt-image-2.6-sunburst`
-  at quality `max` (2048px), and a three-tone vector trace of it. Awaiting the owner.
-- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`,
-  `resolvers:check`, lint (0 errors), typecheck and build pass. `npm run test`: 6,801
-  pass; 1 file fails (`tests/mcp-hosted-fixtures.test.mjs` needs full git history; the
-  cloud clone is shallow).
-
-Platform impact: none yet (docs, catalog and map only). Messaging impact: P-081 (planned).
-
-## Behaviors of Opportunity, web, MCP, Daily Brief and Mac — November 21, 2026
-
-- **Merged (PR #351, `07fb29ea`) and live; the Mac part shipped in Cadence for Mac 0.1.14
-  (November 21, 06:36Z).** A Behavior can be available as an
-  opportunity, with or without a schedule; the person adds it to today from the Timeline's
-  Opportunity Basket (a time, a window or Done now) and removes a clean added item.
-  Adherence stays scheduled-only; unscheduled ones show Done N times. Five waves:
-  Postgres, core rules and sync contract 8; web form, list, basket and rows; MCP 1.6.0
-  and Chat; Daily Brief "Add for today" lines and the `opportunity_ready_to_schedule`
-  coach signal; Cadence for Mac (SQLite schema 27 rebuilds `behaviors` and `occurrences`,
-  local add and Remove, contract 8 sync, the brief lines on a linked Mac).
-- **Hosted migrations applied before the merge:** `20261121100000`, `20261121110000`,
-  `20261121120000`, `20261121130000`.
-- **Verification (Node 24):** `cargo test` (Rust store, incl. 26 → 27 upgrade, add, Done
-  now, Remove, generation guard, contract 8 round trip); real-SQLite
-  `tests/desktop-opportunity-contract.test.ts`; DOM and service tests for each wave;
-  typecheck (web and Mac), interactions, map, resolvers, core and agents checks. Not run:
-  full `npm run test`, SQL replay (CI "Local Supabase rehearsal").
-- **Done:** contract 8 has no contract 7 fallback, so linked Macs need 0.1.14 to sync.
-
-Platform impact: web implemented (Tasks 3–7); desktop implemented (Task 8,
-`apps/desktop/src/local-opportunity.service.ts`, `local_store/opportunity.rs`); marketing
-not applicable; future mobile deferred (no ticket). Messaging impact: P-078, P-079, P-080.

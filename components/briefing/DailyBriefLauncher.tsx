@@ -153,7 +153,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
           // first brief waits up to 5 seconds for the first travel result. It does not wait with
           // travel off, not configured or not mounted, and a retry uses the token it has.
           const [installationId, travelConclusions] = await Promise.all([
-            dailyBriefInstallationId(window.localStorage, signal),
+            dailyBriefInstallationId(undefined, signal),
             retry ? travelConclusionsToken(travelAccountId, settings.localDate) : waitForDailyBriefTravel(travelAccountId, settings.localDate, signal),
           ]);
           return briefClient.requestBrief({ installationId, retry, ...(travelConclusions ? { travelConclusions } : {}), ...moveRequestFields(briefClient, travelAccountId, settings.localDate) }, signal);
@@ -272,7 +272,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
         setRefreshState({ pending: true, error: null });
         void (async () => {
           try {
-            const installationId = await dailyBriefInstallationId(window.localStorage);
+            const installationId = await dailyBriefInstallationId();
             const travelConclusions = travelConclusionsToken(travelAccountId, settings.localDate);
             const response = await briefClient.requestBrief({
               installationId, retry: false, refresh: true,

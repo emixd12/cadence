@@ -72,6 +72,14 @@ import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColum
 import { BriefingDays } from "./BriefingDays";
 import type { BenchCaseDetail, BenchCaseSummary, BenchGeneration, BenchProposal } from "@/lib/services/briefing-bench-store";
 import type { DailyBriefCallUsage } from "@/lib/services/daily-brief-consumer";
+import { getLocalStorage } from "@/lib/ui/browser-storage";
+
+/** Throws when storage is unavailable, so save and load report their error as before. */
+function requiredLocalStorage(): Storage {
+  const storage = getLocalStorage();
+  if (!storage) throw new Error("Browser storage is unavailable.");
+  return storage;
+}
 
 // Advisor 4F states: every AI feature on, Hevy excluded, Outlook with no selected calendar, iCloud not connected.
 const client: DailyBriefClient = createAiFeaturesBenchClient({ approved: true });
@@ -400,11 +408,11 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   }
   function save(index: number) {
     if (mode === 'account') return;
-    try { const config = parseBriefingConfig(configs[index]); localStorage.setItem("cadence.briefing-workbench.config.v1", JSON.stringify(config)); setSaved(config); setError(""); }
+    try { const config = parseBriefingConfig(configs[index]); requiredLocalStorage().setItem("cadence.briefing-workbench.config.v1", JSON.stringify(config)); setSaved(config); setError(""); }
     catch { setError("The configuration draft could not be saved."); }
   }
   function loadSaved(index: number) {
-    try { change(index, parseBriefingConfig(JSON.parse(localStorage.getItem("cadence.briefing-workbench.config.v1") ?? "null"))); }
+    try { change(index, parseBriefingConfig(JSON.parse(requiredLocalStorage().getItem("cadence.briefing-workbench.config.v1") ?? "null"))); }
     catch { setError("No valid saved configuration is available."); }
   }
   function exportConfig(index: number) {
