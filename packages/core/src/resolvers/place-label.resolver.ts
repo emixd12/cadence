@@ -348,6 +348,12 @@ export function resolvePlaceLabelState(input: Readonly<{
   behaviors: readonly PlaceLabelBehaviorInput[];
   today: Temporal.PlainDate;
   rules?: WhereSuggestionRuleSet;
+  /**
+   * Ticket 358 (D33): current model guesses of Where, by Behavior id, passed only while
+   * `CADENCE_ALONGSIDE` is on. A Behavior with Where Not set and no label suggestion
+   * then shows its guess on the same line (`basis: "guess"`), until it is dismissed.
+   */
+  whereGuesses?: ReadonlyMap<string, string>;
 }>): PlaceLabelState {
   const rules = input.rules ?? CURRENT_WHERE_SUGGESTION_RULES;
   const homePlaceKey = input.homeText?.trim() ? travelPlaceKey(input.homeText) : null;
@@ -390,10 +396,37 @@ export function resolvePlaceLabelState(input: Readonly<{
       }) : null;
       // A saved place can be suggested only while some Behavior still names it.
       const suggestedPlaceText = resolved?.kind === "saved_place" ? placeTexts.get(resolved.key as PlaceRef) ?? null : null;
-      const suggestion = resolved?.kind === "saved_place" && !suggestedPlaceText ? null : resolved;
+      const counted = resolved?.kind === "saved_place" && !suggestedPlaceText ? null : resolved;
+      const suggestion = counted ?? (behavior.active ? resolveWhereGuessSuggestion({
+        whereKind: behavior.whereKind, guess: input.whereGuesses?.get(behavior.id) ?? null,
+        dismissal: dismissals.get(behavior.id) ?? null, rules,
+      }) : null);
       return { behaviorId: behavior.id, suggestion, suggestedPlaceText, markerPrompt };
     }),
   };
+}
+
+const WHERE_GUESS_SUGGESTION_KEYS: Readonly<Record<string, Extract<WhereSuggestionKey, "home" | "anywhere" | "add_place">>> = Object.freeze({
+  home: "home", anywhere: "anywhere", elsewhere: "add_place",
+});
+
+/**
+ * Ticket 358 (D33): the Where suggestion line for a guessed Where. Only for a Behavior
+ * with Where Not set, and only for a guess of `home`, `anywhere` or `elsewhere`
+ * (`unknown` is no guess). `elsewhere` reads as Add a place, like counted labels away
+ * from saved places. A dismissal with the same key hides it; it stores the existing
+ * dismissal, so planning, which never reads dismissals, keeps the guess.
+ */
+export function resolveWhereGuessSuggestion(input: Readonly<{
+  whereKind: BehaviorWhereKind | null;
+  guess: string | null;
+  dismissal: Pick<WhereSuggestionDismissal, "suggestion"> | null;
+  rules: WhereSuggestionRuleSet;
+}>): WhereSuggestion | null {
+  if (input.whereKind !== null || !input.guess || !Object.hasOwn(WHERE_GUESS_SUGGESTION_KEYS, input.guess)) return null;
+  const key = WHERE_GUESS_SUGGESTION_KEYS[input.guess]!;
+  if (input.dismissal?.suggestion === key) return null;
+  return { ruleVersion: input.rules.version, kind: key, key, placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" };
 }
 
 export type PlaceLabelCountProjection = Readonly<{

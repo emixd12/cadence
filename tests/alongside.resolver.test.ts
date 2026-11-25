@@ -1,7 +1,9 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 import {
+  alongsideFormView,
   alongsideGuessWanted,
+  alongsideRowView,
   resolveAlongside,
   resolveRoutineBlockAlongside,
 } from "@cadence/core/resolvers/alongside.resolver";
@@ -91,5 +93,36 @@ describe("collapseBriefMoveRoutines reads the block rule", () => {
     const [block] = collapseBriefMoveRoutines([step("serum", 0, { alongside: true }), step("wash", 1, {})]);
     expect(block!.alongside).toBe(false);
     expect(block).not.toHaveProperty("alongsideSource");
+  });
+});
+
+// Ticket 358 (D33): the form's three states and the Timeline row's label facts.
+describe("alongsideFormView", () => {
+  it("shows the person's answer and no guess once answered", () => {
+    expect(alongsideFormView({ setting: true, guess: false })).toEqual({ answer: "yes", guess: null });
+    expect(alongsideFormView({ setting: false, guess: true })).toEqual({ answer: "no", guess: null });
+  });
+
+  it("offers the current guess only while unanswered", () => {
+    expect(alongsideFormView({ setting: null, guess: true })).toEqual({ answer: "unanswered", guess: true });
+    expect(alongsideFormView({ setting: undefined, guess: false })).toEqual({ answer: "unanswered", guess: false });
+    expect(alongsideFormView({ setting: null, guess: null })).toEqual({ answer: "unanswered", guess: null });
+  });
+});
+
+describe("alongsideRowView", () => {
+  it("labels only alongside values and says when the value is a guess", () => {
+    expect(alongsideRowView(resolveAlongside({ setting: true, guess: null }))).toEqual({ source: "person" });
+    expect(alongsideRowView(resolveAlongside({ setting: null, guess: true }))).toEqual({ source: "guess" });
+    expect(alongsideRowView(resolveAlongside({ setting: false, guess: true }))).toBeNull();
+    expect(alongsideRowView(resolveAlongside({ setting: null, guess: false }))).toBeNull();
+    expect(alongsideRowView(resolveAlongside({ setting: null, guess: null }))).toBeNull();
+  });
+
+  it("carries the effective Where kind and place key, never its source", () => {
+    expect(alongsideRowView({ value: true, source: "person" }, { kind: "place", placeKey: "k".repeat(43), source: "evidence" } as never))
+      .toEqual({ source: "person", where: { kind: "place", placeKey: "k".repeat(43) } });
+    expect(alongsideRowView({ value: true, source: "guess" }, { kind: "home" }))
+      .toEqual({ source: "guess", where: { kind: "home" } });
   });
 });

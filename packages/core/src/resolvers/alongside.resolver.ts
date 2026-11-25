@@ -93,3 +93,28 @@ export function alongsideMayOverlap(alongsideItem: Readonly<{ where?: OverlapPla
 function open(where: NonNullable<OverlapPlace>): boolean {
   return where.kind === "unknown" || where.kind === "anywhere";
 }
+
+/**
+ * Ticket 358 (D33): what the Behavior form shows for the setting. `answer` is the
+ * person's answer; `guess` is set only while it is unanswered and a current model guess
+ * exists, so the form can offer it as a guess to accept.
+ */
+export type AlongsideAnswer = "yes" | "no" | "unanswered";
+export type AlongsideFormView = Readonly<{ answer: AlongsideAnswer; guess: boolean | null }>;
+
+export function alongsideFormView(input: AlongsideInput): AlongsideFormView {
+  if (typeof input.setting === "boolean") return { answer: input.setting ? "yes" : "no", guess: null };
+  return { answer: "unanswered", guess: typeof input.guess === "boolean" ? input.guess : null };
+}
+
+/**
+ * Ticket 358 (D33): the Timeline row's alongside facts. Null unless the effective value
+ * is alongside. `source` says whether the row's label names a guess; `where` is the
+ * item's effective Where for the same-place overlap rule (`alongsideMayOverlap`).
+ */
+export type AlongsideRowView = Readonly<{ source: "person" | "guess"; where?: OverlapPlace }>;
+
+export function alongsideRowView(resolved: ResolvedAlongside, where?: OverlapPlace): AlongsideRowView | null {
+  if (!resolved.value || resolved.source === "default") return null;
+  return where ? { source: resolved.source, where: { kind: where.kind, ...(where.placeKey ? { placeKey: where.placeKey } : {}) } } : { source: resolved.source };
+}
