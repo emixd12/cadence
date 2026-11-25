@@ -54,8 +54,12 @@ Recorded November 18 and November 25, 2026 (`docs/DECISIONS.md`):
 6. **Future iPhone-specific roadmap (post-v1):** Lightweight context-collection prompts in
    Live Activities, deeper Siri + Cadence Agent / Apple Intelligence analysis, and
    optional always-on location / geofencing.
-7. **Mac App Store alongside direct download:** Keep both the Mac App Store (primary easy
-   install on the website) and the notarized direct DMG (GitHub/power users).
+7. **Mac App Store alongside direct download (separate listings, shared Mac ID):** Keep
+   both the Mac App Store (primary easy install on the website) and the notarized direct
+   DMG (GitHub/power users), sharing **one Mac bundle ID** (`app.cadence.desktop`) so
+   macOS treats them as the same app. Keep **separate App Store listings** for
+   iPhone/Watch (`app.cadence.ios`) and Mac (`app.cadence.desktop`)—not Universal
+   Purchase—so ratings and reviews stay scoped per platform.
 8. **Store & compliance posture:** Organization Developer account (Identity Scaffolding
    LLC via D-U-N-S, unless Apple allows a non-legal org named "Cadence"); distinctive App
    Store title + subtitle after trademark check ("Cadence" under Home Screen icon); 18+
@@ -88,18 +92,11 @@ These rules keep every-other-day refreshes automatic and low-noise:
 
 ## 4. Open Questions Inbox
 
-All 19 prior open decisions from the October/November 18 plan were resolved in the
-November 25 planning pass (`docs/DECISIONS.md`) or assigned to engineering evaluation at
-activation (`IOS-189`).
-
-Two pre-registration identifier questions surfaced while writing
-[05-mac-app-store.md](ios-plan/05-mac-app-store.md). Neither blocks planning; both only
-need an answer before registering App Store identifiers in M0:
-
-| # | Question | Options & recommended default | Source |
-|---|---|---|---|
-| Q1 | **Single App Store listing (Universal Purchase) or separate iPhone and Mac listings?** Sharing one App Store record requires the same bundle ID on iPhone and Mac (`app.cadence.desktop` vs. proposed `app.cadence.ios`). Bundle IDs lock at the first upload. | Separate listings (keep `app.cadence.desktop` on Mac and `app.cadence.ios` on iPhone) vs. unified ID for one combined listing. **Recommended:** decide before M0 ID registration based on whether unified reviews/listing outweighs changing the Mac MAS bundle ID. | `05-mac-app-store.md` |
-| Q2 | **One bundle ID or two across the two Mac channels (Mac App Store vs. direct DMG)?** | **Recommended:** one bundle ID across both Mac channels so macOS treats them as the same app (avoiding duplicate installs). | `05-mac-app-store.md` |
+**Current open product questions: 0.** All 19 prior open decisions from the October/November
+18 plan—plus the two Mac/iOS App Store identifier questions (Q1: separate iPhone/Watch
+`app.cadence.ios` and Mac `app.cadence.desktop` listings; Q2: one shared
+`app.cadence.desktop` bundle ID across both Mac channels)—were resolved on November 25,
+2026 (`docs/DECISIONS.md`) or assigned to engineering evaluation at activation (`IOS-189`).
 
 Non-code owner action items that can be started anytime before activation (not blocking
 planning) are tracked in [06-app-store-readiness.md](ios-plan/06-app-store-readiness.md):

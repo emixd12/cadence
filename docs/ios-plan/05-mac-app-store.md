@@ -117,23 +117,23 @@ Code and behavior changes the sandbox forces:
 
 ### 3.3 Identity and coexistence
 
-To settle in `IOS-MAS-1`, before the first upload locks anything:
+Decided November 25, 2026 (`docs/DECISIONS.md`):
 
-- **Bundle identifier.** Keeping `app.cadence.desktop` for both channels gives
-  one app identity: one Keychain group, one notification identity and one
-  Launch Services entry. Two copies cannot then sit side by side, and the store
-  install replaces the direct copy. A separate identifier (for example
-  `app.cadence.desktop.mas`) allows both but splits Keychain items,
-  notifications and data, and macOS scopes notification requests to the
-  identifier (`docs/DESKTOP_RELEASE.md`, "Identity and data"). Recommendation:
-  one identifier, one Cadence on a Mac.
-- **Universal Purchase with the iPhone app.** One App Store record for iPhone
-  and Mac requires the same bundle identifier on both platforms. The iPhone
-  identifiers proposed in the baseline (`app.cadence.ios`, B 4.9) differ from
-  `app.cadence.desktop`. Separate records need separate names, privacy labels
-  and age ratings. Decide at activation, before any iPhone identifier is
-  registered; identifiers lock at the first upload. Not verified: whether
-  Apple lets one developer use the same name on two separate records.
+- **One shared Mac bundle identifier (`app.cadence.desktop`).** Both the Mac App
+  Store build and the direct GitHub DMG build use `app.cadence.desktop`. macOS
+  treats them as the same app: one Keychain access group, one notification
+  identity, one `cadence://` deep-link handler, one Launch Services entry, and
+  no duplicate side-by-side installs (installing the store copy replaces the
+  direct copy).
+- **Separate iPhone and Mac App Store listings (no Universal Purchase).**
+  iPhone and Apple Watch use `app.cadence.ios` (plus its extension/watch
+  sub-IDs) and Mac uses `app.cadence.desktop` on its own App Store Connect
+  record. Because Mac (Tauri) and iPhone (native SwiftUI) are separate
+  codebases, separate listings keep ratings and reviews scoped per platform so
+  reviews stay relevant to the device people are shopping for. Separate records
+  maintain their own privacy labels, age ratings and metadata; confirm at
+  activation how Apple handles matching titles/subtitles across two separate
+  records under one developer account.
 - **Team ID.** If the organization upgrade (`06-app-store-readiness.md`, item 1)
   changes `HK26VT477G`, both channels' Keychain groups and the Developer ID
   identity change. Settle the membership first.
@@ -257,7 +257,7 @@ Each is unverified on November 25, 2026.
 5. Tauri v2 App Store guide: current steps, `productbuild` flags, profile embedding.
 6. Whether any sign-in or ChatGPT callback needs `network.server`.
 7. Container migration for existing direct-download data (Section 3.2).
-8. One bundle identifier for both channels, and Universal Purchase with iPhone (Section 3.3).
+8. Whether Apple permits the exact same App Store title on two separate records (iPhone `app.cadence.ios` and Mac `app.cadence.desktop`) under one organization account, or requires slight title differentiation (Section 3.3).
 9. Whether the team ID survives the organization upgrade.
 10. Whether an arm64-only store build is offered only to Apple silicon Macs.
 11. Whether WKWebView behavior, notifications and location prompts differ inside the sandbox.
@@ -295,7 +295,7 @@ released store build.
 
 | Step | Contents | Depends on | Size |
 |---|---|---|---|
-| `IOS-MAS-1` | Channel switch; updater removal from `mas`; sandbox entitlements; `/bin/df` replacement; container path audit and data move; identity decision | Organization membership settled | M |
+| `IOS-MAS-1` | Channel switch; updater removal from `mas`; sandbox entitlements; `/bin/df` replacement; container path audit and data move (shared `app.cadence.desktop` ID) | Organization membership settled | M |
 | `IOS-MAS-2` | 4.8 and 5.1.1(v) parity, terminal account-deleted state, privacy manifest and label, 18+ rating, AI consent check, credentials, dual-channel release pipeline | `IOS-MAS-1`; deletion API from `IOS-190f` | M |
 | `IOS-MAS-3` | Mac TestFlight, Section 7 acceptance, App Review, store release, marketing badge through the messaging track | `IOS-MAS-2`; store title from `06-app-store-readiness.md` | M (L with repeated reviews) |
 

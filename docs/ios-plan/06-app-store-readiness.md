@@ -78,11 +78,13 @@ after trademark clearance. The Home Screen name under the icon stays
       "Cadence — Behavioral Remodeling" (matches the D30 positioning,
       `docs/NARRATIVE.md`) or "Cadence: Behavior Tracker". A public claim in the
       subtitle needs a row in `docs/NARRATIVE.md`, "Claims".
-- [ ] **Owner.** Reserve the name by creating the App Store record right after
-      the organization upgrade and clearance. Creating the record locks the
-      bundle identifier choice (`05-mac-app-store.md`, Section 3.3).
-- [ ] **Owner.** Decide whether the Mac App Store listing shares the record
-      (Universal Purchase) or has its own (`05-mac-app-store.md`, Section 3.3).
+- [ ] **Owner.** Reserve both separate App Store records right after the
+      organization upgrade and clearance: iPhone/Watch under `app.cadence.ios`
+      and Mac under `app.cadence.desktop` (decided November 25, 2026: separate
+      listings, no Universal Purchase, and one shared `app.cadence.desktop` ID
+      across both Mac channels; `05-mac-app-store.md`, Section 3.3). Confirm
+      whether Apple allows matching titles across both records under one
+      organization account.
 - [ ] **Agent.** PLA 3.3.5(C): use one product title everywhere Sign in with
       Apple appears: iPhone, Mac, web and the Apple Services ID display name.
       List every place at activation.
@@ -291,10 +293,11 @@ From B 17.2.
 From B 13. These follow the organization upgrade.
 
 - [ ] Developer portal: App IDs, App Group, capabilities (Sign in with Apple,
-      App Groups, Push for Live Activities), devices. Proposed identifiers:
-      `app.cadence.ios`, `.widgets`, `.watchkitapp`, `.watchkitapp.widgets`,
-      App Group `group.app.cadence.ios`. They lock at the first upload; settle
-      the Universal Purchase question first (item 2).
+      App Groups, Push for Live Activities), devices. Locked identifiers
+      (November 25, 2026): iPhone/Watch `app.cadence.ios`, `.widgets`,
+      `.watchkitapp`, `.watchkitapp.widgets`, App Group `group.app.cadence.ios`;
+      Mac App Store and direct DMG both share `app.cadence.desktop` on a
+      separate Mac App Store record.
 - [ ] App Store Connect: create the app record, internal tester group,
       export-compliance answer.
 - [ ] App Store Connect API key with the Developer role, stored outside git.

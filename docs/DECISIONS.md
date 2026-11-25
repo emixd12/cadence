@@ -3226,10 +3226,16 @@ authorized yet.
    earlier?", "At Home?", "Alongside?"), (b) deeper Siri + Cadence Agent / Apple
    Intelligence analysis, and (c) optional always-on location / geofencing to power
    smarter Agent and Travel features.
-7. **Mac App Store dual distribution.** Keep **both** the Mac App Store (primary easy
-   install on the website) and the notarized direct download DMG (GitHub/power users),
-   built from one codebase with a sandboxed MAS build variant that removes the built-in
-   self-updater.
+7. **Mac App Store dual distribution and App Store identifiers.** Keep **both** the Mac
+   App Store (primary easy install on the website) and the notarized direct download DMG
+   (GitHub/power users), built from one codebase with a sandboxed MAS build variant that
+   removes the built-in self-updater. Use **separate App Store listings** for iPhone/Watch
+   (`app.cadence.ios`) and Mac (`app.cadence.desktop`)—not a combined Universal Purchase
+   listing—so ratings and reviews stay scoped per platform across the separate SwiftUI and
+   Tauri codebases. Use **one shared bundle ID** (`app.cadence.desktop`) across both the
+   Mac App Store build and the direct GitHub DMG build so macOS treats them as the same
+   app (one Keychain group, one notification identity, one `cadence://` handler, and no
+   duplicate installs).
 8. **App Store and business readiness.** Upgrade the Apple Developer membership to an
    Organization account (Identity Scaffolding LLC, as Apple requires a legal entity with a
    D-U-N-S number; "Cadence" would be preferred only if Apple permitted a non-legal org
