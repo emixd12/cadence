@@ -2537,8 +2537,8 @@ be done alongside other things?". Null means unanswered. Migration:
   answer makes the estimate stale and the next brief asks about alongside again.
 - **Writers.** `create_behavior_with_schedule_graph` stores the payload's `alongside`
   (absent: null). `update_behavior_with_schedule_graph` changes it only when the payload
-  carries the key; JSON null clears it. A change is a revision: the `updated_at` trigger
-  watches the column.
+  carries the key; JSON null clears it. A change through the RPC is a revision: the RPC
+  sets every column the `updated_at` trigger watches. The trigger itself is unchanged.
 - **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code reads the column and
   planners read the cached guess, then false, as before Ticket 356.
 - **Hosted-only until Ticket 363.** Account sync contract 9 does not carry the column:

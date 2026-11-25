@@ -5,7 +5,7 @@
 -- behavior_advisor_estimates, then false (alongside.resolver.ts). No default.
 --
 -- The definition RPCs store it: create takes it from the payload, update changes it only
--- when the payload carries the key. A change is a revision (updated_at).
+-- when the payload carries the key. An RPC change is a revision (updated_at).
 --
 -- Hosted-only until Ticket 363. Account sync contract 9 does not carry the column: the
 -- snapshot leaves it out, a device's expected row is compared without it, and a synced
@@ -21,15 +21,10 @@ alter table public.behaviors
 comment on column public.behaviors.alongside is
   'The person''s answer to whether the Behavior can be done alongside other things. Null: unanswered. Hosted-only until account sync carries it (Ticket 363).';
 
--- Changing the answer is a revision: integration and brief-move conflict checks read updated_at.
-drop trigger set_behaviors_updated_at on public.behaviors;
-create trigger set_behaviors_updated_at
-  before update of category_id, title, description, recurrence_rule, scheduled_time, timezone,
-    browser_reminder_enabled, email_reminder_enabled, reminder_offset_minutes, active, archived_at,
-    end_on, end_time, pause_from_on, pause_from_time, pause_back_on, is_opportunity,
-    parent_behavior_id, sub_behavior_sort_order, inherit_parent_schedule, alongside
-  on public.behaviors
-  for each row execute function public.set_updated_at();
+-- The update RPC lists every trigger column in its SET list, so set_behaviors_updated_at
+-- already fires when the RPC changes the answer. The trigger itself is left unchanged: no
+-- writer updates alongside alone, and the migration stays additive (docs/DECISIONS.md,
+-- 2026-11-10, "Standing approval for additive hosted migrations").
 
 -- A small text patcher for the function rewrites below: each anchor must occur once.
 create or replace function pg_temp.patch_definition(definition text, anchor text, replacement text, label text)
