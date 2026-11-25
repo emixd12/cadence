@@ -3,6 +3,7 @@ import {
   listIntegrationToolDescriptors, type IntegrationOperationName, type JsonSchemaObject,
 } from "@cadence/core/integration";
 import type { ChatOutcomeKind, ChatToolSubject } from "@cadence/core/types/chat";
+import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 
 /**
  * Advisor plan Phase 5 (5A). Chat's tools: every Cadence operation from the MCP
@@ -132,7 +133,8 @@ export type ChatToolDefinition = Readonly<{ name: ChatToolName; description: str
  * or Hevy off, its tool is left out so the model never asks for it.
  */
 export function buildChatToolDefinitions(sources: ChatSourceFlags): ChatToolDefinition[] {
-  const cadence = listIntegrationToolDescriptors()
+  // The same contract edition the MCP endpoint validates against (Ticket 364).
+  const cadence = listIntegrationToolDescriptors(integrationContractOptions())
     .filter((descriptor) => sources.notes || !NOTE_TOOLS.has(descriptor.name))
     .map((descriptor) => ({ name: descriptor.name, description: descriptor.description, inputSchema: withoutServerKeys(descriptor.inputSchema) }));
   const anyCalendar = sources.googleCalendar || sources.outlookCalendar || sources.icloudCalendar;

@@ -139,6 +139,8 @@ export type BehaviorLogExistingBehavior = {
   autoArchivedAt?: string | null;
   /** Behaviors of Opportunity. Absent means not an opportunity Behavior. */
   isOpportunity?: boolean;
+  /** D33 alongside answer (null: unanswered). Present only when the caller reads alongside (Ticket 364). */
+  alongside?: boolean | null;
   /** Sub-behavior link (depth 1). Absent reads as standalone. */
   parentBehaviorId?: string | null;
   subBehaviorSortOrder?: number;
@@ -293,6 +295,12 @@ export type BehaviorLogImportBehaviorPlan = {
   cadenceAutoArchivedAt?: string | null;
   /** Behaviors of Opportunity, from `extensions.app.cadence.is_opportunity`. Absent when the bundle carries none. */
   cadenceIsOpportunity?: boolean;
+  /**
+   * The person's alongside answer (D33, Ticket 364) from `extensions.app.cadence.alongside`:
+   * true, false, or null for unanswered. Absent when the bundle carries none or the
+   * caller does not read alongside; restore then keeps the stored answer.
+   */
+  cadenceAlongside?: boolean | null;
   /**
    * Sub-behaviors (depth 1) from `extensions.app.cadence`: the bundle ID of the parent
    * Behavior, sibling order and schedule inheritance. Absent in bundles without them,

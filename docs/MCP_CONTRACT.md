@@ -964,6 +964,46 @@ Output:
 
 A status change written from a connected service's recorded activity appears in `status_history` with `semantics` `system_rule_declared` and `capture_method` `derived`; a revert after the activity is deleted at the source carries the same pair with `status` `unresolved`. Both values were already in the enums, so the tool's schema is unchanged. The user's own marks keep `explicit_user_mark` or `explicit_user_correction` with `manual_tap` or `manual_text`. Clients must not describe a `derived` entry as something the user did.
 
+## Alongside (contract 1.8.0, available when `CADENCE_ALONGSIDE` is on)
+
+Ticket 364 (`docs/DECISIONS.md`, 2026-11-25, D33). The generated reference above stays
+the published contract 1.7.0. Contract 1.8.0 is a minor edition of it that the hosted
+endpoint serves only while the server flag `CADENCE_ALONGSIDE` is `on`; with the flag
+off, `tools/list`, every output and every error are byte-identical to 1.7.0
+(`tests/integration-alongside-contract.test.ts` pins the 1.7.0 tool list's digest).
+
+- **How it is built.** `packages/core/src/integration/editions.ts` derives the 1.8.0
+  edition from the registry. Callers pass `{ alongside: true }` to
+  `listIntegrationToolDescriptors`, `validateOperationInput`, `validateOperationOutput`
+  and `integrationContractVersion`; no options means 1.7.0. The web app reads the flag
+  once per call in `lib/services/integration-contract-options.ts`. A test checks that
+  the edition differs from 1.7.0 only by the fields below and the version.
+- **Version.** `get_account_context.contract_version`, the MCP server `version` and
+  every error's `contract_version` are `"1.8.0"`.
+- **Outputs.** Behaviors (`list_behaviors`, `get_behavior` and every Behavior write)
+  carry `alongside` after `is_opportunity`. Occurrences, including `get_timeline` days
+  and Needs decision, `list_occurrences`, `get_occurrence` and every Occurrence write,
+  carry the Behavior's `alongside` after `added_by`. The value is `true`, `false` or
+  `null` (unanswered). The field is optional in the schema only so that an idempotent
+  replay recorded before the flag still validates; live results always include it.
+- **Inputs.** `create_behavior` and `update_behavior` accept optional `alongside`
+  (`true`, `false` or `null`). Omitted on an update keeps the stored answer; `null`
+  clears it. `update_behavior` with only `alongside` is a valid change. The field is
+  top-level only: set a sub-behavior's answer with `update_behavior` on it.
+- **Only the person's answer.** The model's guess
+  (`behavior_advisor_estimates.alongside`) and the effective value's source never cross
+  the contract. `guess` joins the forbidden output field fragments.
+- **Writes.** The confirmed, scoped write path is unchanged: `cadence.behaviors.write`,
+  `destructiveHint` as before, idempotency keys and `expected_revision`. No new tool and
+  no delete.
+- **Rollback.** Turning the flag off serves 1.7.0 again, and a replayed result recorded
+  under 1.8.0 drops `alongside` (`fitOutputToContract`).
+- **Turning it on.** Needs migrations `20261125140000_behavior_alongside.sql` and
+  `20261125180000_alongside_mcp_and_portability.sql`. When the owner turns the flag on
+  for good (Ticket 365), fold the edition into the registry, bump
+  `INTEGRATION_CONTRACT_VERSION` to 1.8.0 and regenerate this reference and the
+  developer reference.
+
 ## Behaviors of Opportunity (contract 1.6.0)
 
 `docs/RECURRENCE_RULES.md`, "Behaviors of Opportunity", holds the rules. In the contract:
