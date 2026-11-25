@@ -1,7 +1,7 @@
 -- Effective Where guess column (migration 20261125150000, Ticket 357). Local-only
 -- rollback fixture. Covers: the column exists, is nullable with no default, accepts only
--- the four coarse values, keeps the owner-only read, gives authenticated no write, and the
--- unchanged upsert leaves it null.
+-- the four coarse values, keeps the owner-only read, gives authenticated no write, and a
+-- row written without a guess leaves it null.
 begin;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data)
@@ -146,7 +146,8 @@ end;
 $$;
 reset role;
 
--- A row written without a guess has none, and the estimate upsert does not name the column yet.
+-- A row written without a guess has none. Ticket 359's upsert writer has its own fixture
+-- (advisor-estimate-where-guess-writer-smoke.sql).
 do $$
 begin
   delete from public.behavior_advisor_estimates where user_id = '35700000-0000-4000-8000-000000000001';
@@ -154,9 +155,6 @@ begin
   select '35700000-0000-4000-8000-000000000001', behavior_id, repeat('b', 64), 10, true from where_guess_fixture;
   if (select where_guess from public.behavior_advisor_estimates where user_id = '35700000-0000-4000-8000-000000000001') is not null then
     raise exception 'A row written without a guess has one.';
-  end if;
-  if position('where_guess' in pg_get_functiondef('public.upsert_behavior_advisor_estimates(jsonb)'::regprocedure)) > 0 then
-    raise exception 'The estimate upsert writes where_guess before Ticket 359.';
   end if;
 end;
 $$;
