@@ -2370,7 +2370,26 @@ cite has not changed.
   rather than a dedicated `"Recorded activity · Hevy"` header section.
 - **Status:** logged.
 
-## P-086: The public source moves to github.com/cadence-me/cadence
+## P-086: Advisor speech pill replaces AdvisorDayLine and "Advisor · 1 new"
+
+- **Change:** implemented November 24, 2026 (`docs/DECISIONS.md`, 2026-11-24). Removed the
+  inline line under today's date (`AdvisorDayLine`) and replaced `"Advisor · 1 new"` with a
+  rounded speech pill beside (desktop/Mac, 72px horse) or below (phones, 60px horse) the
+  advisor avatar on the top wave banner, scrolling naturally with the page. When nothing
+  waits (or while the panel is open), the speech pill hides and the quiet `"Advisor"` label
+  appears.
+- **Affected:** `components/advisor/AdvisorParts.tsx`, `components/advisor/AdvisorTimelineFrame.tsx`,
+  `components/timeline/DayProgressTimeline.tsx`.
+- **Surfaces:** user guide (`docs/user-guide/timeline.md`, Advisor section).
+- **Conflicting current text:** `docs/user-guide/timeline.md` says the advisor stays in view
+  when you scroll, reads **Advisor · 1 new**, and shows one line under today's date for the
+  brief, schedule questions, check-ins, and tips.
+- **Update needed:** update the Advisor section in `docs/user-guide/timeline.md` to describe
+  the speech pill on the banner, natural scrolling, and answering tips/check-ins in the
+  Advisor panel.
+- **Status:** logged.
+
+## P-087: The public source moves to github.com/cadence-me/cadence
 
 - **Change:** decided November 21, 2026 (Ticket 350; `docs/DECISIONS.md`, 2026-11-21).
   The repository moves from `emixd12/cadence` to the `cadence-me` organization. The

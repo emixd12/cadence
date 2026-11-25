@@ -17,7 +17,7 @@ export type AdvisorAvatarGestureEvent = Readonly<{ id: AdvisorAvatarGesture; key
 
 const { window: VIEW, eyes: EYES, mane: MANE_AREA, maneRoot: MANE_ROOT, ears: EARS, head: HEAD } = advisorAvatarArt.anchors;
 const ART_SIZE = 1024;
-/** Above this size the mane also ripples; smaller, its strands are too fine to show it. */
+/** From this size upward the mane also ripples; smaller, its strands are too fine to show it. */
 const DETAIL_FROM = 72;
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -66,7 +66,7 @@ export function AdvisorAvatar({
 }: Readonly<{ size: number; state?: AdvisorAvatarState | null; gesture?: AdvisorAvatarGestureEvent | null }>) {
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const reduceMotion = usePrefersReducedMotion();
-  const detailed = size > DETAIL_FROM && !reduceMotion;
+  const detailed = size >= DETAIL_FROM && !reduceMotion;
   // A product size has a file made at exactly its pixels for this screen, so nothing is scaled at rest.
   const rendition = advisorAvatarRendition(size, useScreenDensity());
   const { area } = rendition;

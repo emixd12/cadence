@@ -117,6 +117,23 @@ export function briefLineText(openMoves: number): string {
   return "Today’s brief is ready.";
 }
 
+/** First sentence of a tip or notice, keeping ?/! and dropping a trailing period for the speech pill. */
+function firstSentence(text: string): string {
+  const trimmed = text.trim();
+  const match = /^(.+?[.!?])(?:\s+|$)/.exec(trimmed);
+  const sentence = match ? match[1] : trimmed;
+  return sentence.endsWith(".") ? sentence.slice(0, -1) : sentence;
+}
+
+/** Short teaser shown in the advisor's speech pill when something waits in the panel. */
+export function advisorBubbleTeaser(item: AdvisorLineItem): string {
+  if (item.kind === "brief") return briefLineText(item.openMoves).replace(/\.$/, "");
+  if (item.kind === "proposal") return proposalShortLine(item.view);
+  if (item.kind === "check_in") return item.view.question;
+  if (item.kind === "notice") return firstSentence(item.view.text);
+  return firstSentence(item.tip.text);
+}
+
 export const TIP_REACTION_OUTCOME: Readonly<Record<AdvisorTipReaction, string>> = {
   helpful: "Saved as helpful.",
   not_now: "Hidden for today.",

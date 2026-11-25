@@ -45,7 +45,7 @@
     "links": {
       "aliases (asserted)": 28,
       "belongs-to (asserted)": 211,
-      "calls (derived)": 671,
+      "calls (derived)": 667,
       "contains (asserted)": 588,
       "defined-in (asserted)": 629,
       "explained-in (asserted)": 251,
@@ -32286,34 +32286,6 @@
     {
       "from": "file:components/timeline/DayProgressTimeline.tsx",
       "type": "calls",
-      "to": "api:/api/advisor/coach/schedule-proposal",
-      "grade": "derived",
-      "source": "scan:components/timeline/DayProgressTimeline.tsx#/api/advisor/coach/schedule-proposal"
-    },
-    {
-      "from": "file:components/timeline/DayProgressTimeline.tsx",
-      "type": "calls",
-      "to": "api:/api/advisor/tips/next",
-      "grade": "derived",
-      "source": "scan:components/timeline/DayProgressTimeline.tsx#/api/advisor/tips/next"
-    },
-    {
-      "from": "file:components/timeline/DayProgressTimeline.tsx",
-      "type": "calls",
-      "to": "api:/api/advisor/tips/reaction",
-      "grade": "derived",
-      "source": "scan:components/timeline/DayProgressTimeline.tsx#/api/advisor/tips/reaction"
-    },
-    {
-      "from": "file:components/timeline/DayProgressTimeline.tsx",
-      "type": "calls",
-      "to": "api:/api/advisor/tips/recent",
-      "grade": "derived",
-      "source": "scan:components/timeline/DayProgressTimeline.tsx#/api/advisor/tips/recent"
-    },
-    {
-      "from": "file:components/timeline/DayProgressTimeline.tsx",
-      "type": "calls",
       "to": "api:/api/connectors/completions/reconcile",
       "grade": "derived",
       "source": "scan:components/timeline/DayProgressTimeline.tsx#/api/connectors/completions/reconcile"
@@ -33730,7 +33702,7 @@
       "type": "implemented-in",
       "to": "file:components/advisor/AdvisorParts.tsx",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-ADVISOR-002/implementation/components/advisor/AdvisorParts.tsx#AdvisorDayLine"
+      "source": "interaction-registry.json#INT-ADVISOR-002/implementation/components/advisor/AdvisorParts.tsx#AdvisorPanel"
     },
     {
       "from": "interaction:INT-ADVISOR-002",
@@ -33821,7 +33793,7 @@
       "type": "implemented-in",
       "to": "file:components/advisor/AdvisorParts.tsx",
       "grade": "asserted",
-      "source": "interaction-registry.json#INT-ADVISOR-004/implementation/components/advisor/AdvisorParts.tsx#AdvisorDayLine"
+      "source": "interaction-registry.json#INT-ADVISOR-004/implementation/components/advisor/AdvisorParts.tsx#AdvisorPanel"
     },
     {
       "from": "interaction:INT-ADVISOR-004",

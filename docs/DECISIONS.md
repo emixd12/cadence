@@ -3017,3 +3017,26 @@ Owner decision on November 24, 2026:
 Platform impact: web implemented (`components/timeline/DayProgressTimeline.tsx`, `RecordedActivityList`
 removed); desktop implemented (shares `DayProgressTimeline`, ships in next Mac release); marketing not
 applicable; future mobile deferred. Messaging impact: `P-085`.
+
+## 2026-11-24: Advisor speech pill on banner, larger avatar, and removal of AdvisorDayLine
+
+Owner decision on November 24, 2026:
+
+- **Remove `AdvisorDayLine` under today's date.** Keep tips, briefs, schedule questions, and
+  check-ins inside the Advisor side panel so the Timeline header stays low-density and regular
+  tracking flows stay uncluttered.
+- **Replace `"Advisor · 1 new"` with a speech pill.** When the advisor has something waiting and
+  the panel is closed, hide the `"Advisor"` label and show a rounded speech pill with a concise
+  teaser (`advisorBubbleTeaser`) pointing to the horse: side-by-side to the right on desktop/Mac
+  (left tail) and stacked directly below on phones (top tail). When nothing is waiting (or while
+  the panel is open), show the quiet `"Advisor"` label below the horse.
+- **Larger avatar, natural scroll, out of the phone top bar.** Increase the Timeline horse to
+  **72px** on desktop/Mac (enabling full mane-ripple detail in `AdvisorAvatar`) and **60px** on
+  phones, moving the mobile horse out of the top nav bar onto the wave banner. Let the entire
+  advisor header scroll naturally with the page.
+
+Platform impact: web implemented (`components/advisor/AdvisorParts.tsx`, `AdvisorTimelineFrame.tsx`,
+`AdvisorAvatar.tsx`, `lib/ui/advisor.ts`, `components/timeline/DayProgressTimeline.tsx`,
+`packages/core/src/advisor-avatar/catalog.json`, `public/brand/advisor/advisor-{60,72}-{1,2,3}x.webp`);
+desktop implemented (shares components and lists new assets in `apps/desktop/vite.config.ts`, ships
+in next Mac release); marketing not applicable; future mobile deferred. Messaging impact: `P-086`.
