@@ -217,6 +217,13 @@ export async function reconcileConnectorCompletions(
   const applied = await applyPlan(store, plan, clock);
   if (applied.reverted.length > 0) await store.repairReminders(applied.reverted, clock());
   const finishedAt = clock().toString();
+  // Ticket 352: share fetched activities and deletions with `recorded_activities` (best-effort).
+  if (!options.store) {
+    await import("./recorded-activity-sync.service")
+      .then(({ persistCompletionEvidenceToLedger }) =>
+        persistCompletionEvidenceToLedger(caller.client, caller.user.id, source, evidence, finishedAt))
+      .catch(() => undefined);
+  }
   // A run that deferred writes keeps its cursor, so the next run reads those changes again.
   await store.recordOutcome(source, applied.counts.deferred === 0
     ? { at: finishedAt, succeeded: true, readCursor: evidence.nextCursor }

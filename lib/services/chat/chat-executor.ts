@@ -9,7 +9,17 @@ import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from 
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { searchAdviceCards } from "./chat-advice";
-import { getHevyActivities } from "@/lib/services/hevy.service";
+import { getPersistedHevyActivities } from "@/lib/services/recorded-activity-sync.service";
+import {
+  CALENDAR_LOAD_MAX_QUERY_DAYS,
+  getDailyCalendarLoadForUser,
+  type DailyCalendarLoadSummary,
+} from "@/lib/services/daily-calendar-load.service";
+import type { ExternalEventSource } from "@cadence/core/types/day-progress";
+import {
+  createEphemeralCalendarSessionCache,
+  MAX_CALENDAR_LIVE_SPAN_DAYS,
+} from "./chat-calendar-cache";
 import { withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
 import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
 
@@ -38,6 +48,7 @@ export type ChatCalendarEvent = Readonly<{
 
 export type ChatConnectorReads = Readonly<{
   calendarEvents: (start: string, end: string) => Promise<Readonly<{ events: ChatCalendarEvent[]; sources: ChatSourceReport[] }>>;
+  calendarLoad?: (start: string, end: string) => Promise<Readonly<{ days: DailyCalendarLoadSummary[]; sources: ChatSourceReport[] }>>;
   workouts: (start: string, end: string) => Promise<Readonly<{ workouts: unknown[]; sources: ChatSourceReport[] }>>;
 }>;
 
@@ -47,7 +58,7 @@ const CALENDAR_READ_MS = 12_000;
 export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSourceFlags, signal: AbortSignal): ChatConnectorReads {
   const readSource = async (source: ChatCalendarSource, start: string, end: string): Promise<Readonly<{ events: ChatCalendarEvent[]; report: ChatSourceReport }>> => {
     if (!sources[source]) return { events: [], report: { source, state: "off" } };
-    const options = { signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]) };
+    const options = { signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]), allowPastDates: true };
     try {
       const read = source === "googleCalendar" ? await getCalendarEventsForAdvisor(caller, start, end, options)
         : source === "outlookCalendar" ? await getOutlookCalendarEventsForCaller(caller, start, end, { ...options, includeLocation: true })
@@ -73,10 +84,40 @@ export function liveChatConnectorReads(caller: CalendarCaller, sources: ChatSour
       // A source that was never connected is not worth mentioning to the model.
       return { events, sources: reads.map((read) => read.report).filter((report) => report.state !== "not_connected") };
     },
+    calendarLoad: async (start, end) => {
+      const enabledSources: ExternalEventSource[] = [];
+      const reports: ChatSourceReport[] = [];
+      const pairs: ReadonlyArray<readonly [ChatCalendarSource, ExternalEventSource]> = [
+        ["googleCalendar", "google_calendar"],
+        ["outlookCalendar", "outlook_calendar"],
+        ["icloudCalendar", "icloud_calendar"],
+      ];
+      for (const [chatSource, dbSource] of pairs) {
+        if (sources[chatSource]) {
+          enabledSources.push(dbSource);
+          reports.push({ source: chatSource, state: "read" });
+        } else {
+          reports.push({ source: chatSource, state: "off" });
+        }
+      }
+      if (enabledSources.length === 0) return { days: [], sources: reports };
+      try {
+        const result = await getDailyCalendarLoadForUser(caller.client, caller.user.id, start, end, {
+          sources: enabledSources,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
+        });
+        return { days: result.days, sources: reports };
+      } catch (error) {
+        logConnectorRead("chat_calendar_load_failed", "googleCalendar", "provider_unavailable", error);
+        return { days: [], sources: reports.map((r) => r.state === "read" ? { ...r, state: "failed" as const } : r) };
+      }
+    },
     workouts: async (start, end) => {
       if (!sources.hevy) return { workouts: [], sources: [{ source: "hevy", state: "off" }] };
       try {
-        const snapshot = await getHevyActivities(caller, start, end, { signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]) });
+        const snapshot = await getPersistedHevyActivities(caller, start, end, "chat", {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(CALENDAR_READ_MS)]),
+        });
         const workouts = snapshot.activities.map((activity) => ({
           start: activity.startAt, end: activity.endAt, minutes: Math.round(activity.duration.seconds / 60), date: activity.localStartDate,
         }));
@@ -142,12 +183,14 @@ export function createLiveChatExecutor(input: Readonly<{
   /** Today's local date in the person's timezone. */
   today: () => string;
 }>): ChatToolExecutor {
+  const sessionCache = createEphemeralCalendarSessionCache((start, end) => input.reads.calendarEvents(start, end));
   let todayBusy: Promise<MoveCalendarBusy[]> | null = null;
-  const busyToday = () => (todayBusy ??= input.reads.calendarEvents(input.today(), input.today())
+  const busyToday = () => (todayBusy ??= sessionCache.readSpan(input.today(), input.today())
     .then((read) => calendarBusyFrom(read.events)).catch(() => []));
 
   return async (name: ChatToolName, args, options): Promise<ChatToolResult> => {
-    if (name === "list_calendar_events") return calendarTool(input.reads, args, input.today());
+    if (name === "list_calendar_events") return calendarTool(sessionCache, args, input.today());
+    if (name === "list_calendar_load") return calendarLoadTool(input.reads, args);
     if (name === "list_workouts") return workoutsTool(input.reads, args);
     if (name === "search_advice") {
       if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
@@ -169,20 +212,71 @@ export function createLiveChatExecutor(input: Readonly<{
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-async function calendarTool(reads: ChatConnectorReads, args: Readonly<Record<string, unknown>>, today: string): Promise<ChatToolResult> {
+async function calendarTool(
+  cache: ReturnType<typeof createEphemeralCalendarSessionCache>,
+  args: Readonly<Record<string, unknown>>,
+  today: string,
+): Promise<ChatToolResult> {
+  const maxFuture = Temporal.PlainDate.from(today).add({ days: 30 });
+  const minPast = Temporal.PlainDate.from("2000-01-01");
+
+  if (Array.isArray(args.dates) && args.dates.length > 0) {
+    if (args.dates.length > 14) {
+      return { ok: false, error: { code: "invalid_input", message: "Request at most 14 outlier dates per call." } };
+    }
+    const dates: string[] = [];
+    for (const entry of args.dates) {
+      if (typeof entry !== "string" || !DATE.test(entry)) {
+        return { ok: false, error: { code: "invalid_input", message: "Use dates as YYYY-MM-DD." } };
+      }
+      try {
+        const parsed = Temporal.PlainDate.from(entry);
+        if (Temporal.PlainDate.compare(parsed, maxFuture) > 0 || Temporal.PlainDate.compare(parsed, minPast) < 0) {
+          return { ok: false, error: { code: "invalid_input", message: `Dates must be on or before ${maxFuture.toString()}.` } };
+        }
+        dates.push(entry);
+      } catch {
+        return { ok: false, error: { code: "invalid_input", message: "Use dates as YYYY-MM-DD." } };
+      }
+    }
+    const read = await cache.readDates(dates);
+    return { ok: true, result: { events: read.events, sources: read.sources, note: sourceNote(read.sources) } };
+  }
+
   const start = typeof args.start_date === "string" && DATE.test(args.start_date) ? args.start_date : today;
   const end = typeof args.end_date === "string" && DATE.test(args.end_date) ? args.end_date : start;
-  if (start !== today) {
-    return { ok: false, error: { code: "invalid_input", message: `Cadence reads calendars from today (${today}) up to 30 days ahead. Use start_date ${today}.` } };
-  }
   try {
-    const span = Temporal.PlainDate.from(start).until(Temporal.PlainDate.from(end)).days;
-    if (span < 0 || span > 30) return { ok: false, error: { code: "invalid_input", message: "end_date must be within 30 days after start_date." } };
+    const first = Temporal.PlainDate.from(start);
+    const last = Temporal.PlainDate.from(end);
+    const spanDays = first.until(last).days + 1;
+    if (spanDays < 1 || spanDays > MAX_CALENDAR_LIVE_SPAN_DAYS) {
+      return { ok: false, error: { code: "invalid_input", message: `Calendar live reads are capped at ${MAX_CALENDAR_LIVE_SPAN_DAYS} days per call.` } };
+    }
+    if (Temporal.PlainDate.compare(last, maxFuture) > 0 || Temporal.PlainDate.compare(first, minPast) < 0) {
+      return { ok: false, error: { code: "invalid_input", message: `end_date must be on or before ${maxFuture.toString()}.` } };
+    }
   } catch {
     return { ok: false, error: { code: "invalid_input", message: "Use dates as YYYY-MM-DD." } };
   }
-  const read = await reads.calendarEvents(start, end);
+  const read = await cache.readSpan(start, end);
   return { ok: true, result: { events: read.events, sources: read.sources, note: sourceNote(read.sources) } };
+}
+
+async function calendarLoadTool(reads: ChatConnectorReads, args: Readonly<Record<string, unknown>>): Promise<ChatToolResult> {
+  const start = typeof args.start_date === "string" && DATE.test(args.start_date) ? args.start_date : null;
+  const end = typeof args.end_date === "string" && DATE.test(args.end_date) ? args.end_date : null;
+  if (!start || !end) return { ok: false, error: { code: "invalid_input", message: "Use dates as YYYY-MM-DD." } };
+  try {
+    const spanDays = Temporal.PlainDate.from(start).until(Temporal.PlainDate.from(end)).days + 1;
+    if (spanDays < 1 || spanDays > CALENDAR_LOAD_MAX_QUERY_DAYS) {
+      return { ok: false, error: { code: "invalid_input", message: `Calendar load range must be between 1 and ${CALENDAR_LOAD_MAX_QUERY_DAYS} days.` } };
+    }
+  } catch {
+    return { ok: false, error: { code: "invalid_input", message: "Use dates as YYYY-MM-DD." } };
+  }
+  if (!reads.calendarLoad) return { ok: true, result: { days: [], sources: [], note: null } };
+  const read = await reads.calendarLoad(start, end);
+  return { ok: true, result: { days: read.days, sources: read.sources, note: sourceNote(read.sources) } };
 }
 
 async function workoutsTool(reads: ChatConnectorReads, args: Readonly<Record<string, unknown>>): Promise<ChatToolResult> {

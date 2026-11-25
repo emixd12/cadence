@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({ google: vi.fn(), outlook: vi.fn(), outlookConn
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarEventsForAdvisor: mocks.google }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarEventsForCaller: mocks.outlook, getOutlookCalendarConnection: mocks.outlookConnection }));
 vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarEventsForCaller: mocks.icloud, getIcloudCalendarConnection: mocks.icloudConnection }));
-vi.mock("@/lib/services/hevy.service", () => ({ getHevyActivities: mocks.hevy }));
+vi.mock("@/lib/services/recorded-activity-sync.service", () => ({ getPersistedHevyActivities: mocks.hevy }));
 
 import { createLiveChatExecutor, liveChatConnectorReads } from "@/lib/services/chat/chat-executor";
 

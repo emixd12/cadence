@@ -1,4 +1,5 @@
 import { assertConnectorReadActive, withConnectorReadDeadline } from "./connector-read-deadline";
+import { clearCalendarLoadForSource, persistCalendarLoadFromSnapshot } from "./daily-calendar-load.service";
 import { Temporal } from "@js-temporal/polyfill";
 import { saveConnectorPreferences } from "@/lib/db/connectors.repo";
 import {
@@ -156,6 +157,7 @@ export async function updateIcloudCalendarPreferences(caller: ConnectorCaller, r
   if (selectedSourceIds.some((id) => !calendars.some((calendar) => calendar.id === id))) throw new ConnectorError("invalid_request");
   await saveConnectorPreferences(caller.client, caller.user.id, PROVIDER,
     { selectedSourceIds, hiddenSourceIds, visible: body.visible, showAllDay: body.showAllDay }, before.selectionRevision);
+  await clearCalendarLoadForSource(caller.client, caller.user.id, PROVIDER);
   return getIcloudCalendarConnection(caller);
 }
 
@@ -165,6 +167,8 @@ export type IcloudEventsOptions = IcloudServiceOptions & Readonly<{
   expectedSelectionRevision?: number;
   /** Ticket 283: read event locations too. Only the travel route and the Timeline ask; the Daily Brief never does. */
   includeLocation?: boolean;
+  /** Ticket 355: allow bounded past-date live drill-downs (still capped at 31 inclusive days). */
+  allowPastDates?: boolean;
 }>;
 export type IcloudCalendarRead = Readonly<{ connection: ConnectorConnection; result: IcloudCalendarReadResult }>;
 
@@ -188,8 +192,13 @@ async function readEventsForCaller(caller: ConnectorCaller, start: string, end: 
   catch { throw new ConnectorError("invalid_request"); }
   const nowInstant = Temporal.Instant.fromEpochMilliseconds(clock());
   const today = nowInstant.toZonedDateTimeISO(profile.timezone).toPlainDate();
+  const maxFuture = today.add({ days: 30 });
   const span = first.until(last).days;
-  if (first.toString() !== start || last.toString() !== end || span < 0 || span > 30 || Temporal.PlainDate.compare(first, today) !== 0) throw new ConnectorError("invalid_request");
+  const rangeInvalid = first.toString() !== start || last.toString() !== end || span < 0 || span > 30
+    || (options.allowPastDates
+      ? Temporal.PlainDate.compare(last, maxFuture) > 0 || Temporal.PlainDate.compare(first, Temporal.PlainDate.from("2000-01-01")) < 0
+      : Temporal.PlainDate.compare(first, today) !== 0);
+  if (rangeInvalid) throw new ConnectorError("invalid_request");
   const authorized = options.authorizedCalendarIds === undefined ? null : [...new Set(options.authorizedCalendarIds)];
   if (authorized && (authorized.length > 32 || authorized.some((id) => !id || id.length > 1024))) throw new ConnectorError("invalid_request");
 
@@ -211,6 +220,9 @@ async function readEventsForCaller(caller: ConnectorCaller, start: string, end: 
       range: { startLocalDate: start, endLocalDate: end, timezone: profile.timezone, selectedCalendarIds: selected.map((calendar) => calendar.id) },
       fetchedAt: nowInstant.toString(), includeLocation: options.includeLocation === true });
     if (!result.ok && result.error.code === "reconnect_required") await markConnectorReconnectRequired(connection).catch(() => undefined);
+    if (result.ok) {
+      await persistCalendarLoadFromSnapshot(caller.client, caller.user.id, PROVIDER, connection.generation, result.snapshot, nowInstant.toString());
+    }
     return { connection, result };
   });
 }
@@ -222,6 +234,8 @@ export async function getIcloudCalendarEvents(caller: ConnectorCaller, start: st
   return read.result.snapshot;
 }
 
-export function disconnectIcloudCalendar(caller: ConnectorCaller): Promise<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }> {
-  return disconnectConnector(caller, PROVIDER);
+export async function disconnectIcloudCalendar(caller: ConnectorCaller): Promise<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }> {
+  const result = await disconnectConnector(caller, PROVIDER);
+  await clearCalendarLoadForSource(caller.client, caller.user.id, PROVIDER);
+  return result;
 }

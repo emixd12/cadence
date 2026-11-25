@@ -97,6 +97,45 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Tickets 352–355: Persisted connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down — November 24, 2026
+
+- **Owner's decision:** keep persisted connector activity until disconnect or account deletion;
+  persist minimized Hevy workout timing in hosted-only `recorded_activities` with bounded connect
+  backfill, incremental `/v1/workouts/events` sync, daily background polling for unlinked accounts
+  (prioritized behind linked completion accounts, paused after 21 days of Cadence inactivity and
+  re-armed on next open), 15-minute on-demand freshness, and non-PII `reportMonitoringEvent`
+  telemetry; persist derived daily calendar busy-load rollups (`daily_calendar_load`, no event
+  details) via write-through on complete reads and hard-delete on disconnect/selection change;
+  expose `list_calendar_load` and widen Chat `list_calendar_events` to bounded past dates
+  (≤31 days per call) with date coalescing and ephemeral session caching (`docs/DECISIONS.md`,
+  2026-11-24).
+- **Implemented:**
+  - Migrations: `supabase/migrations/20261124193000_recorded_activities_ledger.sql`,
+    `20261124193500_unlinked_hevy_background_sync.sql`, and
+    `20261124194000_daily_calendar_load.sql`; updated `lib/db/database.types.ts`.
+  - Core resolvers: `packages/core/src/resolvers/calendar-load.resolver.ts` (re-exported in
+    `lib/resolvers/calendar-load.resolver.ts`, registered in `docs/AGENT_RESOLVERS.md` and
+    `scripts/check-resolvers.mjs`); `resolveUnlinkedDailySyncSchedule` / `isUnlinkedAccountInactive`
+    in `packages/core/src/resolvers/completion-check-schedule.resolver.ts`.
+  - Repos & services: `lib/db/recordedActivities.repo.ts`, `lib/db/dailyCalendarLoad.repo.ts`,
+    `lib/services/recorded-activity-sync.service.ts`, `lib/services/daily-calendar-load.service.ts`,
+    `lib/services/hevy-provider.ts`, `lib/services/hevy.service.ts`,
+    `lib/services/connector-completion.service.ts`, `lib/services/connector-completion-job.service.ts`,
+    `lib/services/google-calendar.service.ts`, `lib/services/outlook-calendar.service.ts`,
+    `lib/services/icloud-calendar.service.ts`.
+  - Consumers & Chat: `app/api/hevy/activities/route.ts`, `lib/services/advisor-day-context.service.ts`,
+    `lib/services/chat/chat-calendar-cache.ts`, `lib/services/chat/chat-tools.ts`,
+    `lib/services/chat/chat-executor.ts`, `lib/services/chat/chat-prompt.ts`,
+    `lib/services/chat-eval/fake-tools.ts`.
+  - Tests: `tests/calendar-load.resolver.test.ts`, `tests/daily-calendar-load.service.test.ts`,
+    `tests/recorded-activity-sync.service.test.ts`, `tests/chat-past-calendar-drilldown.test.ts`.
+- **Verification (Node 24):** `agents:check`, `interactions:check`, `map:check`, `resolvers:check`,
+  `core:check`, `lint` (0 errors), `typecheck`, `build`, and full `npm run test` (7,251 passed) all pass.
+
+Platform impact: web implemented; desktop unaffected (hosted-only tables, no SQLite or `account_sync`
+changes; linked Macs inherit hosted Brief/Chat/Timeline reads); marketing not applicable; future mobile
+deferred. Messaging impact: `P-086`, `P-087`, `P-088`. Legal: `L-023` updated, `L-026` logged.
+
 ## Remove Recorded activity · Hevy section from Timeline header — November 24, 2026
 
 - **Owner's decision:** remove the dedicated `"Recorded activity · Hevy"` section (including

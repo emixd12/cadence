@@ -635,9 +635,10 @@ part of L-002.
 - **Question:** Do Hevy's terms allow Cadence to read a user's Hevy account on a schedule
   with that user's API key, to store workout times and digests of routine identifiers, and
   to name Hevy in the product and in marketing?
-- **Affected:** Tickets 310, 311, 315, 321 and 323 (decision D28). Files:
-  `lib/services/hevy-provider.ts`, the planned `lib/services/connector-completion.service.ts`
-  and job. Related messaging entries: P-039, P-041 and P-042.
+- **Affected:** Tickets 310, 311, 315, 321, 323 (decision D28) and Tickets 352–353 (2026-11-24).
+  Files: `lib/services/hevy-provider.ts`, `lib/services/connector-completion.service.ts`,
+  `lib/services/connector-completion-job.service.ts`, `lib/services/recorded-activity-sync.service.ts`.
+  Related messaging entries: P-039, P-041, P-042, and P-086.
 - **Provider, clause, source and check date:** Hevy.
   - Public API document, `https://api.hevyapp.com/docs/swagger-ui-init.js`, read
     2026-11-10: "we make no guarantees that we won't completely change the structure or
@@ -766,3 +767,29 @@ part of L-002.
 - **Next action:** Ticket 337's production run confirms the refresh token and a 200 from
   Apple on deletion, then this entry can close. Ticket 334 adds revocation when the Apple
   method is removed.
+
+## L-026: Google Calendar Limited Use for derived daily busy-load rollups and past live drill-down
+
+- **Question:** Does persisting a derived per-day numeric busy-load rollup (`daily_calendar_load`)
+  until disconnect/delete and allowing Chat to live-read bounded past date spans (≤31 days) stay
+  within Google API Services User Data Policy (Limited Use) and Microsoft/Apple calendar terms?
+- **Affected:** Tickets 354–355 (decision 2026-11-24). Files:
+  `packages/core/src/resolvers/calendar-load.resolver.ts`,
+  `lib/services/daily-calendar-load.service.ts`, `lib/services/chat/chat-executor.ts`. Related
+  messaging entries: `P-087`, `P-088`.
+- **Provider, clause, source and check date:** Google API Services User Data Policy (Limited
+  Use), Microsoft Graph API terms, Apple iCloud terms; reviewed 2026-11-24.
+- **Current reading:** `daily_calendar_load` persists only numeric per-day aggregates
+  (`busy_minutes`, `event_count`, `earliest_start_minute`, `latest_end_minute`,
+  `has_all_day_busy`) used exclusively for user-facing behavioral context in Daily Brief and
+  Chat; zero titles, descriptions, locations, attendees, or raw events are persisted, and rows
+  are hard-deleted on disconnect, calendar-selection change, or account deletion. Past live
+  drill-downs in Chat read only when the user asks, are bounded to ≤31 days per call, keep
+  fields to title/times/calendar/location/busy, and discard raw events after the turn. No
+  calendar data is used to train generalized AI/ML models or shared with third parties beyond
+  the user-requested AI turn.
+- **Risk level:** low.
+- **Owner decision or risk acceptance:** approved 2026-11-24 (`docs/DECISIONS.md`).
+- **Status:** open.
+- **Next action:** include `daily_calendar_load` and past live drill-down in the Google OAuth
+  verification narrative (Ticket 245) and pre-launch Privacy pass (Ticket 246).

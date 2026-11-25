@@ -19870,3 +19870,147 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); future mobile inherits the shared core resolver rule. |
 
 Messaging impact: none.
+
+## Ticket 352: Persisted `recorded_activities` ledger & incremental Hevy sync
+
+Status: complete (2026-11-24)
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-24, "Persisting connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down".
+
+Goal: Persist minimized recorded activity timing from Hevy (and future activity connectors) in a
+hosted-only `recorded_activities` table kept until disconnect or account deletion, populated via a
+bounded initial backfill on connect and incremental `/v1/workouts/events` syncs shared with
+connector completion.
+
+Requirements:
+
+- Additive hosted-only Postgres migration `supabase/migrations/20261124193000_recorded_activities_ledger.sql`
+  creating `public.recorded_activities` with owner RLS, `on delete cascade` from `auth.users`,
+  unique `(user_id, source, activity_ref)`, and minimized timing/digest columns matching
+  `RecordedActivity` (no titles, exercises, sets, weights, or raw provider IDs). Excluded from
+  `account_sync` and BehaviorLog exports.
+- Repository `lib/db/recordedActivities.repo.ts` owning upserts, range queries, and hard-delete on
+  disconnect.
+- Sync service `lib/services/recorded-activity-sync.service.ts` owning bounded connect backfill,
+  incremental `/v1/workouts/events` sync, and disconnect cleanup.
+- Wire `lib/services/hevy.service.ts` (connect backfill, disconnect hard-delete) and
+  `lib/services/connector-completion.service.ts` (share synced activities/deletions with the ledger).
+- Unit tests covering ledger upsert, deletion propagation, disconnect cleanup, and cursor handling.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted Postgres migration, repo, sync service, Hevy connect/disconnect and completion wiring. |
+| Desktop | Not applicable: hosted-only table, excluded from SQLite and `account_sync`; linked Macs benefit via hosted reads. |
+| Marketing | Not applicable: deferred to messaging track (`P-086`). |
+| Future mobile | Deferred (no mobile track active); inherits hosted reads automatically. |
+
+Messaging impact: `P-086`. Legal: `L-023`.
+
+## Ticket 353: Unlinked Hevy daily background sync, freshness, telemetry & consumers
+
+Status: complete (2026-11-24)
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-24, "Persisting connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down".
+
+Goal: Keep `recorded_activities` warm for connected unlinked Hevy accounts via a prioritized daily
+background sync with a 21-day inactivity guardrail and 15-minute on-demand freshness, emit non-PII
+telemetry, and switch Daily Brief, Chat (`list_workouts`), and Timeline (`countableWorkouts`) to
+read from `recorded_activities`.
+
+Requirements:
+
+- Additive migration `supabase/migrations/20261124193500_unlinked_hevy_background_sync.sql` extending
+  `connector_completion_state` with `sync_priority` (1 = linked, 2 = unlinked), `last_user_activity_at`,
+  `paused_for_inactivity`, `last_synced_at`, `backfilled_at`, due-selection index, and minimal
+  `service_role` select grant on `(sync_priority, paused_for_inactivity)`.
+- Extend `lib/services/connector-completion-job.service.ts` and schedule resolver so linked
+  completion accounts run before unlinked daily syncs within the 50s cron budget, and unlinked
+  accounts pause after 21 days of no Cadence activity and auto-rearm on next app open.
+- On-demand 15-minute freshness check on Brief, Chat, and Timeline reads, emitting non-PII
+  `reportMonitoringEvent` telemetry (`surface`, `account_mode`, `sync_outcome`, `sync_duration_ms`,
+  `pages_fetched`).
+- Switch `app/api/hevy/activities/route.ts`, `lib/services/advisor-day-context.service.ts`, and
+  `lib/services/chat/chat-executor.ts` + `chat-tools.ts` (`list_workouts`, removing the 31-day cap)
+  to read from `recorded_activities`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted migration, cron job extension, freshness/telemetry service, Brief/Chat/Timeline consumers. |
+| Desktop | Not applicable: linked Macs read via hosted APIs; no desktop code changes needed. |
+| Marketing | Not applicable: deferred to messaging track (`P-086`). |
+| Future mobile | Deferred (no mobile track active); inherits hosted reads automatically. |
+
+Messaging impact: `P-086`. Legal: `L-023`.
+
+## Ticket 354: Derived `daily_calendar_load` rollup (resolver, persistence, write-through & consumption)
+
+Status: complete (2026-11-24)
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-24, "Persisting connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down".
+
+Goal: Persist compact per-source daily calendar busy-load rollups (`daily_calendar_load`) without
+storing raw calendar events, populated via write-through on normal calendar reads and bounded
+connect backfill, hard-deleted on disconnect/selection change, and exposed to Daily Brief and Chat.
+
+Requirements:
+
+- Pure resolver `packages/core/src/resolvers/calendar-load.resolver.ts` (re-exported in
+  `lib/resolvers/calendar-load.resolver.ts`, registered in `docs/AGENT_RESOLVERS.md`, with paired
+  unit tests) computing per-day `busy_minutes`, `event_count`, `earliest_start_minute`,
+  `latest_end_minute`, and `has_all_day_busy` from `NormalizedExternalEvent[]`.
+- Additive hosted-only migration `supabase/migrations/20261124194000_daily_calendar_load.sql`
+  creating `public.daily_calendar_load` keyed on `(user_id, source, local_date)` with owner RLS,
+  `on delete cascade`, and zero event text/PII columns. Excluded from `account_sync` and exports.
+- Repo `lib/db/dailyCalendarLoad.repo.ts` and service `lib/services/daily-calendar-load.service.ts`.
+- Best-effort write-through on Google, Outlook, and iCloud calendar reads, bounded one-time connect
+  backfill (last 30 days), and hard-delete on disconnect or selected-calendar change.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Core resolver, hosted migration, repo, rollup service, calendar service write-through/cleanup. |
+| Desktop | Not applicable: hosted-only table; linked Macs inherit hosted Brief/Chat rollups automatically. |
+| Marketing | Not applicable: deferred to messaging track (`P-087`). |
+| Future mobile | Deferred (no mobile track active); inherits core resolver and hosted reads. |
+
+Messaging impact: `P-087`. Legal: `L-026`.
+
+## Ticket 355: Bounded past calendar drill-down and `list_calendar_load` in Chat
+
+Status: complete (2026-11-24)
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-24, "Persisting connector activity (`recorded_activities`, `daily_calendar_load`) and bounded past calendar drill-down".
+
+Goal: Expose `list_calendar_load` to Chat for fast long-range busyness analysis and widen
+`list_calendar_events` to allow bounded past live drill-downs (≤31-day span per call) with date
+coalescing, short-lived ephemeral session caching, and outlier-sampling prompt guidance.
+
+Requirements:
+
+- Add `list_calendar_load` tool in `lib/services/chat/chat-tools.ts` and `chat-executor.ts` reading
+  `daily_calendar_load` across multi-month spans (up to 365 days).
+- Widen `list_calendar_events` in `chat-tools.ts` and `chat-executor.ts` to allow past dates with
+  a strict ≤31-day span cap per call, keeping fields to `title`, `start`, `end`, `calendar`,
+  `location`, `all_day`, and `busy` (no descriptions or attendees).
+- Coalesce/cluster nearby requested dates into minimal bounding-window provider calls with
+  in-memory filtering and a short-lived ephemeral session cache in `chat-executor.ts`.
+- Update `lib/services/chat/chat-prompt.ts` to instruct the agent to inspect `list_calendar_load`
+  first and sample top outlier days with `list_calendar_events` rather than pulling large raw spans.
+- Unit tests covering past date validation, ≤31-day span cap, coalescing, ephemeral caching, and
+  `list_calendar_load`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Chat tools, executor, ephemeral cache/coalescing, and prompt guidance. |
+| Desktop | Not applicable: Chat runs against the hosted server. |
+| Marketing | Not applicable: deferred to messaging track (`P-088`). |
+| Future mobile | Deferred (no mobile track active); inherits hosted Chat tools. |
+
+Messaging impact: `P-088`. Legal: `L-026`.

@@ -59,7 +59,7 @@ import {
 } from "@/lib/services/google-calendar.service";
 import { CalendarConnectionError } from "@/lib/services/google-calendar-oauth";
 import { getConnectorConnection } from "@/lib/services/connector-credentials";
-import { getHevyActivities } from "@/lib/services/hevy.service";
+import { getPersistedHevySnapshotV1 } from "@/lib/services/recorded-activity-sync.service";
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { ConnectorError } from "@/lib/types/connectors";
@@ -598,7 +598,7 @@ async function readHevyActivity(
   const deadlineMs = connectorReadDeadline(deadlineAt);
   if (deadlineMs <= 0) return projectUnavailableAdvisorActivity({ connectionGeneration, failure: SOURCE_TIMEOUT });
   try {
-    const snapshot = await getHevyActivities(caller, localDate, localDate, { expectedConnectionGeneration: connectionGeneration, signal, deadlineMs });
+    const snapshot = await getPersistedHevySnapshotV1(caller, localDate, localDate, "daily_brief", { expectedConnectionGeneration: connectionGeneration, signal, deadlineMs });
     assertNotAborted(signal);
     return projectAdvisorActivityConnector({ snapshot, now: clock(), makeOpaqueRef });
   } catch (error) {
