@@ -79,6 +79,7 @@ export type Database = {
           model: string | null
           updated_at: string
           user_id: string
+          where_guess: string | null
         }
         Insert: {
           alongside?: boolean
@@ -88,6 +89,7 @@ export type Database = {
           model?: string | null
           updated_at?: string
           user_id: string
+          where_guess?: string | null
         }
         Update: {
           alongside?: boolean
@@ -97,6 +99,7 @@ export type Database = {
           model?: string | null
           updated_at?: string
           user_id?: string
+          where_guess?: string | null
         }
         Relationships: [
           {
