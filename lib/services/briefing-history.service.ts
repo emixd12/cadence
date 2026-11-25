@@ -2,8 +2,8 @@ import { effectiveStartAt } from "@cadence/core/resolvers/time.resolver";
 import { createHash, randomUUID } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
-import { projectAdvisorCadenceSource, projectAdvisorCalendarConnector, projectUnavailableAdvisorCalendar, validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
-import type { AdvisorCalendarConnector, AdvisorDayContextV1, AdvisorOpaqueRef } from "@cadence/core/types/advisor-day-context";
+import { projectAdvisorCadenceSource, validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
+import type { AdvisorDayContextV1, AdvisorOpaqueRef } from "@cadence/core/types/advisor-day-context";
 import { ADVISOR_DAY_CONTEXT_LIMITS, ADVISOR_DAY_CONTEXT_VERSION } from "@cadence/core/types/advisor-day-context";
 import type { BriefingAnalysisSource } from "@cadence/core/types/briefing-analysis";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
@@ -23,8 +23,7 @@ import { benchPartition, BRIEFING_BENCH_MAX_INPUT_BYTES, BRIEFING_BENCH_RETENTIO
 import { guard, json, readComparisonBody } from "./briefing-workbench.service";
 import { DailyBriefError, raceBriefAbort } from "./daily-brief-consumer";
 import { runDailyBriefRequest } from "./daily-brief-request";
-import { getCalendarEventsForWorkbenchHistory, type CalendarCaller } from "./google-calendar.service";
-import { CalendarConnectionError } from "./google-calendar-oauth";
+import type { CalendarCaller } from "./google-calendar.service";
 
 export const BRIEFING_HISTORY_DEFAULTS = Object.freeze({ targetDays: 14, maxTargetDays: 90, logicalTime: "07:00", timezone: "America/New_York" });
 const RECONSTRUCTION_LIMIT = "Production advisor RPCs require today's local date. Retained records do not establish ingestion cutoffs or full historical state.";
@@ -113,7 +112,8 @@ function parseInput(value: unknown): BriefingHistoryInput {
       throw new DailyBriefError("invalid_request");
     }
   } else if (typeof item.accountRef !== "string" || item.accountRef.length > 128 || !Number.isSafeInteger(item.preferenceRevision) ||
-      (item.preferenceRevision as number) < 0 || item.fixtureId !== undefined || item.analysisFixtureId !== undefined) throw new DailyBriefError("invalid_request");
+      (item.preferenceRevision as number) < 0 || item.fixtureId !== undefined || item.analysisFixtureId !== undefined ||
+      item.includePastCalendar === true) throw new DailyBriefError("invalid_request");
   return { ...item, mode: item.mode as BriefingHistoryInput["mode"], configs: item.configs.map(parseBriefingConfig) } as BriefingHistoryInput;
 }
 
@@ -158,15 +158,14 @@ async function inspectRange(input: BriefingHistoryInput, caller: CalendarCaller 
   const retained = await store.listCases(partition);
   const days: BriefingHistoryDay[] = [];
   let selected: { contexts: AdvisorDayContextV1[]; analysisSource: BriefingAnalysisSource | null; history: BenchCaseHistory } | null = null;
-  const calendarRequested = !!(caller && capture && input.includePastCalendar && !!capture.calendar && input.configs.some(config => config.scope.includeCalendar));
-  const calendars = calendarRequested ? await readPastCalendars(caller!, start, end, timezone, signal) : new Map<string, AdvisorCalendarConnector>();
+  // §2(f): Live account Google Calendar events must never enter workbench history capture.
   for (let date = start; Temporal.PlainDate.compare(date, end) <= 0; date = date.add({ days: 1 })) {
     signal.throwIfAborted();
     const logical = date.toZonedDateTime({ timeZone: timezone, plainTime: logicalTime }).toInstant();
-    let coverage = sourceCoverage(date, historyDays, rows, input, calendars.get(date.toString()), !!analysisRows);
+    let coverage = sourceCoverage(date, historyDays, rows, input, !!analysisRows);
     const targetCount = rows?.occurrences.filter(row => row.local_date === date.toString()).length;
     const available = !rows || (!!targetCount && targetCount <= ADVISOR_DAY_CONTEXT_LIMITS.occurrences);
-    const contexts = !available ? [] : rows && capture && caller ? retrospectiveContexts(rows, date, logical, timezone, historyDays, caller, capture.preferences.revision, calendarRequested, capture.calendar, calendars.get(date.toString()))
+    const contexts = !available ? [] : rows && capture && caller ? retrospectiveContexts(rows, date, logical, timezone, historyDays, caller, capture.preferences.revision)
       : historyDays.map(days => historicalFixture(input.fixtureId ?? "sparse", { ...input.configs[0],
         scope: { ...input.configs[0].scope, historyDays: days },
         context: { ...input.configs[0].context, includeHistoricalCompletionTimes: true } }, date, timezone, logical));
@@ -208,8 +207,8 @@ async function inspectRange(input: BriefingHistoryInput, caller: CalendarCaller 
       source: caller && capture ? { mode: "account", accountRef: accountRef!, preferenceRevision: capture.preferences.revision }
         : { mode: "synthetic", fixtureId: input.fixtureId ?? "sparse", fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: input.analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
       evidenceType: caller ? "retrospective" : "synthetic", history: selected.history, localDate: first.localDate, timezone, capturedAt: first.capturedAt, expiresAt: first.expiresAt,
-      capture: { calendarGrantPurpose: "timeline", historyDays, includeCalendar: caller ? calendarRequested : input.configs.some(config => config.scope.includeCalendar),
-        calendarDisclosed: capture ? !!capture.calendar : true, includeRecordedElapsedDurations: input.configs.some(config => config.context.includeRecordedElapsedDurations),
+      capture: { historyDays, includeCalendar: caller ? false : input.configs.some(config => config.scope.includeCalendar),
+        calendarDisclosed: caller ? false : true, includeRecordedElapsedDurations: input.configs.some(config => config.context.includeRecordedElapsedDurations),
         includeHistoricalCompletionTimes: input.configs.some(config => config.context.includeHistoricalCompletionTimes), analysis: input.configs.some(config => config.analysis.lanes.length > 0),
         includeReminders: false, remindersDisclosed: capture?.preferences.includeReminderHistory ?? false, includeNotes: false, notesDisclosed: capture?.preferences.includeNotes ?? false },
       inputs, behaviorTitles: [...titles].map(([ref, title]) => ({ ref, title })) };
@@ -251,41 +250,7 @@ function retrospectiveAnalysis(rows: AccountRows, analysis: Awaited<ReturnType<t
   }, { context, makeOpaqueRef: ownerRef(caller), startLocalDate: start });
 }
 
-async function readPastCalendars(caller: CalendarCaller, start: Temporal.PlainDate, end: Temporal.PlainDate, timezone: string, signal: AbortSignal): Promise<Map<string, AdvisorCalendarConnector>> {
-  const days = new Map<string, AdvisorCalendarConnector>();
-  for (let first = start; Temporal.PlainDate.compare(first, end) <= 0; first = first.add({ days: 31 })) {
-    const limit = first.add({ days: 30 }), last = Temporal.PlainDate.compare(limit, end) < 0 ? limit : end;
-    signal.throwIfAborted();
-    try {
-      const read = await raceBriefAbort(getCalendarEventsForWorkbenchHistory(caller, first.toString(), last.toString(), { signal }), signal);
-      const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      if (!snapshot) continue;
-      const connector = projectAdvisorCalendarConnector({ snapshot, selectionRevision: read.connection.selectionRevision, now: Temporal.Now.instant(),
-        makeOpaqueRef: ownerRef(caller), failure: read.result.ok ? null : read.result.error });
-      for (let date = first; Temporal.PlainDate.compare(date, last) <= 0; date = date.add({ days: 1 })) {
-        const next = date.add({ days: 1 }), dayStart = date.toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant(),
-          dayEnd = next.toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant();
-        // Provider coverage stays bounded by both the requested range and each actual Calendar coverage row.
-        const inRequestedRange = snapshot.requestedRange.startLocalDate <= date.toString() && snapshot.requestedRange.endLocalDate >= date.toString();
-        const dayCoverage = connector.coverage.filter(row => inRequestedRange && row.startLocalDate <= date.toString() && row.endLocalDate >= date.toString());
-        const complete = connector.complete && dayCoverage.length > 0 && dayCoverage.length === connector.coverage.length && dayCoverage.every(row => row.paginationComplete);
-        days.set(date.toString(), { ...connector, complete, state: connector.state === "current" && !complete ? "incomplete" : connector.state,
-          failure: complete ? null : connector.failure ?? { code: "incomplete_pagination", retryable: false, retryAfterSeconds: null },
-          coverage: dayCoverage.map(row => ({ ...row, startLocalDate: date.toString(), endLocalDate: date.toString() })),
-          events: complete ? connector.events.filter(event => event.interval.kind === "all_day"
-            ? event.interval.startLocalDate < next.toString() && event.interval.endLocalDate > date.toString()
-            : Temporal.Instant.compare(Temporal.Instant.from(event.interval.startAt), dayEnd) < 0 && Temporal.Instant.compare(Temporal.Instant.from(event.interval.endAt), dayStart) > 0) : [] });
-      }
-    } catch (error) {
-      signal.throwIfAborted();
-      if (error instanceof CalendarConnectionError && ["permission_denied", "connection_changed", "same_account_required"].includes(error.code)) throw error;
-      // A failed or capped provider snapshot stays unavailable. Never claim an empty past Calendar.
-    }
-  }
-  return days;
-}
-
-function sourceCoverage(date: Temporal.PlainDate, historyDays: readonly number[], rows: AccountRows | null, input: BriefingHistoryInput, calendar?: AdvisorCalendarConnector, analysisRead = false): BenchHistoryCoverage[] {
+function sourceCoverage(date: Temporal.PlainDate, historyDays: readonly number[], rows: AccountRows | null, input: BriefingHistoryInput, analysisRead = false): BenchHistoryCoverage[] {
   const start = date.subtract({ days: 90 }).toString(), end = date.toString();
   const historyRows = rows?.occurrences.filter(row => row.local_date >= start && row.local_date < end).length ?? null;
   const entry = (source: BenchHistoryCoverage["source"], state: BenchHistoryCoverage["state"], limitations: readonly string[], retainedRows: number | null = null,
@@ -307,13 +272,11 @@ function sourceCoverage(date: Temporal.PlainDate, historyDays: readonly number[]
     entry("reminders", "unavailable", ["Current delivery status and send time do not establish past reminder state."]),
     entry("analysis", analysisRead ? "retained" : "not_requested", ["Current retained occurrence/status/configuration records only. Ingestion and later revisions never establish facts known at the replay cutoff.",
       "Analysis caps: 10,000 occurrences, 20,000 status events, 2,000 configuration events. A capped source never becomes complete."], historyRows),
-    entry("calendar", calendar?.complete ? "retained" : input.includePastCalendar ? "unavailable" : "not_requested", [calendar ? `Retrospective provider snapshot read at ${calendar.fetchedAt ?? "unknown live time"}; not Calendar as known on the selected morning.`
-      : input.includePastCalendar ? "Past Calendar is unavailable or not currently disclosed; no empty Calendar is substituted." : "Past Calendar requires a separate explicit request.",
-      "A retrospective past Calendar day never enables the historical Calendar-pattern lane."], null, end, date.add({ days: 1 }).toString())];
+    entry("calendar", "not_requested", ["Live account Google Calendar is blocked in the workbench (§2(f))."], null, end, date.add({ days: 1 }).toString())];
 }
 
 function retrospectiveContexts(rows: AccountRows, date: Temporal.PlainDate, logical: Temporal.Instant, timezone: string, windows: readonly number[], caller: CalendarCaller,
-  grantGeneration: number, includeCalendar: boolean, fence: Readonly<{ connectionGeneration: number; selectionRevision: number }> | null, calendar?: AdvisorCalendarConnector): AdvisorDayContextV1[] {
+  grantGeneration: number): AdvisorDayContextV1[] {
   const ref = ownerRef(caller);
   const byId = new Map(rows.behaviors.map(behavior => [behavior.id, behavior]));
   const unknownAverage = { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0 as const, requiredSampleCount: 3 as const, lookbackDays: 90 as const };
@@ -326,14 +289,12 @@ function retrospectiveContexts(rows: AccountRows, date: Temporal.PlainDate, logi
       durationCandidates: { configuredDefault: configured ? { kind: "known" as const, seconds: configured.seconds, source: "behavior_default" as const, sampleCount: 0, lookbackDays: 90 as const } : null,
         historicalAverage: { kind: "unknown" as const, reason: "history_limit_exceeded" as const, sampleCount: 0, lookbackDays: 90 as const } } };
   });
-  const connectors: AdvisorDayContextV1["connectors"] = includeCalendar ? [calendar ? { ...calendar, fetchedAt: calendar.fetchedAt ? logical.toString() : null }
-    : projectUnavailableAdvisorCalendar({ connectionGeneration: fence!.connectionGeneration, selectionRevision: fence!.selectionRevision,
-      failure: { code: "provider_unavailable", retryable: false, retryAfterSeconds: null } })] : [{ source: "google_calendar", state: "not_requested" }];
+  const connectors: AdvisorDayContextV1["connectors"] = [{ source: "google_calendar", state: "not_requested" }];
   const start = date.toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant(), end = date.add({ days: 1 }).toZonedDateTime({ timeZone: timezone, plainTime: "00:00" }).toInstant();
   const expiry = logical.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs });
   return windows.map(historyDays => validateAdvisorDayContext({ version: ADVISOR_DAY_CONTEXT_VERSION, snapshotId: ref("snapshot", `${date}:${historyDays}:${digest(rows)}`),
     accountRef: briefingAccountRef(caller.user.id), localDate: date.toString(), timezone, dayStartAt: start.toString(), dayEndAt: end.toString(), capturedAt: logical.toString(),
-    expiresAt: (Temporal.Instant.compare(expiry, end) < 0 ? expiry : end).toString(), status: includeCalendar && !calendar?.complete ? "partial" : "complete", authority: "read_only", grantGeneration,
+    expiresAt: (Temporal.Instant.compare(expiry, end) < 0 ? expiry : end).toString(), status: "complete", authority: "read_only", grantGeneration,
     // These timestamps adapt evaluation freshness only. BenchCase.history.observedAt retains the actual live read clock.
     cadence: projectAdvisorCadenceSource({ observedAt: logical.toString(), revision: digest(rows), historyStartLocalDate: date.subtract({ days: historyDays }).toString(),
       historyEndLocalDateExclusive: date.toString(), historyDays, behaviors: rows.behaviors, historyOccurrences: [], historyComplete: false, occurrences, makeOpaqueRef: ref }), connectors }));

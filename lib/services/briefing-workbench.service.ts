@@ -15,9 +15,8 @@ import { isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import { getDailyBriefSettings } from "./daily-brief.service";
 import { briefingAccountRef, prepareAccountBriefingContexts, workbenchBehaviorRef } from "./briefing-account-context.service";
-import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
+import type { CalendarCaller } from "./google-calendar.service";
 import { createHash, randomUUID } from "node:crypto";
-import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
 import { briefingBenchBudget, type BriefingBenchReservation } from "./briefing-bench-budget";
 import type { BriefingAnalysisLaneId, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
@@ -195,8 +194,9 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
       try { reservation = options.reservation ?? briefingBenchBudget().reserve(configs.length + estimateCalls); }
       catch (error) { if (caller) throw new DailyBriefError("rate_limited", 3600); throw error; }
       try {
+        // §2(f): Live account Google Calendar events must never enter workbench comparisons.
         const account = caller && !saved ? await raceBriefAbort(prepareAccountBriefingContexts(caller, {
-          historyDays: configs.map(config => config.scope.historyDays), includeCalendar: configs.some(config => config.scope.includeCalendar), signal, preferences,
+          historyDays: configs.map(config => config.scope.historyDays), includeCalendar: false, signal, preferences,
           includeRecordedElapsedDurations: configs.some(config => config.context.includeRecordedElapsedDurations),
           includeHistoricalCompletionTimes: configs.some(config => config.context.includeHistoricalCompletionTimes),
           ...(configs.some(config => config.analysis.lanes.length) ? { analysis: {
@@ -211,7 +211,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         const fixtureId = (saved?.case.source.mode === "synthetic" ? saved.case.source.fixtureId : value.fixtureId) as BriefingFixtureId;
         const analysisFixtureId = (saved?.case.source.mode === "synthetic" ? saved.case.source.analysisFixtureId ?? undefined : value.analysisFixtureId) as BriefingAnalysisFixtureId | undefined;
         const contexts = replay?.contexts ?? accountContexts ?? configs.map(config => briefingFixture(fixtureId, config));
-        const effectiveConfigs = replay?.configs ?? (account ? configs.map(config => accountConfig(config, account.configurationRefs, !!account.calendar)) : configs);
+        const effectiveConfigs = replay?.configs ?? (account ? configs.map(config => accountConfig(config, account.configurationRefs, false)) : configs);
         const analysisSource = replay ? replay.analysisSource : account ? account.analysisSource : undefined;
         const revisions = effectiveConfigs.map(briefingConfigurationRevision);
         const frozenClock = !account;
@@ -220,10 +220,9 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           source: account ? { mode: "account", accountRef: ownerRef!, preferenceRevision: preferences!.revision }
             : { mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
           capture: account ? {
-            calendarGrantPurpose: "timeline",
             historyDays: [...new Set(configs.map(config => config.scope.historyDays))],
-            includeCalendar: configs.some(config => config.scope.includeCalendar) && !!account.calendar,
-            calendarDisclosed: !!account.calendar,
+            includeCalendar: false,
+            calendarDisclosed: false,
             includeRecordedElapsedDurations: configs.some(config => config.context.includeRecordedElapsedDurations),
             includeHistoricalCompletionTimes: configs.some(config => config.context.includeHistoricalCompletionTimes),
             analysis: configs.some(config => config.analysis.lanes.length > 0),
@@ -407,8 +406,18 @@ async function startReview(store: BriefingBenchStore, partition: BenchPartition,
   }
 }
 
+/** §2(f): True when a saved account case captured live Google Calendar data. */
+export function hasLiveAccountGoogleCalendar(saved: BenchCase): boolean {
+  if (saved.source.mode !== "account") return false;
+  if (saved.capture.includeCalendar) return true;
+  return (saved.inputs?.contexts ?? []).some((context) =>
+    context.connectors.some((connector) => connector.source === "google_calendar" && connector.state !== "not_requested"),
+  );
+}
+
 /** Saved inputs support a configuration only when the capture read everything it needs. */
 export function replaySavedCase(saved: BenchCase, configs: readonly BriefingConfig[]) {
+  if (hasLiveAccountGoogleCalendar(saved)) throw new DailyBriefError("access_denied", undefined, "live_google_calendar_workbench_blocked");
   if (saved.source.mode === "synthetic" && !saved.inputs) {
     if (saved.source.fixtureVersion !== BRIEFING_FIXTURE_VERSION || saved.source.analysisFixtureVersion !== BRIEFING_ANALYSIS_FIXTURE_VERSION) throw new DailyBriefError("fixture_changed");
     return null;
@@ -438,22 +447,11 @@ export function replaySavedCase(saved: BenchCase, configs: readonly BriefingConf
 /** A frozen case still needs today's consent: same owner, enabled briefing, its disclosed sources, and its Behaviors. */
 export async function assertSavedCaseAuthorized(caller: CalendarCaller, preferences: DailyBriefPreferences, saved: BenchCase, signal: AbortSignal): Promise<void> {
   if (saved.source.mode !== "account" || saved.source.accountRef !== briefingAccountRef(caller.user.id)) throw new DailyBriefError("access_denied");
+  if (hasLiveAccountGoogleCalendar(saved)) throw new DailyBriefError("access_denied", undefined, "live_google_calendar_workbench_blocked");
   const current = await readDailyBriefPreferences(caller.client, signal);
   if (!current.enabled || current.revision !== preferences.revision ||
-      (saved.capture.includeCalendar && !dailyBriefSourceAllowed(current, "googleCalendar")) ||
       (saved.capture.includeReminders && !current.includeReminderHistory) ||
       (saved.capture.includeNotes && !current.includeNotes)) throw new DailyBriefError("access_denied");
-  if (saved.capture.includeCalendar) {
-    if (saved.capture.calendarGrantPurpose !== "timeline" || !dailyBriefReadsGoogleCalendar(current)) throw new DailyBriefError("review_only");
-    const connection = await getCalendarConnection(caller);
-    if (connection.status !== "connected") throw new DailyBriefError("access_denied");
-    const contexts = saved.inputs?.contexts;
-    if (!contexts?.length || contexts.some(context => !context.connectors.some(connector =>
-      connector.source === "google_calendar" && connector.state !== "not_requested" &&
-      connector.connectionGeneration === connection.generation && connector.selectionRevision === connection.selectionRevision))) {
-      throw new DailyBriefError("context_changed");
-    }
-  }
   const behaviors = new Set((await listDailyBriefBehaviorIds(caller.client, caller.user.id, signal)).map((id) => workbenchBehaviorRef(caller.user.id, id)));
   // A Behavior deleted or archived since capture withdraws the case from reruns.
   if (Object.keys(saved.inputs?.configurationRefs ?? {}).some((ref) => !behaviors.has(ref))) throw new DailyBriefError("context_changed");

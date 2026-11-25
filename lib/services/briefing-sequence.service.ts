@@ -18,7 +18,7 @@ import { dailyBriefPromptRevision, effectiveDailyBriefPromptVariant, type DailyB
 import { runDailyBriefRequest } from "./daily-brief-request";
 import type { CalendarCaller } from "./google-calendar.service";
 import { agentModelConfigured } from "./agent-model";
-import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, json, parseGeneration, parseReview, productionGeneration, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
+import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, hasLiveAccountGoogleCalendar, json, parseGeneration, parseReview, productionGeneration, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
 
 export type BriefingSequenceHistory = Readonly<{ fingerprint: string; lastShownLocalDate: string }>;
 export type BriefingSequenceResult = Readonly<{
@@ -97,6 +97,9 @@ function inputs(detail: BenchCaseDetail, config: BriefingConfig) {
 async function authorize(caller: CalendarCaller | undefined, accountRef: string | null, details: readonly BenchCaseDetail[], signal: AbortSignal) {
   if (!caller) { if (accountRef !== null || details.some(detail => detail.case.source.mode !== "synthetic")) throw new DailyBriefError("access_denied"); return; }
   if (briefingAccountRef(caller.user.id) !== accountRef) throw new DailyBriefError("access_denied");
+  if (details.some((detail) => hasLiveAccountGoogleCalendar(detail.case))) {
+    throw new DailyBriefError("access_denied", undefined, "live_google_calendar_workbench_blocked");
+  }
   const preferences = await readDailyBriefPreferences(caller.client, signal);
   if (!preferences.enabled) throw new DailyBriefError("access_denied");
   for (const detail of details) await assertSavedCaseAuthorized(caller, preferences, detail.case, signal);

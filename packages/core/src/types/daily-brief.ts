@@ -75,6 +75,13 @@ export type DailyBriefSourceFlags = Readonly<Record<DailyBriefConnectedSource, b
  */
 export type DailyBriefSourceStatus = "ready" | "no_calendars" | "not_connected";
 
+/**
+ * Stored or reported Google Calendar source for AI features.
+ * `"agent_mcp"` uses the dedicated Google Workspace MCP grant; `"timeline"` is
+ * retained only for zero-downtime compatibility during migration; `null` disables it.
+ */
+export type DailyBriefGoogleCalendarSource = "timeline" | "agent_mcp" | null;
+
 export type DailyBriefSettings = Readonly<{
   accountRef: string;
   /** Whether the hosted model path can run: Cadence's server has its OpenAI key. */
