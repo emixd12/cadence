@@ -104,8 +104,12 @@ export type BriefMovePlanningInput = Readonly<{
   travelTimes?: string | null;
 }>;
 
-/** The calendar as the one rule sees it: the context's busy events plus the request's own. */
-export function briefMoveCalendar(context: AdvisorDayContext | null, requestBusy: readonly BriefCalendarBusy[] | undefined)
+/**
+ * The calendar as the one rule sees it: derived strictly server-side from authorized AI
+ * context connectors. Client-supplied `calendarBusy` is ignored (WS-2B Path 4 closure)
+ * so Timeline REST calendar data can never leak into AI move planning.
+ */
+export function briefMoveCalendar(context: AdvisorDayContext | null, _requestBusy?: readonly BriefCalendarBusy[] | undefined)
   : Readonly<{ busy: BriefMoveCalendarBusy[]; state: "current" | "stale" | "none" }> {
   const busy: BriefMoveCalendarBusy[] = [];
   let requested = false, stale = false;
@@ -120,23 +124,17 @@ export function briefMoveCalendar(context: AdvisorDayContext | null, requestBusy
       busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt) });
     }
   }
-  for (const [index, event] of (requestBusy ?? []).entries()) {
-    const start = Temporal.Instant.from(event.startAt), end = Temporal.Instant.from(event.endAt);
-    if (Temporal.Instant.compare(end, start) <= 0) continue;
-    requested = true;
-    // A request event at the same time as a context event names it; otherwise it is its own block.
-    const same = busy.find((item) => item.start.equals(start) && item.end.equals(end) && !item.title);
-    if (same && event.title) Object.assign(same, { title: event.title });
-    else if (!same) busy.push({ ref: event.ref ?? `request:${index}`, start, end, ...(event.title ? { title: event.title } : {}) });
-  }
   return { busy, state: stale ? "stale" : requested ? "current" : "none" };
 }
 
-/** The verified travel times for this request, or null. Never throws. */
+/** The verified travel times for this request, or null. Rejects Timeline-REST Google tokens (Path 3). Never throws. */
 export function briefMoveTravel(token: string | null | undefined, input: Readonly<{
   secrets: TravelConclusionsSecrets; userId: string; localDate: string; now: Temporal.Instant;
 }>): BriefMoveTravelInput | null {
-  return token ? briefMoveTravelInput(verifyTravelTimesToken(token, input)) : null;
+  if (!token) return null;
+  const payload = verifyTravelTimesToken(token, input);
+  if (!payload || payload.googleSource === "standard") return null;
+  return briefMoveTravelInput(payload);
 }
 
 /**
@@ -281,6 +279,8 @@ export async function saveBriefProposals(agent: AppSupabaseClient | null, input:
   /** The planner's lines, with the brief's own reason words when it wrote them. `candidates` is the same list. */
   lines?: readonly BriefMoveCandidate[]; candidates?: readonly BriefMoveCandidate[];
   replaces?: ReadonlyMap<string, string>;
+  containsGoogleCalendar?: boolean;
+  googleCalendarGrantGeneration?: number | null;
 }>): Promise<BriefMoveLine[]> {
   const candidates = input.lines ?? input.candidates ?? [];
   // No agent client: no proposals, so no lines the person could answer.
@@ -297,6 +297,10 @@ export async function saveBriefProposals(agent: AppSupabaseClient | null, input:
       expected_revision: candidate.expectedRevision,
       line: storedLine(candidate),
       replaces_proposal_id: input.replaces?.get(candidate.occurrenceId) ?? null,
+      ...(input.containsGoogleCalendar ? {
+        contains_google_calendar: true,
+        google_calendar_grant_generation: input.googleCalendarGrantGeneration ?? null,
+      } : {}),
     })) as unknown as Json,
   });
   if (error) throw error;

@@ -198,6 +198,7 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
     routingConsentAt: routeSource.settings.routingConsentAt, calendar, connectors, behaviors: routeSource.behaviors, occurrences: [dayOccurrence] });
   const payload = (overrides: Partial<Omit<TravelConclusionsPayload, "v">> = {}): Omit<TravelConclusionsPayload, "v"> => ({
     sub: "owner-1", date: fixture.localDate, src: sourceKey(), iat: "2026-11-01T11:58:00Z", exp: "2026-11-01T12:03:00Z",
+    googleSource: "agent_mcp",
     conclusions: { version: "2.0", travelDay: "yes", calendarEvents: true,
       trips: [{ destinationRef: "event:fixture", role: "outbound", mode: "transit", estimate: "current" },
         { destinationRef: null, role: "return", mode: "transit", estimate: "current" }],

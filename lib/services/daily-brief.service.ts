@@ -182,7 +182,7 @@ function parseDailyBriefSettingsInput(value: unknown): DailyBriefPreferenceInput
 export async function readDailyBriefSourceStatus(caller: CalendarCaller, preferences: Pick<DailyBriefPreferences, "googleCalendarSource">): Promise<Record<DailyBriefConnectedSource, DailyBriefSourceStatus>> {
   const read = <T,>(operation: () => Promise<T>) => Promise.resolve().then(operation).catch(() => null);
   const [google, outlook, icloud, hevy] = await Promise.all([
-    dailyBriefReadsGoogleCalendar(preferences) ? read(() => getCalendarConnection(caller)) : null,
+    dailyBriefReadsGoogleCalendar(preferences) ? read(() => getCalendarConnection(caller, "agent")) : null,
     read(() => getOutlookCalendarConnection(caller)),
     read(() => getIcloudCalendarConnection(caller)),
     read(() => getHevyConnection(caller)),
@@ -339,15 +339,18 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const now = clock().toString();
       // Usage reaches only the performance log and the run log, never the response.
       const usage: DailyBriefCallUsage[] = [];
+      const includedGoogleCalendar = prepared.calendar !== null;
+      const googleCalendarGrantGeneration = prepared.calendar?.connectionGeneration ?? null;
       // Cadence plans the lines for every client, so the opening says what really needs a new
       // time. A client without move lines gets the opening only; its lines are not stored.
+      // WS-2B (Path 4): ignore client-supplied calendarBusy; busy intervals come strictly from server-side AI context.
       const [plan, conflicts] = await phase("moves", async () => {
         const [, open] = await Promise.all([
           ensureBehaviorEstimates(agentRun?.client ?? null, context,
             withAgentRun(agentRun, (input) => generateDurationEstimatesWithModel(input)), signal),
           readOpenBriefConflicts(caller.client, { userId: caller.user.id, localDate: context.localDate }),
         ]);
-        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
+        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
         return [planned, open] as const;
       });
       const words = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
@@ -358,16 +361,20 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const lines = wantsMoves ? await phase("proposals", () => saveBriefProposals(agentRun?.client ?? null, {
         runId: agentRun?.runId ?? "", localDate: context.localDate, refresh: refreshing,
         lines: plan.candidates.map((candidate) => ({ ...candidate, reason: words.reasons[candidate.key] ?? candidate.reason })),
+        containsGoogleCalendar: includedGoogleCalendar,
+        googleCalendarGrantGeneration,
       })) : [];
       // Task 7: "Add for today" lines after the move lines, under the same free-slot rule and line cap.
       const opportunities = wantsOpportunities ? await phase("opportunities", async () => {
         const planned = await planBriefOpportunityDay({
           supabase: caller.client, userId: caller.user.id, localDate: context.localDate, timezone: context.timezone,
-          now: Temporal.Instant.from(now), context, planning: { calendarBusy: attempt.calendarBusy ?? [], travelTimes: attempt.travelTimes ?? null },
+          now: Temporal.Instant.from(now), context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null },
           travelSecrets: readTravelConclusionsSecrets(process.env), day: plan.day, moveCandidates: wantsMoves ? plan.candidates : [],
         });
         const saved = await saveBriefOpportunityProposals(agentRun?.client ?? null, {
           runId: agentRun?.runId ?? "", localDate: context.localDate, refresh: refreshing, candidates: planned.candidates,
+          containsGoogleCalendar: includedGoogleCalendar,
+          googleCalendarGrantGeneration,
         });
         return briefOpportunitiesFor({ localDate: context.localDate, timezone: context.timezone, runId: agentRun?.runId ?? null, lines: saved, calendar: planned.calendar });
       }) : null;
@@ -383,6 +390,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const stored = await phase("save", () => saveDailyBrief(caller.client, {
         installationId, leaseToken, expectedRevision: preferences.revision, runId: agentRun?.runId ?? null,
         refresh: refreshing, withMoves: wantsMoves, briefing: saved,
+        includedGoogleCalendar,
+        googleCalendarGrantGeneration,
       }, signal));
       if (!stored) throw new DailyBriefError("context_changed");
       successful = true;
@@ -393,7 +402,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         ...(opportunities ? { opportunities } : {}),
         refresh: publicRefreshState(await refreshState(agentClient, used).catch(() => ({ remaining: Math.max(0, DAILY_BRIEF_REFRESHES_PER_DAY - used), available: false, retryAfterSeconds: undefined }))),
       };
-      await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context), wordsError: words.failure?.error,
+      await agentRun?.finish({ ok: true, briefing, calendarDerived: dailyBriefContextIsCalendarDerived(context),
+        googleCalendarDerived: includedGoogleCalendar, wordsError: words.failure?.error,
         linkedProposalIds: lines.map((line) => line.proposalId).filter((id) => UUID.test(id)) }, logSignal);
       return { state: "ready", briefing };
     } catch (error) {

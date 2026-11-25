@@ -4,6 +4,7 @@ import { behaviorEndAt as coreBehaviorEndAt } from "@cadence/core/services/depar
 import { Temporal } from "@js-temporal/polyfill";
 
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
+import { buildTravelEventRevisionFingerprint } from "@cadence/core/resolvers/travel-horizon.resolver";
 import { resolveBehaviorDurationEstimate } from "@cadence/core/resolvers/timeline-context.resolver";
 import { rememberedTravelMode, travelHabitBuffers, travelHabitPlaceKey } from "@cadence/core/services/travel-habits";
 import {
@@ -37,11 +38,121 @@ import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/
 import { readTravelWeather } from "@/lib/services/weather-forecast.service";
 import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
 import { advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
-import type { TravelEvidenceResult } from "@cadence/core/types/travel";
+import type { TravelEvidenceResult, TravelRouteEstimate, TravelRouteRequest } from "@cadence/core/types/travel";
 import { issueTravelTimesToken, travelTimesFromEvidence } from "@/lib/services/travel-times-token";
-import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey, travelDurationHistoryRange, travelDurationRevision, type TravelConclusionsStops } from "@/lib/services/travel-conclusions-token";
+import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey, travelDurationHistoryRange, travelDurationRevision, type TravelConclusionsGoogleSource, type TravelConclusionsStops } from "@/lib/services/travel-conclusions-token";
 
 const PLACE_LOOKUP_CONCURRENCY = 4;
+
+/**
+ * Provenance-safe short-TTL (5 min) in-memory Routes estimate reuse cache keyed strictly by
+ * `(originKey, destinationKey, mode, departureTimeBucket)` — never storing event titles,
+ * calendar IDs, or grant metadata, so Timeline, Daily Brief, and Chat can avoid double-billing
+ * Google Routes without leaking Timeline REST metadata into AI.
+ */
+const TRAVEL_ROUTE_ESTIMATE_CACHE_TTL_MS = 5 * 60 * 1_000;
+const TRAVEL_ROUTE_ESTIMATE_CACHE_MAX_ENTRIES = 512;
+const TRAVEL_DEPARTURE_BUCKET_SECONDS = 5 * 60;
+
+type CachedRouteEstimate = Readonly<{
+  estimate: TravelRouteEstimate;
+  expiresAtMs: number;
+}>;
+
+const routeEstimateReuseCache = new Map<string, CachedRouteEstimate>();
+
+function travelPointKey(point: TravelPoint): string {
+  return point.kind === "place_id"
+    ? `pid:${point.placeId}`
+    : `geo:${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`;
+}
+
+function departureBucket(isoInstant: string | null | undefined): string {
+  if (!isoInstant) return "none";
+  try {
+    const epochSeconds = Math.floor(Temporal.Instant.from(isoInstant).epochMilliseconds / 1000);
+    return String(Math.floor(epochSeconds / TRAVEL_DEPARTURE_BUCKET_SECONDS));
+  } catch {
+    return "none";
+  }
+}
+
+export function travelRouteEstimateCacheKey(request: TravelRouteRequest): string {
+  return JSON.stringify([
+    travelPointKey(request.origin),
+    travelPointKey(request.destination),
+    request.mode,
+    departureBucket(request.readyAt),
+    request.timing.kind,
+  ]);
+}
+
+export function getCachedTravelRouteEstimate(request: TravelRouteRequest, nowMs = Date.now()): TravelRouteEstimate | null {
+  const key = travelRouteEstimateCacheKey(request);
+  const entry = routeEstimateReuseCache.get(key);
+  if (!entry) return null;
+  if (nowMs >= entry.expiresAtMs || Date.parse(entry.estimate.expiresAt) <= nowMs) {
+    routeEstimateReuseCache.delete(key);
+    return null;
+  }
+  routeEstimateReuseCache.delete(key);
+  routeEstimateReuseCache.set(key, entry);
+  return entry.estimate;
+}
+
+export function setCachedTravelRouteEstimate(request: TravelRouteRequest, estimate: TravelRouteEstimate, nowMs = Date.now()): void {
+  const key = travelRouteEstimateCacheKey(request);
+  if (routeEstimateReuseCache.has(key)) routeEstimateReuseCache.delete(key);
+  routeEstimateReuseCache.set(key, {
+    estimate,
+    expiresAtMs: nowMs + TRAVEL_ROUTE_ESTIMATE_CACHE_TTL_MS,
+  });
+  while (routeEstimateReuseCache.size > TRAVEL_ROUTE_ESTIMATE_CACHE_MAX_ENTRIES) {
+    const oldest = routeEstimateReuseCache.keys().next().value;
+    if (oldest === undefined) break;
+    routeEstimateReuseCache.delete(oldest);
+  }
+}
+
+export function resetTravelRouteEstimateCacheForTests(): void {
+  routeEstimateReuseCache.clear();
+}
+
+export async function routeTravelLegsWithReuseCache(input: Readonly<{
+  routes: readonly Readonly<{ id: string; request: TravelRouteRequest }>[];
+  provider: TravelProviderConfig;
+  reserve: TravelSpendReservation;
+  now: Temporal.Instant;
+  signal?: AbortSignal;
+}>): Promise<Awaited<ReturnType<typeof routeTravelLegs>>> {
+  const nowMs = input.now.epochMilliseconds;
+  const cachedResults = new Map<string, TravelRouteEstimate>();
+  const uncached: Array<Readonly<{ id: string; request: TravelRouteRequest }>> = [];
+  for (const route of input.routes) {
+    const hit = getCachedTravelRouteEstimate(route.request, nowMs);
+    if (hit) cachedResults.set(route.id, hit);
+    else uncached.push(route);
+  }
+  const fresh = uncached.length > 0
+    ? await routeTravelLegs({
+        routes: uncached,
+        provider: input.provider,
+        reserve: input.reserve,
+        now: input.now,
+        signal: input.signal,
+      })
+    : [];
+  const freshById = new Map(fresh.map((item) => [item.id, item]));
+  for (const route of uncached) {
+    const result = freshById.get(route.id);
+    if (result?.estimate) setCachedTravelRouteEstimate(route.request, result.estimate, nowMs);
+  }
+  return input.routes.map((route) => {
+    const hit = cachedResults.get(route.id);
+    if (hit) return { id: route.id, estimate: hit, failure: null };
+    return freshById.get(route.id)!;
+  });
+}
 
 type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">; placeText: string | null; endpointSource: TravelEndpoint["source"] }>;
 
@@ -233,7 +344,7 @@ export async function refreshTravelRoutesReportingCalendars(
   if (due.length) {
     await beforeFirstProviderCall();
     routed = await measurePerformanceSpan({ span: "travel.route_legs", counts: { routed_legs: due.length, later_legs: later.length } },
-      () => routeTravelLegs({ routes: due.map((leg) => ({ id: leg.id, request: leg.request })), provider: config, reserve, now, signal: deadline }));
+      () => routeTravelLegsWithReuseCache({ routes: due.map((leg) => ({ id: leg.id, request: leg.request })), provider: config, reserve, now, signal: deadline }));
   }
   const weather = await weatherRequest;
   await assertAllCurrent();
@@ -248,9 +359,11 @@ export async function refreshTravelRoutesReportingCalendars(
   const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips && !firstTrip &&
     calendarEvents.unavailable.length === 0;
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
+  const googleSource: TravelConclusionsGoogleSource = calendars.google.status === "connected" ? "standard" : "none";
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
     events, occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
+    googleSource,
     stops: { outlook_calendar: stops.some(({ event }) => event.source === "outlook_calendar"),
       icloud_calendar: stops.some(({ event }) => event.source === "icloud_calendar") },
     sourceKey: travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
@@ -262,7 +375,7 @@ export async function refreshTravelRoutesReportingCalendars(
   const timesToken = (expiresAt: string) => {
     if (!signConclusions) return null;
     const times = travelTimesFromEvidence(evidence, new Set(behaviorOccurrences.map((occurrence) => occurrence.id)));
-    return times ? issueTravelTimesToken({ sub: caller.user.id, date: request.startLocalDate, iat: now.toString(), exp: expiresAt, ...times }, conclusionsSecret!) : null;
+    return times ? issueTravelTimesToken({ sub: caller.user.id, date: request.startLocalDate, iat: now.toString(), exp: expiresAt, googleSource, ...times }, conclusionsSecret!) : null;
   };
   const tokens = (expiresAt: string) => ({ conclusionsToken: conclusionsToken(expiresAt), travelTimesToken: timesToken(expiresAt) });
   const budget = await readTravelBudget(caller, timezone, now);
@@ -664,6 +777,7 @@ function response(accountId: string, source: Awaited<ReturnType<typeof readTrave
 function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
   secret: string; userId: string; localDate: string; now: Temporal.Instant; expiresAt: string; sourceKey: string;
   events: readonly NormalizedExternalEvent[]; occurrenceIds: readonly string[]; stops: TravelConclusionsStops;
+  googleSource: TravelConclusionsGoogleSource;
 }>): string | null {
   const conclusions = evidence.modelProjection;
   if (!conclusions || Temporal.Instant.compare(Temporal.Instant.from(input.expiresAt), input.now) <= 0) return null;
@@ -679,7 +793,7 @@ function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
   try {
     const facts = renameTravelConclusionRefs({ conclusions, weather: advisorWeatherOutlook(evidence) }, rename);
     return issueTravelConclusionsToken({ sub: input.userId, date: input.localDate, src: input.sourceKey, iat: input.now.toString(),
-      exp: input.expiresAt, conclusions: facts.conclusions, weather: facts.weather, events: Object.fromEntries(named), stops: input.stops }, input.secret);
+      exp: input.expiresAt, googleSource: input.googleSource, conclusions: facts.conclusions, weather: facts.weather, events: Object.fromEntries(named), stops: input.stops }, input.secret);
   } catch {
     return null;
   }
@@ -695,5 +809,13 @@ function conclusionEventName(event: NormalizedExternalEvent): string {
 }
 
 function conclusionEventRevision(event: NormalizedExternalEvent): string {
-  return conclusionEventScope(event, JSON.stringify(event.revision));
+  return buildTravelEventRevisionFingerprint({
+    source: event.source,
+    calendarId: event.calendarId,
+    eventId: event.providerEventId,
+    startAt: event.kind === "timed" ? event.startAt : event.startLocalDate,
+    endAt: event.kind === "timed" ? event.endAt : event.endLocalDate,
+    status: event.state,
+    availability: event.availability,
+  });
 }

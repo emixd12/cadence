@@ -83,9 +83,13 @@ export function openCalendarSecret(config: CalendarOAuthConfig, sealed: string, 
     return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]).toString("utf8");
   } catch { throw new CalendarConnectionError("reconnect_required"); }
 }
+export const GOOGLE_CALENDAR_AI_MCP_STATE_PREFIX = "m_" as const;
+export const GOOGLE_CALENDAR_RETIRED_AGENT_STATE_PREFIX = "a_" as const;
+
 export function hashCalendarState(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 export function createCalendarAuthorization(config: CalendarOAuthConfig, subject: string) {
-  const state = randomBytes(32).toString("base64url");
+  const rawState = randomBytes(32).toString("base64url");
+  const state = config.grantPurpose === "agent" ? `${GOOGLE_CALENDAR_AI_MCP_STATE_PREFIX}${rawState}` : rawState;
   const verifier = randomBytes(32).toString("base64url");
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.search = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.callbackUrl, response_type: "code",
