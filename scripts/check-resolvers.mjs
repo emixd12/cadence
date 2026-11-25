@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -389,6 +390,16 @@ const dateStrategy = read("docs/DATETIME_STRATEGY.md");
 for (const snippet of ["Temporal", "America/New_York", "local_date", "timestamptz", "now is injected"]) {
   assert(dateStrategy.includes(snippet), `docs/DATETIME_STRATEGY.md must lock ${snippet}.`);
 }
+
+// Ambiguous PostgREST embeds (PGRST201) need no database to find: the generated types list
+// every foreign key. The script also asserts its negative fixture still fails.
+const embedCheck = spawnSync(process.execPath, [filePath("scripts/check-postgrest-embeds.mjs")], {
+  cwd: root, encoding: "utf8",
+});
+assert(embedCheck.status === 0, `PostgREST embed validation failed:\n${(
+  embedCheck.stderr || embedCheck.stdout || "Unknown error"
+).trim()}`);
+if (embedCheck.status === 0 && embedCheck.stdout.trim()) notes.push(embedCheck.stdout.trim());
 
 if (failures.length > 0) {
   console.error(`resolvers:check failed with ${failures.length} issue(s):`);
