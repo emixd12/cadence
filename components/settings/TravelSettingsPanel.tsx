@@ -288,7 +288,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
                 homeInput.current?.focus();
               }}
               onBlur={commitHome}
-              onEnter={commitHome} /></HomeCurrentLocation>{homeSelection ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" role="status" data-home-selection><span>{homeSelection.saved
+              onEnter={commitHome} /></HomeCurrentLocation>{homeSelection ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" aria-live="polite" data-home-selection><span>{homeSelection.saved
                 ? (homeSelection.markerSaved ? "Home and its marker updated from selection." : "Home updated from selection.")
                 : `Selected ${homeSelection.title}. Press Enter or leave the field to save.${homeSelection.position && placeLabelActions?.enabled ? " Its Home marker will save with it." : ""}`}</span><button type="button" className="product-action product-action-secondary" onMouseDown={(event) => event.preventDefault()} onClick={undoHomeSelection}>Undo</button></div> : null}<p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
           <SettingsResultLine channel={result} />

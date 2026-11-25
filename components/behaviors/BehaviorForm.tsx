@@ -495,7 +495,7 @@ export function BehaviorForm({
               />
               <FieldError message={fieldErrors.location_text} />
               {placeSelection && placeSelection.forState === state ? (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" role="status" data-place-selection>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-5 text-muted-readable" aria-live="polite" data-place-selection>
                   <span>
                     Selected {placeSelection.title}.
                     {placeSelection.position && placeLabelActions?.enabled
