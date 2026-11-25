@@ -1,0 +1,31 @@
+{
+  "about": "Accepted product-map warnings per category (scripts/build-product-map.mjs). A ratcheted category fails map:check when it has more warnings than listed here. npm run map:build lowers this file; raising it is a hand edit to explain in review. See docs/PRODUCT_MAP_GUIDE.md, \"Warning ratchet\".",
+  "unratcheted": {
+    "design-system.usage.json differences": "Fixing it needs npm run design-system:check, which is not in CI and needs a tool outside the repository, so a ratchet would block unrelated pull requests."
+  },
+  "ratcheted": {
+    "hard-coded colors": [],
+    "missing references": [],
+    "token aliases": [],
+    "token descriptions": [
+      "app/globals.css: --font-mono has no description comment",
+      "app/globals.css: --font-sans has no description comment",
+      "apps/marketing/src/styles/global.css: --ink has no description comment",
+      "apps/marketing/src/styles/global.css: --ink-line has no description comment",
+      "apps/marketing/src/styles/global.css: --ink-muted has no description comment",
+      "apps/marketing/src/styles/global.css: --ink-raised has no description comment",
+      "apps/marketing/src/styles/global.css: --ink-text has no description comment",
+      "apps/marketing/src/styles/global.css: --line-strong has no description comment",
+      "apps/marketing/src/styles/global.css: --max-width has no description comment",
+      "apps/marketing/src/styles/global.css: --page-gutter has no description comment",
+      "apps/marketing/src/styles/global.css: --primary-soft has no description comment",
+      "apps/marketing/src/styles/global.css: --primary-soft-strong has no description comment",
+      "apps/marketing/src/styles/global.css: --primary-strong has no description comment",
+      "apps/marketing/src/styles/global.css: --radius-card has no description comment",
+      "apps/marketing/src/styles/global.css: --radius-control has no description comment",
+      "apps/marketing/src/styles/global.css: --surface-strong has no description comment",
+      "apps/marketing/src/styles/global.css: --wide-page-gutter has no description comment",
+      "apps/marketing/src/styles/global.css: --wide-width has no description comment"
+    ]
+  }
+}
