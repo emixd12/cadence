@@ -103,11 +103,13 @@ begin
   exception when raise_exception then
     if sqlerrm <> 'Completion place labels are off.' then raise; end if;
   end;
-  -- Unknown keys still fail the check constraint.
+  -- Unknown keys are still refused: the labels-off trigger runs before the check constraint.
   begin
     perform pg_temp.dismiss('saved', 'elsewhere');
     raise exception 'An unknown suggestion key was accepted.';
   exception when check_violation then null;
+    when raise_exception then
+      if sqlerrm <> 'Completion place labels are off.' then raise; end if;
   end;
   -- Markers keep the unchanged check.
   begin
