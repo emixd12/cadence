@@ -114,7 +114,9 @@
                 "updated_at": "2026-10-18T13:00:00Z",
                 "revision": "o1.3"
               }
-            ]
+            ],
+            "periods": [],
+            "more_periods": false
           }
         ],
         "freshness": {
@@ -290,7 +292,101 @@
                   "0000000d-1111-4111-8111-00000000000d"
                 ]
               }
-            ]
+            ],
+            "periods": [],
+            "more_periods": false
+          }
+        ],
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
+    },
+    {
+      "name": "day inside a Period",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "needs_decision": {
+          "occurrences": [
+            {
+              "id": "00000004-1111-4111-8111-000000000004",
+              "behavior_id": "00000001-1111-4111-8111-000000000001",
+              "behavior_title": "Morning walk",
+              "category_name": "Fitness",
+              "local_date": "2026-10-16",
+              "timezone": "America/New_York",
+              "scheduled_for": "2026-10-16T11:30:00Z",
+              "effective_start_at": "2026-10-16T11:30:00Z",
+              "move": null,
+              "schedule": {
+                "kind": "exact",
+                "preset": null,
+                "start_time": "07:30",
+                "end_time": null,
+                "label": "7:30 AM"
+              },
+              "status": "unresolved",
+              "status_label": "Unresolved",
+              "needs_decision": true,
+              "origin": "scheduled",
+              "added_by": null,
+              "completed_at": null,
+              "status_marked_at": null,
+              "note": null,
+              "updated_at": "2026-10-18T13:00:00Z",
+              "revision": "o1.3"
+            }
+          ],
+          "total_count": 1,
+          "truncated": false,
+          "lookback_start_local_date": "2026-07-20"
+        },
+        "days": [
+          {
+            "local_date": "2026-10-18",
+            "is_today": true,
+            "occurrences": [
+              {
+                "id": "00000005-1111-4111-8111-000000000005",
+                "behavior_id": "00000001-1111-4111-8111-000000000001",
+                "behavior_title": "Morning walk",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:30:00Z",
+                "effective_start_at": "2026-10-18T11:30:00Z",
+                "move": null,
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                "status": "completed",
+                "status_label": "Completed",
+                "needs_decision": false,
+                "origin": "scheduled",
+                "added_by": null,
+                "completed_at": "2026-10-18T11:41:00Z",
+                "status_marked_at": "2026-10-18T11:41:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3"
+              }
+            ],
+            "periods": [
+              {
+                "id": "00000007-1111-4111-8111-000000000007",
+                "label": "Sick",
+                "start_local_date": "2026-03-06",
+                "end_local_date": "2026-03-09",
+                "ongoing": false
+              }
+            ],
+            "more_periods": false
           }
         ],
         "freshness": {
@@ -340,7 +436,9 @@
                 "updated_at": "2026-10-18T13:00:00Z",
                 "revision": "o1.3"
               }
-            ]
+            ],
+            "periods": [],
+            "more_periods": false
           }
         ],
         "freshness": {
@@ -497,7 +595,9 @@
                   "0000000d-1111-4111-8111-00000000000d"
                 ]
               }
-            ]
+            ],
+            "periods": [],
+            "more_periods": false
           }
         ],
         "freshness": {

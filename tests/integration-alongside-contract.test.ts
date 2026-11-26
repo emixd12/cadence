@@ -25,12 +25,13 @@ import { mcpTools } from "@/lib/mcp/server";
 import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 
 /**
- * Ticket 364 (D33): contract 1.8.0 adds the person's alongside setting behind
- * CADENCE_ALONGSIDE. With the flag off the endpoint must serve 1.7.0 unchanged.
+ * Ticket 364 (D33): contract 1.9.0 adds the person's alongside setting behind
+ * CADENCE_ALONGSIDE. With the flag off the endpoint must serve 1.8.0 unchanged.
  */
 
-// sha256 of JSON.stringify(mcpTools()) on feat/alongside-364 before Ticket 364 (contract 1.7.0).
-const PUBLISHED_TOOLS_SHA256 = "bd602a832060c6c7c18c55a0fe6a50ddc547404eea030d0f24004020b6be80b8";
+// sha256 of JSON.stringify(mcpTools()) with CADENCE_ALONGSIDE off: the published contract
+// 1.8.0, which added Periods (Ticket 370). Recompute it when the published registry changes.
+const PUBLISHED_TOOLS_SHA256 = "2af18dc90f9b71fc645d14eaa21d1d32304deb8b19a3d0c7365bf1590750a7cd";
 const ON = { alongside: true } as const;
 const fixtureDir = path.resolve(__dirname, "fixtures/integration/operations");
 const fixture = (name: string) => JSON.parse(fs.readFileSync(path.join(fixtureDir, `${name}.json`), "utf8")) as {
@@ -40,7 +41,7 @@ const fixture = (name: string) => JSON.parse(fs.readFileSync(path.join(fixtureDi
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
-/** Removes what the 1.8.0 edition adds, so the rest can be compared with 1.7.0. */
+/** Removes what the 1.9.0 edition adds, so the rest can be compared with 1.8.0. */
 function withoutAlongside(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.filter((item) => !(item && typeof item === "object" && JSON.stringify(item) === "{\"required\":[\"alongside\"]}"))
@@ -68,7 +69,7 @@ function addAlongside(value: unknown, setting: boolean | null): unknown {
 }
 
 describe("contract editions (Ticket 364)", () => {
-  it("serves the published 1.7.0 tools byte for byte while CADENCE_ALONGSIDE is off", () => {
+  it("serves the published 1.8.0 tools byte for byte while CADENCE_ALONGSIDE is off", () => {
     vi.stubEnv("CADENCE_ALONGSIDE", "");
     expect(integrationContractOptions()).toEqual({});
     expect(createHash("sha256").update(JSON.stringify(mcpTools())).digest("hex")).toBe(PUBLISHED_TOOLS_SHA256);
@@ -77,22 +78,22 @@ describe("contract editions (Ticket 364)", () => {
     for (const descriptor of listIntegrationToolDescriptors()) {
       expect(descriptor.inputSchema).toBe(INTEGRATION_OPERATIONS[descriptor.name].input.schema);
     }
-    expect(integrationContractVersion()).toBe("1.7.0");
+    expect(integrationContractVersion()).toBe("1.8.0");
   });
 
-  it("serves 1.8.0 with the flag on, and only the exact value on enables it", () => {
+  it("serves 1.9.0 with the flag on, and only the exact value on enables it", () => {
     vi.stubEnv("CADENCE_ALONGSIDE", "true");
     expect(integrationContractOptions()).toEqual({});
     vi.stubEnv("CADENCE_ALONGSIDE", "on");
     expect(integrationContractOptions()).toEqual(ON);
-    expect(integrationContractVersion(ON)).toBe("1.8.0");
+    expect(integrationContractVersion(ON)).toBe("1.9.0");
     const tools = mcpTools();
     expect(tools.map((tool) => tool.name)).toEqual(INTEGRATION_OPERATION_NAMES);
     const create = tools.find((tool) => tool.name === "create_behavior")!;
     expect(Object.keys(create.inputSchema.properties ?? {})).toContain("alongside");
   });
 
-  it("differs from 1.7.0 only by the alongside fields and the version", () => {
+  it("differs from 1.8.0 only by the alongside fields and the version", () => {
     for (const name of INTEGRATION_OPERATION_NAMES) {
       const base = INTEGRATION_OPERATIONS[name] as IntegrationOperation;
       const edition = integrationOperationFor(name, ON);
@@ -102,7 +103,7 @@ describe("contract editions (Ticket 364)", () => {
     }
   });
 
-  it("keeps every 1.8.0 schema strict, supported and valid JSON Schema 2020-12", () => {
+  it("keeps every 1.9.0 schema strict, supported and valid JSON Schema 2020-12", () => {
     const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true, validateFormats: false });
     for (const name of INTEGRATION_OPERATION_NAMES) {
       const edition = integrationOperationFor(name, ON);
@@ -129,10 +130,10 @@ describe("contract editions (Ticket 364)", () => {
     expect(timeline.match(/"alongside"/g)?.length).toBe(2);
     expect(JSON.stringify(integrationOperationFor("get_occurrence", ON).output.schema)).toContain("\"alongside\"");
     expect(JSON.stringify(integrationOperationFor("list_behaviors", ON).output.schema)).toContain("\"alongside\"");
-    expect(JSON.stringify(integrationOperationFor("get_account_context", ON).output.schema)).toContain("\"1.8.0\"");
+    expect(JSON.stringify(integrationOperationFor("get_account_context", ON).output.schema)).toContain("\"1.9.0\"");
   });
 
-  it("accepts true, false and null on create_behavior and update_behavior only in 1.8.0", () => {
+  it("accepts true, false and null on create_behavior and update_behavior only in 1.9.0", () => {
     const create = fixture("create_behavior").valid_inputs[0]!.value;
     const update = { behavior_id: "00000001-1111-4111-8111-000000000001", expected_revision: "2026-10-18T13:00:00Z" };
     for (const setting of [true, false, null]) {
@@ -146,19 +147,19 @@ describe("contract editions (Ticket 364)", () => {
     expect(validateOperationInput("update_behavior", update, ON).ok).toBe(false);
   });
 
-  it("validates outputs with the field in 1.8.0 and refuses it in 1.7.0", () => {
+  it("validates outputs with the field in 1.9.0 and refuses it in 1.8.0", () => {
     for (const name of ["get_behavior", "list_behaviors", "get_timeline", "get_occurrence", "create_behavior", "update_behavior"] as const) {
       const output = fixture(name).valid_outputs[0]!.value;
       for (const setting of [true, false, null]) {
         expect(validateOperationOutput(name, addAlongside(output, setting), ON).ok, name).toBe(true);
       }
       expect(validateOperationOutput(name, addAlongside(output, true)).ok, name).toBe(false);
-      // Optional in 1.8.0, so a replay recorded before the flag still validates.
+      // Optional in 1.9.0, so a replay recorded before the flag still validates.
       expect(validateOperationOutput(name, output, ON).ok, name).toBe(true);
     }
     const context = { ...fixture("get_account_context").valid_outputs[0]!.value };
-    expect(validateOperationOutput("get_account_context", { ...context, contract_version: "1.8.0" }, ON).ok).toBe(true);
-    expect(validateOperationOutput("get_account_context", { ...context, contract_version: "1.7.0" }, ON).ok).toBe(false);
+    expect(validateOperationOutput("get_account_context", { ...context, contract_version: "1.9.0" }, ON).ok).toBe(true);
+    expect(validateOperationOutput("get_account_context", { ...context, contract_version: "1.8.0" }, ON).ok).toBe(false);
   });
 
   it("drops alongside from a replayed result when the flag is off", () => {

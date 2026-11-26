@@ -100,10 +100,10 @@ describe("alongside on create_behavior and update_behavior (Ticket 364)", () => 
     expect(store.updateBehaviorWithAtomicScheduleGraph.mock.calls[1]![0].behavior.alongside).toBeNull();
   });
 
-  it("refuses the field with the flag off, as contract 1.7.0 does", async () => {
+  it("refuses the field with the flag off, as contract 1.8.0 does", async () => {
     vi.stubEnv("CADENCE_ALONGSIDE", "");
     expect(await writeOperationHandlers.create_behavior(context, { ...create, alongside: true }))
-      .toMatchObject({ ok: false, error: { code: "invalid_input", contract_version: "1.7.0" } });
+      .toMatchObject({ ok: false, error: { code: "invalid_input", contract_version: "1.8.0" } });
     vi.mocked(getBehaviorById).mockResolvedValue(current);
     expect(await writeOperationHandlers.update_behavior(context, { behavior_id: id, expected_revision: current.updated_at, alongside: false }))
       .toMatchObject({ ok: false, error: { code: "invalid_input" } });

@@ -25,7 +25,7 @@ const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 
 /** In-memory Cadence: grants, token families, two accounts' data, per-grant rate limits. */
-function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false, contractVersion = '1.7.0', reportsApps, listedTools = REGISTRY_TOOLS } = {}) {
+function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false, contractVersion = '1.8.0', reportsApps, listedTools = REGISTRY_TOOLS } = {}) {
   const grants = [];
   const access = new Map();
   const refresh = new Map();
@@ -80,7 +80,7 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false,
   const own = (list, slot, id) => list.find((x) => x.id === id && x.slot === slot) ?? null;
   const notFound = () => ({ isError: true, errorCode: 'not_found', structured: { error: { code: 'not_found' } } });
   const okResult = (structured) => ({ isError: false, errorCode: null, structured });
-  const alongside = contractVersion === '1.8.0';
+  const alongside = contractVersion === '1.9.0';
   const view = (b) => ({ id: b.id, title: b.title, state: b.state, revision: b.revision, created_at: b.created_at,
     ...(alongside ? { alongside: b.alongside ?? null } : {}) });
   const PLANNED = '2026-10-18T13:00:00Z';
@@ -98,6 +98,7 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false,
       case 'list_occurrences': return okResult({ occurrences: data.occurrences.filter((o) => o.slot === slot && (!args.behavior_ids || args.behavior_ids.includes(o.behavior_id))).map(occView) });
       case 'get_occurrence': { const o = own(data.occurrences, slot, args.occurrence_id); return o ? okResult({ occurrence: occView(o) }) : notFound(); }
       case 'list_day_notes': return okResult({ timezone: 'America/New_York', day_notes: [] });
+      case 'list_periods': return okResult({ timezone: 'America/New_York', today_local_date: TODAY, periods: [], next_cursor: null });
       case 'get_adherence_summary': return okResult({ overall: {}, behaviors: [] });
       case 'search': return okResult({ results: data.behaviors.filter((b) => b.slot === slot && b.title.startsWith(args.query)).map((b) => ({ id: `behavior:${b.id}`, title: b.title, url: 'https://x' })) });
       case 'fetch': { const b = own(data.behaviors, slot, args.id.split(':')[1]); return b ? okResult({ id: args.id }) : notFound(); }
@@ -210,7 +211,7 @@ describe('Ticket 249 protocol acceptance suite', () => {
       if (scope === 'cadence.read') expect(READ_TOOLS).toContain(name);
       else expect(WRITE_SCOPE[name]).toBe(scope);
     }
-    expect(READ_TOOLS).toHaveLength(11);
+    expect(READ_TOOLS).toHaveLength(12);
   });
 
   it('passes every check against a correct server and leaves no grant active', async () => {
@@ -227,15 +228,15 @@ describe('Ticket 249 protocol acceptance suite', () => {
     expect(report).toMatch(/PASS/);
   });
 
-  it('checks the alongside setting when the server reports contract 1.8.0 (Ticket 364)', async () => {
-    const { ok, checks } = await runFake({ fake: createFakeCadence({ contractVersion: '1.8.0' }) });
+  it('checks the alongside setting when the server reports contract 1.9.0 (Ticket 364)', async () => {
+    const { ok, checks } = await runFake({ fake: createFakeCadence({ contractVersion: '1.9.0' }) });
     expect(failed(checks)).toEqual([]);
     expect(ok).toBe(true);
     for (const name of ['alongside-unanswered-on-create', 'alongside-saved', 'alongside-read-back']) {
       expect(checks.some((c) => c.check === name && c.ok)).toBe(true);
     }
     const published = await runFake();
-    expect(published.checks.some((c) => c.check === 'alongside-absent-before-1.8.0' && c.ok)).toBe(true);
+    expect(published.checks.some((c) => c.check === 'alongside-absent-before-1.9.0' && c.ok)).toBe(true);
   });
 
   it('expects the transport tools only when the server reports MCP Apps (Ticket 376)', async () => {
@@ -246,13 +247,13 @@ describe('Ticket 249 protocol acceptance suite', () => {
     const withApps = [...REGISTRY_TOOLS, ...TRANSPORT_TOOLS];
     // Flag on: the registry plus show_day passes, and the registry alone fails.
     const on = await runFake({ fake: createFakeCadence({ reportsApps: true, listedTools: withApps }) });
-    expect(inventory(on)).toMatchObject({ ok: true, detail: 'count=27 apps=on' });
+    expect(inventory(on)).toMatchObject({ ok: true, detail: 'count=31 apps=on' });
     expect(failed(on.checks)).toEqual([]);
     expect(inventory(await runFake({ fake: createFakeCadence({ reportsApps: true }) })).ok).toBe(false);
     // Flag off stays strict: a server that lists show_day without reporting MCP Apps fails.
-    expect(inventory(await runFake({ fake: createFakeCadence({ reportsApps: false, listedTools: withApps }) }))).toMatchObject({ ok: false, detail: 'count=27 apps=off' });
+    expect(inventory(await runFake({ fake: createFakeCadence({ reportsApps: false, listedTools: withApps }) }))).toMatchObject({ ok: false, detail: 'count=31 apps=off' });
     expect(inventory(await runFake({ fake: createFakeCadence({ listedTools: withApps }) })).ok).toBe(false);
-    expect(inventory(await runFake())).toMatchObject({ ok: true, detail: 'count=26 apps=off' });
+    expect(inventory(await runFake())).toMatchObject({ ok: true, detail: 'count=30 apps=off' });
   });
 
   it.each(['token-request-failed', 'granted-scope-mismatch'])('cleans the final consent-created grant after %s', async reason => {

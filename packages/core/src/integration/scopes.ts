@@ -36,12 +36,12 @@ export const INTEGRATION_SCOPE_DEFINITIONS: readonly IntegrationScopeDefinition[
   {
     scope: INTEGRATION_SCOPES.read,
     required: true,
-    summary: "Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone.",
+    summary: "Read Behaviors, categories, Occurrences, statuses, notes, day notes, Periods, time sessions, adherence, and the profile timezone.",
   },
   {
     scope: INTEGRATION_SCOPES.occurrencesWrite,
     required: false,
-    summary: "Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes.",
+    summary: "Mark Occurrences Completed, Not Completed, or Unresolved, edit Occurrence notes and day notes, and create, edit, and end Periods. No Period is removed.",
   },
   {
     scope: INTEGRATION_SCOPES.behaviorsWrite,

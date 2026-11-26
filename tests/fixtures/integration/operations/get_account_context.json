@@ -34,7 +34,44 @@
         "granted_scopes": [
           "cadence.read"
         ],
-        "contract_version": "1.7.0",
+        "contract_version": "1.8.0",
+        "active_periods": [],
+        "more_active_periods": false,
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
+    },
+    {
+      "name": "a Period covers today",
+      "value": {
+        "account_ref": "pw_9f8e7d6c5b4a3f2e1d0c",
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "local_time": "11:56",
+        "now": "2026-10-18T15:56:42Z",
+        "granted_scopes": [
+          "cadence.read"
+        ],
+        "contract_version": "1.8.0",
+        "active_periods": [
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false
+          },
+          {
+            "id": "00000008-1111-4111-8111-000000000008",
+            "label": "Travel",
+            "start_local_date": "2026-03-08",
+            "end_local_date": null,
+            "ongoing": true
+          }
+        ],
+        "more_active_periods": false,
         "freshness": {
           "as_of": "2026-10-18T15:56:42Z",
           "occurrences_generated_through": "2026-11-17"
@@ -54,7 +91,9 @@
         "granted_scopes": [
           "cadence.read"
         ],
-        "contract_version": "1.7.0",
+        "contract_version": "1.8.0",
+        "active_periods": [],
+        "more_active_periods": false,
         "freshness": {
           "as_of": "2026-10-18T15:56:42Z",
           "occurrences_generated_through": "2026-11-17"
@@ -75,7 +114,9 @@
         "granted_scopes": [
           "cadence.read"
         ],
-        "contract_version": "1.7.0",
+        "contract_version": "1.8.0",
+        "active_periods": [],
+        "more_active_periods": false,
         "freshness": {
           "as_of": "2026-10-18T15:56:42Z",
           "occurrences_generated_through": "2026-11-17"
@@ -83,6 +124,37 @@
       },
       "code": "internal_error",
       "path": "$.now"
+    },
+    {
+      "name": "active Period carries a note",
+      "value": {
+        "account_ref": "pw_9f8e7d6c5b4a3f2e1d0c",
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "local_time": "11:56",
+        "now": "2026-10-18T15:56:42Z",
+        "granted_scopes": [
+          "cadence.read"
+        ],
+        "contract_version": "1.8.0",
+        "active_periods": [
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu"
+          }
+        ],
+        "more_active_periods": false,
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.active_periods[0].note"
     }
   ]
 }

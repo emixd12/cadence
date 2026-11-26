@@ -35,6 +35,10 @@ import {
   occurrenceStatus,
   pageSize,
   parentGroupOutput,
+  periodLabelInput,
+  periodNoteInput,
+  periodOutput,
+  periodSummaryOutput,
   subBehaviorSortOrder,
   remindersInput,
   revision,
@@ -168,12 +172,25 @@ const behaviorIdInput = () => uuid("Behavior id.");
 const occurrenceIdInput = () => uuid("Occurrence id.");
 const searchId = () =>
   string({
-    pattern: "^(behavior|occurrence|day_note):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+    pattern: "^(behavior|occurrence|day_note|period):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
     maxLength: 64,
-    description: "Result id from `search`: `behavior:<uuid>`, `occurrence:<uuid>`, or `day_note:<uuid>`.",
+    description: "Result id from `search`: `behavior:<uuid>`, `occurrence:<uuid>`, `day_note:<uuid>`, or `period:<uuid>`.",
   });
 const behaviorIdsFilter = () =>
   array(uuid(), { minItems: 1, maxItems: L.maxBehaviorFilterIds, uniqueItems: true, description: "Only these Behaviors." });
+
+/**
+ * What a Period is, stated once and repeated in every Period tool description
+ * (Ticket 370, D35). It describes the record; it gives a client no instruction.
+ */
+export const PERIOD_MEANING =
+  "A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it.";
+
+/** Agents create, edit and end a Period; removing one stays in the app (D35). */
+const PERIOD_NO_REMOVE = "No tool removes a Period: the user removes one in the Cadence app.";
+
+const periodIdInput = () => uuid("Period id from list_periods, get_account_context `active_periods`, or a get_timeline day.");
+const periodSummaries = (description: string) => array(periodSummaryOutput, { maxItems: L.maxEmbeddedPeriods, description });
 
 // ------------------------------------------------------------------ reads
 
@@ -181,7 +198,7 @@ const getAccountContext = readOperation({
   name: "get_account_context",
   title: "Get Cadence account context",
   description:
-    "Returns the account's timezone, today's local date and time, the permissions this connection has, and how fresh the data is. Use it first to learn what \"today\" means for this user and which Cadence tools the connection may call.",
+    "Returns the account's timezone, today's local date and time, the Periods that cover today, the permissions this connection has, and how fresh the data is. Use it first to learn what \"today\" means for this user and which Cadence tools the connection may call. A Period in `active_periods` is the user's own label for these days; it changes no status, adherence, reminder or schedule.",
   input: object({}),
   output: object({
     account_ref: string({
@@ -196,6 +213,8 @@ const getAccountContext = readOperation({
     now: utcInstant("Current instant."),
     granted_scopes: array(enumOf(INTEGRATION_SCOPE_LIST), { minItems: 1, uniqueItems: true }),
     contract_version: literal(INTEGRATION_CONTRACT_VERSION),
+    active_periods: periodSummaries(`Periods that cover today, earliest first, at most ${L.maxEmbeddedPeriods}. Empty when none does (contract 1.8.0).`),
+    more_active_periods: boolean({ description: "True when more Periods cover today than `active_periods` returns. list_periods returns them all." }),
     freshness: freshnessOutput,
   }),
 });
@@ -269,13 +288,15 @@ const timelineDay = object({
   day_note: optional(nullable(string({ description: "The user's day note for this date, or null. Separate from Occurrence notes and statuses." }))),
   occurrences: array(occurrenceOutput, { description: "Every Occurrence of the day, sub-behavior Occurrences included." }),
   parent_groups: optional(array(parentGroupOutput, { description: "The day's parent Behavior slots in time order. Their Occurrences also appear in `occurrences` (contract 1.7.0)." })),
+  periods: periodSummaries(`Periods that cover this date, earliest first, at most ${L.maxEmbeddedPeriods}. Empty when none does (contract 1.8.0).`),
+  more_periods: boolean({ description: "True when more Periods cover this date than `periods` returns. list_periods returns them all." }),
 });
 
 const getTimeline = readOperation({
   name: "get_timeline",
   title: "Get Timeline",
   description:
-    `Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in \`parent_groups\`. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to ${L.maxTimelineDays} days from the start date.`,
+    `Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in \`parent_groups\`. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to ${L.maxTimelineDays} days from the start date. Each day also lists the Periods that cover it, the user's own labels for those days; a Period changes no status.`,
   input: object({
     start_local_date: optional(localDate("First day to return. Defaults to today in the account timezone.")),
     days: optional(integer({ minimum: 1, maximum: L.maxTimelineDays, default: 1, description: "Number of days to return." })),
@@ -337,6 +358,26 @@ const listDayNotes = readOperation({
   errors: ["limit_exceeded"],
 });
 
+const listPeriods = readOperation({
+  name: "list_periods",
+  since: "1.8.0",
+  title: "List Periods",
+  description:
+    `Lists the user's Periods that overlap a date range of up to ${L.maxPeriodRangeDays} days, earliest first, up to ${L.maxPeriodsPerPage} per page, each with its note and revision. ${PERIOD_MEANING} ${PERIOD_NO_REMOVE}`,
+  input: object({
+    start_local_date: localDate("First local date, inclusive."),
+    end_local_date: localDate("Last local date, inclusive."),
+    cursor: optional(cursor()),
+  }),
+  output: object({
+    timezone: timezone(),
+    today_local_date: localDate("Today's date in the account timezone."),
+    periods: array(periodOutput, { maxItems: L.maxPeriodsPerPage, description: "Periods with at least one day in the range. An ongoing Period overlaps every range that reaches its first day." }),
+    next_cursor: nextCursor(),
+  }),
+  errors: ["limit_exceeded"],
+});
+
 const getOccurrence = readOperation({
   name: "get_occurrence",
   title: "Get Occurrence",
@@ -351,7 +392,7 @@ const getAdherenceSummary = readOperation({
   name: "get_adherence_summary",
   title: "Get adherence summary",
   description:
-    `Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to ${L.maxAdherenceRangeDays} days. ${ADHERENCE_DEFINITION} Counts and the rate cover scheduled Occurrences; opportunity_completed_count counts added opportunities apart. Use it for "how am I doing" questions. Cadence does not compute streaks.`,
+    `Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to ${L.maxAdherenceRangeDays} days. ${ADHERENCE_DEFINITION} Counts and the rate cover scheduled Occurrences; opportunity_completed_count counts added opportunities apart. \`period_split\` gives the same counts for days inside and outside the user's Periods. Use it for "how am I doing" questions. Cadence does not compute streaks.`,
   input: object({
     start_local_date: localDate("First local date, inclusive."),
     end_local_date: localDate("Last local date, inclusive."),
@@ -369,6 +410,14 @@ const getAdherenceSummary = readOperation({
       state: enumOf(BEHAVIOR_STATES),
       ...adherenceCounts,
     })),
+    period_split: nullable(object({
+      periods: periodSummaries(`Periods that overlap the range, earliest first, at most ${L.maxEmbeddedPeriods}.`),
+      more_periods: boolean({ description: "True when more Periods overlap the range than `periods` returns. `inside` and `outside` still count every Period." }),
+      inside: object(adherenceCounts, { description: "Counts for Occurrences on dates that at least one Period covers. A date covered by several Periods counts once." }),
+      outside: object(adherenceCounts, { description: "Counts for Occurrences on every other date in the range." }),
+    }), {
+      description: "The overall counts split by the user's Periods, after the `behavior_ids` filter. Null when no Period overlaps the range. `overall`, `behaviors` and the adherence definition do not change: a Period excludes nothing (contract 1.8.0).",
+    }),
   }),
   errors: ["limit_exceeded"],
 });
@@ -377,7 +426,7 @@ const search = readOperation({
   name: "search",
   title: "Search Cadence",
   description:
-    `Searches the user's Behaviors (titles, descriptions, archive notes), Occurrence notes, and day notes by text. Returns ids for \`fetch\` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword. ${DAY_NOTE_MEANING}`,
+    `Searches the user's Behaviors (titles, descriptions, archive notes), Occurrence notes, day notes, and Period labels by text. Returns ids for \`fetch\` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword. A Period's note is not searched. ${DAY_NOTE_MEANING}`,
   input: object({
     query: string({ minLength: 1, maxLength: L.maxSearchQueryLength, pattern: "\\S", description: "Search text." }),
   }),
@@ -394,7 +443,7 @@ const fetchRecord = readOperation({
   name: "fetch",
   title: "Fetch Cadence record",
   description:
-    `Returns the full text of one \`search\` result: a Behavior's definition, an Occurrence and its note, or a day note. Use it after \`search\` to read a result. ${DAY_NOTE_MEANING}`,
+    `Returns the full text of one \`search\` result: a Behavior's definition, an Occurrence and its note, a day note, or a Period's label and dates (list_periods returns a Period's note). Use it after \`search\` to read a result. ${DAY_NOTE_MEANING}`,
   input: object({ id: searchId() }),
   output: object({
     id: searchId(),
@@ -402,8 +451,8 @@ const fetchRecord = readOperation({
     text: string({ description: "Plain-text rendering of the record. User-entered text is quoted as data." }),
     url: httpsUrl("Link to the record in the Cadence web app."),
     metadata: object({
-      kind: enumOf(["behavior", "occurrence", "day_note"] as const),
-      behavior_id: optional(uuid("Present for Behavior and Occurrence results. Absent for day notes.")),
+      kind: enumOf(["behavior", "occurrence", "day_note", "period"] as const),
+      behavior_id: optional(uuid("Present for Behavior and Occurrence results. Absent for day notes and Periods.")),
       local_date: optional(localDate()),
       status: optional(occurrenceStatus()),
     }),
@@ -583,6 +632,80 @@ const updateDayNote = writeOperation({
   idempotentHint: true,
   annotationRationale:
     "Replaces the previous day note text, which Cadence does not keep in history, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments produce the same day note, so idempotentHint is true. openWorldHint is false.",
+});
+
+const createPeriod = writeOperation({
+  name: "create_period",
+  since: "1.8.0",
+  title: "Create Period",
+  description:
+    `Adds a Period from start_local_date through end_local_date, or an ongoing one when no end is sent. Past, current and future dates are allowed, and Periods may overlap. ${PERIOD_MEANING} ${PERIOD_NO_REMOVE}`,
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    label: periodLabelInput(),
+    start_local_date: localDate("First day of the Period, inclusive, in the account timezone."),
+    end_local_date: optional(nullable(localDate(), { description: "Last day, inclusive, on or after start_local_date. Omit or send null for an ongoing Period." })),
+    note: optional(nullable(periodNoteInput(), { description: "Optional note about the Period. Omit, or send null or an empty string, for none." })),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({ period: periodOutput }),
+  errors: ["limit_exceeded", "idempotency_key_reused"],
+  destructiveHint: false,
+  idempotentHint: false,
+  annotationRationale:
+    "Adds a new Period and changes no existing record, like create_behavior, so destructiveHint is false under both Claude's and OpenAI's guidance; readOnlyHint is false, so clients still treat it as a write. Calling it twice without an idempotency_key adds two Periods, and no tool removes one, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.",
+});
+
+const periodChangeFields = ["label", "start_local_date", "end_local_date", "note"] as const;
+
+const updatePeriod = writeOperation({
+  name: "update_period",
+  since: "1.8.0",
+  title: "Update Period",
+  description:
+    `Edits a Period's label, dates or note. Only the fields sent change: end_local_date null makes it ongoing, and note null clears the note. The revision comes from list_periods. ${PERIOD_MEANING} ${PERIOD_NO_REMOVE}`,
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    period_id: periodIdInput(),
+    expected_revision: revision("Revision from list_periods. If the Period changed since, the call fails with `conflict` and changes nothing."),
+    label: optional(periodLabelInput("New label. Omit to keep it.")),
+    start_local_date: optional(localDate("New first day, inclusive. Omit to keep it.")),
+    end_local_date: optional(nullable(localDate(), { description: "New last day, inclusive, or null to make the Period ongoing. Omit to keep it." })),
+    note: optional(nullable(periodNoteInput(), { description: "New note, or null (or an empty string) to clear it. Omit to keep it." })),
+    idempotency_key: optional(idempotencyKey()),
+  }, { requireOneOf: periodChangeFields }),
+  output: object({
+    period: periodOutput,
+    changed: boolean({ description: "False when the sent values matched the stored ones." }),
+  }),
+  errors: ["not_found", "conflict", "idempotency_key_reused"],
+  destructiveHint: true,
+  idempotentHint: true,
+  annotationRationale:
+    "Overwrites the Period's label, dates or note, and Cadence keeps no history of the earlier values, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments leave the same Period, so idempotentHint is true. openWorldHint is false.",
+});
+
+const endPeriod = writeOperation({
+  name: "end_period",
+  since: "1.8.0",
+  title: "End Period today",
+  description:
+    `Ends a Period today: its last day becomes today in the account timezone. It takes no date. A Period that has not started, or has already ended, fails with invalid_state; update_period changes its dates. ${PERIOD_MEANING} ${PERIOD_NO_REMOVE}`,
+  scope: INTEGRATION_SCOPES.occurrencesWrite,
+  input: object({
+    period_id: periodIdInput(),
+    expected_revision: revision("Revision from list_periods. If the Period changed since, the call fails with `conflict` and changes nothing."),
+    idempotency_key: optional(idempotencyKey()),
+  }),
+  output: object({
+    period: periodOutput,
+    changed: boolean({ description: "True when the last day was set to today." }),
+  }),
+  errors: ["not_found", "conflict", "idempotency_key_reused", "invalid_state"],
+  destructiveHint: false,
+  idempotentHint: true,
+  annotationRationale:
+    "Sets one field, the Period's last day, to today, and only when the Period has started and has not ended. update_period sets any other last day or makes the Period ongoing again, so the change is easy to reverse and destructiveHint is false, as OpenAI's guidance reads it; Claude's stricter reading would set it, and readOnlyHint false still marks the tool as a write. Repeating it leaves the same Period, ended today, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.",
 });
 
 const REFUSED_DESCRIPTION = "Set when nothing changed because a rule refused the request. Null when the change was made.";
@@ -884,6 +1007,7 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   list_occurrences: listOccurrences,
   get_occurrence: getOccurrence,
   list_day_notes: listDayNotes,
+  list_periods: listPeriods,
   get_adherence_summary: getAdherenceSummary,
   search,
   "fetch": fetchRecord,
@@ -893,6 +1017,9 @@ export const INTEGRATION_OPERATIONS = Object.freeze({
   move_occurrence_for_day: moveOccurrenceForDay,
   revert_occurrence_move: revertOccurrenceMove,
   update_day_note: updateDayNote,
+  create_period: createPeriod,
+  update_period: updatePeriod,
+  end_period: endPeriod,
   add_opportunity_occurrence: addOpportunityOccurrence,
   remove_opportunity_occurrence: removeOpportunityOccurrence,
   create_behavior: createBehavior,
