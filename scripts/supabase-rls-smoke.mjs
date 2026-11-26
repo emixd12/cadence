@@ -49,6 +49,7 @@ export const PUBLIC_AUTHENTICATED_FUNCTIONS = [
   "consume_launch_rate_limit",
   "create_behavior_with_schedule_graph",
   "create_period",
+  "create_period_if_absent",
   "delete_period",
   "get_export_page_read_bundle",
   "list_my_occurrence_time_session_history",

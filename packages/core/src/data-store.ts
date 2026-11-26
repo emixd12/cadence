@@ -138,6 +138,12 @@ export type PeriodCreateCommit = {
   note: string | null;
 };
 
+export type PeriodCreateIfAbsentResult = {
+  period: import("./resolvers/period.resolver").PeriodRecord;
+  /** False when a Period with the same natural key already existed. */
+  created: boolean;
+};
+
 export type PeriodUpdateCommit = PeriodCreateCommit & {
   id: string;
   expectedRevision: number;
@@ -158,6 +164,15 @@ export type PeriodDataStore = {
   listPeriods(range?: { from: string; to: string }): Promise<import("./resolvers/period.resolver").PeriodRecord[]>;
   getPeriod(id: string): Promise<import("./resolvers/period.resolver").PeriodRecord | null>;
   createPeriod(input: PeriodCreateCommit): Promise<import("./resolvers/period.resolver").PeriodRecord>;
+  /**
+   * Ticket 373: adds the Period unless the account already has one with the same
+   * natural key (`periodNaturalKey`: exact label, first day, last day, ongoing
+   * matching ongoing), as one atomic step. An existing Period is returned unchanged
+   * with `created: false`. Throws at the cap like createPeriod. Optional: BehaviorLog
+   * import and restore use it when present, so overlapping applies of one bundle
+   * cannot store a Period twice; without it they fall back to createPeriod.
+   */
+  createPeriodIfAbsent?(input: PeriodCreateCommit): Promise<PeriodCreateIfAbsentResult>;
   updatePeriod(input: PeriodUpdateCommit): Promise<import("./resolvers/period.resolver").PeriodRecord | null>;
   deletePeriod(input: PeriodDeleteCommit): Promise<string | null>;
 };

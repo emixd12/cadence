@@ -39,6 +39,9 @@ import type { BehaviorLogImportRun } from "@/lib/types/database";
 import { createClient } from "@/lib/supabase/server";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
+import { applyBehaviorLogPeriods, previewBehaviorLogPeriods } from "@cadence/core/services/behaviorlog-period.service";
+import { withBehaviorLogPeriodMessage } from "@cadence/core/resolvers/behaviorlog-period.resolver";
+import { createPeriodStore } from "@/lib/db/periods.repo";
 import { DEFAULT_ZIP_READ_LIMITS } from "@/lib/services/zip";
 import type {
   BehaviorLogRestorePreview,
@@ -228,11 +231,15 @@ export async function previewBehaviorLogRestoreUploadFromFormData(
   const dayNotes = preview.valid
     ? await previewBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "restore")
     : null;
+  // Ticket 373: how many Periods will be added, already exist, or do not fit.
+  const periods = preview.valid
+    ? await previewBehaviorLogPeriods(createPeriodStore(supabase, userId), bundle.files, "restore")
+    : null;
 
   return {
     status: "previewed",
     message: preview.valid
-      ? withBehaviorLogDayNoteMessage("BehaviorLog restore preview ready.", dayNotes, "preview")
+      ? withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("BehaviorLog restore preview ready.", dayNotes, "preview"), periods, "preview")
       : "BehaviorLog restore preview found validation errors.",
     upload: {
       fileName: bundle.fileName,
@@ -468,14 +475,24 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
   const dayNotes = await applyBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "restore", {
     replaceDifferent: !rpcResult.alreadyApplied,
   });
+  // Ticket 373: Periods restore after the product restore commits. A fresh restore
+  // adds missing Periods and sets the note of a matching one when the bundle
+  // carries it; a retry only adds missing Periods, so a note edited since stays.
+  const periods = await applyBehaviorLogPeriods(createPeriodStore(supabase, userId), bundle.files, "restore", {
+    setNotes: !rpcResult.alreadyApplied,
+  });
 
   return {
     status: "applied",
-    message: withBehaviorLogDayNoteMessage(
-      rpcResult.alreadyApplied
-        ? "This accepted BehaviorLog restore was already applied."
-        : "BehaviorLog restore applied.",
-      dayNotes,
+    message: withBehaviorLogPeriodMessage(
+      withBehaviorLogDayNoteMessage(
+        rpcResult.alreadyApplied
+          ? "This accepted BehaviorLog restore was already applied."
+          : "BehaviorLog restore applied.",
+        dayNotes,
+        "applied",
+      ),
+      periods,
       "applied",
     ),
     upload: {
@@ -547,10 +564,12 @@ async function createAlreadyAppliedRestoreState(
 ): Promise<BehaviorLogRestoreActionState> {
   const appliedSummary = readObject(input.appliedRun.dry_run_summary);
   const dayNotes = await applyBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), input.bundle.files, "restore", { replaceDifferent: false });
+  // The same holds for Periods: the retry adds missing ones and keeps stored notes.
+  const periods = await applyBehaviorLogPeriods(createPeriodStore(supabase, userId), input.bundle.files, "restore", { setNotes: false });
 
   return {
     status: "applied",
-    message: withBehaviorLogDayNoteMessage("This accepted BehaviorLog restore was already applied.", dayNotes, "applied"),
+    message: withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("This accepted BehaviorLog restore was already applied.", dayNotes, "applied"), periods, "applied"),
     upload: {
       fileName: input.bundle.fileName,
       fileSize: input.bundle.fileSize,

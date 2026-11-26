@@ -40,6 +40,9 @@ import { createDayNoteStore, listAllDayNotes } from "@/lib/db/dayNotes.repo";
 import type { DayNoteDataStore } from "@cadence/core/data-store";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
+import { applyBehaviorLogPeriods, previewBehaviorLogPeriods } from "@cadence/core/services/behaviorlog-period.service";
+import { withBehaviorLogPeriodMessage } from "@cadence/core/resolvers/behaviorlog-period.resolver";
+import { createPeriodStore } from "@/lib/db/periods.repo";
 import type {
   BehaviorLogExistingRecords,
   BehaviorLogImportFile,
@@ -187,11 +190,15 @@ export async function previewBehaviorLogImportUploadFromFormData(
   const dayNotes = preview.valid
     ? await previewBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "import")
     : null;
+  // Ticket 373: how many Periods will be added, already exist, or do not fit.
+  const periods = preview.valid
+    ? await previewBehaviorLogPeriods(createPeriodStore(supabase, userId), bundle.files, "import")
+    : null;
 
   return {
     status: "previewed",
     message: preview.valid
-      ? withBehaviorLogDayNoteMessage("BehaviorLog preview ready.", dayNotes, "preview")
+      ? withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("BehaviorLog preview ready.", dayNotes, "preview"), periods, "preview")
       : "BehaviorLog preview found validation errors.",
     upload: {
       fileName: bundle.fileName,
@@ -297,10 +304,13 @@ export async function applyBehaviorLogImportUploadFromFormData(
   // Ticket 292: day notes save after the import commits, one compare-and-set
   // save per date. A different saved note is reported, never overwritten.
   const dayNotes = await applyBehaviorLogDayNotes(createBehaviorLogDayNoteStore(supabase, userId), bundle.files, "import");
+  // Ticket 373: Periods also save after the import commits. Import adds a Period
+  // no stored Period matches and never changes a stored one. The step never throws.
+  const periods = await applyBehaviorLogPeriods(createPeriodStore(supabase, userId), bundle.files, "import");
   if (modeValue === "create_missing_only") {
     return {
       status: "applied",
-      message: withBehaviorLogDayNoteMessage("Create-only import applied.", dayNotes, "applied"),
+      message: withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("Create-only import applied.", dayNotes, "applied"), periods, "applied"),
       upload: {
         fileName: bundle.fileName,
         fileSize: bundle.fileSize,
@@ -320,7 +330,7 @@ export async function applyBehaviorLogImportUploadFromFormData(
 
   return {
     status: "applied",
-    message: withBehaviorLogDayNoteMessage("Approved merge import applied.", dayNotes, "applied"),
+    message: withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("Approved merge import applied.", dayNotes, "applied"), periods, "applied"),
     upload: {
       fileName: bundle.fileName,
       fileSize: bundle.fileSize,

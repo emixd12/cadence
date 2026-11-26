@@ -9,6 +9,7 @@ import { listBehaviorConfigurationEvents } from "@/lib/db/behaviorConfigurationE
 import { consumeExportDownloadRateLimit } from "@/lib/db/launchRateLimits.repo";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { listAllDayNotes } from "@/lib/db/dayNotes.repo";
+import { listPeriods } from "@/lib/db/periods.repo";
 import { listOccurrenceMovesForExport } from "@/lib/db/occurrenceMoves.repo";
 import { listAppliedBehaviorLogImportRuns, listBehaviorLogImportRecordMappings } from "@/lib/db/behaviorLogImports.repo";
 import { listImportedNotes } from "@/lib/db/notes.repo";
@@ -122,12 +123,15 @@ export async function getUserExportBundle(
     range: options.range,
   });
   const endLocalDate = exportReadEndLocalDate(range);
-  const [importRuns, importMappings, importedNotes, importedInterventions, dayNotes, occurrenceMoves] = await Promise.all([
+  const [importRuns, importMappings, importedNotes, importedInterventions, dayNotes, occurrenceMoves, periods] = await Promise.all([
     listAppliedBehaviorLogImportRuns(supabase, userId), listBehaviorLogImportRecordMappings(supabase, userId),
     options.includeNotes ? listImportedNotes(supabase, userId) : Promise.resolve([]),
     listImportedInterventions(supabase, userId),
     options.includeNotes ? listAllDayNotes(supabase, userId) : Promise.resolve([]),
     listOccurrenceMovesForExport(supabase, userId, range.startLocalDate, endLocalDate),
+    // Ticket 373: at most 500 rows. The resolver keeps those inside the range and
+    // drops each note when notes are not included.
+    listPeriods(supabase, userId),
   ]);
   const initialRead = await readExportPageBundle(supabase, {
     startLocalDate: range.startLocalDate,
@@ -168,7 +172,7 @@ export async function getUserExportBundle(
     occurrences: exportRead.occurrences, statusEvents: exportRead.statusEvents,
     reminderDeliveries: exportRead.reminderDeliveries, timeSessions,
     finalBehaviors: finalRead.behaviors,
-    importRuns, importMappings, importedNotes, importedInterventions, dayNotes, occurrenceMoves,
+    importRuns, importMappings, importedNotes, importedInterventions, dayNotes, occurrenceMoves, periods,
     // Ticket 364: the person's alongside answer, only while CADENCE_ALONGSIDE is on.
     includeAlongside: alongsideEnabled(),
   });
