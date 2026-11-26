@@ -23030,7 +23030,7 @@
       "journeys": [
         "J29"
       ],
-      "intent": "Approve or decline every pending change of one question at once (Behavior changes and any second write).",
+      "intent": "Approve or decline every pending change of one question at once: Behavior changes, any second write, and every Period write (add, edit or end), which asks even as the first write.",
       "triggers": [
         {
           "kind": "activate",
@@ -23042,8 +23042,8 @@
         }
       ],
       "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts). Shown while a confirm is pending.",
-      "success_result": "Yes runs the listed changes and shows their outcome lines and any refusals under the question; No shows Not changed.",
-      "failure_result": "An expired confirm or a changed record changes nothing and says so. A failed request shows one red sentence.",
+      "success_result": "Yes runs the listed changes and shows their outcome lines and any refusals under the question; No shows Not changed. A Period line names the label and dates and never quotes the note. A Period write offers no Undo afterwards: chat has no tool that removes a Period, and an edit or an end keeps no earlier values.",
+      "failure_result": "An expired confirm or a changed record, including a Period whose revision moved after it was read, changes nothing and says so. A failed request shows one red sentence.",
       "effects": [
         "database_write",
         "network_request"
@@ -23052,14 +23052,18 @@
       "confirmation": "acknowledgement",
       "implementation": [
         "components/chat/ChatMessages.tsx",
-        "components/chat/ChatPage.tsx"
+        "components/chat/ChatPage.tsx",
+        "lib/services/chat/chat-tools.ts",
+        "lib/services/chat/chat-writes.ts",
+        "lib/services/chat/chat-confirm.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/chat-page.dom.test.tsx"
+          "tests/chat-page.dom.test.tsx",
+          "tests/chat-periods.test.ts"
         ],
-        "notes": "DOM check covers Yes listing what ran."
+        "notes": "DOM check covers Yes listing what ran. The Period test covers the Yes before a first Period write, the confirm lines, the expired Yes after the Period changed, the refusal after a Yes and the absent Undo."
       },
       "platforms": {
         "web": {
