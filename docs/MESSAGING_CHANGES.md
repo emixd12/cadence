@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-092` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-102` is next; `npm run ids:next` confirms). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -2625,3 +2625,98 @@ cite has not changed.
   the model.
 - **Related:** P-028, P-095.
 - **Status:** logged.
+
+## P-097: Claude and ChatGPT listing copy and screenshots for the day view (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Tickets 377, 378 and 380.
+  Cadence's MCP server will serve an interactive "Cadence day" view that Claude and
+  ChatGPT render inside the conversation. The Claude directory listing needs 3 to 5 PNG
+  screenshots, 1000 pixels or wider, with paired prompts. The ChatGPT resubmission needs a
+  statement of the view's content security policy.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Tickets 377, 378, 380. Files:
+  `docs/qa/mcp-directory-submission.md`, `integrations/chatgpt-plugin/plugin.json`,
+  `integrations/claude-plugin/.claude-plugin/plugin.json`.
+- **Surfaces:** provider submissions (Claude directory and Verified listing, ChatGPT
+  plugin), plugin listings, marketing.
+- **Conflicting current text:** the submission drafts and both plugin listings describe
+  tools with text results only. `docs/qa/mcp-directory-submission.md` says "Cadence
+  requires a hosted account with Google sign-in"; email and Apple sign-in are live.
+- **Update needed:** listing copy that names the view, screenshots with prompts, the CSP
+  statement and reviewer test cases. Ticket 380 drafts them unpublished.
+- **Related:** P-048, P-098, P-100.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
+  instruction. Nothing is submitted or published before it.
+
+## P-098: Privacy, Terms and Trust text about views rendered inside AI clients (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Tickets 376 and 377. An AI
+  client can render a Cadence view in a sandboxed frame. The view shows today's
+  Occurrences, notes and the day note, and a count of earlier items that need a decision.
+  A click in the view marks an Occurrence or saves a note through the client, under the
+  permissions the user already granted. The click is the user's confirmation. The view
+  makes no network request and receives no credential.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Tickets 376, 377.
+- **Surfaces:** Privacy and Terms, Trust, OAuth consent and Connected apps text, user
+  guide.
+- **Conflicting current text:** `components/settings/LegalContent.tsx`, "Exports and
+  connected AI clients": "You direct and confirm changes in the AI client." It describes
+  requested records sent to the client and does not mention a view the client displays
+  or a change made by clicking in one.
+- **Update needed:** say that a connected client may display a Cadence view, that a click
+  in it changes the record under the granted permissions, what the view shows, and that
+  it sends nothing to any other party. Add a user guide section.
+- **Related:** P-013, P-014, P-061.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246).
+  The owner decided the production flag waits for the same overhaul.
+
+## P-099: Developer docs say Cadence implements no MCP Apps views or resources (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Ticket 376. With the flag on,
+  the MCP server lists one more read tool, declares the `io.modelcontextprotocol/ui`
+  extension and serves view HTML through `resources/list` and `resources/read`.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Ticket 376. Files:
+  `apps/marketing/src/data/developers.ts`, the generated developer reference.
+- **Surfaces:** marketing (developer docs).
+- **Conflicting current text:** `developers.ts`: "Cadence does not implement MCP Apps
+  widgets, prompts or resources." and "Cadence has no sessions, resumption, unsolicited
+  messages, resources".
+- **Update needed:** describe the view tool, the view resource, the empty CSP and the text
+  result for hosts that show no view. Prompts stay unimplemented.
+- **Related:** P-048.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and general release. The
+  current text stays accurate while the production flag is off.
+
+## P-100: Plugin skill update that names the day view (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Ticket 380. The published
+  `daily-check-in` skill tells the model to call `get_timeline` and to confirm before it
+  writes. With a view, the model should call `show_day`, and the person's click in the
+  view is the confirmation.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Ticket 380. Files:
+  `integrations/skills/daily-check-in/SKILL.md` and its copies in both plugins.
+- **Surfaces:** plugin listings (published skills), provider submissions.
+- **Conflicting current text:** `integrations/skills/daily-check-in/SKILL.md` names
+  `get_timeline` for the day and does not mention a view.
+- **Update needed:** an unpublished skill draft with skill-rule tests (Ticket 380).
+  Publishing it is listing work.
+- **Related:** P-097.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
+  instruction.
+
+## P-101: Gemini listing and Google's Connected Apps submission (D36)
+
+- **Change:** decided November 25, 2026 (D36). Gemini Apps Developer Mode is a required
+  acceptance host (Ticket 378). A public Gemini listing needs Google's Connected Apps
+  interest form and console. If consumer Gemini cannot sign in as-is, Ticket 381 may adapt
+  Cadence's OAuth server for it.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Tickets 378, 380, 381.
+- **Surfaces:** provider submissions (Google), Privacy, marketing, developer docs.
+- **Conflicting current text:** Privacy, "Exports and connected AI clients", names
+  "Claude or ChatGPT" as examples. Marketing and the developer docs name Claude and
+  ChatGPT only. No Google listing text exists.
+- **Update needed:** Gemini listing copy and screenshots; name Google as a client
+  provider where the text lists them; record any OAuth change from Ticket 381 in the
+  developer docs.
+- **Related:** P-090, P-097.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
+  instruction. Developer Mode testing publishes nothing and does not wait.

@@ -20607,3 +20607,314 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active). |
 
 Messaging impact: `P-096`.
+
+## Ticket 375: MCP Apps spike: resource handlers and a static view on real hosts
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: `docs/plans/2026-11-25-mcp-apps-expansion.md`, package B and section 7.
+
+Dependencies: none.
+
+Goal: Answer the plan's eight unknowns on real hosts and freeze the `show_day` schema and the view contract before Tickets 376 and 377 start.
+
+Scope:
+
+- A throwaway branch that never merges: resource handlers and one static view on the local stack.
+- Run the view in the `ext-apps` `basic-host` and in MCP Inspector, then in Claude and ChatGPT as test account A against a preview deployment.
+- Answer each unknown in the plan's section 7: approval prompts on view-initiated writes; `resources/read` on the 2026-07-28 and legacy paths with a fresh server per request; host behavior on a 403 step-up challenge; bundle size with React 19 inlined; view caching per host; the redirect URI VS Code uses; whether Gemini sends the `resource` parameter; whether a preview deployment can run the acceptance suites.
+
+Acceptance criteria:
+
+- A dated note under `docs/qa/` records each of the eight answers with the host, client version and connection method, or states why an answer could not be obtained.
+- The note holds the frozen `show_day` input and output schema and the view contract (messages, write preconditions, `_meta` fields).
+- The note says whether Ticket 381 is needed, and for which host.
+- No spike code reaches `main`. No production setting changes.
+
+Out of scope: production code, the flag, any listing or submission.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Throwaway branch and a `docs/qa/` note only. Follow-up Tickets 376 and 377. |
+| Desktop | Not applicable: the MCP server is hosted, and Cadence for Mac renders no MCP view. |
+| Marketing | Not applicable: nothing public changes. |
+| Future mobile | Deferred (no mobile track active). The Claude and ChatGPT mobile apps render the view; Ticket 378 tests Claude mobile. |
+
+Messaging impact: none.
+
+## Ticket 376: MCP Apps server: `show_day`, view resources and the flag
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.2 and 3.4, package C.
+
+Dependencies: Ticket 375 (frozen schema and view contract).
+
+Goal: Serve the day projection and the view HTML from the MCP endpoint behind a flag that is off in production.
+
+Scope:
+
+- Read tool `show_day` (name frozen by Ticket 375), scope `cadence.read`, optional `date`. It is a one-day adapter over the Timeline service in `lib/services/integration-read.service.ts` and returns the same JSON as text for hosts that show no view.
+- One server-computed field per Occurrence: whether a Completed status came from a connected service, and which one. `get_timeline` does not change.
+- Granted scopes travel in the result's `_meta`. `_meta.ui.resourceUri` is `ui://cadence/day/v1.html`.
+- `resources: {}` and the `io.modelcontextprotocol/ui` extension in capabilities. `resources/list` returns descriptors only. `resources/read` returns the HTML for an exact known URI with an explicit empty CSP.
+- Both resource methods need a valid grant with `cadence.read`, count against the per-grant read limit, log a fixed operation label and have a byte cap.
+- Flag `CADENCE_MCP_APPS` (working name), off in production. Off removes the tool and the resources.
+- During the trial `show_day` lives in `lib/mcp/`, outside the contract registry. No change to `editions.ts`.
+- `docs/MCP_CONTRACT.md`, `docs/MCP_INTEGRATION.md`, `docs/AGENT_RESOLVERS.md` and `docs/ROUTE_MAP.md` updated.
+
+Acceptance criteria:
+
+- Protocol tests pass on the 2026-07-28 and legacy paths with the flag on and off. `tests/mcp-server.test.ts` no longer asserts that `resources` is undefined when the flag is on.
+- A resource read without a valid grant fails. A resource read counts against the read limit and returns the rate-limit error past it.
+- Rollback tests cover a host that holds a stale tool descriptor after the flag goes off.
+- A test asserts that Cadence Chat neither lists nor executes `show_day`.
+- Calendar events, travel, leave times, Daily Brief text and location never appear in `show_day` output.
+- No log line holds a token, note text or view HTML.
+- The checks in `AGENTS.md`, "Testing rules", pass, and `npm run test:web-client` if a file it imports changes.
+
+Out of scope: the view itself (Ticket 377); joining the contract registry, which follows Ticket 365; the production flag.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/mcp/server.ts`, a new `lib/mcp/` module for `show_day` and the resource handlers, `lib/services/integration-read.service.ts`, `app/mcp/route.ts`. |
+| Desktop | Not applicable: the MCP server is hosted. A linked Mac receives view-made changes through existing account sync. |
+| Marketing | Follow-up: the generated developer reference and `/developers` text change at general release (`P-099`), after the marketing overhaul. |
+| Future mobile | Not applicable: no Cadence mobile client calls MCP. Host mobile apps render the view. |
+
+Messaging impact: `P-098`, `P-099`.
+
+## Ticket 377: MCP Apps view: "Cadence day"
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.3 and 3.4, package D.
+
+Dependencies: Ticket 375 (frozen schema and view contract). Runs in parallel with Ticket 376.
+
+Goal: Build the one bundled HTML view that shows today and lets the person mark Occurrences and save notes inside an AI client.
+
+Scope:
+
+- New workspace package (working name `packages/mcp-views`): Vite, `vite-plugin-singlefile`, React and `@modelcontextprotocol/ext-apps`. The dependency stays out of the Next.js root.
+- The build writes the single HTML file into a generated TypeScript string module. A check rebuilds it and fails on any byte difference.
+- The view shows today's Occurrences with Completed, Not Completed and Note; Needs decision as one count line; parent Behavior slots collapsed to their derived progress; the day note; labels for an opportunity row, an alongside row (only when `alongside` is `true`) and a connector completion.
+- Writes go through `set_occurrence_status`, `set_parent_occurrence_status` and `update_occurrence_note` with the displayed precondition and an `idempotency_key`. A click on a status button is the person's confirmation.
+- On a conflict the view refreshes and asks again. On 429 it honors `Retry-After`. Without a write scope it shows "Reconnect to allow changes".
+- After a successful write the view re-reads the day and sends one `ui/update-model-context` line with the Behavior and the new status. Note text is never sent there.
+- The view computes nothing: grouping, status rules and dates come from the resolvers.
+- Styling uses host CSS variables with Cadence token fallbacks. Text comes from the notices library. A `/design-system` bench page hosts the view against fixtures.
+- Use the impeccable and design-system-bench workflows. Update `interaction-registry.json`, `DESIGN.md` and `docs/UI_SPEC.md`, and run `npm run map:build`.
+
+Acceptance criteria:
+
+- DOM tests cover a status write, a note save, a conflict, a missing write scope, a rate limit, the Needs decision count and an empty day.
+- Fixtures cover `alongside` true, false, null and absent. The view shows "Alongside" only for `true`.
+- A test runs the shipped bundle in a sandboxed frame with no network allowlist and hostile note text. It makes no network request, loads no external asset and renders the note as text.
+- The view works at phone width with touch targets of at least 44 points, one inline note editor at a time, no modal and no nested scroll.
+- The bench page returns 404 in production.
+- The checks in `AGENTS.md`, "Testing rules", pass.
+
+Out of scope: an expanded Needs decision list, day-note editing, opportunity add and remove, move controls and tracked time (Ticket 382).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/mcp-views` (new), the generated HTML module read by `lib/mcp/`, a bench page under `app/design-system/`, `packages/core/src/notices/catalog/`. |
+| Desktop | Not applicable: Cadence for Mac renders no MCP view. `npm run desktop:build` must still pass. |
+| Marketing | Follow-up: screenshots and copy wait for the marketing overhaul (`P-097`). |
+| Future mobile | Deferred (no mobile track active). The view is built phone width first because host mobile apps render it. |
+
+Messaging impact: `P-097`, `P-098`.
+
+## Ticket 378: MCP Apps acceptance on the required hosts
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package E and section 6.
+
+Dependencies: Tickets 376 and 377. Ticket 381 for a host the spike shows cannot sign in.
+
+Goal: Show, with real hosts and Cadence's own records, that the day view reads and writes correctly on every host the owner requires before release.
+
+Scope:
+
+- `mcp-acceptance` suites on the local stack and a Vercel preview, as test accounts A and B.
+- Required hosts: Claude web, ChatGPT web, Claude Desktop, Claude mobile, VS Code Copilot and Gemini Apps Developer Mode. Claude web and ChatGPT web run in the QA Chrome profile. The other four need new harnesses.
+- Cases per host: a status write, a note save, a parent slot write, a denied approval, an expired grant, a read-only consent, and a reconnect that does not replay a pending write.
+- Each run records the host, client version, connection method and the text fallback.
+- Each step is checked against Cadence's records with `npm run mcp:watch`.
+- Acceptance ends on a preview deployment. The production flag is not part of this ticket.
+
+Acceptance criteria:
+
+- Every required host passes every case, or the run ledger names the failing case and its blocker.
+- A host that shows no view still receives the text result.
+- The run ledger under `.intent/acceptance/<run-id>/` holds tool names, outcomes and counts only.
+- `docs/qa/mcp-server.md` describes the new harnesses and how to resume a run.
+- `npm run test:web-client` passes after any change under `scripts/acceptance/`.
+
+Out of scope: the production flag, any listing or submission, Gemini Enterprise.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `scripts/acceptance/`, `.agentic/test-access.json`, `docs/qa/mcp-server.md`, the project skill `.claude/skills/mcp-acceptance`. |
+| Desktop | Not applicable to Cadence for Mac. Claude Desktop is a host under test, not a Cadence surface. |
+| Marketing | Not applicable: acceptance publishes nothing. Screenshot capture is Ticket 380. |
+| Future mobile | Deferred (no mobile track active). The Claude mobile run is the first evidence of the view on a phone. |
+
+Messaging impact: none.
+
+## Ticket 379: Consent Allow or Deny before hydration returns 500
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package F. Source of the finding: `STATUS.md`, "MCP acceptance tooling, Tickets 247–258" row.
+
+Dependencies: none. It can run at any time.
+
+Goal: A person who presses Allow or Deny on the OAuth consent page before the page hydrates gets the normal result, not a 500.
+
+Scope:
+
+- Reproduce the finding on the local stack with a submit before hydration.
+- Fix the consent page so Allow and Deny work before and after hydration.
+- Add a regression test at the layer the cause lives in.
+
+Acceptance criteria:
+
+- Allow before hydration grants the connection and redirects to the client. Deny before hydration returns the OAuth denial to the client. Neither returns 500.
+- The granted scopes equal the scopes shown on the page.
+- A double submit grants once.
+- The acceptance runner no longer needs a wait for hydration before it clicks.
+- The checks in `AGENTS.md`, "Testing rules", pass, and `npm run test:web-client`.
+
+Out of scope: consent copy (`P-013`, `P-014`), new scopes.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `app/oauth/` (the consent page and its action). |
+| Desktop | Not applicable: consent runs in the browser on the hosted web app. |
+| Marketing | Not applicable: no public text changes. |
+| Future mobile | Not applicable: no mobile client. A phone browser uses the same page and gets the fix. |
+
+Messaging impact: none.
+
+## Ticket 380: MCP Apps listing preparation, nothing published
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package G.
+
+Dependencies: Ticket 378 for screenshots. Drafts can start beside Ticket 378.
+
+Goal: Have every listing and submission input ready, so the owner can submit after the marketing site overhaul without new engineering.
+
+Scope:
+
+- Unpublished drafts in `docs/qa/mcp-directory-submission.md`, following that file's precedent: screenshot prompts, the CSP statement, reviewer test cases, and corrections to stale Ticket 231 text that still says Google-only sign-in.
+- A script that captures listing screenshots from acceptance runs: PNG, 1000 pixels or wider, with the paired prompt.
+- An unpublished update to the `daily-check-in` plugin skill that names `show_day`, with skill-rule tests. The published copies under `integrations/` do not change.
+- A checklist of the deferred owner steps: the Claude directory update and Verified listing, the ChatGPT plugin resubmission, Google's Connected Apps interest form and console, publishing the skill update, `/developers` and marketing copy, and Privacy, Terms and Trust text.
+
+Acceptance criteria:
+
+- Nothing is submitted, listed or published. No provider form is filled in.
+- No credential or reviewer account is in the repository.
+- No Privacy, Terms, Trust or marketing text changes, and no test that asserts that text.
+- The checklist names, for each deferred step, its input file and the messaging entry it waits on.
+
+Out of scope: every submission and listing step. Each waits for the marketing site overhaul (P-048, Ticket 246) and the owner's instruction.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `docs/qa/mcp-directory-submission.md`, a capture script under `scripts/acceptance/`, an unpublished skill draft. No app code. |
+| Desktop | Not applicable: no listing covers Cadence for Mac here. |
+| Marketing | Follow-up Ticket 246: public copy and listings wait for the overhaul (`P-097`, `P-099`, `P-100`, `P-101`). |
+| Future mobile | Not applicable: no mobile listing. |
+
+Messaging impact: `P-097`, `P-099`, `P-100`, `P-101`.
+
+## Ticket 381: Host sign-in compatibility for consumer Gemini and VS Code
+
+Status: not_started
+
+Conditional: it starts only if Ticket 375 shows that a required host cannot complete Cadence's OAuth flow as it is.
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package H and section 8, decision 4.
+
+Dependencies: Ticket 375.
+
+Goal: Let a required host that cannot sign in today connect to Cadence's OAuth server, with the smallest change and a security review.
+
+Scope:
+
+- Consumer Gemini: only if Google omits the RFC 8707 `resource` parameter that Cadence requires on authorization and token requests.
+- VS Code Copilot: only if its redirect URI fails Cadence's redirect rules, which reject custom schemes.
+- One change per host, each in its own pull request with a written security review.
+- The decision record states which D31 and MCP security rules change, and only as far as this ticket needs.
+
+Acceptance criteria:
+
+- The security review is recorded in `docs/qa/` before the change merges.
+- Tokens stay opaque, hashed at rest, bound to the MCP URL and revocable for every client.
+- Existing Claude and ChatGPT connections keep working without re-consent. The protocol suite passes.
+- A client that sends `resource` is still held to it.
+- If Ticket 375 finds no gap, this ticket closes as not needed, with that finding cited.
+
+Out of scope: Gemini Enterprise (a client secret and Cloud Run IAM); any new auth vendor; password sign-in.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `app/oauth/` and the OAuth services and private-schema functions the review names. |
+| Desktop | Not applicable: Cadence for Mac does not use the MCP OAuth server. |
+| Marketing | Follow-up: a Gemini listing waits for the overhaul (`P-101`). |
+| Future mobile | Not applicable: no mobile client. |
+
+Messaging impact: `P-101`.
+
+## Ticket 382: Later MCP Apps views
+
+Status: deferred, November 25, 2026. It holds the views after "Cadence day". Split it into one ticket per view before any work starts.
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package I.
+
+Dependencies: Tickets 376–378 complete, and the first view released.
+
+Goal: Record the later views so they are not built inside the first-view tickets.
+
+Scope, one future ticket each:
+
+- A Needs decision view.
+- A weekly adherence review.
+- A Behavior preview and confirm view.
+- In the day view: day-note editing, opportunity add and remove, move controls and tracked time.
+
+Acceptance criteria:
+
+- Each split ticket states its own scope, acceptance criteria, platform impact and messaging impact.
+- Each new view passes acceptance on every required host before release.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Deferred. Follow-up tickets split from this one. |
+| Desktop | Not applicable: Cadence for Mac renders no MCP view. |
+| Marketing | Deferred: each view logs its own listing entry when ticketed. |
+| Future mobile | Deferred (no mobile track active). Host mobile apps would render each view. |
+
+Messaging impact: none until a view is ticketed.
