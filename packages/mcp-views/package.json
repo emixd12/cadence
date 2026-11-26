@@ -1,0 +1,21 @@
+{
+  "name": "@cadence/mcp-views",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "MCP Apps views that Cadence's MCP server serves and an AI client renders. Each view builds to one HTML file.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/build.mjs --check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.4",
+    "preact": "10.27.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vite": "8.3.6",
+    "vite-plugin-singlefile": "2.3.4"
+  }
+}

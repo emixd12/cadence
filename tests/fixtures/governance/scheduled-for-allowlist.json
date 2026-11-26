@@ -98,7 +98,8 @@
     "packages/core/src/types/day-progress.ts": 1,
     "packages/core/src/types/export.ts": 2,
     "packages/core/src/types/note-shortcut.ts": 2,
-    "packages/core/src/types/timeline.ts": 5
+    "packages/core/src/types/timeline.ts": 5,
+    "packages/mcp-views/src/fixtures.ts": 1
   },
   "reasons": {
     "app/design-system/OpportunityBasketBench.tsx": "Bench fixture rows set TimelineOccurrenceView.scheduledFor, which already holds the effective time.",

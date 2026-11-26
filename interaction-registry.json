@@ -3,7 +3,7 @@
   "schema_version": "1.4.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-25",
+  "updated": "2026-11-26",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -133,6 +133,14 @@
       "kind": "authenticated",
       "routes": [
         "/oauth/consent"
+      ]
+    },
+    {
+      "id": "mcp_day_view",
+      "label": "Cadence day view in an AI client",
+      "kind": "authenticated",
+      "routes": [
+        "ui://cadence/day/v1.html"
       ]
     }
   ],
@@ -1573,6 +1581,24 @@
       "interaction_ids": [
         "INT-TIMELINE-027"
       ]
+    },
+    {
+      "path": "app/design-system/McpDayViewBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 10,
+      "interaction_ids": [],
+      "reason": "Ticket 377 development-only bench for the Cadence day view: the shipped bundle in a sandboxed frame with a mock host and fixture days. Its links and buttons pick a fixture, theme and width. No account or provider access."
+    },
+    {
+      "path": "packages/mcp-views/src/DayView.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 13,
+      "interaction_ids": [
+        "INT-DAYVIEW-001",
+        "INT-DAYVIEW-002",
+        "INT-DAYVIEW-003",
+        "INT-DAYVIEW-004"
+      ]
     }
   ],
   "features": [
@@ -1803,6 +1829,12 @@
       "name": "Mac updates",
       "meaning": "Reviewing, downloading, installing and restarting into a Cadence for Mac update.",
       "spec": "docs/DESKTOP_RELEASE.md"
+    },
+    {
+      "id": "cadence-day-view",
+      "name": "Cadence day view",
+      "meaning": "One day of Occurrences shown inside an AI client that renders MCP Apps views, with Completed, Not Completed and Note on each row.",
+      "spec": "docs/UI_SPEC.md#cadence-day-view-in-an-ai-client-ticket-377"
     }
   ],
   "interactions": [
@@ -23723,6 +23755,358 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-001",
+      "name": "Mark an Occurrence from the Cadence day view",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Mark one of the day's Occurrences Completed or Not Completed, or return it to Unresolved, without leaving the AI client.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Completed"
+        },
+        {
+          "kind": "activate",
+          "control": "Not Completed"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36). The grant includes cadence.occurrences.write.",
+      "success_result": "Calls set_occurrence_status with the displayed status as expected_status and a new idempotency key. Clicking the status a row already has returns it to Unresolved. The view then reads the day again and sends the AI client one line naming the Behavior and the new status.",
+      "failure_result": "A conflict reloads the day and shows \"Not changed. This changed somewhere else. Check it and try again.\"; nothing is sent again without a new click. A rate limit shows the wait and holds the controls until it ends. A rejected call reloads the day and applies its scopes. Other failures show \"Not changed. Cadence could not save that. Try again.\"",
+      "effects": [
+        "occurrence_mutation",
+        "network_request",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-002",
+      "name": "Mark a parent Behavior slot from the Cadence day view",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Mark every step of one routine slot Completed or Not Completed in one change, or open the slot to see its steps.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Completed (slot)"
+        },
+        {
+          "kind": "activate",
+          "control": "Not Completed (slot)"
+        },
+        {
+          "kind": "activate",
+          "control": "Show steps / Hide steps"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36). The grant includes cadence.occurrences.write.",
+      "success_result": "Calls set_parent_occurrence_status with the slot's Occurrence ids and each displayed step's status as expected_statuses. The slot then shows the server's derived progress. Opening the slot shows each step once, with its own controls.",
+      "failure_result": "A conflict reloads the day and shows \"Not changed. This changed somewhere else. Check it and try again.\"; nothing is sent again without a new click. A rate limit shows the wait and holds the controls until it ends. A rejected call reloads the day and applies its scopes. Other failures show \"Not changed. Cadence could not save that. Try again.\"",
+      "effects": [
+        "occurrence_mutation",
+        "network_request",
+        "disclosure",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-003",
+      "name": "Save an Occurrence note from the Cadence day view",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Add, change or clear the note on one of the day's Occurrences.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Note"
+        },
+        {
+          "kind": "input",
+          "control": "Note text"
+        },
+        {
+          "kind": "activate",
+          "control": "Save note"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36). The grant includes cadence.occurrences.write.",
+      "success_result": "Note opens one inline editor; opening another closes the first. Save note calls update_occurrence_note with the displayed revision as expected_revision. The view reads the day again and tells the AI client only that a note was saved, never its text.",
+      "failure_result": "A conflict keeps the draft open and shows the note that is saved now above it, so a second Save note is the person's decision. Other failures match marking an Occurrence.",
+      "effects": [
+        "occurrence_mutation",
+        "network_request",
+        "form_draft",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-004",
+      "name": "See that the AI client must reconnect to change the day",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Understand why the Cadence day view shows no Completed, Not Completed or Note controls.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Reconnect to allow changes (text, no control)"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36).",
+      "success_result": "When the grant lacks cadence.occurrences.write, or a write returns insufficient_scope, the line \"Reconnect to allow changes\" replaces every write control. The day stays readable and routine slots still open.",
+      "failure_result": "The view starts no sign-in itself. The person reconnects Cadence in the AI client, then asks for the day again.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
         }
       }
     }

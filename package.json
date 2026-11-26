@@ -35,6 +35,8 @@
     "marketing:check": "npm run developers:check && npm --workspace apps/marketing run check",
     "developers:check": "node apps/marketing/scripts/developer-reference.mjs",
     "marketing:preview": "npm --workspace apps/marketing run preview",
+    "mcp-views:build": "npm --workspace packages/mcp-views run build",
+    "mcp-views:check": "npm --workspace packages/mcp-views run check",
     "design-system:check": "node scripts/check-design-system.mjs",
     "agents:check": "node scripts/check-agents.mjs && node scripts/check-contract-numbers.mjs",
     "ids:next": "node scripts/next-id.mjs",

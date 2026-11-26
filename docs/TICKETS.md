@@ -20373,7 +20373,7 @@ Messaging impact: `P-094`.
 
 ## Ticket 367: The Daily Brief reads day notes
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: `docs/plans/2026-11-25-periods.md`, section 6.
 
@@ -20407,7 +20407,7 @@ Messaging impact: `P-095`.
 
 ## Ticket 368: Period foundation: table, resolver and services
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: sections 1 to 3.
 
@@ -20438,7 +20438,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 369: Periods on the web Timeline and Behaviors
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 4.
 
@@ -20466,7 +20466,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 370: Periods in the MCP contract and Chat
 
-Status: not_started
+Status: complete
+
+Follow-up open: Chat does not write Periods yet. Draft PR #423 holds the Chat writes and migration `20261126150000_chat_period_actions.sql`, which drops and re-adds `chat_actions_kind_check` and so needs the owner's yes before the hosted push.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 5.
 
@@ -20497,7 +20499,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 371: The Daily Brief and advisor tips read Periods
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 7.
 
@@ -20526,7 +20528,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 372: Period days in coach signals
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 8.
 
@@ -20554,7 +20556,7 @@ Messaging impact: none.
 
 ## Ticket 373: Periods in export, BehaviorLog import and restore
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 9.
 
@@ -20582,7 +20584,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 374: Periods on Cadence for Mac
 
-Status: not_started
+Status: blocked
+
+Blocked November 26, 2026: Ticket 363 (account sync contract 10, SQLite 0029) is in draft PR #407, which conflicts with `main`. This ticket takes the next contract and SQLite numbers after it.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
 
@@ -20690,7 +20694,9 @@ Messaging impact: `P-098`, `P-099`.
 
 ## Ticket 377: MCP Apps view: "Cadence day"
 
-Status: not_started
+Status: complete (November 26, 2026; behind `CADENCE_MCP_APPS`, off in production; real-host acceptance is Ticket 378)
+
+Built: `packages/mcp-views` (Preact 10.27.2, as Ticket 375 recommended, not React), the generated `lib/mcp/apps/day-view-html.ts` (271,236 bytes raw, 72,598 gzip), notices in `packages/core/src/notices/catalog/day-view.json`, the bench `/design-system?preview=mcp-day-view`, and `tests/mcp-day-view.dom.test.ts` and `tests/mcp-day-view-build.test.ts`. Evidence: `docs/qa/2026-11-25-mcp-day-view.md`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.3 and 3.4, package D.
 
@@ -20774,7 +20780,9 @@ Messaging impact: none.
 
 ## Ticket 379: Consent Allow or Deny before hydration returns 500
 
-Status: not_started
+Status: complete (November 26, 2026)
+
+Result: the cause was the consent page's `no-referrer` referrer policy, set as a header in `proxy.ts` and as a meta tag in `app/oauth/consent/page.tsx`. Under it a browser sends `Origin: null` on a plain form post, even to its own site, and the Server Action origin check answered 500. The policy is now `same-origin` (`CONSENT_REFERRER_POLICY` in `lib/types/oauth-ui.ts`): the Origin header stays on the form post and no referrer reaches another origin. The same-origin check, the pending-request cookie and the atomic consume did not change. Reproduced and verified on the local stack in Chrome with JavaScript off: before, Allow and Deny answered 500 with no grant; after, both answer 303 to the client, the grant equals the switches left on, and the same post sent twice grants once (the second answers 200 with "Connection request unavailable"). `scripts/acceptance/consent-page.mjs` no longer waits for hydration. Tests: `tests/oauth-proxy.test.ts`, `tests/oauth-server.test.ts`, `tests/oauth-ui-actions.test.ts`, `tests/oauth-ui.dom.test.tsx`, `tests/acceptance-web-client/consent-scopes.test.mjs`. Known limit: with JavaScript off, a person who presses twice lands on "Connection request unavailable" although the first press granted; the hydrated form disables both buttons after one press. Not verified on production.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package F. Source of the finding: `STATUS.md`, "MCP acceptance tooling, Tickets 247–258" row.
 
