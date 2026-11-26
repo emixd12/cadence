@@ -3402,3 +3402,51 @@ Decided by the agent after an outside plan review, for the owner to change:
 Platform impact: web in Tickets 367–373; desktop in Ticket 374 (it needs Ticket 363 on
 `main` and a Mac release); marketing not applicable; future mobile inherits the
 `@cadence/core` resolvers and the hosted functions. Messaging impact: P-095, P-096.
+
+## 2026-11-25: MCP Apps moves into scope, starting with one "Cadence day" view (D36)
+
+The owner decided on November 25, 2026 to move **MCP Apps** into scope: interactive views
+that Cadence's MCP server serves and an AI client renders inside the conversation. This
+reverses the deferral in `docs/FUTURE_UPDATES.md` ("MCP server follow-ups") and the
+exclusion in `docs/MCP_INTEGRATION.md`, section 1. Plan:
+`docs/plans/2026-11-25-mcp-apps-expansion.md`, reviewed by two outside auditors. Tickets
+375–382. Nothing is implemented yet.
+
+- **One view first.** "Cadence day" shows today only: each Occurrence with Completed, Not
+  Completed and Note. Needs decision is one count line, not a list. Later views are
+  deferred in Ticket 382.
+- **A click is the confirmation.** A click on a status button or a note save in the view
+  is the user's confirmation, as on `/timeline`. The view writes through the existing
+  scoped tools under the user's existing grant. No new scope.
+- **Production flag.** The flag (working name `CADENCE_MCP_APPS`) stays off in production
+  until the marketing site overhaul (P-048, Ticket 246). Build and acceptance run on the
+  local stack and on preview deployments now. Turning the flag on in production also
+  needs the consent fix (Ticket 379) and the contract fold below.
+- **Everything outward waits for that overhaul.** Directory submissions, the Claude
+  Verified listing, the ChatGPT plugin resubmission, Google's Connected Apps interest form
+  and console, and public copy all wait, and each needs the owner's instruction.
+  Preparation that publishes nothing proceeds now (Ticket 380).
+- **Hosts that must pass acceptance before release:** Claude web, ChatGPT web, Claude
+  Desktop, Claude mobile, VS Code Copilot and Gemini Apps Developer Mode (Ticket 378).
+- **Gemini sign-in.** If consumer Gemini cannot connect to Cadence's OAuth server as it
+  is, the server may be adapted for it in its own ticket with a security review
+  (Ticket 381). That ticket states exactly which D31 and MCP security rules change.
+  Gemini Enterprise stays out of scope.
+- **Contract edition: sequential.** During the trial `show_day` lives in the MCP
+  transport layer (`lib/mcp/`), outside the contract registry, so Cadence Chat never sees
+  it. For general release it joins the registry as the next minor version after the
+  alongside edition folds in under Ticket 365. The plan names that edition 1.8.0. D35
+  gives 1.8.0 to Periods and moves the alongside edition to 1.9.0, so `show_day` takes the
+  minor version after whichever number the alongside edition holds when it folds in.
+- **MCP resources.** The server gains MCP resources for view HTML only. MCP prompts and
+  other resources stay deferred.
+- **View rules.** A view makes no network request and loads no external asset. No
+  credential reaches the iframe. User text renders as text, never HTML. A resource read
+  needs a valid grant and counts against the read limit. Calendar events, travel, leave
+  times, Daily Brief text and location stay excluded from MCP, so no view shows them.
+
+Platform impact: web in Tickets 375–381 (the MCP server is hosted); desktop not
+applicable, because Cadence for Mac renders no MCP view and receives view-made changes
+through existing account sync; marketing waits for the overhaul (Ticket 246); future
+mobile has no Cadence code, and host mobile apps render the view. Messaging impact:
+P-097, P-098, P-099, P-100, P-101.
