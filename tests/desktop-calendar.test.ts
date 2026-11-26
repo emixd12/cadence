@@ -139,6 +139,7 @@ describe("desktop Calendar transport", () => {
     await clearDesktopCalendarClientState(async (command, args) => { calls.push([command, args]); });
     expect(calls).toEqual(expect.arrayContaining([
       ["auth_secret_remove", { name: "pending-calendar-state" }],
+      ["auth_secret_remove", { name: "pending-ai-calendar-state" }],
       ["auth_secret_remove", { name: "pending-calendar-agent-state" }],
       ["calendar_cache_clear", undefined],
     ]));
