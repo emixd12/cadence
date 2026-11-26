@@ -91,7 +91,7 @@ Check the cited entry before acting on a row.
 | Account sync timezone rule | PR #159 merged October 28; hosted push authorized | Not verified: a timezone change synced from an installed Mac after the push; authenticated hosted sync against the new rule | STATUS, "Account sync timezone rule for archived Behaviors — October 27, 2026" |
 | Ticket 232: MCP production acceptance | Live acceptance complete October 31 | Trust Preview → Production run: unclear — see source | STATUS, "Ticket 232 live acceptance complete — October 31, 2026" |
 | Trust evidence binding (launch gate) | Marketing-ID refresh paused before public launch; the Trust page reads Stale; the nightly collection still runs | Before launch: automate the refresh after each production deploy, run it once, collect Production evidence and confirm Passed. No agent refreshes or asks before then | DECISIONS, 2026-11-11, "No Trust marketing-ID refresh before launch"; `docs/OPERATIONS.md`, "Public-product operations" |
-| MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | Consent Allow or Deny before hydration returns 500 (product finding, not fixed; Ticket 379) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
+| MCP acceptance tooling, Tickets 247–258 | Complete except conditional Ticket 253 (on hold); TICKETS reconciled November 11, 2026 | None: the consent 500 before hydration is fixed (Ticket 379, November 26) | STATUS, "Automated MCP client acceptance: Tickets 247–258 — October 31, 2026"; TICKETS, Ticket 253 |
 | Connector Tickets 236, 240–242 (Hevy, iCloud, Outlook) | Hevy, Outlook (personal account) and iCloud (owner's Apple Account) passed on production web and installed Mac 0.1.10 (November 11–12); cross-tenant Outlook checks skipped by owner decision | Not verified on production: an iCloud event on Timeline (no events in the selected calendars), the Outlook `cadence://` completion, sign-out and account-switch cache cleanup, Hevy key entry on the Mac. Owner revokes the "Cadence QA" app-specific password when testing ends. 241 step 7 copy is live and awaits the owner's review | TICKETS, Tickets 236, 240, 241, 242; STATUS, "iCloud production acceptance — November 12, 2026" |
 | Tickets 243–244: travel backlog | Filed October 22; backlog | None scheduled | TICKETS, Tickets 243–244 |
 | Daily Brief release acceptance (grouped): Tickets 147, 148, 155, 161, 168, 169, 172, 173, 174, 182, 183, 185 | In progress or implemented in source; reconciled October 27: still open | Ticket 174 carries hosted, deployed-web and installed-desktop gates; 182–183 owner-run live checks; 185 awaits owner product decisions | TICKETS, Ticket 174 and each listed ticket |
@@ -135,6 +135,19 @@ Platform impact: web implemented; desktop follow-up Ticket 374 (a linked Mac sho
 brief words that may name a Period); marketing: the generated developer reference;
 future mobile inherits `@cadence/core` and the hosted functions. Messaging impact: P-095,
 P-096.
+
+## Ticket 379 complete: consent works before hydration — November 26, 2026
+
+- **Cause:** the consent page's `no-referrer` policy made the browser send
+  `Origin: null` on the plain form post, and the Server Action origin check answered 500.
+- **Fix:** the policy is `same-origin` (`proxy.ts`, `app/oauth/consent/page.tsx`). The
+  origin check, cookie secret and atomic consume are unchanged. The runner no longer
+  waits for hydration.
+- **Verification:** local stack, Chrome with JavaScript off: Allow and Deny answer 303;
+  a double post grants once. `dagger check --cadence` and `npm run test:web-client`
+  passed. Not run on production.
+
+Platform impact: web only. Messaging impact: none.
 
 ## Ticket 376: MCP Apps server behind `CADENCE_MCP_APPS` — November 26, 2026
 

@@ -20778,7 +20778,9 @@ Messaging impact: none.
 
 ## Ticket 379: Consent Allow or Deny before hydration returns 500
 
-Status: not_started
+Status: complete (November 26, 2026)
+
+Result: the cause was the consent page's `no-referrer` referrer policy, set as a header in `proxy.ts` and as a meta tag in `app/oauth/consent/page.tsx`. Under it a browser sends `Origin: null` on a plain form post, even to its own site, and the Server Action origin check answered 500. The policy is now `same-origin` (`CONSENT_REFERRER_POLICY` in `lib/types/oauth-ui.ts`): the Origin header stays on the form post and no referrer reaches another origin. The same-origin check, the pending-request cookie and the atomic consume did not change. Reproduced and verified on the local stack in Chrome with JavaScript off: before, Allow and Deny answered 500 with no grant; after, both answer 303 to the client, the grant equals the switches left on, and the same post sent twice grants once (the second answers 200 with "Connection request unavailable"). `scripts/acceptance/consent-page.mjs` no longer waits for hydration. Tests: `tests/oauth-proxy.test.ts`, `tests/oauth-server.test.ts`, `tests/oauth-ui-actions.test.ts`, `tests/oauth-ui.dom.test.tsx`, `tests/acceptance-web-client/consent-scopes.test.mjs`. Known limit: with JavaScript off, a person who presses twice lands on "Connection request unavailable" although the first press granted; the hydrated form disables both buttons after one press. Not verified on production.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package F. Source of the finding: `STATUS.md`, "MCP acceptance tooling, Tickets 247–258" row.
 
