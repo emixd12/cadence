@@ -4,11 +4,10 @@ import type { BehaviorConfigurationEventPlan } from "../types/behavior-configura
 export function toBehaviorConfigurationEventPlanPayload(
   plan: BehaviorConfigurationEventPlan,
 ): Json {
-  // D33 (Ticket 363): both snapshots carry the alongside answer once either side has
-  // one. A plan with no answer on either side leaves the key and the field name out, and
-  // the database reads the stored (unanswered) value in its place, so a plan built before
-  // the hosted migration and one built after compare the same. The stored event still
-  // lists every changed field, because the database computes them.
+  // D33 (Ticket 363): the planner's history rule (withHistoryAlongside). Both snapshots
+  // carry the alongside answer once either side has one; with no answer on either side
+  // neither carries the key and no changed field names it, so the database stores an
+  // unanswered Behavior's history as it did before the setting existed.
   const alongside = typeof plan.previousConfiguration?.alongside === "boolean"
     || typeof plan.nextConfiguration.alongside === "boolean";
   return {
@@ -19,7 +18,6 @@ export function toBehaviorConfigurationEventPlanPayload(
     next_configuration: toBehaviorConfigurationSnapshotPayload(
       plan.nextConfiguration, { alongside },
     ),
-    // Without the key the database expects no answer field (a baseline lists every field).
     changed_fields: alongside ? plan.changedFields : plan.changedFields.filter((field) => field !== "alongside"),
     recorded_at: plan.recordedAt,
     effective_at: plan.effectiveAt,

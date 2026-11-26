@@ -3082,6 +3082,31 @@ fn migration_0028_keeps_every_schema_27_row_standalone() {
     assert!(rows.iter().all(|row| row.parent_behavior_id.is_none() && !row.inherit_parent_schedule));
 }
 
+/// D33 history rule (defect D1): TypeScript leaves the answer out of an unanswered
+/// Behavior's configuration events. The local store accepts such an event for a Behavior
+/// with no answer and stores it as planned, without adding the key.
+#[test]
+fn unanswered_configuration_history_is_stored_without_the_answer() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+    let revision = graph["revision"].clone();
+    graph.as_object_mut().unwrap().remove("revision");
+    graph["behavior"]["reminder_offset_minutes"] = json!(15);
+    graph["behavior"]["current_configuration_event_id"] = json!(id(70));
+    let mut event = create_request(&fixture.profile)["configurationEvent"].clone();
+    event["id"] = json!(id(70));
+    event["event_kind"] = json!("revision");
+    event["previous_configuration"] = configuration();
+    event["next_configuration"]["reminderOffsetMinutes"] = json!(15);
+    event["changed_fields"] = json!(["reminder_offset_minutes"]);
+    event["reason_code"] = json!("behavior_edited");
+    fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":event}), 70).unwrap();
+    assert_eq!(fixture.count("behavior_configuration_events"), 2);
+    let stored: String = fixture.db.query_row("SELECT group_concat(coalesce(previous_configuration,'') || next_configuration || changed_fields, '|') FROM behavior_configuration_events", [], |row| row.get(0)).unwrap();
+    assert!(!stored.contains("alongside"), "{stored}");
+}
+
 #[test]
 fn migration_0029_leaves_every_schema_28_behavior_unanswered() {
     let mut fixture = Fixture::at_schema(28);

@@ -34,11 +34,15 @@ export function preparePrivateFirstLinkImport(local: AccountSyncSnapshot, hosted
     return match && match.id !== entity.id ? [[entity.id, match] as const] : [];
   }));
   const categoryId = (value: Json | undefined) => typeof value === "string" ? aliases.get(value)?.id ?? value : value;
-  const configuration = (value: Json | undefined): Json => {
+  // D33: an event carries the alongside answer in both snapshots once either side has one.
+  const configuration = (value: Json | undefined, other: Json | undefined): Json => {
     if (value == null) return null;
     const source = object(value);
+    const alongside = typeof source.alongside === "boolean"
+      || (other != null && typeof object(other).alongside === "boolean");
     const row = "scheduleGraph" in source
-      ? object(toBehaviorConfigurationSnapshotPayload(normalizeBehaviorConfiguration(source as unknown as BehaviorConfigurationSnapshot))) : source;
+      ? object(toBehaviorConfigurationSnapshotPayload(
+        normalizeBehaviorConfiguration(source as unknown as BehaviorConfigurationSnapshot), { alongside })) : source;
     return { ...row, category_id: categoryId(row.category_id) };
   };
   return {
@@ -49,7 +53,8 @@ export function preparePrivateFirstLinkImport(local: AccountSyncSnapshot, hosted
       if (alias) return { ...entity, id: alias.id, value: { ...row, id: alias.id, created_at: object(alias.value).created_at } };
       if (entity.kind === "behavior") return { ...entity, value: { ...row, category_id: categoryId(row.category_id) } };
       if (entity.kind === "configuration_event") return { ...entity, value: { ...row,
-        previous_configuration: configuration(row.previous_configuration), next_configuration: configuration(row.next_configuration) } };
+        previous_configuration: configuration(row.previous_configuration, row.next_configuration),
+        next_configuration: configuration(row.next_configuration, row.previous_configuration) } };
       return entity;
     }) },
   };
