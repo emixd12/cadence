@@ -92,9 +92,10 @@ capability research is recorded in `docs/qa/google-calendar-capabilities.md`.
 
 ## Day notes in the Daily Brief
 
-The owner wants the Daily Brief to read day notes (Ticket 292) as part of a later
-Daily Brief upgrade. That upgrade must update the brief's model-input disclosure
-before any day note reaches a provider.
+Decided November 25, 2026 (D35): Ticket 367 makes the production Daily Brief read day
+notes. The disclosure text is logged as P-095 and does not block the ticket. Still
+future: day notes and Periods in the layered recipes and the ChatGPT-plan device path,
+which the owner paused.
 
 ## AI-friendly routing provider for prose-level travel reasoning
 

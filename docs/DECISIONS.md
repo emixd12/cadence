@@ -3361,3 +3361,44 @@ and intended time. That is prompt work with its own ticket.
 Platform impact: web and desktop in Ticket 366 (shared resolvers and components; the
 Mac gets it in its next release); marketing not applicable; future mobile inherits the
 `@cadence/core` resolvers. Messaging impact: P-094.
+
+## 2026-11-25: Periods, and day notes and Periods in the Daily Brief (D35)
+
+The owner decided on November 25, 2026 to add **Periods**: the person labels a range of
+local dates for the whole account, for example "Sick" from November 3 to 9, to say that
+something affected those days. Plan: `docs/plans/2026-11-25-periods.md`. Tickets 367–374.
+
+- **Name.** The feature is a Period. "Status" stays the Occurrence word.
+- **Annotation only.** A Period never changes a status, adherence, a reminder or a
+  schedule. Stopping a Behavior's schedule stays with pause. Adherence reads gain counts
+  inside and outside Periods; the adherence definition does not change.
+- **Label.** Free text, with the person's past labels offered as suggestions. No fixed
+  kinds.
+- **Shape.** A label, a first day, an optional last day and an optional note. No last day
+  means ongoing. Periods may overlap and may lie in the future. Dates are local dates.
+- **MCP scope.** Period writes reuse `cadence.occurrences.write`, as day notes do, so
+  existing connections need no new consent.
+- **No removal over MCP.** An agent can create, edit and end a Period. Removing one stays
+  in the app.
+- **The Daily Brief reads Period labels and dates, and day notes.** This reverses the
+  Ticket 292 line "Daily Brief input from day notes is deferred to a later Daily Brief
+  upgrade". The `docs/FUTURE_UPDATES.md` sentence that made a disclosure update a
+  precondition is withdrawn: disclosure text is messaging-track work, logged in
+  `docs/MESSAGING_CHANGES.md`, and never blocks development.
+
+Decided by the agent after an outside plan review, for the owner to change:
+
+- Advisor tips also read Period labels and dates, under the tips' own switch. Tips
+  already read day notes.
+- No coach signal is suppressed because of a Period. `completion_drop` facts gain counts
+  of Period days.
+- MCP search matches a Period's label only, and fetched text never holds its note.
+- BehaviorLog import and restore match a Period by label, first day and last day, not by
+  id.
+- No flag. Nothing that creates a Period merges before export can carry it.
+- The MCP contract with Periods is 1.8.0. The flag-gated alongside edition moves from
+  1.8.0 to 1.9.0.
+
+Platform impact: web in Tickets 367–373; desktop in Ticket 374 (it needs Ticket 363 on
+`main` and a Mac release); marketing not applicable; future mobile inherits the
+`@cadence/core` resolvers and the hosted functions. Messaging impact: P-095, P-096.
