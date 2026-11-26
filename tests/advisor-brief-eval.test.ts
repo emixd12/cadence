@@ -86,7 +86,7 @@ describe("Phase 3 brief eval (no model)", () => {
       const lines = [...moves, ...planBriefPairingLines({ ...fixture.plan, evidence: fixture.pairing }, moves)];
       expect({ fixture: fixture.id, violations: checkBriefLayerOne(fixture.plan, lines) }).toEqual({ fixture: fixture.id, violations: [] });
       const pairings = lines.filter((line) => line.reasonCode === "alongside_pairing");
-      if (fixture.id !== "alongside_pairing") expect({ fixture: fixture.id, pairings }).toEqual({ fixture: fixture.id, pairings: [] });
+      if (fixture.id !== "alongside_pairing" && fixture.id !== "alongside_event_place") expect({ fixture: fixture.id, pairings }).toEqual({ fixture: fixture.id, pairings: [] });
     }
     const fixture = briefEvalFixture("alongside_pairing");
     const moves = planBriefMoveLinesFromInputs(fixture.plan).candidates;
@@ -104,6 +104,23 @@ describe("Phase 3 brief eval (no model)", () => {
     expect(checkBriefLayerOne(fixture.plan, [off]).map((item) => item.rule)).toEqual(["pairing_off_host"]);
     // The same line as an ordinary move line is an alongside item offered against the rules.
     expect(checkBriefLayerOne(fixture.plan, [{ ...line!, reasonCode: "item_overlap", pairing: undefined }]).map((item) => item.rule)).toEqual(["alongside_offered"]);
+  });
+
+  it("Ticket 384: pairs Vitamins away from a Team sync at the office, and leaves it when the event's place is unknown", () => {
+    const fixture = briefEvalFixture("alongside_event_place");
+    const moves = planBriefMoveLinesFromInputs(fixture.plan).candidates;
+    expect(moves.some((line) => line.occurrenceId === "occurrence_fixture_1")).toBe(false);
+    const [line, ...rest] = planBriefPairingLines({ ...fixture.plan, evidence: fixture.pairing! }, moves);
+    expect(rest).toEqual([]);
+    expect(line).toMatchObject({ occurrenceId: "occurrence_fixture_1", reasonCode: "alongside_pairing",
+      pairing: { hostOccurrenceId: "occurrence_fixture_10", needs: ["conflict"] } });
+    expect(checkBriefLayerOne(fixture.plan, [...moves, line!])).toEqual([]);
+    // The same day with Team sync's place unknown: the overlap is allowed and nothing needs pairing.
+    const unknown = { ...fixture.plan, calendarBusy: fixture.plan.calendarBusy.map((event) => ({ ...event, eventPlace: undefined })) };
+    expect(planBriefPairingLines({ ...unknown, evidence: fixture.pairing! }, planBriefMoveLinesFromInputs(unknown).candidates)).toEqual([]);
+    // Team sync at Home: same place, also allowed.
+    const home = { ...fixture.plan, calendarBusy: fixture.plan.calendarBusy.map((event) => event.eventPlace ? { ...event, eventPlace: { kind: "home" as const } } : event) };
+    expect(planBriefPairingLines({ ...home, evidence: fixture.pairing! }, planBriefMoveLinesFromInputs(home).candidates)).toEqual([]);
   });
 
   it("Ticket 367: sends the day notes and marks a brief that repeats one", async () => {

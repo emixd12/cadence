@@ -103,6 +103,12 @@ export type ChatWorld = {
   alongside?: true;
   /** Ticket 361: the coach's stored evidence the pairing tool reads (ids are Behavior ids). */
   pairingEvidence?: AlongsidePairingEvidence;
+  /**
+   * Ticket 384: Home's text and each place-Where Behavior's text (by Behavior id), from
+   * which the move check gives each event a coarse place, as the live executor does. Unset:
+   * every event's place is unknown. Never part of a tool result.
+   */
+  placeTexts?: Readonly<{ home: string | null; behaviors: Readonly<Record<string, string>> }>;
 };
 
 let counter = 0;
