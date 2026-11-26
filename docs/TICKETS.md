@@ -15315,8 +15315,15 @@ Submit Google's sensitive-scope verification for `cadence-calendar-agent-prod`.
   in the Verification Center. Owner steps: `docs/qa/2026-10-12-agentic-calendar.md`.
 - Record the video link, submission time and Verification Center state in that QA
   file and `STATUS.md`. Then follow Google's review to a decision.
+- **Hold & return trigger (November 25, 2026):** `P-090` Privacy copy, `calendarmcp.googleapis.com`
+  production transport, Model Armor screening, and the Phase 0 live wire check passed on
+  November 25, 2026 (`docs/qa/2026-11-25-google-calendar-mcp-spike.md`), along with a full
+  8-shot dry-run video. Per owner instruction, hold uploading the final demo video and
+  submitting in Google Verification Center until the pre-beta marketing site overhaul
+  (`P-048` / Ticket 246) ships to `https://cadence-me.com`, then re-record against the
+  updated homepage and submit before February 1, 2027.
 
-Messaging impact: resolves P-010 and P-012. Platform impact: web Privacy and Settings
+Messaging impact: resolves P-010, P-012, and P-090 verification submission. Platform impact: web Privacy and Settings
 text only if the owner chooses text changes; desktop shares the hosted pages;
 marketing and future mobile not applicable.
 
@@ -15330,6 +15337,13 @@ Trust, in-app copy, the user guide, marketing and the README in one review. Upda
 tests that assert changed text. Include the README and marketing wording left by the
 2026-10-23 removal of "not a medical dosing app" from `AGENTS.md`. Mark each entry
 resolved with file, deployment and date.
+
+- **Required return-to-Ticket-245 reminder (logged November 25, 2026):** as soon as the
+  pre-beta marketing site overhaul (`P-048`, `apps/marketing`) deploys to
+  `https://cadence-me.com`, immediately return to **Ticket 245** to re-record the
+  single-take verification demo video (`docs/qa/2026-10-12-agentic-calendar.md`, shot list
+  1–8) against the updated homepage and submit `cadence-calendar-agent-prod` in Google Auth
+  Platform Verification Center (deadline: February 1, 2027).
 
 Messaging impact: resolves all open entries. Platform impact: web legal and copy,
 desktop in-app copy, marketing site; future mobile not applicable.
