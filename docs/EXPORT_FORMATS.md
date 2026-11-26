@@ -118,6 +118,67 @@ the bundle covers. Neither clears notes on dates the bundle does not cover, beca
 export can cover a date range or leave notes out. A save that fails is reported by date
 and does not undo the committed import. Applying the same bundle again changes nothing.
 
+Periods (Ticket 373, D35) are exported for every Period with at least one day inside the
+export range. An all-time export keeps every Period, including one that starts in the
+future. The label is always exported. The note follows the notes option.
+
+- **Full JSON** adds a top-level `periods` array (`id`, `label`, `start_on`, `end_on`,
+  `note`, `created_at`, `updated_at`) in display order: first day, then last day with
+  ongoing last. `end_on` is null for an ongoing Period. `note` is present only with notes
+  included, and is null when the Period has no note. The `periods` key is written only
+  when at least one Period is exported, so an account without Periods exports the same
+  bytes as before.
+- **BehaviorLog** writes each Period to `data/reviews.jsonl` as a `review` record:
+  `review_id` is the Period's id, `period_start_local_date` its first day,
+  `review_role: "user"`, `summary_markdown` its label, and the `app.cadence` extension
+  `{ "period": true, "label": …, "ongoing": …, "note": …, "updated_at_utc": … }`. The
+  extension's `note` key is written only with notes included. The BehaviorLog schema is
+  unchanged.
+- **Ongoing end date.** BehaviorLog requires an end date. For an ongoing Period,
+  `period_end_local_date` is the later of the export's last date and the Period's first
+  day, and the extension says `ongoing: true`. The end date is therefore never before the
+  start, also for a Period that starts in the future. A reader that sees `ongoing: true`
+  restores no last day and ignores `period_end_local_date`.
+- **Order.** Day-note reviews and Period reviews share the file in one order: by first
+  day; on the same day, day notes before Periods; Periods in display order.
+- JSONL, CSV and Markdown carry no Periods.
+
+Import and restore read these records back through
+`packages/core/src/resolvers/behaviorlog-period.resolver.ts` and
+`packages/core/src/services/behaviorlog-period.service.ts`. The Mac's local export, import
+and restore follow in Ticket 374.
+
+- Only a review with the `app.cadence` extension `period: true` and `review_role: "user"`
+  is a Period. Day-note reviews and reviews from other tools keep their own handling.
+- **Natural key.** A Period in a file is matched by label, first day and last day, where
+  ongoing matches only ongoing. The label is compared exactly. The file's `review_id` is
+  never used and never stored. A file from another account, a repeated import and a retry
+  after a partial failure therefore behave the same: applying a bundle twice adds nothing
+  the second time.
+- **Import** adds a Period when no stored Period has the same key. It never changes a
+  stored Period, including its note.
+- **Restore** does the same. It also sets the note of a matching Period when the file's
+  extension carries a `note` key: an absent key keeps the stored note, an explicit null
+  clears it. A retried restore that was already applied only adds missing Periods and
+  keeps every stored note, so a note edited after the first run stays. When two stored
+  Periods share a key, the oldest is the match.
+- Neither removes a Period the file does not name, because an export can cover a date
+  range. Neither changes a stored Period's label or dates.
+- **Limitation.** After the person edits a stored Period's label or dates, the file's
+  Period no longer matches, and import or restore adds it as a new Period beside the
+  edited one.
+- **Cap.** Neither passes the limit of 500 Periods per account. New Periods are added in
+  display order while room remains. The preview reports how many will be added, how many
+  already exist and how many do not fit. Apply adds only those that fit.
+- An invalid record (no valid label, no valid first or last day, an end before the start,
+  an invalid note) is skipped and counted in the preview. It does not fail the import.
+  The same Period twice in one file is one Period; when the copies carry different notes,
+  no copy's note is used.
+- Periods are saved after the main import or restore commits, like day notes, so they
+  are not part of its database transaction. A failed save or a refusal at the cap is
+  counted in the result and never undoes or fails the committed import. Result messages
+  give counts only and never a label or a note.
+
 Behavior definition and configuration history has a separate privacy posture
 from occurrence notes. Full JSON and BehaviorLog exports include full prior and
 next title, description, schedule, reminder, category, timezone, and active
