@@ -73,6 +73,7 @@ import { listBehaviorOccurrenceTimesOnLocalDate } from "@/lib/db/occurrences.rep
 import { readAcceptedBriefPairings, readNeverMoveBehaviorIds } from "@/lib/db/alongside-schedule-pairing.repo";
 import { readStoredSignals } from "@/lib/db/advisor-tips.repo";
 import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
+import { alongsidePairingGuesses } from "@cadence/core/resolvers/alongside.resolver";
 import { updateBehaviorForUser } from "@/lib/services/behavior.service";
 import { integrationBehaviorInput } from "@/lib/services/integration-behavior-input";
 import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
@@ -574,6 +575,8 @@ async function settleAndView(caller: ScheduleProposalCaller, row: BehaviorChange
     }
     const change = changeOf(row);
     const first = firstAffectedDate(today, row.weekdays);
+    // Audit fix 11: label a pairing that rests on Cadence's guesses.
+    const guesses = pairing ? await pairingGuesses(caller, row.behaviorId, pairing.hostBehaviorId, today) : null;
     return {
       kind: "proposal",
       proposalId: row.id,
@@ -586,7 +589,7 @@ async function settleAndView(caller: ScheduleProposalCaller, row: BehaviorChange
       firstAffectedDate: first,
       answers: ["try", "for_good", "no"],
       tip,
-      ...(pairing ? { pairing } : {}),
+      ...(pairing ? { pairing: guesses ? { ...pairing, guesses } : pairing } : {}),
     };
   }
 
@@ -637,6 +640,20 @@ async function pairingView(caller: ScheduleProposalCaller, row: Extract<Behavior
   const host = await getBehaviorById(caller.supabase, caller.userId, row.pairing.hostBehaviorId);
   if (!host || !schedulePairingHostHolds({ active: host.active, schedules: proposalSchedules(host) }, changeOf(row))) return null;
   return { hostBehaviorId: host.id, hostTitle: host.title };
+}
+
+/**
+ * Audit fix 11 (D33): which of the pairing's inputs are model guesses today, by the same
+ * planning facts the proposal was built from. A failed read shows no note.
+ */
+async function pairingGuesses(caller: ScheduleProposalCaller, guestId: string, hostId: string, today: string) {
+  try {
+    const facts = await readBehaviorPlanningFacts(caller.supabase, caller.userId, [guestId, hostId], today);
+    const guest = facts.get(guestId), host = facts.get(hostId);
+    return guest && host ? alongsidePairingGuesses({ alongsideSource: guest.alongside.source, where: guest.where }, { where: host.where }) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function pairingHostHolds(caller: ScheduleProposalCaller, row: Extract<BehaviorChangeProposalRow, { changeKind: "time" }>): Promise<boolean> {

@@ -127,7 +127,11 @@ export function briefMoveRoutineMembers(items: readonly BriefMoveDayItem[], occu
 
 /**
  * Each routine slot as one item: the lead's id, the routine's title, and the summed
- * length of its steps (alongside steps add nothing). Other items pass through.
+ * length of its steps, done one after another from the lead's start. Alongside steps
+ * run during the other steps and add nothing. When every step is alongside, no step
+ * carries the time, so the block lasts the sum of all its steps (audit fix 3): the
+ * routine is still running for that long, and travel or an item elsewhere is refused
+ * across it. Other items pass through.
  */
 export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): BriefMoveDayItem[] {
   const blocks = briefMoveRoutineBlocks(items);
@@ -136,7 +140,8 @@ export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): B
     const block = blocks.get(item.occurrenceId);
     if (!block) { out.push(item); continue; }
     if (block.members[0]!.occurrenceId !== item.occurrenceId) continue;
-    const timed = block.members.filter((member) => !member.alongside);
+    const notAlongside = block.members.filter((member) => !member.alongside);
+    const timed = notAlongside.length > 0 ? notAlongside : block.members;
     const alongside = resolveRoutineBlockAlongside(block.members);
     const minutes = Math.min(1440, Math.max(1, timed.reduce((sum, member) => sum + member.length.minutes, 0)));
     const end = item.start.add({ minutes });
@@ -202,11 +207,19 @@ export function resolveBriefMoveLength(input: Readonly<{
   return made(BRIEF_MOVE_FALLBACK_MINUTES, "fallback");
 }
 
-/** A routine block's place: its steps' shared Where, otherwise unknown. */
+/**
+ * A routine block's place: the one place its steps share. Anywhere steps defer to the
+ * place the other steps share (audit fix 10), so Home + Anywhere is Home and all
+ * Anywhere stays Anywhere. Two different places, or a step without a known place, make
+ * it unknown.
+ */
 function routineBlockWhere(members: readonly BriefMoveDayItem[]): EffectiveWhere {
-  const first = members[0]?.where;
-  const same = first && members.every((member) => member.where?.kind === first.kind && member.where?.placeKey === first.placeKey);
-  return same ? first : { kind: "unknown", source: "none" };
+  const unknown: EffectiveWhere = { kind: "unknown", source: "none" };
+  if (members.length === 0 || members.some((member) => !member.where)) return unknown;
+  const placed = members.filter((member) => member.where!.kind !== "anywhere");
+  const first = (placed[0] ?? members[0])!.where!;
+  const same = placed.every((member) => member.where!.kind === first.kind && member.where!.placeKey === first.placeKey);
+  return same && first.kind !== "unknown" ? first : unknown;
 }
 
 /** The moving item's side of an overlap: whether it is alongside, and its Where under the same-place rule. */
@@ -274,6 +287,30 @@ export function briefMoveItemBlocks(
     placed.push({ kind: "item", ref: item.occurrenceId, title: item.title, start, end: start.add({ seconds }) });
   }
   return placed;
+}
+
+/**
+ * Audit fix 4: schedule-edit conflicts (Phase 2 `move_conflicts`) under the same-place
+ * rule, for a day whose items carry their effective Where (`CADENCE_ALONGSIDE` on). Each
+ * moved, Unresolved, exact-time item (a routine slot as one item) is checked against the
+ * other items as it sees them (`briefMoveItemBlocks` with itself as subject): an overlap
+ * `alongsideMayOverlap` allows (a guest paired onto its host) opens nothing; an alongside
+ * item at another place collides like any other item. The first colliding item by start,
+ * then id, is named, as `findMoveConflicts` does. Without a Where on the items, callers
+ * keep `findMoveConflicts`, where an alongside item never collides.
+ */
+export function briefMoveConflicts(items: readonly BriefMoveDayItem[], movedIds: ReadonlySet<string>)
+  : Readonly<{ occurrence_id: string; conflicting_occurrence_id: string }>[] {
+  return collapseBriefMoveRoutines(items)
+    .filter((item) => item.status === "unresolved" && item.scheduleKind === "exact" && movedIds.has(item.occurrenceId))
+    .flatMap((moved) => {
+      const own = { start: moved.start, end: later(moved.end, moved.start) };
+      const collision = briefMoveItemBlocks(items, moved.occurrenceId)
+        .filter((block) => overlaps(own, block))
+        .sort((left, right) => Temporal.Instant.compare(left.start, right.start) || left.ref.localeCompare(right.ref))[0];
+      return collision ? [{ occurrence_id: moved.occurrenceId, conflicting_occurrence_id: collision.ref }] : [];
+    })
+    .sort((left, right) => left.occurrence_id.localeCompare(right.occurrence_id));
 }
 
 /** Is `interval` (padded by the item's own travel) free of every block, with the gap? */

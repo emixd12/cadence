@@ -20062,7 +20062,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 357: Effective Where and the same-place overlap rule
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare).
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare). Audit fix (November 26, 2026): schedule-edit conflict notices now follow the same-place rule from the moved item's side, flag on only.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20249,7 +20249,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 363: Alongside on Cadence for Mac
 
-Status: complete November 26, 2026, off behind `VITE_CADENCE_ALONGSIDE` on the Mac and `CADENCE_ALONGSIDE` on the hosted server; hosted migration `20261126120000` pending (it replaces the `changed_fields` check constraint and inserts one contract-registry row, as `20261122010000` did, so it needs the owner's yes before a hosted push). SQLite schema 29, account sync contract 10, minimum writer contract 8. Flag mechanism: a build switch that release and preview builds force off, plus, on a linked Mac, the server's answer from the new `GET /api/behaviors/alongside`, which also carries the account's current guesses (memory only). The installed check on a dev-signed build moves to Ticket 365. Scope note: configuration history records an answer change with reason code `alongside_answered` from the Mac's row question; the hosted surfaces keep `behavior_edited`.
+Status: complete November 26, 2026, off behind `VITE_CADENCE_ALONGSIDE` on the Mac and `CADENCE_ALONGSIDE` on the hosted server; hosted migration `20261126120000` pending (it replaces the `changed_fields` check constraint and inserts one contract-registry row, as `20261122010000` did, so it needs the owner's yes before a hosted push). SQLite schema 29, account sync contract 10, minimum writer contract 8. Flag mechanism: a build switch that release and preview builds force off, plus, on a linked Mac, the server's answer from the new `GET /api/behaviors/alongside`, which also carries the account's current guesses (memory only). The installed check on a dev-signed build moves to Ticket 365. Scope note: configuration history records an answer change with reason code `alongside_answered` from the Mac's row question; the hosted surfaces keep `behavior_edited`. Audit fix (November 26, 2026): the web Timeline row and Daily Brief question now record `alongside_answered` too, through the same core writer; the hosted function accepts any non-empty reason code, so no migration.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 

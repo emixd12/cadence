@@ -25,7 +25,8 @@ import {
   listResolvedOccurrencesBeforeLocalDateMarkedBetween,
   listUnresolvedOccurrencesBeforeLocalDate,
 } from "@/lib/db/occurrences.repo";
-import { behaviorEstimateInputHash } from "@/lib/services/brief-move-day.service";
+import { currentEstimateMinutes } from "@/lib/services/brief-move-day.service";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import {
   listTimeSessionsByOccurrenceIds,
   listTimeSessionHistory,
@@ -294,7 +295,9 @@ async function readTimelineAlongside(
 
 /**
  * Reads cached AI duration estimates (`behavior_advisor_estimates`) for Behaviors
- * whose title, description, and place still match the cached `input_hash`.
+ * whose title, description, and place still match the cached `input_hash`. The
+ * validity rule is `currentEstimateMinutes`, shared with the Daily Brief, so the recipe
+ * `CADENCE_ALONGSIDE` selects is the recipe this reader accepts (audit fix 1).
  */
 export async function readValidBehaviorAdvisorEstimates(
   supabase: AppSupabaseClient,
@@ -304,8 +307,10 @@ export async function readValidBehaviorAdvisorEstimates(
     title: string;
     description?: string | null;
     where_kind?: string | null;
+    alongside?: boolean | null;
     active?: boolean;
   }>[],
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<Record<string, number>> {
   const eligible = behaviors.filter((behavior) => behavior.active !== false);
   if (eligible.length === 0) return {};
@@ -315,24 +320,19 @@ export async function readValidBehaviorAdvisorEstimates(
     eligible.map((behavior) => behavior.id),
   );
   if (rows.length === 0) return {};
-  const hashByBehavior = new Map(
-    eligible.map((behavior) => [
-      behavior.id,
-      behaviorEstimateInputHash({
-        title: behavior.title,
-        description: behavior.description ?? null,
-        whereKind: behavior.where_kind ?? null,
-      }),
-    ]),
-  );
+  const personSetting = alongsideEnabled(env);
+  const byId = new Map(eligible.map((behavior) => [behavior.id, behavior]));
   const estimates: Record<string, number> = {};
   for (const row of rows) {
-    if (
-      row.duration_minutes != null &&
-      row.input_hash === hashByBehavior.get(row.behavior_id)
-    ) {
-      estimates[row.behavior_id] = row.duration_minutes;
-    }
+    const behavior = byId.get(row.behavior_id);
+    if (!behavior) continue;
+    const minutes = currentEstimateMinutes(row, {
+      title: behavior.title,
+      description: behavior.description ?? null,
+      whereKind: behavior.where_kind ?? null,
+      alongside: personSetting ? behavior.alongside ?? null : undefined,
+    }, personSetting);
+    if (minutes !== undefined) estimates[row.behavior_id] = minutes;
   }
   return estimates;
 }

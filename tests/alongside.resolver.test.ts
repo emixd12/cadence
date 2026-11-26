@@ -183,3 +183,17 @@ describe("pickBriefAlongsideQuestion", () => {
     expect(pickBriefAlongsideQuestion({ items: [item("b", at, true, "Pill"), item("a", at, true, "Pill")] })?.behaviorId).toBe("a");
   });
 });
+
+// Audit fix 11 (D33): a pairing that rests on a guess is labelled as one.
+describe("alongside pairing guesses", () => {
+  it("names the guessed inputs and nothing when none is a guess", async () => {
+    const { alongsidePairingGuesses, alongsidePairingGuessNote } = await import("@cadence/core/resolvers/alongside.resolver");
+    expect(alongsidePairingGuesses({ alongsideSource: "person", where: { source: "person" } }, { where: { source: "evidence" } })).toBeNull();
+    expect(alongsidePairingGuesses({ alongsideSource: "guess", where: { source: "person" } }, { where: { source: "guess" } }))
+      .toEqual({ alongside: true, guestWhere: false, hostWhere: true });
+    expect(alongsidePairingGuessNote(null)).toBeNull();
+    expect(alongsidePairingGuessNote({ alongside: true, guestWhere: false, hostWhere: false })).toBe("alongside");
+    expect(alongsidePairingGuessNote({ alongside: false, guestWhere: false, hostWhere: true })).toBe("where");
+    expect(alongsidePairingGuessNote({ alongside: true, guestWhere: true, hostWhere: false })).toBe("both");
+  });
+});

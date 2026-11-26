@@ -257,6 +257,16 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   findings with places from the day context's `planning` field, where the person's
   alongside answer outranks the run's own estimate, and an exact-time opportunity add
   (Chat and MCP), which checks the added Behavior's own side. Chat's moves already used it.
+- **Schedule-edit conflicts.** With `CADENCE_ALONGSIDE` on, `move_conflicts` follow the
+  same rule from the moved item's side (`briefMoveConflicts`): a guest paired onto its
+  host opens nothing, and an alongside item at another place collides. With the flag
+  off, an alongside item never collides, as before.
+- **Routine blocks.** A routine slot of two or more steps is one item from the lead's
+  start, lasting the sum of its steps' lengths, done one after another. Alongside steps
+  run during the other steps and add nothing. When every step is alongside, the block
+  lasts the sum of all its steps, so travel or an item elsewhere is refused while the
+  routine runs. The block's place is the one concrete place its steps share; Anywhere
+  steps defer to it, and steps at two different places leave it unknown.
 - **Calendar and travel on each request.** The device sends today's busy calendar
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it
@@ -306,7 +316,8 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
     `crowded_hour` threshold, alongside items not counted) or the coach's stored
     `crowded_hour` signal names that hour; the guest runs into travel or an item somewhere
     else; or the coach's `done_together` signal names the guest with one of today's hosts.
-    A guest already inside a compatible host's time is left alone.
+    A guest already inside a compatible host's time is left alone, including a host already
+    in progress.
   - The host the `done_together` signal names comes first, then the nearest host. At most
     one pairing per guest and per host. The new time is the host's start for the guest's
     length, and it passes the same slot check Yes runs on the guest's side of the

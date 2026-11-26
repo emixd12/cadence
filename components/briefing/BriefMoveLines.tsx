@@ -14,6 +14,7 @@ import type {
   BriefPlanningContext,
 } from "@cadence/core/types/brief-moves";
 import { noticeText } from "@cadence/core/notices";
+import { alongsidePairingGuessNote } from "@cadence/core/resolvers/alongside.resolver";
 import { AlertNotice } from "@/components/feedback/AlertNotice";
 import { Notice } from "@/components/feedback/Notice";
 import { moveTimeLabel, useOccurrenceMoves, wallTime } from "@/components/timeline/OccurrenceMoves";
@@ -342,6 +343,7 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
   const closed = line.status === "declined" || line.status === "undone" || line.status === "already_done";
   const moved = (line.status === "accepted" || line.status === "other_time") && !!line.moveId;
   const pending = !!ui.pending;
+  const pairingGuess = alongsidePairingGuessNote(line.pairing?.guesses);
   return (
     <li className="break-words text-sm leading-6 [overflow-wrap:anywhere]"
       data-brief-move-line={line.proposalId} data-brief-move-status={line.status}>
@@ -356,6 +358,10 @@ function MoveLine({ line, ui, onYes, onNo, onAlreadyDone, onNeverMove, onUndo, o
       {!closed && !moved && line.length.assumed && !line.routine ? <p className="text-xs leading-5 text-muted-readable">
         {noticeText("brief-moves.length-guess", { minutes: line.length.minutes })} ·{" "}
         <button type="button" className={LINK} disabled={pending} onClick={() => onPanel(ui.panel === "length" ? null : "length")} aria-expanded={ui.panel === "length"}>set length</button>
+      </p> : null}
+      {/* Audit fix 11 (D33): a pairing that rests on Cadence's guesses says so, quietly. */}
+      {!closed && !moved && pairingGuess ? <p className="text-xs leading-5 text-muted-readable" data-brief-pairing-guess>
+        {noticeText("alongside.pairing-guess", { kind: pairingGuess })}
       </p> : null}
       {line.status === "proposed" ? <p data-brief-move-actions>
         <ActionLink label="Yes" strong disabled={pending} onClick={onYes} />

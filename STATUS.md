@@ -102,6 +102,30 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Alongside audit fixes (Tickets 356–363) — November 26, 2026
+
+Branch `feat/alongside-audit-fixes`, stacked on `feat/alongside-wave5`. No migration. All behind
+`CADENCE_ALONGSIDE` / the Mac switch; flag-off behavior unchanged.
+
+- **Estimates:** the Timeline and travel refresh read cached lengths through
+  `currentEstimateMinutes`, the brief's own validity rule (recipe-1.3 rows were read as stale).
+- **Pairing:** Yes and Accept all refuse a pairing whose host moved, was marked or left
+  (`pairing_host_changed`, not counted for Ticket 362); a guest inside an in-progress host
+  counts as paired; Re-check and Re-plan keep the coach's evidence; pairing lines and coach
+  pairing proposals label guessed inputs (`alongside.pairing-guess`).
+- **Free-slot rule:** an all-alongside routine block lasts the sum of its steps; Anywhere
+  steps defer to the steps' shared place; schedule-edit conflicts follow the same-place rule
+  (`briefMoveConflicts`).
+- **Answers:** a question prompt answers only an unanswered Behavior
+  (`alongside.answer-already`); web question answers record `alongside_answered`.
+- **Mac:** the guesses read runs after each completed sync; export, import and restore follow
+  the server's answer like the screens.
+- **Docs:** the flag comment, `docs/OPERATIONS.md` and `.env.example` name all seven migrations.
+- **Open risk (not fixed):** a released contract-9 Mac that pulls a configuration event naming
+  `alongside` fails its export (`normalizeBehaviorConfigurationChangedFields`); the hosted
+  projection hides only the Behavior column. Needs an owner decision before
+  `20261126120000` is pushed.
+
 ## Ticket 363 complete: alongside on Cadence for Mac — November 26, 2026
 
 - **Data:** SQLite schema 29 (`0029_behavior_alongside.sql`), account sync contract 10, writer

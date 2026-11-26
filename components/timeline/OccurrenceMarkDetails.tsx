@@ -26,7 +26,8 @@ import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
  */
 
 export type MarkDetailState =
-  | Readonly<{ status: "saved" }>
+  /** `outcome` replaces the line's own outcome words (an alongside question answered elsewhere). */
+  | Readonly<{ status: "saved"; outcome?: string }>
   | Readonly<{ status: "refused" | "error"; message: string }>;
 
 export type OccurrenceMarkDetailActions = Readonly<{
@@ -134,7 +135,7 @@ export function useOccurrenceMarkDetailParts({ occurrence, justMarked, toneClass
   const run = async (save: () => Promise<MarkDetailState>, outcome: string) => {
     setPhase({ key, state: "pending" });
     const result = await save();
-    setPhase(result.status === "saved" ? { key, state: "saved", outcome } : { key, state: "refused", message: result.message });
+    setPhase(result.status === "saved" ? { key, state: "saved", outcome: result.outcome ?? outcome } : { key, state: "refused", message: result.message });
   };
   const timeLabel = (instant: string) => Temporal.Instant.from(instant).toZonedDateTimeISO(context.timezone)
     .toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });

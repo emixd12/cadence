@@ -12,6 +12,7 @@ import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import {
   ADVISOR_FIXTURE_CHECK_IN,
   ADVISOR_FIXTURE_LINK_TIP,
+  ADVISOR_FIXTURE_PAIRING_PROPOSAL,
   ADVISOR_FIXTURE_PROPOSAL,
   ADVISOR_FIXTURE_QUESTION_TIP,
   ADVISOR_FIXTURE_TIP_QUESTION,
@@ -212,6 +213,17 @@ describe("advisor speech pill and panel", () => {
     await click("Go back", panel()!);
     expect(panel()?.querySelector("p.italic")?.textContent).toBe("Gym is back at 7:00 AM every Tuesday.");
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels a schedule pairing that rests on a guess, and only that one (audit fix 11)", async () => {
+    await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_PAIRING_PROPOSAL }));
+    await openAdvisor();
+    expect(panel()!.querySelector("[data-advisor-pairing-guess]")?.textContent).toBe("Alongside is a guess");
+    await act(() => root.unmount());
+    root = createRoot(container);
+    await render(fixtureAdvisorClient({ proposal: ADVISOR_FIXTURE_PROPOSAL }));
+    await openAdvisor();
+    expect(panel()!.querySelector("[data-advisor-pairing-guess]")).toBeNull();
   });
 
   it("shows a refused answer as one red Not changed line", async () => {

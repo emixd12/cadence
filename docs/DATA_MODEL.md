@@ -1020,6 +1020,10 @@ both `reason` columns accept any lowercase code.
 **`move_conflicts`**: a notice that a later base-schedule change put another
 Occurrence of the same Behavior next to a moved one on the same day. `status`
 `open` until the person keeps, reverts or moves it, or it clears on its own.
+With `CADENCE_ALONGSIDE` on, an overlap the same-place rule allows (an alongside item
+with an item at the same place, or where a place is unknown or Anywhere) opens no
+conflict, and an alongside item at another place collides like any other item
+(`briefMoveConflicts`). With the flag off, an alongside item never collides, as before.
 
 **Account sync.** Contract 6 adds `occurrence_move` rows, read-only, without
 `user_id`, `client_ref`, `idempotency_key`, `request_hash` or `proposal_id`.
@@ -2561,7 +2565,9 @@ be done alongside other things?". Null means unanswered. Migration:
   without `is_opportunity` does; the TypeScript payload leaves the key out only when
   neither side has an answer. Existing history is not rewritten: a snapshot without the
   key was unanswered. Core writes the reason code `alongside_answered` for a single
-  answer (`setBehaviorAlongside`); form, MCP and Chat edits keep `behavior_edited`.
+  answer to the question (`setBehaviorAlongside`): the Mac's Timeline row and, since the
+  audit fixes, the web Timeline row and the Daily Brief line. A question answers only an
+  unanswered Behavior. Form, MCP and Chat edits keep `behavior_edited`.
   Account sync contract 10 carries `behavior.alongside`: the snapshot, the expected-row
   comparison and the synced insert and update lists include it, and a contract-10
   Behavior write must carry it. Contract-8 and contract-9 writers keep syncing: the

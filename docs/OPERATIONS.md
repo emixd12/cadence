@@ -2088,8 +2088,18 @@ before Ticket 356: planners read the cached model guess, then false, the estimat
 asks the model about alongside for every Behavior, and no web code reads
 `behaviors.alongside`. Default: off. Server-only.
 
-Turn it on only after migration `20261125140000_behavior_alongside.sql` is on the
-database: with the flag on, the move-day read selects the column. The migration is
+Turn it on only after all seven alongside migrations are on the database:
+
+1. `20261125140000_behavior_alongside.sql`
+2. `20261125150000_advisor_estimate_where_guess.sql`
+3. `20261125180000_alongside_mcp_and_portability.sql`
+4. `20261125190000_advisor_estimate_where_guess_writer.sql`
+5. `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`
+6. `20261126110000_alongside_schedule_pairing.sql`
+7. `20261126120000_account_sync_alongside.sql`
+
+The seventh differs: it must reach the database before the Ticket 363 code deploys,
+whatever the flag (below). With the flag on, the move-day read selects the column. The migration is
 additive and grants nothing new, so it fits the standing approval for additive
 migrations (`docs/DECISIONS.md`, 2026-11-10) once its conditions hold. The owner turns
 the flag on in Production after Ticket 365's acceptance. Turning it off again restores

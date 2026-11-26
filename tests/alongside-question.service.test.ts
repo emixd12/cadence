@@ -15,11 +15,7 @@ vi.mock("@/lib/db/brief-alongside-asks.repo", () => ({
   recordBriefAlongsideAsk: (...args: unknown[]) => recordAsk(...args),
 }));
 vi.mock("@/lib/db/behaviors.repo", () => ({ getBehaviorById: (...args: unknown[]) => getBehavior(...args) }));
-vi.mock("@/lib/services/behavior.service", () => ({ updateBehaviorForUser: (...args: unknown[]) => updateBehavior(...args) }));
-vi.mock("@/lib/services/integration-read-serialization", () => ({ serializeIntegrationBehavior: (row: { id: string }) => ({ id: row.id, schedules: [] }) }));
-vi.mock("@/lib/services/integration-behavior-input", () => ({
-  integrationBehaviorInput: (input: { alongside?: boolean }) => ({ title: "Red light helmet", ...(input.alongside === undefined ? {} : { alongside: input.alongside }) }),
-}));
+vi.mock("@/lib/services/behavior.service", () => ({ answerBehaviorAlongsideQuestionForUser: (...args: unknown[]) => updateBehavior(...args) }));
 
 const { recordBehaviorAlongsideAnswer, AlongsideAnswerError } = await import("@/lib/services/alongside-answer.service");
 const { answerBriefAlongsideQuestion, parseBriefAlongsideAnswer, planBriefAlongsideQuestion, recordBriefAlongsideQuestionAsked, reopenBriefAlongsideQuestion } =
@@ -40,13 +36,12 @@ beforeEach(() => {
 });
 
 describe("recordBehaviorAlongsideAnswer", () => {
-  it("writes the setting through the Behavior definition service with the read revision", async () => {
+  it("writes the setting through the Behavior definition service", async () => {
     getBehavior.mockResolvedValue({ id: HELMET, updated_at: "2026-11-25T12:00:00Z", alongside: null });
+    updateBehavior.mockResolvedValue({ alongside: true, alreadyAnswered: false });
     expect(await recordBehaviorAlongsideAnswer(supabase, "user-1", { behaviorId: HELMET, alongside: true, recordedAt: "2026-11-25T14:00:00Z", env: ON }))
       .toEqual({ behaviorId: HELMET, alongside: true, changed: true });
-    expect(updateBehavior).toHaveBeenCalledWith(supabase, "user-1", {
-      behaviorId: HELMET, values: { title: "Red light helmet", alongside: true }, expectedUpdatedAt: "2026-11-25T12:00:00Z",
-    }, "2026-11-25T14:00:00Z");
+    expect(updateBehavior).toHaveBeenCalledWith(supabase, "user-1", { behaviorId: HELMET, alongside: true }, "2026-11-25T14:00:00Z");
   });
 
   it("writes nothing for the answer already stored", async () => {
@@ -54,6 +49,16 @@ describe("recordBehaviorAlongsideAnswer", () => {
     expect(await recordBehaviorAlongsideAnswer(supabase, "user-1", { behaviorId: HELMET, alongside: false, env: ON }))
       .toEqual({ behaviorId: HELMET, alongside: false, changed: false });
     expect(updateBehavior).not.toHaveBeenCalled();
+  });
+
+  it("never overwrites an answer made elsewhere since the prompt was shown (audit fix 7)", async () => {
+    getBehavior.mockResolvedValue({ id: HELMET, updated_at: "2026-11-25T12:30:00Z", alongside: false });
+    expect(await recordBehaviorAlongsideAnswer(supabase, "user-1", { behaviorId: HELMET, alongside: true, env: ON }))
+      .toEqual({ behaviorId: HELMET, alongside: false, changed: false, alreadyAnswered: true });
+    expect(updateBehavior).not.toHaveBeenCalled();
+    // The brief's route returns the same result.
+    expect(await answerBriefAlongsideQuestion({ supabase, userId: "user-1" }, { behaviorId: HELMET, alongside: true }, ON))
+      .toMatchObject({ alongside: false, alreadyAnswered: true });
   });
 
   it("refuses with the flag off, for a missing Behavior, and for a changed revision", async () => {

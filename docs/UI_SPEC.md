@@ -642,7 +642,10 @@ open (not answered and Cadence guesses yes, `alongsideQuestionOpen`) may show th
 detail line "Done alongside other things? Yes · No", on the share of marks set in
 `MARK_DETAIL_PROMPTS.alongside` (0.5, fixed per item and day). Yes or No writes the
 Behavior's alongside setting and reads back as `alongside.answer-saved`; a refusal reads
-"Not changed." with an `alongside.answer-*` notice. One line per row at a time; Done at
+"Not changed." with an `alongside.answer-*` notice. The line answers only an unanswered
+Behavior: when another surface or device answered since the row asked, nothing is written
+and the line reads `alongside.answer-already` ("Already answered: it needs its own time.
+Change it in the Behavior.") with the stored answer. One line per row at a time; Done at
 keeps priority. The row asks only when the page passes an `alongside` mark-detail action
 (web: `recordAlongsideAnswerAction`); the Mac passes none until Ticket 363. Bench:
 `module.occurrence-mark-details` (the Red light helmet row).
@@ -655,9 +658,21 @@ today's items whose question is open (`pickBriefAlongsideQuestion`), saved with 
 brief so a reopen asks the same question while it is still open, or nothing. Yes or No
 writes the Behavior's alongside setting (`POST /api/advisor/brief/alongside`), reads back
 as `alongside.answer-saved` and redraws the Timeline; a refusal shows the inline Alert
-notice and keeps Yes · No. Only a client that sends `alongside_question_v1` (the web)
+notice and keeps Yes · No. An answer given elsewhere since the brief asked stands: the
+line writes nothing and reads `alongside.answer-already` with the stored answer. Only a client that sends `alongside_question_v1` (the web)
 gets the line; the Mac follows in Ticket 363. Advisor tips carry no alongside card (no
 reviewed source fits; `STATUS.md`).
+
+Guess note on pairings (audit fix 11, D33: "Where a guess drives a result, the UI labels
+it as a guess"; behind `CADENCE_ALONGSIDE`): a Daily Brief pairing line and an advisor
+schedule pairing proposal show one quiet `text-xs` Readable Ash note, like the length
+note, when the guest's alongside value or either side's Where comes from Cadence's model
+guess: `alongside.pairing-guess` ("Alongside is a guess", "Where is a guess" or
+"Alongside and Where are guesses"). It has no action; the Behavior form changes either
+setting. Counted completion places are the person's record, not a guess. A pairing with
+no guess, and a line stored before the note existed, show no note. The brief line hides
+it once answered, as the length note does. Benches: `module.daily-brief-moves` (pairing
+state) and `/design-system?preview=advisor&state=pairing`.
 
 ### Routine rows and Semantic Zoom (Ticket 349)
 

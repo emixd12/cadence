@@ -618,7 +618,9 @@ Hosted web, behind `CADENCE_ALONGSIDE`; the Mac follows in Ticket 363.
    warning about Calendar overlaps; travel overlaps still show.
 5. **Cadence asks (Ticket 360).** While a Behavior is Not answered and Cadence guesses
    yes, Cadence may ask once on a surface the person is already using. One answer
-   anywhere stores the setting and closes the question everywhere:
+   anywhere stores the setting and closes the question everywhere. A question still on
+   screen after an answer elsewhere does not change it; it says "Already answered" and
+   points to the Behavior form:
    - Timeline: right after marking the item Completed (when no "Done at" line shows),
      "Done alongside other things? Yes · No".
    - Daily Brief: one line, "Can Red light helmet be done alongside other things?

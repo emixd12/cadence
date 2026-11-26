@@ -19637,7 +19637,7 @@
         }
       ],
       "availability": "Web Timeline with CADENCE_ALONGSIDE on, right after marking an item Completed when no Done at line shows, while the Behavior's alongside question is open (not answered, guessed yes), on the share of marks set in MARK_DETAIL_PROMPTS.alongside. On the Mac: Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside.",
-      "success_result": "Writes the Behavior's alongside setting (Yes true, No false) through the Behavior definition service and says it is saved. The question closes on every surface, and the row label and the Behavior form show the answer after the refresh.",
+      "success_result": "Writes the Behavior's alongside setting (Yes true, No false) through the Behavior definition service and says it is saved. The question closes on every surface, and the row label and the Behavior form show the answer after the refresh. When another surface or device answered since the row asked, nothing is written and the line says it was already answered, with the stored answer.",
       "failure_result": "A Behavior no longer in the account, a change while saving, or a failed save shows under Not changed. Nothing changes.",
       "effects": [
         "database_write",
@@ -20157,7 +20157,7 @@
         }
       ],
       "availability": "Web Timeline with CADENCE_ALONGSIDE on, inside a ready Daily Brief whose client sent alongside_question_v1, when one of today's items has an open alongside question (not answered, guessed yes). At most one question per brief; reopening today's brief shows the same question while it is still open. On the Mac: in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365), linked accounts only.",
-      "success_result": "Writes the Behavior's alongside setting through the Behavior definition service (POST /api/advisor/brief/alongside), says it is saved and redraws the Timeline. The question closes on every surface.",
+      "success_result": "Writes the Behavior's alongside setting through the Behavior definition service (POST /api/advisor/brief/alongside), says it is saved and redraws the Timeline. The question closes on every surface. When another surface or device answered since the brief asked, nothing is written and the line says it was already answered, with the stored answer.",
       "failure_result": "A Behavior no longer in the account, a change while saving, or a failed or offline request shows under the line in the alert style; Yes and No stay. Nothing changes.",
       "effects": [
         "database_write",

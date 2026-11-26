@@ -4,7 +4,7 @@ import { markLocalOccurrence, markLocalParentSlot, recordLocalDoneAt, recordLoca
 import type { MarkDetailState, OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive, setBehaviorAlongside, updateBehavior,
+  answerBehaviorAlongsideQuestion, applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive, updateBehavior,
   updateBehaviorArchiveNote,
 } from "@cadence/core/services/behavior.service";
 import { noticeText } from "@cadence/core/notices";
@@ -109,10 +109,16 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
   const markDetailActions: OccurrenceMarkDetailActions = {
     doneAt: (input) => detail(() => recordLocalDoneAt(profileId, input)),
     notDoneReason: (input) => detail(() => recordLocalNotDoneReason(profileId, input)),
-    ...(options.alongside ? { alongside: (input: Readonly<{ occurrenceId: string; behaviorId: string; alongside: boolean }>) => detail(() => {
-      const now = Temporal.Now.instant();
-      return setBehaviorAlongside(createLocalBehaviorStore(profileId, now), { behaviorId: input.behaviorId, alongside: input.alongside, recordedAt: now.toString() });
-    }) } : {}),
+    ...(options.alongside ? { alongside: async (input: Readonly<{ occurrenceId: string; behaviorId: string; alongside: boolean }>): Promise<MarkDetailState> => {
+      let outcome: string | undefined;
+      const state = await detail(async () => {
+        const now = Temporal.Now.instant();
+        const answer = await answerBehaviorAlongsideQuestion(createLocalBehaviorStore(profileId, now), { behaviorId: input.behaviorId, alongside: input.alongside, recordedAt: now.toString() });
+        // Audit fix 7: answered elsewhere (a sync, another surface) since the row asked.
+        if (answer.alreadyAnswered) outcome = noticeText("alongside.answer-already", { answer: answer.alongside ? "yes" : "no" });
+      });
+      return state.status === "saved" && outcome ? { status: "saved", outcome } : state;
+    } } : {}),
   };
   // Behaviors of Opportunity: the basket's add and Done now, and a row's Remove, on the
   // local store. A success refreshes the Timeline so the added or removed row shows.

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { alongsideMayOverlap, type OverlapPlace } from "@cadence/core/resolvers/alongside.resolver";
 import {
   briefMoveBlocksForSubject,
+  briefMoveConflicts,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   briefMoveOverlapSubject,
@@ -15,6 +16,7 @@ import {
 } from "@cadence/core/resolvers/brief-move.resolver";
 import type { EffectiveWhere } from "@cadence/core/resolvers/effective-where.resolver";
 import { alongsideFindingAllowed } from "@/lib/services/daily-brief-consumer";
+import { findMoveConflicts } from "@cadence/core/resolvers/move.resolver";
 
 // Ticket 357 (D33): an alongside item may overlap a Cadence item or calendar event at
 // the same place, or where either place is unknown or Anywhere; never travel or an item
@@ -128,6 +130,27 @@ describe("the free-slot rule with the same-place rule", () => {
       routine: { parentBehaviorId: "skin", parentTitle: "Skin routine", inheritParentSchedule: true, stepOrder: order } });
     expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, HOME)])[0]!.where).toEqual(HOME);
     expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, GYM)])[0]!.where).toEqual(UNKNOWN);
+    // Audit fix 10: Anywhere steps defer to the one place the others share.
+    expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, ANYWHERE)])[0]!.where).toEqual(HOME);
+    expect(collapseBriefMoveRoutines([step("serum", 0, ANYWHERE), step("helmet", 1, GYM), step("pill", 2, ANYWHERE)])[0]!.where).toEqual(GYM);
+    expect(collapseBriefMoveRoutines([step("serum", 0, ANYWHERE), step("helmet", 1, ANYWHERE)])[0]!.where).toEqual(ANYWHERE);
+    expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, ANYWHERE), step("pill", 2, GYM)])[0]!.where).toEqual(UNKNOWN);
+    expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, UNKNOWN)])[0]!.where).toEqual(UNKNOWN);
+  });
+
+  it("an all-alongside routine block lasts the sum of its steps (audit fix 3)", () => {
+    const step = (id: string, order: number, minutes: number, alongside: boolean) => item(id, "07:00", minutes, { alongside, where: HOME,
+      routine: { parentBehaviorId: "skin", parentTitle: "Skin routine", inheritParentSchedule: true, stepOrder: order } });
+    const [all] = collapseBriefMoveRoutines([step("serum", 0, 10, true), step("helmet", 1, 15, true)]);
+    expect(all).toMatchObject({ alongside: true, length: { minutes: 25 }, end: local("07:25") });
+    // Mixed: alongside steps still add nothing.
+    const [mixed] = collapseBriefMoveRoutines([step("serum", 0, 10, false), step("helmet", 1, 15, true)]);
+    expect(mixed).toMatchObject({ alongside: false, length: { minutes: 10 }, end: local("07:10") });
+    // Travel 15 minutes after the start is inside the running routine.
+    const subject = briefMoveOverlapSubject([step("serum", 0, 10, true), step("helmet", 1, 15, true)], "serum");
+    const blocks = briefMoveBlocksForSubject([{ kind: "travel", ref: "trip", start: local("07:15"), end: local("07:40") }], subject);
+    expect(checkBriefMoveSlot({ interval: { start: all!.start, end: all!.end }, blocks, travelBeforeSeconds: 0, travelAfterSeconds: 0 }))
+      .toMatchObject({ ok: false, ref: "trip" });
   });
 
   it("the brief moves the item that collides with an alongside item somewhere else", () => {
@@ -160,5 +183,31 @@ describe("Daily Brief overlap and tight-fit findings", () => {
 
   it("without places (the default), every finding with an alongside side is dropped, as before", () => {
     expect(alongsideFindingAllowed(["o-helmet", "o-gym"], alongside, () => undefined)).toBe(true);
+  });
+});
+
+describe("schedule-edit conflicts under the same-place rule (audit fix 4)", () => {
+  const helmet = (where: EffectiveWhere) => item("helmet", "20:00", 10, { alongside: true, where });
+  const reading = (where: EffectiveWhere) => item("reading", "20:00", 45, { where });
+
+  it("a guest paired onto its host at the same place opens no conflict", () => {
+    expect(briefMoveConflicts([helmet(HOME), reading(HOME)], new Set(["helmet"]))).toEqual([]);
+    expect(briefMoveConflicts([helmet(HOME), reading(HOME)], new Set(["reading"]))).toEqual([]);
+    expect(briefMoveConflicts([helmet(ANYWHERE), reading(GYM)], new Set(["helmet"]))).toEqual([]);
+  });
+
+  it("an alongside item at another place still collides, whichever side moved", () => {
+    expect(briefMoveConflicts([helmet(HOME), reading(GYM)], new Set(["helmet"])))
+      .toEqual([{ occurrence_id: "helmet", conflicting_occurrence_id: "reading" }]);
+    expect(briefMoveConflicts([helmet(HOME), reading(GYM)], new Set(["reading"])))
+      .toEqual([{ occurrence_id: "reading", conflicting_occurrence_id: "helmet" }]);
+  });
+
+  it("two ordinary items collide as findMoveConflicts says", () => {
+    const items = [item("walk", "20:00", 30, { where: HOME }), reading(HOME)];
+    const old = findMoveConflicts(items.map((entry) => ({ id: entry.occurrenceId, status: entry.status, moved: entry.occurrenceId === "walk",
+      interval: { start: entry.start, end: entry.end } })));
+    expect(briefMoveConflicts(items, new Set(["walk"]))).toEqual(old);
+    expect(old).toEqual([{ occurrence_id: "walk", conflicting_occurrence_id: "reading" }]);
   });
 });

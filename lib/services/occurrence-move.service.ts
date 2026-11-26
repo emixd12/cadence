@@ -19,6 +19,7 @@ import {
 } from "@cadence/core/resolvers/move.resolver";
 import {
   briefMoveBlocksForSubject,
+  briefMoveConflicts,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   briefMoveOverlapSubject,
@@ -400,16 +401,25 @@ export async function syncMoveConflicts(caller: OccurrenceMoveCaller): Promise<n
   for (const localDate of [...new Set((data ?? []).map((row) => row.local_date))].sort()) {
     const day = await readBriefMoveDay(caller.supabase, caller.userId, localDate);
     const items = day.items.filter((item) => item.localDate === localDate);
-    const blocks = new Map(briefMoveItemBlocks(items, null).map((block) => [block.ref, block]));
-    const conflicts = findMoveConflicts(items.filter((item) => blocks.has(item.occurrenceId)).map((item) => ({
-      id: item.occurrenceId, status: item.status, moved: isMoved(day.occurrences.get(item.occurrenceId)!),
-      interval: blocks.get(item.occurrenceId)!,
-    })));
+    // Audit fix 4: with CADENCE_ALONGSIDE on the items carry their Where, and conflicts
+    // follow the same-place rule; with it off, the earlier rule, unchanged.
+    const conflicts = items.some((item) => item.where)
+      ? briefMoveConflicts(items, new Set(items.filter((item) => isMoved(day.occurrences.get(item.occurrenceId)!)).map((item) => item.occurrenceId)))
+      : earlierMoveConflicts(day, items);
     const result = await caller.supabase.rpc("sync_move_conflicts", { p_local_date: localDate, p_conflicts: conflicts });
     if (result.error) throw result.error;
     open += (result.data ?? []).length;
   }
   return open;
+}
+
+/** Conflicts as before Ticket 357: an alongside item never collides. */
+function earlierMoveConflicts(day: BriefMoveDay, items: BriefMoveDay["items"]) {
+  const blocks = new Map(briefMoveItemBlocks(items, null).map((block) => [block.ref, block]));
+  return findMoveConflicts(items.filter((item) => blocks.has(item.occurrenceId)).map((item) => ({
+    id: item.occurrenceId, status: item.status, moved: isMoved(day.occurrences.get(item.occurrenceId)!),
+    interval: blocks.get(item.occurrenceId)!,
+  })));
 }
 
 /** The database's own rules, checked here only to order refusals. */

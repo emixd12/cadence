@@ -778,8 +778,11 @@ Ticket 299 adds the Settings card and the Daily Brief wiring.
   preview builds pin an empty value and the signing check refuses a set one, so published
   builds stay dark until the owner turns the feature on (Ticket 365). On a linked Mac the
   hosted `GET /api/behaviors/alongside` also decides: `enabled: false` (production with
-  `CADENCE_ALONGSIDE` off) hides every alongside surface for that account. The column
-  itself syncs in every build (contract 10). For installed acceptance, set the switch for
+  `CADENCE_ALONGSIDE` off) hides every alongside surface for that account, and export,
+  BehaviorLog import and restore then leave the answer out as with the switch off. The
+  Mac reads the guesses after the account changes and after each completed
+  synchronization, otherwise at most once a minute. The column itself syncs in every
+  build (contract 10). For installed acceptance, set the switch for
   the dev-signed build and use a hosted deployment with `CADENCE_ALONGSIDE=on`.
 - Ticket 299 flow, with the switch on, ChatGPT connected with plan usage and Settings
   reporting `deviceModelAvailable`: `POST /api/advisor/brief/device/prepare`, the plan

@@ -6,6 +6,7 @@ import { isNotDoneReason } from "@cadence/core/resolvers/status.resolver";
 import { parseOccurrenceId } from "@cadence/core/services/occurrence.service";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { recordOccurrenceDoneAt, recordOccurrenceNotDoneReason } from "@/lib/services/occurrence.service";
+import { noticeText } from "@cadence/core/notices";
 import { recordBehaviorAlongsideAnswer } from "@/lib/services/alongside-answer.service";
 import { createClient } from "@/lib/supabase/server";
 import type { MarkDetailState } from "@/components/timeline/OccurrenceMarkDetails";
@@ -37,10 +38,14 @@ export async function recordNotDoneReasonAction(input: Readonly<{ occurrenceId: 
  * The Timeline and Behaviors pages are refreshed so the row label and the form show it.
  */
 export async function recordAlongsideAnswerAction(input: Readonly<{ occurrenceId: string; behaviorId: string; alongside: boolean }>): Promise<MarkDetailState> {
+  let outcome: string | undefined;
   const result = await run(async (supabase, userId) => {
     if (typeof input.behaviorId !== "string" || !input.behaviorId || typeof input.alongside !== "boolean") throw new Error("Choose Yes or No.");
-    await recordBehaviorAlongsideAnswer(supabase, userId, { behaviorId: input.behaviorId, alongside: input.alongside });
+    const answer = await recordBehaviorAlongsideAnswer(supabase, userId, { behaviorId: input.behaviorId, alongside: input.alongside });
+    // Audit fix 7: answered elsewhere since the row asked; the stored answer stands.
+    if (answer.alreadyAnswered) outcome = noticeText("alongside.answer-already", { answer: answer.alongside ? "yes" : "no" });
   });
+  if (result.status === "saved" && outcome) return { status: "saved", outcome };
   if (result.status === "saved") {
     revalidatePath("/timeline");
     revalidatePath("/behaviors");
