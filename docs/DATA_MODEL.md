@@ -2557,6 +2557,22 @@ be done alongside other things?". Null means unanswered. Migration:
   include it yet either, because configuration history is synced; changing the answer
   writes no configuration event. Ticket 363 adds the column to the Mac's SQLite, the
   sync contract and configuration history together.
+- **Brief asks (Ticket 360).** `public.brief_alongside_asks` records that a saved
+  Daily Brief included a Behavior's alongside question, so a later day's brief does not
+  ask about that Behavior again: `user_id`, `behavior_id`, `local_date` (the first
+  saved brief that asked), `created_at`; primary key `(user_id, behavior_id)`, so a
+  repeat keeps the first date. No text. Owner-only RLS: `select` and `insert` policies on
+  `auth.uid() = user_id`, grants `select, insert` to `authenticated`, none to `anon`;
+  no update or delete. Account deletion (the `auth.users` cascade) and Behavior deletion
+  (the `(user_id, behavior_id)` foreign key) remove its rows. Hosted-only: not in
+  account sync, exports, BehaviorLog or MCP. Written on the person's own client
+  (`lib/db/brief-alongside-asks.repo.ts`) after `save_daily_brief` stores a brief whose
+  `alongsideQuestion` is set; read for the pick's `askedBehaviorIds`, counting only
+  rows from earlier local dates, so a refresh the same day may ask again. Only the
+  Daily Brief reads it; the Timeline row, the form and Chat do not, and an answer on any
+  surface still closes the question through `behaviors.alongside`. Nothing reads or
+  writes it while `CADENCE_ALONGSIDE` is off. Migration
+  `20261126100000_alongside_pairing_evidence_and_brief_asks.sql` (additive).
 - **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
   and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
   import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
@@ -3656,6 +3672,20 @@ shown to the person; Phase 4 matches the signals to advice cards.
   `/api/advisor/coach/signals/process`. It reads `move_proposal_answers` when that
   table exists (Phase 3A1) and each brief proposal's final status otherwise.
 - Account deletion cascades; deleting a Behavior removes its signals.
+- `advisor_read_pairing_evidence(local_date)` (Ticket 361, D33; migration
+  `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`): the Daily Brief and
+  Chat agent tokens only (`daily_brief`, `chat`); the person's session, the coach token
+  and MCP grant tokens get `42501`. Security definer, stable, empty `search_path`,
+  execute granted to `authenticated` only. Returns, for the caller's own account,
+  `{"done_together": [{"behavior_id", "other_behavior_id"}], "crowded_hours": [hour]}`
+  and nothing else: no other kind, fact, date or account. A pair counts only when both
+  Behaviors are the caller's; an hour only as a whole number from 0 to 23. It reads the
+  signals of `local_date`, or of the day before while none are stored for `local_date`
+  yet. The pairing planner's I/O (`lib/services/alongside-pairing.service.ts`, through
+  `lib/db/pairing-evidence.repo.ts`) calls it on the caller's own agent client; a
+  refused or failed read means no evidence. Only `coach_read_signals` reads the full
+  rows, on the coach token. Local verification:
+  `tests/sql/alongside-pairing-evidence-and-brief-asks.sql`.
 
 Local verification: `tests/coach-signals.local-integration.test.ts`.
 

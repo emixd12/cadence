@@ -20141,7 +20141,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 360: The agent asks whether a Behavior is alongside
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. The brief keeps one question per brief and never asks an answered Behavior again; an ignored question can return in a later brief because no "asked" record is stored.
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. The brief keeps one question per brief and never asks an answered Behavior again. Follow-up (migration `20261126100000`): `brief_alongside_asks` records the first saved brief that asked about each Behavior (ids and a date, owner-only RLS, hosted-only), so an ignored question does not return on a later day; a refresh the same day may ask it again. The requirement's "No new table" refers to the answer, which stays `behaviors.alongside`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20173,7 +20173,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 361: Pairing for today in the Daily Brief and Chat
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration (both `reason` columns accept the new code `alongside_pairing`). Readings: "crowded" reuses the coach's `crowded_hour` threshold (3 items in a local hour, alongside items not counted) or an hour the stored signal names; `done_together` counts only when the named partner is one of today's hosts; the brief and Chat read the coach's signals through the coach agent's read-only channel. The proposal's `line.pairing` records the host offered, as history for Ticket 362, not a link. Re-check pairs a guest again when its host moved or left; Re-plan pairs it with another host. Chat skips the "helps" rule for an item the person asked about.
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration for the lines (both `reason` columns accept the new code `alongside_pairing`). Readings: "crowded" reuses the coach's `crowded_hour` threshold (3 items in a local hour, alongside items not counted) or an hour the stored signal names; `done_together` counts only when the named partner is one of today's hosts; the brief and Chat read the coach's evidence on their own agent tokens (`daily_brief`, `chat`) through `advisor_read_pairing_evidence`, which returns `done_together` pairs and `crowded_hour` hours only (follow-up migration `20261126100000`); no coach client is minted outside the coach's own jobs. The proposal's `line.pairing` records the host offered, as history for Ticket 362, not a link. Re-check pairs a guest again when its host moved or left; Re-plan pairs it with another host. Chat skips the "helps" rule for an item the person asked about.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
