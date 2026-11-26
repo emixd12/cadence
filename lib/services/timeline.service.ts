@@ -1,6 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
+import { attachTimelinePeriods } from "@cadence/core/resolvers/period.resolver";
 import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
+import { listPeriodsOrNone } from "@/lib/db/periods.repo";
 import { attachTimelineSourceCountable, attachTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
 import { readTimelineSourceEvidence } from "@/lib/services/timeline-source-evidence.service";
 import { readConnectorConnection } from "@/lib/db/connectors.repo";
@@ -257,7 +259,12 @@ async function getTimelineViewForUser(input: {
     now, timezone, futureDays: input.futureDays,
   });
   const dayNoteRange = timelineDayNoteRange(view);
-  const withNotes = attachTimelineDayNotes(view, dayNoteRange ? await listDayNotesInRange(supabase, userId, dayNoteRange) : []);
+  const [dayNotes, periods] = await Promise.all([
+    dayNoteRange ? listDayNotesInRange(supabase, userId, dayNoteRange) : [],
+    // Ticket 369: the whole account's Periods (500 at most), for day chips and label suggestions.
+    listPeriodsOrNone(supabase, userId),
+  ]);
+  const withNotes = attachTimelinePeriods(attachTimelineDayNotes(view, dayNotes), periods);
   const [evidence, countable, alongside] = await Promise.all([
     readTimelineSourceEvidence(supabase, userId, occurrenceRows, timezone),
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),

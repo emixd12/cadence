@@ -8,8 +8,8 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 34 |
-| error | 90 |
+| outcome | 37 |
+| error | 91 |
 | note | 27 |
 | question | 5 |
 
@@ -188,6 +188,15 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
 | `timeline.left-to-decide` Counts the earlier items in Needs decision that still wait for Completed or Not Completed. | note | {count, plural, =0 {None left to decide} other {# left to decide}} | web, Mac | INT-TIMELINE-002, `components/timeline/TimelineGroup.tsx` |
+
+## Periods
+
+| Notice | Style | Words | Where | Shown in |
+| --- | --- | --- | --- | --- |
+| `period.conflict` Says a Period was not saved, ended or removed because it changed somewhere else first; the editor then shows the latest version. | error | This period changed elsewhere. Review the latest version before saving again. | web, Mac | INT-PERIOD-002, INT-PERIOD-003, INT-PERIOD-004, `app/design-system/PeriodBench.tsx`, `components/periods/PeriodEditor.tsx`, `packages/core/src/types/period.ts`, `lib/services/period.service.ts` |
+| `period.ended` Confirms that End today set a Period's last day to today. | outcome | Period ended today. | web, Mac | INT-PERIOD-003, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `packages/core/src/types/period.ts` |
+| `period.removed` Confirms that a Period was removed. | outcome | Period removed. | web, Mac | INT-PERIOD-004, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `packages/core/src/types/period.ts` |
+| `period.saved` Confirms that a Period was added or its label, days or note were changed. | outcome | Period saved. | web, Mac | INT-PERIOD-001, INT-PERIOD-002, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `components/periods/PeriodEditor.tsx`, `packages/core/src/types/period.ts` |
 
 ## Reminders
 

@@ -400,6 +400,12 @@ schedule. Adherence views show counts inside and outside Periods. The Daily Brie
 advisor tips, Chat and MCP clients can read Periods. Plan:
 `docs/plans/2026-11-25-periods.md`.
 
+Built so far: the table, resolver and services (Ticket 368), export, import and restore
+(Ticket 373), and the web screens (Ticket 369). On web, each Timeline day a Period
+covers shows its label as a chip, today's header offers "Add period", and Behaviors
+lists every Period and adds an "Outside periods / In periods" adherence line when a
+Period overlaps the selected range.
+
 ## Behavior review and adherence
 
 The Behaviors screen is the primary behavior object surface. It combines

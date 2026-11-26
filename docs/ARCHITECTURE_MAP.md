@@ -118,6 +118,13 @@ one on differs:
 - Create a Behavior: `components/behaviors/BehaviorForm.tsx` → `createBehaviorAction`
   → `lib/services/behavior.service.ts` → core `createBehavior` → occurrence sync →
   `revalidatePath("/timeline")`.
+- Add, edit, end or remove a Period (Ticket 369): `components/periods/PeriodControl.tsx`
+  and `PeriodEditor.tsx` → `savePeriodAction`, `endPeriodAction` or `deletePeriodAction`
+  (`app/(app)/timeline/actions.ts`, also passed by `/behaviors`) →
+  `lib/services/period.service.ts` → core `services/period.service.ts` → RPC
+  `create_period`, `update_period` or `delete_period` → `revalidatePath` for
+  `/timeline` and `/behaviors`. The Timeline view carries `periodsByDate`; the
+  analytics view carries `periodAdherence`.
 - Caching: every `(app)` page is `force-dynamic`. The only Next cache API in use is
   `revalidatePath`. `lib/cache` is a per-process read cache (60 s, 250 entries); its
   invalidators are in `lib/cache/stable-user-data.cache.ts`.

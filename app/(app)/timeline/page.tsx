@@ -17,8 +17,11 @@ import { listInlineNoteShortcutsForCurrentUser } from "@/lib/services/note-short
 import {
   markOccurrenceStatusAction,
   markParentSlotStatusAction,
+  deletePeriodAction,
+  endPeriodAction,
   resetTimeTrackingAction,
   saveDayNoteAction,
+  savePeriodAction,
   setBehaviorDefaultDurationAction,
   startTimeTrackingAction,
   stopTimeTrackingAction,
@@ -39,6 +42,7 @@ import { recordAlongsideAnswerAction, recordDoneAtAction, recordNotDoneReasonAct
 import { MoveConflictNotices, type MoveConflictNotice } from "@/components/timeline/MoveConflictNotices";
 import { hasPersonMovedBefore, listOpenMoveConflicts } from "@/lib/services/occurrence-move.service";
 import { systemClock } from "@/lib/services/clock";
+import type { PeriodActions } from "@/lib/types/period";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -53,6 +57,13 @@ const MARK_DETAIL_ACTIONS: OccurrenceMarkDetailActions = {
   notDoneReason: recordNotDoneReasonAction,
   // Ticket 360: asks only on rows the server marked `alongsideQuestion` (CADENCE_ALONGSIDE on).
   alongside: recordAlongsideAnswerAction,
+};
+
+// Ticket 369: add, edit, End today and Remove for Periods, from the day headers.
+const PERIOD_ACTIONS: PeriodActions = {
+  save: savePeriodAction,
+  end: endPeriodAction,
+  remove: deletePeriodAction,
 };
 
 const MOVE_ACTIONS: OccurrenceMoveActions = {
@@ -146,6 +157,7 @@ async function TimelineContent({
         resetTimeTrackingAction={resetTimeTrackingAction}
         shortcutsByBehavior={shortcutsByBehavior}
         dayNoteAction={saveDayNoteAction}
+        periodActions={PERIOD_ACTIONS}
         liveCalendar
         leaveReminderDigest={leaveReminderDigest}
         runAction={behaviorRunAction}

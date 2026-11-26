@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
+import type { PeriodView } from "../types/period";
 import { resolveNoteUpdate } from "./status.resolver";
 
 /**
@@ -427,6 +428,58 @@ export function resolveTipPeriods(input: Readonly<{ localDate: string; records: 
   const { from, to } = tipPeriodRange(input.localDate);
   return periodsOverlappingRange(input.records, from, to).slice(0, TIP_PERIOD_LIMITS.periods)
     .map((period) => ({ label: period.label, start: period.start_on, end: period.end_on }));
+}
+
+/** The fields a screen reads. Ownership and timestamps stay on the server. */
+export function toPeriodView(period: Pick<PeriodRecord, keyof PeriodView>): PeriodView {
+  return {
+    id: period.id,
+    label: period.label,
+    start_on: period.start_on,
+    end_on: period.end_on,
+    note: period.note,
+    revision: period.revision,
+  };
+}
+
+/** Newest first for the all-Periods list: the reverse of the display order. */
+export function periodsNewestFirst<T extends OrderedPeriod>(periods: readonly T[]): T[] {
+  return [...periods].sort((a, b) => comparePeriods(b, a));
+}
+
+type TimelineShownDates = Readonly<{
+  daySections: readonly Readonly<{ localDate: string }>[];
+  needsDecision: Readonly<{ daySections: readonly Readonly<{ localDate: string }>[] }>;
+}>;
+
+/**
+ * Returns the Timeline view with its Periods (Ticket 369): for each shown local date,
+ * Needs decision days included, the Periods that cover it; the Periods that cover at
+ * least one shown date; and label suggestions from every Period of the account.
+ * `periods` is the whole account's list. A Period changes nothing else in the view.
+ */
+export function attachTimelinePeriods<T extends TimelineShownDates>(
+  view: T,
+  periods: readonly PeriodRecord[],
+): T & { periods: PeriodView[]; periodsByDate: Record<string, PeriodView[]>; periodLabelSuggestions: string[] } {
+  const dates = [...new Set([...view.daySections, ...view.needsDecision.daySections].map((section) => section.localDate))];
+  const covering = periodsByDate(periods, dates);
+  const views = new Map<string, PeriodView>();
+  const byDate: Record<string, PeriodView[]> = {};
+  for (const [date, records] of Object.entries(covering)) {
+    byDate[date] = records.map((record) => {
+      const known = views.get(record.id) ?? toPeriodView(record);
+      views.set(record.id, known);
+      return known;
+    });
+  }
+  const shown = periods.filter((period) => views.has(period.id)).sort(comparePeriods);
+  return {
+    ...view,
+    periods: shown.map((period) => views.get(period.id)!),
+    periodsByDate: byDate,
+    periodLabelSuggestions: periodLabelSuggestions(periods),
+  };
 }
 
 function dayLabel(localDate: string, withYear: boolean): string {

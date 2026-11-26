@@ -354,6 +354,64 @@ Turning off the global setting hides quick-fill buttons and proposals. It keeps
 accepted shortcuts and saved Notes. Removing a shortcut keeps saved Notes and
 suppresses that repeated pattern for 90 days.
 
+## Add, edit, end or remove a Period
+
+A **Period** is a range of days you label for your whole account, such as "Travel"
+from November 3 to 9. It says that something affected those days. A Period is a
+label only: it never marks an Occurrence, and it never changes adherence, a
+reminder or a schedule. It is not a pause. To stop one Behavior for a while, pause
+that Behavior instead.
+
+**Prerequisites:** You are signed in on the web and Timeline has loaded. Cadence
+for Mac does not show Periods yet.
+
+**Add a Period**
+
+1. Under today's date, choose **Add period**, beside **Add day note**.
+2. Enter a **Label** of up to 60 characters. Labels you used before are offered
+   as you type.
+3. Check **First day**. It starts as today and may be a past or future day.
+4. Set **Last day**, or leave it empty if the Period is still going.
+5. Optionally enter a **Note**.
+6. Choose **Save**. Cadence shows **Period saved.**
+
+**See and edit a Period**
+
+Each Timeline day that a Period covers shows the label as a small chip under the
+date. Periods may overlap, so a day can show several chips. Choose a chip to open
+that Period in place, change any field and choose **Save**. **Cancel** or Escape
+closes the form without saving.
+
+**End a Period today**
+
+Open the Period and choose **End today**. Cadence sets the last day to today in
+your account timezone and shows **Period ended today.** The action is offered only
+for a Period that has started and is ongoing or ends after today. For any other
+date change, edit **Last day**.
+
+**Remove a Period**
+
+Open the Period, choose **Remove**, then choose **Remove this period**. **Keep**
+backs out. Removing deletes the Period and its note. Your Occurrences, statuses
+and Notes stay as they are.
+
+**Result and persistence:** Cadence stores the label, the two dates and the note
+for your account. Nothing else is written.
+
+**Recovery:** If a rule is broken, such as a last day before the first day,
+Cadence shows the reason under the form and keeps what you typed. If the Period
+changed in another tab or app first, Cadence shows **This period changed
+elsewhere. Review the latest version before saving again.** and loads the latest
+version into the form. A removed Period cannot be brought back; add it again.
+
+**Privacy and safety:** Labels and notes are your own words. Do not store details
+you do not want hosted or exported. Full JSON and BehaviorLog exports include
+Periods.
+
+**Keyboard and mobile:** Chips, **Add period** and every form control are reached
+with Tab and activated with Enter or Space. Date fields use the browser's own date
+control. On phones the fields stack and each control is at least 44px tall.
+
 ## Track occurrence time
 
 **Prerequisites:** Expand an active Behavior's current-day Occurrence or an

@@ -3,6 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorGraphRecord } from "../behavior-store";
 import type { OccurrenceRecord } from "../data-store";
 import { resolveAnalytics } from "../resolvers/analytics.resolver";
+import type { PeriodDates } from "../resolvers/period.resolver";
 import type { AnalyticsOccurrenceInput, AnalyticsTimeSessionInput, AnalyticsView } from "../types/analytics";
 import type { OccurrenceStatus } from "../types/database";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
@@ -15,6 +16,8 @@ export type AnalyticsSelection = {
 export function assembleAnalyticsView(input: AnalyticsSelection & {
   behaviors: BehaviorGraphRecord[]; occurrences: OccurrenceRecord[]; needsDecisionOccurrences: OccurrenceRecord[];
   timeSessions: Array<Parameters<typeof toAnalyticsTimeSessionInput>[0]>; now: Temporal.Instant; timezone: string;
+  /** Ticket 369: the account's Periods, for the "Outside periods / In periods" line. */
+  periods?: readonly PeriodDates[];
 }): AnalyticsView {
   const { occurrences, needsDecisionOccurrences, timeSessions, now, timezone } = input;
   const options = input;
@@ -36,6 +39,7 @@ export function assembleAnalyticsView(input: AnalyticsSelection & {
     rangeDays: options.rangeDays,
     selectedBehaviorId: options.selectedBehaviorId,
     selectedDayLocalDate: options.selectedDayLocalDate,
+    periods: input.periods,
   });
 }
 

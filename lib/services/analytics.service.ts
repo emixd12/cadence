@@ -4,6 +4,8 @@ import type { AnalyticsConnectorTiming } from "@cadence/core/types/analytics";
 import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
 import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
 import { Temporal } from "@js-temporal/polyfill";
+import type { PeriodDates } from "@cadence/core/resolvers/period.resolver";
+import { listPeriodsOrNone } from "@/lib/db/periods.repo";
 
 import type {
   AppSupabaseClient,
@@ -34,6 +36,8 @@ export type GetAnalyticsPageDataOptions = {
   rangeDays?: number;
   selectedBehaviorId?: string | null;
   selectedDayLocalDate?: string | null;
+  /** The account's Periods when the caller already read them; otherwise this service reads them. */
+  periods?: readonly PeriodDates[];
 };
 
 export async function getAnalyticsPageData(
@@ -90,10 +94,13 @@ export async function getAnalyticsPageDataForUser(
     includeArchived: true,
     throughStartedAt: now.toString(),
   });
+  // Ticket 369: with a Period in the range, the summary adds its inside and outside line.
+  const periods = options.periods ?? await listPeriodsOrNone(supabase, userId);
 
   const view = assembleAnalyticsView({
     behaviors, occurrences, needsDecisionOccurrences, timeSessions, now, timezone,
     rangeDays: dateRange.rangeDays,
+    periods,
     selectedBehaviorId: options.selectedBehaviorId,
     selectedDayLocalDate: options.selectedDayLocalDate,
   });

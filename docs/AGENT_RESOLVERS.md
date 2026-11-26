@@ -322,6 +322,20 @@ Shared `services/period.service.ts` orchestrates the owner-scoped `PeriodDataSto
 check and reads "today" from the profile timezone at the time of the write
 (`tests/period-web.service.test.ts`). Adapters compare-and-set on `revision`.
 
+Screens (Ticket 369) read Periods through the same resolver: `toPeriodView` gives the
+fields a screen may hold, `attachTimelinePeriods` adds `periods`, `periodsByDate` and
+`periodLabelSuggestions` to a Timeline view, and `periodsNewestFirst` orders the
+Behaviors list. `resolvePeriodAdherence` in `analytics.resolver.ts` writes the "Outside
+periods / In periods" line from `periodCoveredDates`, `splitByPeriods` and
+`resolveAdherenceCounts`; `resolveAnalytics` adds it as `periodAdherence` only when a
+Period overlaps the range, and changes no other number
+(`tests/analytics.resolver.test.ts`). `components/periods/` calls `resolvePeriodCreate`
+before a save and `resolvePeriodEndState` to decide whether to offer End today; it
+holds no rule of its own. `lib/services/period.service.ts` maps a failed write to a
+`PeriodActionState` (`periodErrorToActionState`). The Timeline, analytics and Periods
+list reads use `listPeriodsOrNone` in `lib/db/periods.repo.ts`, so a database without
+the `periods` table reads as no Periods.
+
 - A Period is annotation only. No resolver, service or job may change an Occurrence
   status, adherence, a reminder or a schedule because of a Period.
 - `today` is injected. The resolver has no I/O and no clock access, and compares
