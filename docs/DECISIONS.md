@@ -3450,3 +3450,32 @@ applicable, because Cadence for Mac renders no MCP view and receives view-made c
 through existing account sync; marketing waits for the overhaul (Ticket 246); future
 mobile has no Cadence code, and host mobile apps render the view. Messaging impact:
 P-097, P-098, P-099, P-100, P-101.
+
+## 2026-11-25: Alongside follow-ups after the audit (D37)
+
+The owner answered in chat on November 25, 2026, after an independent audit of Tickets
+356–364 and a list of known gaps.
+
+- **The guessed Where always shows (Ticket 383).** The Behavior form shows a guessed
+  Where whether or not Completion places is on, as D33 requires. Position markers and
+  completion counts stay behind Completion places. A guess can be dismissed while the
+  setting is off. The owner approved the hosted push of the migration that relaxes the
+  dismissal trigger.
+- **Calendar events get a coarse place (Ticket 384).** Each busy event carries Home, a
+  saved-place key or unknown, computed from its location text for the request only.
+  Nothing is stored or sent to a model. Calendar events as pairing hosts stay out of
+  scope.
+- **An advice card for the alongside question (Ticket 385).** The existing
+  `stack-after-a-routine` card does not cover doing two things at once. A new card rests
+  on Milkman, Minson and Volpp (2014). It shows no tip until the owner reviews it.
+- **Where leaves the estimate hash (Ticket 386).** The model never receives Where, so a
+  Where change no longer discards the cached length and guess. Each estimate is asked
+  again once.
+- **Hosted push approved.** The owner approved pushing `20261126110000` and
+  `20261126120000` (each replaces a check constraint; the second inserts one row into
+  the private sync contract registry). `20261126120000` waits until the question about
+  contract-9 Mac builds and configuration history is settled.
+- **On hold.** Widening schedule pairing beyond daily and fixed-weekday schedules.
+
+Platform impact: web Tickets 383–386; desktop inside Tickets 383 and 384; marketing not
+applicable; future mobile inherits the resolvers. Messaging impact: P-103.
