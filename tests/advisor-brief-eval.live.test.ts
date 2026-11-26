@@ -59,7 +59,8 @@ describe.skipIf(!enabled)("Phase 3 brief eval (live)", () => {
           declinedMoves: [], expect: {}, knownGaps: [] } as unknown as AdvisorEvalFixture;
         const [current] = await runAdvisorEval({ run: { label: "today", model: DAILY_BRIEF_MODEL, generate: (input) => generateDailyBriefWithModel(input) }, fixtures: [legacy] });
         today.push({ fixture: fixture.id, brief: current!.brief, costMicrodollars: current!.costMicrodollars, latencyMs: current!.latencyMs });
-        const facts = prepareBriefOpening({ context: fixture.context, lines: plan.candidates, conflicts: [], calendar: plan.calendar, now: fixture.now }).facts;
+        const facts = prepareBriefOpening({ context: fixture.context, lines: plan.candidates, conflicts: [], calendar: plan.calendar, now: fixture.now,
+          ...(fixture.dayNotes ? { dayNotes: fixture.dayNotes } : {}) }).facts;
         const briefs = [{ label: "today", brief: current!.brief },
           ...candidates.map((results) => {
             const result = results.find((item) => item.fixture === fixture.id)!;

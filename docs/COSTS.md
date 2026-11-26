@@ -788,6 +788,7 @@ shows the authenticated owner's month-to-date reserved list-price spend; no new
 paid call supports that readback.
 - 2026-11-16: Added "Advisor agent budget" (advisor plan Phase 1A): Postgres reservations
   for every agent model call, the owner's starting shares and a US$25 daily breaker.
+- 2026-11-25: Ticket 367. With the Notes source on, the Daily Brief's one model call also carries up to three day notes of 280 characters and one instruction block: about 330 more input tokens at most (assumed, 4 characters per token), under US$0.0001 per brief. No new call; a quiet day still makes none.
 
 ### Tickets 213–214 production measurements — October 18, 2026
 
