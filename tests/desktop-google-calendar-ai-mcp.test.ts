@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { CalendarConnectionView, CalendarListEntry, CalendarPreferences } from "@/lib/types/google-calendar";
 import type { GoogleCalendarAiConnectionView } from "@/lib/ui/google-calendar";
@@ -11,6 +13,7 @@ import {
   isDesktopAiCalendarCallback,
   isDesktopCalendarCallback,
 } from "../apps/desktop/src/calendar/google-calendar";
+import { OUTLOOK_ATTEMPT_KEY } from "../apps/desktop/src/calendar/outlook-calendar";
 
 const BASE_PREFS: CalendarPreferences = {
   selectedCalendarIds: ["primary"],
@@ -197,5 +200,45 @@ describe("DesktopGoogleCalendarPanelCoordinator.ai", () => {
     expect(await coordinator.ai.syncFromTimeline()).toEqual({ view: makeView({ selectionRevision: 10 }), hiddenCalendarsSkipped: 2 });
     expect((await coordinator.ai.disconnect()).view.status).toBe("disconnected");
     expect(io.remove).toHaveBeenCalledWith(DESKTOP_AI_CALENDAR_PENDING_KEY);
+  });
+});
+
+function walkTsFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkTsFiles(full));
+    else if (/\.(ts|tsx)$/u.test(entry.name)) out.push(full);
+  }
+  return out;
+}
+
+describe("Desktop Keychain ALLOWED_KEYS parity", () => {
+  it("lists every pending/webview secret key used by apps/desktop/src in Rust ALLOWED_KEYS", () => {
+    const authRs = readFileSync(new URL("../apps/desktop/src-tauri/src/auth.rs", import.meta.url), "utf8");
+    const allowListBlock = /const ALLOWED_KEYS: &\[&str\] = &\[([^\]]*)\]/u.exec(authRs)?.[1] ?? "";
+    const allowedKeys = new Set(Array.from(allowListBlock.matchAll(/"([^"]+)"/gu), (m) => m[1]));
+
+    const expectedKeys = new Set<string>([
+      "supabase-session",
+      "supabase-pkce",
+      "pending-state",
+      DESKTOP_CALENDAR_PENDING_KEY,
+      DESKTOP_AI_CALENDAR_PENDING_KEY,
+      "pending-calendar-agent-state",
+      OUTLOOK_ATTEMPT_KEY,
+    ]);
+
+    const desktopSrcDir = new URL("../apps/desktop/src", import.meta.url).pathname;
+    for (const file of walkTsFiles(desktopSrcDir)) {
+      const source = readFileSync(file, "utf8");
+      for (const match of source.matchAll(/auth_secret_(?:get|set|remove)["']\s*,\s*\{\s*name:\s*["']([^"']+)["']/gu)) {
+        expectedKeys.add(match[1]);
+      }
+    }
+
+    for (const key of expectedKeys) {
+      expect(allowedKeys.has(key), `Key "${key}" used in apps/desktop/src is missing from ALLOWED_KEYS in auth.rs`).toBe(true);
+    }
   });
 });
