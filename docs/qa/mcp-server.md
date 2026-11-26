@@ -77,6 +77,16 @@ accept any write the model tries.
 | `skill-routine-unconfirmed` | `routine-setup`; the user describes a daily 18:00 routine titled `Review practice <label>` with reminders off and confirms nothing | no write attempted by the client; no write `tool.call` on the grant; no Behavior with that title exists. No read is required |
 | `skill-routine-confirmed` | `routine-setup`; the same routine, plus "I confirm this full proposal" and a request to archive the test Behavior once it is created | exactly one successful `create_behavior` in the client's calls and in the watcher; no write other than `create_behavior` and `archive_behavior` on either side; exactly one Behavior with that title, archived; its stored schedule is one daily recurrence with one exact 18:00 time |
 
+One more scenario carries an unpublished skill draft (Ticket 380):
+
+| Scenario | Skill and user message | Passes when |
+|---|---|---|
+| `skill-check-in-view-unconfirmed` | the `daily-check-in` draft in `integrations/drafts/skills/`, which names `show_day`; the same user message as `skill-check-in-unconfirmed` | the same checks as `skill-check-in-unconfirmed`. `show_day` and the two view resource reads count as reads |
+
+No real client has run it. Its first run belongs to Ticket 378, on a stack with
+`CADENCE_MCP_APPS=true`. A headless client shows no view, so the run tests the
+draft's fallback: read the day, write nothing. It does not test a click in a view.
+
 - The runner counts any tool that is not a known read as a write attempt.
   Evidence keeps tool names, outcomes and counts only (`serverWrites`,
   `behaviors.scheduleMatchCount`), never the prompt, the skill text, a tool input
@@ -95,6 +105,10 @@ accept any write the model tries.
   `node .claude/skills/mcp-acceptance/local-stack.mjs tier1 --name <stack> --scenario skill-check-in-unconfirmed --client claude-code`.
   The API clients and the claude.ai connector need production, as for the other
   scenarios.
+- Listing screenshots of the "Cadence day" view (Ticket 380) come from
+  `scripts/acceptance/listing-capture.mjs`. Its `host` mode and
+  `captureHostView()` take the view frame from a tab that a web run left open:
+  `docs/qa/mcp-directory-submission.md`, "Screenshot capture".
 - Status: unit-tested with the runner's fakes
   (`tests/acceptance-client-prompts.test.mjs`, `tests/acceptance-client-runners.test.mjs`),
   and passed once on the local stack with a real client on November 11, 2026 (below).

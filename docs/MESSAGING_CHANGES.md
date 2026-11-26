@@ -2645,7 +2645,10 @@ cite has not changed.
   statement and reviewer test cases. Ticket 380 drafts them unpublished.
 - **Related:** P-048, P-098, P-100.
 - **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
-  instruction. Nothing is submitted or published before it.
+  instruction. Nothing is submitted or published before it. Unpublished drafts prepared
+  November 26, 2026 (Ticket 380): `docs/qa/mcp-directory-submission.md`, "Unpublished MCP
+  Apps listing drafts"; the sign-in sentence there is corrected. Host screenshots wait
+  for Ticket 378. Listing copy that names the view is still to write.
 
 ## P-098: Privacy, Terms and Trust text about views rendered inside AI clients (D36)
 
@@ -2701,7 +2704,9 @@ cite has not changed.
   Publishing it is listing work.
 - **Related:** P-097.
 - **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
-  instruction.
+  instruction. Unpublished draft prepared November 26, 2026 (Ticket 380):
+  `integrations/drafts/skills/daily-check-in/SKILL.md`. The published copies are
+  unchanged.
 
 ## P-101: Gemini listing and Google's Connected Apps submission (D36)
 
