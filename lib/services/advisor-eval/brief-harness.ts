@@ -5,7 +5,7 @@ import type { DailyBriefGenerator, DailyBriefModelUsage } from "../daily-brief-c
 import { writeBriefWords, type DailyBriefWords } from "../daily-brief.service";
 import { modelPrice, usageMicrodollars } from "../agent-model-pricing";
 import { briefEvalFixtures, type BriefEvalFixture, type BriefEvalFixtureId } from "./brief-fixtures";
-import { checkBriefLayerOne, type BriefLayerOneViolation } from "./brief-rules";
+import { BRIEF_DAY_NOTE_RULE, checkBriefDayNoteNotQuoted, checkBriefLayerOne, type BriefLayerOneViolation } from "./brief-rules";
 import type { RubricCriterion } from "./harness";
 
 /**
@@ -77,7 +77,7 @@ async function runFixture(fixture: BriefEvalFixture, run: BriefEvalRun, clock: (
   const signal = new AbortController().signal;
   const started = clock();
   const words = await writeBriefWords({ context: fixture.context, candidates: plan.candidates, conflicts: [], calendar: plan.calendar, now: fixture.now,
-    signal, requestSignal: signal, generate, onUsage: (usage) => usages.push(usage) });
+    signal, requestSignal: signal, generate, onUsage: (usage) => usages.push(usage), ...(fixture.dayNotes ? { dayNotes: fixture.dayNotes } : {}) });
   const wordsMs = calls ? clock() - started : 0;
   const lines = plan.candidates.map((line) => evalLine(line, words, fixture.context.timezone));
   const shown = [words.opening, ...lines.map((line) => `${line.title}: ${line.from} → ${line.to}. ${line.reason}`)].join("\n");
@@ -143,6 +143,9 @@ export function scoreBriefRubric(input: Readonly<{
   if (fixture.expect.noHistoryClaims) {
     const match = text.match(HISTORY_CLAIMS);
     criteria.push({ id: "no_history_claims", passed: !match, ...(match ? { detail: match[0] } : {}) });
+  }
+  if (fixture.dayNotes?.length) {
+    criteria.push({ id: BRIEF_DAY_NOTE_RULE, ...checkBriefDayNoteNotQuoted({ dayNotes: fixture.dayNotes, texts: [words.opening, ...lines.map((line) => line.reason)], fallbacks: words.fallbacks }) });
   }
   if (fixture.expect.forbiddenText?.length) {
     const lower = text.toLowerCase();

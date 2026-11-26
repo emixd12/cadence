@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BRIEF_EVAL_FIXTURE_IDS, briefEvalFixture, briefEvalFixtures } from "@/lib/services/advisor-eval/brief-fixtures";
 import { runBriefEval, summarizeBriefEval, type BriefEvalRun } from "@/lib/services/advisor-eval/brief-harness";
-import { checkBriefLayerOne } from "@/lib/services/advisor-eval/brief-rules";
+import { checkBriefDayNoteNotQuoted, checkBriefLayerOne } from "@/lib/services/advisor-eval/brief-rules";
+import { briefOpeningInstructions } from "@/lib/services/brief-opening";
 import { planBriefMoveLinesFromInputs } from "@cadence/core/resolvers/brief-move.resolver";
 import { planBriefPairingLines } from "@cadence/core/resolvers/alongside-pairing.resolver";
 import { Temporal } from "@js-temporal/polyfill";
@@ -103,6 +104,32 @@ describe("Phase 3 brief eval (no model)", () => {
     expect(checkBriefLayerOne(fixture.plan, [off]).map((item) => item.rule)).toEqual(["pairing_off_host"]);
     // The same line as an ordinary move line is an alongside item offered against the rules.
     expect(checkBriefLayerOne(fixture.plan, [{ ...line!, reasonCode: "item_overlap", pairing: undefined }]).map((item) => item.rule)).toEqual(["alongside_offered"]);
+  });
+
+  it("Ticket 367: sends the day notes and marks a brief that repeats one", async () => {
+    const fixture = briefEvalFixture("day_notes");
+    expect(fixture.dayNotes!.map((item) => item.day)).toEqual(["today", "yesterday", "2 days ago"]);
+    const seen: string[] = [];
+    const writer = (opening: string): BriefEvalRun => ({ label: "notes", model: "openai/gpt-5.6-luna", generate: async (request) => {
+      seen.push(request.instructions);
+      const facts = JSON.parse(request.facts) as { dayNotes: unknown; lines: { key: string; with: string | null }[] };
+      expect(facts.dayNotes).toEqual(fixture.dayNotes);
+      return { opening, reasons: facts.lines.map((line) => ({ key: line.key, text: line.with ? `It runs into ${line.with}.` : "Its time no longer works today." })) };
+    } });
+    const [kept] = await runBriefEval({ run: writer("A few things clash on a slow day; here are new times."), fixtures: [fixture] });
+    expect(seen[0]).toBe(briefOpeningInstructions(["dayNotes"]));
+    expect(kept!.rubric.find((item) => item.id === "day_note_not_quoted")).toEqual({ id: "day_note_not_quoted", passed: true });
+    expect(kept!.rubric.filter((item) => !item.passed)).toEqual([]);
+    // The five-word note repeated whole: production shows stock words, and the rule records the slip.
+    const [quoted] = await runBriefEval({ run: writer("Head cold, slept four hours. A few things clash today."), fixtures: [fixture] });
+    expect(quoted!.fallbacks).toEqual(["opening_day_note"]);
+    expect(quoted!.opening).not.toContain("Head cold");
+    expect(quoted!.rubric.find((item) => item.id === "day_note_not_quoted")).toEqual({ id: "day_note_not_quoted", passed: false, detail: "opening_day_note" });
+    // The rule also reads shown text on its own, for words that reached the person.
+    expect(checkBriefDayNoteNotQuoted({ dayNotes: fixture.dayNotes!, texts: ["Your flight home was delayed three hours."], fallbacks: [] })).toEqual({ passed: false, detail: "shown" });
+    // A fixture with no day notes gets the plain prompt and no such rule.
+    const [plain] = await runBriefEval({ run: scripted(), fixtures: [briefEvalFixture("busy_professional")] });
+    expect(plain!.rubric.some((item) => item.id === "day_note_not_quoted")).toBe(false);
   });
 
   it("finds a line offered against the rules", () => {

@@ -5,6 +5,7 @@ import {
 } from "@cadence/core/resolvers/brief-move.resolver";
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brief-moves";
 import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
+import { textQuotesDayNote, type BriefDayNote } from "@cadence/core/resolvers/day-note.resolver";
 
 /**
  * Advisor Phase 3 (3A2) eval, layer 1: rules every offered line must keep, checked with
@@ -85,4 +86,24 @@ export function checkBriefLayerOne(input: BriefMovePlanInputs, lines: readonly L
 
 function overlaps(a: BriefMoveInterval, b: BriefMoveInterval): boolean {
   return Temporal.Instant.compare(a.start, b.end) < 0 && Temporal.Instant.compare(b.start, a.end) < 0;
+}
+
+/**
+ * Ticket 367 (D35): a rule on the brief's words, not its lines. The model's opening and
+ * reasons may be informed by a day note and may never repeat one. Production replaces a
+ * sentence that does with Cadence's stock text (`opening_day_note`, `reason_day_note`), so
+ * the rule reads both what is shown and which sentences were replaced.
+ */
+export const BRIEF_DAY_NOTE_RULE = "day_note_not_quoted";
+
+export function checkBriefDayNoteNotQuoted(input: Readonly<{
+  dayNotes: readonly BriefDayNote[];
+  /** The opening and every reason, as shown. */
+  texts: readonly string[];
+  fallbacks: readonly string[];
+}>): Readonly<{ passed: boolean; detail?: string }> {
+  const replaced = input.fallbacks.filter((item) => item.endsWith("_day_note"));
+  if (replaced.length) return { passed: false, detail: replaced.join(",") };
+  const notes = input.dayNotes.map((item) => item.note);
+  return input.texts.some((text) => textQuotesDayNote(text, notes)) ? { passed: false, detail: "shown" } : { passed: true };
 }
