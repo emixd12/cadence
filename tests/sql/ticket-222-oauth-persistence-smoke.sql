@@ -368,6 +368,7 @@ do $$
 declare
   begin_state record;
   plain_session_rejected boolean := false;
+  method_name_rejected boolean := false;
 begin
   select * into begin_state from public.integration_idempotency_begin('key-1', 'set_occurrence_status', repeat('1', 64));
   if begin_state.state <> 'started' then
@@ -392,6 +393,25 @@ begin
   perform public.integration_record_activity('set_occurrence_status', array[]::uuid[], 'success', null);
   if (select count(*) from public.oauth_list_activity(10, null)) <> 1 then
     raise exception 'User A must see their activity record';
+  end if;
+
+  -- Ticket 376: the MCP Apps transport reads are outside the contract registry. The
+  -- activity table takes their labels as it takes a registry tool's, and refuses the MCP
+  -- method name, which is why the server never uses it as a label.
+  perform public.integration_record_activity('show_day', array[]::uuid[], 'success', null);
+  perform public.integration_record_activity('read_view_resource', array[]::uuid[], 'invalid', 'not_found');
+  perform public.integration_record_activity('list_view_resources', array[]::uuid[], 'rate_limited', 'rate_limited');
+  if (select count(*) from public.oauth_list_activity(10, null)
+      where operation in ('show_day', 'read_view_resource', 'list_view_resources')) <> 3 then
+    raise exception 'User A must see the MCP Apps read activity records';
+  end if;
+  begin
+    perform public.integration_record_activity('resources/read', array[]::uuid[], 'success', null);
+  exception when check_violation then
+    method_name_rejected := true;
+  end;
+  if not method_name_rejected then
+    raise exception 'An MCP method name must not be accepted as an activity operation';
   end if;
 
   perform set_config('request.jwt.claims', '{"sub":"22200000-0000-4000-8000-00000000000a","role":"authenticated"}', true);

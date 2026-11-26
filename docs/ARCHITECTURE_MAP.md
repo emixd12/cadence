@@ -418,6 +418,7 @@ Dagger checks (`.dagger/modules/cadence/main.dang`): `agents`, `interactions`,
 | A desktop SQLite migration | The file, the `MIGRATIONS` entry in `db.rs`, and `schema_version` in `local_store/tests.rs` |
 | An MCP tool | `operations.ts`, a handler in `read/index.ts` or `write/index.ts`, `tests/fixtures/integration/operations/<name>.json`, the name list in `tests/integration-contract.test.ts`, `REGISTRY_TOOLS` in `scripts/acceptance/protocol.mjs`, `OPERATION_ACCESS` in `scripts/acceptance/watch.mjs`, `INTEGRATION_CONTRACT_VERSION`, then regenerate the two files below |
 | The MCP contract | `UPDATE_MCP_CONTRACT_DOC=1 npm run test -- tests/integration-contract.test.ts` and `npm run developers:check -- --write` |
+| An MCP transport tool or its activity label (MCP Apps trial, outside the registry) | `lib/mcp/apps/`, `TRANSPORT_TOOLS` in `scripts/acceptance/protocol.mjs`, `TRANSPORT_OPERATION_ACCESS` in `scripts/acceptance/watch.mjs`, the frozen schema in `docs/qa/2026-11-26-mcp-apps-spike.md`, and `docs/MCP_CONTRACT.md`, "MCP Apps trial" |
 | A plugin skill | Edit `integrations/skills/`, then copy the file to both plugin folders |
 | A protected page | The `proxy.ts` matcher and `lib/navigation.ts` |
 | `STATUS.md` | Stay under 40,000 bytes. Archive only on branch `chore/status-archive`, as its own docs-only PR |

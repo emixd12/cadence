@@ -13,7 +13,7 @@ import { assertSafe, createRun, resumeRun } from '../scripts/acceptance/ledger.m
 import { GRANTS } from '../scripts/acceptance/consent-page.mjs';
 import { AcceptanceError, Secret } from '../scripts/acceptance/test-account-sessions.mjs';
 import {
-  READ_LIMIT, READ_TOOLS, REGISTRY_TOOLS, SAMPLE_NOTE, WRITE_LIMIT, WRITE_SCOPE, main, parseArgs, renderReport, runProtocolSuite, writeReport,
+  READ_LIMIT, READ_TOOLS, REGISTRY_TOOLS, SAMPLE_NOTE, TRANSPORT_TOOLS, WRITE_LIMIT, WRITE_SCOPE, expectedTools, main, parseArgs, renderReport, runProtocolSuite, writeReport,
 } from '../scripts/acceptance/protocol.mjs';
 
 const ISSUER = 'https://127.0.0.1:4440';
@@ -25,7 +25,7 @@ const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 
 /** In-memory Cadence: grants, token families, two accounts' data, per-grant rate limits. */
-function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false, contractVersion = '1.7.0' } = {}) {
+function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false, contractVersion = '1.7.0', reportsApps, listedTools = REGISTRY_TOOLS } = {}) {
   const grants = [];
   const access = new Map();
   const refresh = new Map();
@@ -163,7 +163,8 @@ function createFakeCadence({ readOnlyCanWrite = false, leakIntoNotFound = false,
       return { status: r.status, isError: Boolean(r.isError), errorCode: r.errorCode ?? null, wwwAuthenticate: r.wwwAuthenticate ?? '', retryAfter: r.retryAfter ?? NaN, stepUpMeta: Boolean(r.stepUpMeta) };
     },
     connect: async (tokens) => ({
-      listTools: async () => [...REGISTRY_TOOLS],
+      listTools: async () => [...listedTools],
+      ...(reportsApps === undefined ? {} : { reportsApps: () => reportsApps }),
       call: async (name, args = {}) => {
         const r = handle(tokens.authorization(), name, args);
         return { ok: r.status === 200 && !r.isError, structured: r.structured ?? null, errorCode: r.errorCode ?? (r.status === 200 ? null : `sdk-${r.status}`) };
@@ -235,6 +236,23 @@ describe('Ticket 249 protocol acceptance suite', () => {
     }
     const published = await runFake();
     expect(published.checks.some((c) => c.check === 'alongside-absent-before-1.8.0' && c.ok)).toBe(true);
+  });
+
+  it('expects the transport tools only when the server reports MCP Apps (Ticket 376)', async () => {
+    // tests/mcp-apps-server.test.ts keeps TRANSPORT_TOOLS and the extension name equal to lib/mcp.
+    expect(expectedTools(false)).toEqual([...REGISTRY_TOOLS]);
+    expect(expectedTools(true)).toEqual([...REGISTRY_TOOLS, 'show_day']);
+    const inventory = (result) => result.checks.find((c) => c.check === 'tools-list-equals-registry');
+    const withApps = [...REGISTRY_TOOLS, ...TRANSPORT_TOOLS];
+    // Flag on: the registry plus show_day passes, and the registry alone fails.
+    const on = await runFake({ fake: createFakeCadence({ reportsApps: true, listedTools: withApps }) });
+    expect(inventory(on)).toMatchObject({ ok: true, detail: 'count=27 apps=on' });
+    expect(failed(on.checks)).toEqual([]);
+    expect(inventory(await runFake({ fake: createFakeCadence({ reportsApps: true }) })).ok).toBe(false);
+    // Flag off stays strict: a server that lists show_day without reporting MCP Apps fails.
+    expect(inventory(await runFake({ fake: createFakeCadence({ reportsApps: false, listedTools: withApps }) }))).toMatchObject({ ok: false, detail: 'count=27 apps=off' });
+    expect(inventory(await runFake({ fake: createFakeCadence({ listedTools: withApps }) })).ok).toBe(false);
+    expect(inventory(await runFake())).toMatchObject({ ok: true, detail: 'count=26 apps=off' });
   });
 
   it.each(['token-request-failed', 'granted-scope-mismatch'])('cleans the final consent-created grant after %s', async reason => {

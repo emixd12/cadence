@@ -44,6 +44,14 @@ export const REGISTRY_TOOLS = Object.freeze([
   'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
   'end_behavior', 'pause_behavior', 'resume_behavior',
 ]);
+// Ticket 376: tools the MCP transport lists after the registry while CADENCE_MCP_APPS is
+// on. They are outside the contract registry. A server reports the flag by declaring the
+// MCP Apps extension in its capabilities; tests/acceptance-protocol.test.mjs keeps these
+// names equal to lib/mcp.
+export const MCP_APPS_EXTENSION = 'io.modelcontextprotocol/ui';
+export const TRANSPORT_TOOLS = Object.freeze(['show_day']);
+/** The exact tools/list inventory: the registry, plus the transport tools only when the server reports MCP Apps. */
+export const expectedTools = (reportsApps) => (reportsApps === true ? [...REGISTRY_TOOLS, ...TRANSPORT_TOOLS] : [...REGISTRY_TOOLS]);
 export const WRITE_SCOPE = Object.freeze({
   set_occurrence_status: 'cadence.occurrences.write', set_parent_occurrence_status: 'cadence.occurrences.write',
   update_occurrence_note: 'cadence.occurrences.write',
@@ -92,6 +100,8 @@ export async function createLiveProtocol({ issuer, fetchImpl = fetch }) {
     }));
     return {
       listTools: async () => (await client.listTools()).tools.map((tool) => tool.name),
+      // True only when the server declares the MCP Apps extension (CADENCE_MCP_APPS on, Ticket 376).
+      reportsApps: () => Boolean(client.getServerCapabilities()?.extensions?.[MCP_APPS_EXTENSION]),
       call: async (name, args = {}) => {
         try {
           const result = await client.callTool({ name, arguments: args });
@@ -315,7 +325,9 @@ export async function runProtocolSuite({
   const read = ready ? await scenario('read-a', async (ctx) => withGrant(ctx, { label: 'read-a', slot: 'A', grant: 'read' }, async ({ session, tokens }) => {
     const { check } = ctx;
     const names = await session.listTools();
-    check('tools-list-equals-registry', JSON.stringify(names) === JSON.stringify(REGISTRY_TOOLS), `count=${names.length}`);
+    // Strict either way: with MCP Apps off any extra tool fails; with it on, exactly the transport tools follow the registry.
+    const apps = session.reportsApps?.() === true;
+    check('tools-list-equals-registry', JSON.stringify(names) === JSON.stringify(expectedTools(apps)), `count=${names.length} apps=${apps ? 'on' : 'off'}`);
     const context = await expectOk(session, check, 'get_account_context', {});
     check('granted-scopes', sameSet(context?.granted_scopes ?? [], [READ_SCOPE]));
     const list = await expectOk(session, check, 'list_behaviors', {});

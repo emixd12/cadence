@@ -1004,6 +1004,62 @@ off, `tools/list`, every output and every error are byte-identical to 1.7.0
   `INTEGRATION_CONTRACT_VERSION` to 1.8.0 and regenerate this reference and the
   developer reference.
 
+## MCP Apps trial: `show_day`, a transport tool outside this contract
+
+Ticket 376 (`docs/DECISIONS.md`, 2026-11-25, D36). **`show_day` is not part of the
+published contract.** It is not in the registry, the generated reference above, the
+developer reference or the plugins, and it has no contract version. The MCP endpoint
+adds it to `tools/list`, after the registry tools, only while the server flag
+`CADENCE_MCP_APPS` is exactly `true`. The flag is off in production. With it off,
+`tools/list` is byte-identical to the contract (`tests/mcp-apps-server.test.ts` pins the
+1.7.0 digest on both protocol paths). The frozen schema and view contract are in
+`docs/qa/2026-11-26-mcp-apps-spike.md`; `tests/mcp-apps-show-day.test.ts` compares the
+served schemas with that note.
+
+- **Where it lives.** `lib/mcp/apps/show-day.ts` holds the descriptor and schemas. The
+  day comes from `getIntegrationDay` in `lib/services/integration-day.service.ts`, a
+  one-day adapter over the `get_timeline` read. `get_timeline` is unchanged.
+- **Descriptor.** Name `show_day`, title "Show day", scope `cadence.read`, annotations
+  `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`,
+  `openWorldHint: false`, and `_meta.ui.resourceUri: "ui://cadence/day/v1.html"`. It is
+  always listed with the flag on, whatever the client declares.
+- **Input.** Optional `date` (YYYY-MM-DD). It defaults to today in the account timezone.
+- **Output.** `local_date`, `is_today`, `timezone`, `today_local_date`, `day_note`
+  (always present, null when none), `occurrences`, `parent_groups` (always present),
+  `needs_decision` and `freshness`. `content[0].text` is the same object as JSON.
+- **Occurrences.** Each is the contract Occurrence plus `connector_completion`:
+  `{ source, source_label }` when the Occurrence is Completed and its latest status event
+  came from a connected service, otherwise null. The rule is the web Timeline's
+  (`resolveTimelineSourceEvidence`). It is read only while
+  `CADENCE_CONNECTOR_COMPLETION` is on; with that flag off, or when the evidence read
+  fails, the field is null. `alongside` appears only in the alongside edition.
+- **Needs decision.** `{ count, truncated }` only, never a list. When more than 100
+  Occurrences need a decision, `count` is 100 and `truncated` is true; `get_timeline`
+  returns `limit_exceeded` in that case.
+- **Never returned.** Calendar events, travel, leave times, Daily Brief text, location,
+  tracked time, intended duration and Periods. Every output object is closed, and the
+  result is validated before it is returned, so a field outside the projection is an
+  `internal_error`, not data. An Occurrence field that a later contract edition adds
+  must be added to this schema before `show_day` can return it.
+- **Result `_meta`.** `com.cadence-me/granted_scopes` lists the grant's tracking scopes
+  in consent order. It is never in `structuredContent` or the text.
+- **Errors.** The contract's tool-error shape with `invalid_input`,
+  `insufficient_scope`, `rate_limited`, `service_unavailable` or `internal_error`. A
+  result above the 100,000-byte response limit is `internal_error`.
+- **Admission.** As a registry read: scope, then the per-grant read limit, then one
+  activity row with the operation `show_day`. A failed limit or activity write refuses
+  the call.
+- **Cadence Chat.** Chat builds its tools from the registry, so it neither lists nor
+  runs `show_day` (`tests/mcp-apps-chat.test.ts`).
+- **Rollback.** With the flag off the name is unknown: a host that still holds the
+  descriptor gets the tool error `invalid_input`, "Unknown Cadence tool name.".
+- **General release.** `show_day` joins the registry as a minor version after the
+  alongside edition folds in (Ticket 365). This section, the generated reference and the
+  developer reference change then (`P-099`).
+
+The view resources that go with it are transport features, described in
+`docs/MCP_INTEGRATION.md`, section 17.
+
 ## Behaviors of Opportunity (contract 1.6.0)
 
 `docs/RECURRENCE_RULES.md`, "Behaviors of Opportunity", holds the rules. In the contract:
