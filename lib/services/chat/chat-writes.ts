@@ -41,7 +41,7 @@ export type ChatPendingWrite = Readonly<{
   item: ChatConfirmItem;
   /** The record and revision the confirm was shown against; a change expires the confirm (T13). */
   /** `day_note` uses the local date as id and "none" as the revision of a day with no note. */
-  guard: Readonly<{ kind: "occurrence" | "behavior" | "day_note" | "period"; id: string; revision: string }> | null;
+  guard: Readonly<{ kind: "occurrence" | "behavior" | "day_note"; id: string; revision: string }> | null;
 }>;
 
 type Json = Record<string, unknown>;
@@ -89,8 +89,6 @@ export type ChatWriteFacts = Readonly<{
   parent?: Json | null;
   /** A routine mark: the slot's step Occurrences as read before the write, with their statuses. */
   slot?: readonly Json[] | null;
-  /** A Period edit or end: its label, dates and revision as read before the write. Never its note. */
-  period?: Json | null;
 }>;
 
 export function outcomeKind(name: ChatWriteName): ChatOutcomeKind { return CHAT_OUTCOME_KIND[name]; }
@@ -150,29 +148,6 @@ function groupingText(args: Readonly<Record<string, unknown>>, title: string, fa
   return null;
 }
 
-/** `the period "Sick"`, from the write's result, the record read before it, or the new label. */
-function periodName(...sources: readonly unknown[]): string {
-  const label = sources.map((source) => str(obj(source).label)).find(Boolean);
-  return label ? `the period "${label}"` : "this period";
-}
-
-/** "from Mon Nov 3 to Sun Nov 9", "on Mon Nov 3" for one day, "from Mon Nov 3, with no last day". */
-function periodDatesText(start: string | null, end: string | null): string {
-  if (!start) return "";
-  if (!end) return ` from ${chatDateText(start)}, with no last day`;
-  return end === start ? ` on ${chatDateText(start)}` : ` from ${chatDateText(start)} to ${chatDateText(end)}`;
-}
-
-/** What an edit changes, with the new values. A note is named, never quoted. */
-function periodChangesText(args: Readonly<Record<string, unknown>>): string {
-  const parts: string[] = [];
-  if (str(args.label)) parts.push(`label "${args.label as string}"`);
-  if (str(args.start_local_date)) parts.push(`first day ${chatDateText(args.start_local_date as string)}`);
-  if ("end_local_date" in args) parts.push(str(args.end_local_date) ? `last day ${chatDateText(args.end_local_date as string)}` : "no last day");
-  if ("note" in args) parts.push(str(args.note) ? "a new note" : "no note");
-  return parts.length ? `: ${parts.join(", ")}` : "";
-}
-
 /** The confirm line, in the imperative: "Mark Walk done". */
 export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts): string {
   const args = call.args;
@@ -220,11 +195,6 @@ export function describePendingWrite(call: ChatWriteCall, facts: ChatWriteFacts)
     }
     case "archive_behavior": return `Archive ${title}`;
     case "restore_behavior": return `Restore ${title}`;
-    // Period lines name the label and dates. A note is mentioned, never quoted.
-    case "create_period":
-      return `Add ${periodName(args)}${periodDatesText(str(args.start_local_date), str(args.end_local_date))}${str(args.note) ? ", with a note" : ""}`;
-    case "update_period": return `Change ${periodName(facts.period)}${periodChangesText(args)}`;
-    case "end_period": return `End ${periodName(facts.period)} today`;
   }
 }
 
@@ -287,18 +257,7 @@ export function describeOutcome(call: ChatWriteCall, result: unknown, facts: Cha
     }
     case "archive_behavior": return `Archived ${title}.`;
     case "restore_behavior": return `Restored ${title}.`;
-    case "create_period": {
-      const period = obj(out.period);
-      return `Added ${periodName(period, call.args)}${periodDatesText(str(period.start_local_date) ?? str(call.args.start_local_date), str(period.end_local_date))}.`;
-    }
-    case "update_period":
-      return out.changed === false ? `${capitalizeFirst(periodName(out.period, facts.period))} already had those details.` : `Changed ${periodName(out.period, facts.period)}.`;
-    case "end_period": return `Ended ${periodName(out.period, facts.period)} today.`;
   }
-}
-
-function capitalizeFirst(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const PRESET_TEXT: Readonly<Record<string, string>> = { morning: "this morning", afternoon: "this afternoon", evening: "this evening", night: "tonight" };
@@ -442,11 +401,6 @@ export function undoPlanFor(call: ChatWriteCall, result: unknown, facts: ChatWri
       return id && out.changed !== false ? { call: { name: "archive_behavior", args: { behavior_id: id } } } : null;
     }
     case "update_behavior": return null;
-    // Ticket 370: chat offers no Undo for a Period write. No tool removes a Period, and an
-    // edit or an end keeps no earlier values to set back. The person changes it in the app.
-    case "create_period":
-    case "update_period":
-    case "end_period": return null;
   }
 }
 
@@ -474,9 +428,6 @@ export function factsReadFor(call: ChatWriteCall): Readonly<{ name: ChatToolName
   if (call.name === "update_day_note" && str(call.args.local_date)) {
     return { name: "list_day_notes", args: { start_local_date: call.args.local_date, end_local_date: call.args.local_date } };
   }
-  // A Period is read by id through `fetch`: its text holds the label, dates and revision, never the note.
-  const periodId = str(call.args.period_id);
-  if ((call.name === "update_period" || call.name === "end_period") && periodId) return { name: "fetch", args: { id: `period:${periodId}` } };
   return null;
 }
 
@@ -490,18 +441,9 @@ export function factsFrom(call: ChatWriteCall, read: ChatToolResult | null): Cha
     const match = notes.find((note) => note.local_date === call.args.local_date);
     return { dayNote: match ? str(match.note) : null, dayNoteRevision: match ? str(match.revision) : null };
   }
-  if (call.name === "update_period" || call.name === "end_period") return { period: periodFrom(out) };
   if (out.occurrence) return { occurrence: obj(out.occurrence) };
   if (out.behavior) return { behavior: obj(out.behavior) };
   return {};
-}
-
-/** The Period in a `fetch` result: Cadence's own JSON of its id, label, dates and revision. */
-function periodFrom(fetched: Json): Json | null {
-  try {
-    const period = obj(JSON.parse(str(fetched.text) ?? ""));
-    return str(period.id) ? period : null;
-  } catch { return null; }
 }
 
 /** The parent a write names, read so its lines can say the routine's name. */
@@ -561,8 +503,6 @@ export function guardFrom(facts: ChatWriteFacts, call?: ChatWriteCall): ChatPend
   if (call?.name === "update_day_note" && facts.dayNote !== undefined && str(call.args.local_date)) {
     return { kind: "day_note", id: call.args.local_date as string, revision: facts.dayNoteRevision ?? "none" };
   }
-  const period = facts.period ? obj(facts.period) : null;
-  if (period && str(period.id) && str(period.revision)) return { kind: "period", id: period.id as string, revision: period.revision as string };
   const occurrence = facts.occurrence ? obj(facts.occurrence) : null;
   if (occurrence && str(occurrence.id) && str(occurrence.revision)) return { kind: "occurrence", id: occurrence.id as string, revision: occurrence.revision as string };
   const behavior = facts.behavior ? obj(facts.behavior) : null;
@@ -580,10 +520,6 @@ export function withRevision(call: ChatWriteCall, facts: ChatWriteFacts): ChatWr
   }
   if (call.name === "update_day_note" && facts.dayNoteRevision && !str(call.args.expected_revision)) {
     return { ...call, args: { ...call.args, expected_revision: facts.dayNoteRevision } };
-  }
-  const periodRevision = facts.period ? str(obj(facts.period).revision) : null;
-  if ((call.name === "update_period" || call.name === "end_period") && periodRevision && !str(call.args.expected_revision)) {
-    return { ...call, args: { ...call.args, expected_revision: periodRevision } };
   }
   return call;
 }

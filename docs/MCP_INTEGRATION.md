@@ -766,15 +766,18 @@ The writes run as the grant's user through `public.integration_apply_period_writ
 the opaque revision with the stored row, writes through `create_period` or
 `update_period`, stores a version-2 receipt and records the activity. The same migration
 adds the three operations to `integration_lock_write` by a text patch that raises when
-its anchor is missing, and adds the `period` kind to `chat_actions`. The service plans
+its anchor is missing. It drops nothing. The service plans
 each write with the Period resolver, so the app and MCP follow the same rules, and reads
 "today" for `end_period` from the profile timezone. The cap trigger's SQLSTATE `54000`
 maps to `limit_exceeded`.
 
-Cadence Chat reads the tools from the registry. The three writes always wait for a Yes
-and have no Undo. With the Notes source off, the Period tools stay (a label is not a
-note), `create_period` and `update_period` offer no `note`, and `withoutNotes` removes
-the note from every result.
+Cadence Chat reads Periods and does not write them yet. It takes `list_periods` and the
+new fields from the registry; `buildChatToolDefinitions` leaves `create_period`,
+`update_period` and `end_period` out, and Chat's executor refuses them. With the Notes
+source off, `list_periods` stays (a label is not a note) and `withoutNotes` removes the
+note from every result. Chat's Period writes are a follow-up on branch
+`feat/370-chat-period-writes`: they need the `period` kind in `chat_actions`, a
+constraint change outside the standing approval for hosted pushes.
 
 Evidence: `tests/integration-contract.test.ts`, `tests/integration-read.test.ts`
 (including 500 overlapping Periods), `tests/integration-write.test.ts`,

@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MockLanguageModelV4 } from "ai/test";
-import { simulateReadableStream } from "ai";
-import type { ChatEvent } from "@cadence/core/types/chat";
 import { periodsOverlappingRange, type PeriodRecord } from "@cadence/core/resolvers/period.resolver";
 
 /**
- * Ticket 370: Periods in Chat. The executor under test is the live one, running the
+ * Ticket 370: Periods in Chat. Chat reads Periods and does not write them yet (the
+ * writes are the follow-up on branch feat/370-chat-period-writes). The executor under test is the live one, running the
  * real MCP read and write handlers over an in-memory account, so what reaches the
  * model is what production serializes. Only the database and its neighbors are faked.
  */
@@ -34,17 +32,13 @@ vi.mock("@/lib/services/occurrence.service", async (original) => ({
   ...await original<typeof import("@/lib/services/occurrence.service")>(), ensureUserOccurrencesFresh: async () => ({ synced: true }),
 }));
 
-import { agentModelSetting } from "@/lib/services/agent-model";
-import { buildChatSystemPrompt } from "@/lib/services/chat/chat-prompt";
 import {
-  CHAT_CONFIRM_WRITES, CHAT_IMMEDIATE_WRITES, CHAT_OUTCOME_KIND, CHAT_TOOL_SUBJECT, buildChatToolDefinitions, chatToolLineText, isImmediateWrite,
+  CHAT_CONFIRM_WRITES, CHAT_IMMEDIATE_WRITES, CHAT_OUTCOME_KIND, CHAT_TOOL_SUBJECT, buildChatToolDefinitions, chatToolLineText, isChatWrite,
   type ChatSourceFlags,
 } from "@/lib/services/chat/chat-tools";
-import { runChatTurn } from "@/lib/services/chat/chat-turn";
-import { runChatConfirm } from "@/lib/services/chat/chat-confirm";
 import { createLiveChatExecutor } from "@/lib/services/chat/chat-executor";
 import { compactTimeline } from "@/lib/services/chat/chat.service";
-import { describeOutcome, describePendingWrite, undoPlanFor, type ChatToolExecutor, type ChatToolResult } from "@/lib/services/chat/chat-writes";
+import type { ChatToolExecutor, ChatToolResult } from "@/lib/services/chat/chat-writes";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 
 const NOTES_ON: ChatSourceFlags = { notes: true, googleCalendar: false, outlookCalendar: false, icloudCalendar: false, hevy: false };
@@ -54,7 +48,6 @@ const SICK = "00000000-1111-4111-8111-000000000070";
 const TODAY = "2026-11-19";
 /** Text that exists only in a Period note. It must never reach the model with Notes off. */
 const SECRET = "migraine with aura";
-const usage = { inputTokens: { total: 1000, noCache: 1000, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 50, text: 50, reasoning: 0 } };
 
 let periods: PeriodRecord[];
 let clock: number;
@@ -103,40 +96,6 @@ function liveExecutor(sources: ChatSourceFlags) {
   return { executor, results };
 }
 
-type Step = { text?: string; calls?: Array<{ name: string; input: Record<string, unknown> }> };
-function scriptedModel(steps: Step[], seen: unknown[] = []) {
-  let index = 0, callId = 0;
-  return new MockLanguageModelV4({
-    doStream: async (options) => {
-      seen.push(options.prompt);
-      let step = steps[Math.min(index++, steps.length - 1)]!;
-      if (options.toolChoice?.type === "none") step = { text: step.text ?? "" };
-      const chunks: unknown[] = [{ type: "stream-start", warnings: [] }];
-      if (step.text) chunks.push({ type: "text-start", id: "t" }, { type: "text-delta", id: "t", delta: step.text }, { type: "text-end", id: "t" });
-      for (const call of step.calls ?? []) {
-        chunks.push({ type: "tool-input-start", id: `call-${callId}`, toolName: call.name }, { type: "tool-input-end", id: `call-${callId}` });
-        chunks.push({ type: "tool-call", toolCallId: `call-${callId++}`, toolName: call.name, input: JSON.stringify(call.input) });
-      }
-      chunks.push({ type: "finish", usage, finishReason: { unified: step.calls?.length ? "tool-calls" : "stop", raw: undefined } });
-      return { stream: simulateReadableStream({ chunks: chunks as never[] }) };
-    },
-  });
-}
-
-async function turn(steps: Step[], sources: ChatSourceFlags) {
-  const live = liveExecutor(sources);
-  const events: ChatEvent[] = [];
-  const prompts: unknown[] = [];
-  let id = 0;
-  const result = await runChatTurn({
-    setting: agentModelSetting("chat"), model: scriptedModel(steps, prompts),
-    instructions: buildChatSystemPrompt({ timezone: "America/New_York", today: TODAY, localTime: "10:00", weekday: "Thursday", sourcesOff: [] }),
-    tools: buildChatToolDefinitions(sources), history: [], userMessage: "hi", executor: live.executor, replyId: "reply-1",
-    signal: AbortSignal.timeout(5_000), onEvent: (event) => events.push(event), newId: () => `00000000-0000-4000-8000-${String(++id).padStart(12, "0")}`,
-  });
-  return { result, events, live, prompts };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   clock = 0;
@@ -151,108 +110,39 @@ beforeEach(() => {
 });
 
 describe("Period tools in Chat (Ticket 370)", () => {
-  it("offers the Period tools from the registry, and never runs a Period write without a Yes", () => {
-    const names = buildChatToolDefinitions(NOTES_ON).map((tool) => tool.name);
-    for (const name of ["list_periods", "create_period", "update_period", "end_period"]) expect(names).toContain(name);
-    expect(names).not.toContain("delete_period");
-    expect(names).not.toContain("remove_period");
-    for (const name of ["create_period", "update_period", "end_period"] as const) {
-      expect(CHAT_CONFIRM_WRITES).toContain(name);
-      expect(CHAT_IMMEDIATE_WRITES as readonly string[]).not.toContain(name);
-      expect(isImmediateWrite(name)).toBe(false);
-      expect(CHAT_OUTCOME_KIND[name]).toBe("period");
+  const WRITES = ["create_period", "update_period", "end_period"] as const;
+
+  it("offers list_periods and none of the three Period writes, whatever the Notes setting", () => {
+    for (const sources of [NOTES_ON, NOTES_OFF]) {
+      const names = buildChatToolDefinitions(sources).map((tool) => tool.name as string);
+      expect(names).toContain("list_periods");
+      for (const name of ["get_account_context", "get_timeline", "get_adherence_summary", "search", "fetch"]) expect(names).toContain(name);
+      for (const name of [...WRITES, "delete_period", "remove_period"]) expect(names).not.toContain(name);
     }
+    // The note tools still go with Notes off; list_periods is not one of them.
+    expect(buildChatToolDefinitions(NOTES_OFF).map((tool) => tool.name as string)).not.toContain("list_day_notes");
     expect(CHAT_TOOL_SUBJECT.list_periods).toBe("periods");
     expect(chatToolLineText("periods", "done")).toBe("Looked at your periods");
   });
 
-  it("keeps the Period tools with Notes off, without a note to send", () => {
-    const tools = new Map(buildChatToolDefinitions(NOTES_OFF).map((tool) => [tool.name, tool]));
-    // A label is not a note: Period tools stay. The note tools go, as before.
-    for (const name of ["list_periods", "create_period", "update_period", "end_period", "search", "fetch"]) expect(tools.has(name as never)).toBe(true);
-    for (const name of ["list_day_notes", "update_day_note", "update_occurrence_note"]) expect(tools.has(name as never)).toBe(false);
-    for (const name of ["create_period", "update_period"] as const) {
-      expect(Object.keys(tools.get(name)!.inputSchema.properties as object)).not.toContain("note");
-      expect(Object.keys(new Map(buildChatToolDefinitions(NOTES_ON).map((tool) => [tool.name, tool])).get(name)!.inputSchema.properties as object)).toContain("note");
+  it("has no write path for a Period: not a chat write, no outcome kind, and the executor refuses a call", async () => {
+    for (const name of WRITES) {
+      expect(isChatWrite(name)).toBe(false);
+      expect([...CHAT_IMMEDIATE_WRITES, ...CHAT_CONFIRM_WRITES] as readonly string[]).not.toContain(name);
+      expect(CHAT_OUTCOME_KIND).not.toHaveProperty(name);
     }
-  });
-
-  it("describes each write in Cadence's words, naming a note without quoting it", () => {
-    const sick = { id: SICK, label: "Sick", start_local_date: "2026-11-17", end_local_date: null, ongoing: true, revision: "r1" };
-    expect(describePendingWrite({ name: "create_period", args: { label: "Sick", start_local_date: "2026-11-17", end_local_date: "2026-11-20", note: SECRET } }, {}))
-      .toBe("Add the period \"Sick\" from Tue Nov 17 to Fri Nov 20, with a note");
-    expect(describePendingWrite({ name: "create_period", args: { label: "Travel", start_local_date: "2026-11-19" } }, {}))
-      .toBe("Add the period \"Travel\" from Thu Nov 19, with no last day");
-    expect(describePendingWrite({ name: "create_period", args: { label: "Off", start_local_date: "2026-11-19", end_local_date: "2026-11-19" } }, {}))
-      .toBe("Add the period \"Off\" on Thu Nov 19");
-    expect(describePendingWrite({ name: "update_period", args: { period_id: SICK, label: "Flu", end_local_date: "2026-11-21", note: SECRET } }, { period: sick }))
-      .toBe("Change the period \"Sick\": label \"Flu\", last day Sat Nov 21, a new note");
-    expect(describePendingWrite({ name: "update_period", args: { period_id: SICK, end_local_date: null, note: null } }, { period: sick }))
-      .toBe("Change the period \"Sick\": no last day, no note");
-    expect(describePendingWrite({ name: "end_period", args: { period_id: SICK } }, { period: sick })).toBe("End the period \"Sick\" today");
-    expect(describePendingWrite({ name: "end_period", args: { period_id: SICK } }, {})).toBe("End this period today");
-    const ended = { period: { ...sick, end_local_date: TODAY, ongoing: false, note: SECRET }, changed: true };
-    expect(describeOutcome({ name: "end_period", args: { period_id: SICK } }, ended, { period: sick })).toBe("Ended the period \"Sick\" today.");
-    expect(describeOutcome({ name: "update_period", args: { period_id: SICK, label: "Flu" } }, { period: { ...sick, label: "Flu" }, changed: true }, { period: sick }))
-      .toBe("Changed the period \"Flu\".");
-    expect(describeOutcome({ name: "update_period", args: { period_id: SICK, label: "Sick" } }, { period: sick, changed: false }, { period: sick }))
-      .toBe("The period \"Sick\" already had those details.");
-    expect(describeOutcome({ name: "create_period", args: { label: "Sick", start_local_date: "2026-11-17", note: SECRET } }, { period: { ...sick, note: SECRET } }, {}))
-      .toBe("Added the period \"Sick\" from Tue Nov 17, with no last day.");
-  });
-
-  it("offers no Undo for any Period write", () => {
-    const period = { id: SICK, label: "Sick", start_local_date: "2026-11-17", end_local_date: TODAY, ongoing: false, note: null, revision: "r2" };
-    const facts = { period: { id: SICK, label: "Sick", start_local_date: "2026-11-17", end_local_date: null, revision: "r1" } };
-    expect(undoPlanFor({ name: "create_period", args: { label: "Sick", start_local_date: "2026-11-17" } }, { period }, {})).toBeNull();
-    expect(undoPlanFor({ name: "update_period", args: { period_id: SICK, label: "Flu" } }, { period, changed: true }, facts)).toBeNull();
-    expect(undoPlanFor({ name: "end_period", args: { period_id: SICK } }, { period, changed: true }, facts)).toBeNull();
-  });
-
-  it("asks before creating a Period even as the first write, then writes it on Yes with no Undo", async () => {
-    const { result, live } = await turn([
-      { calls: [{ name: "create_period", input: { label: "Travel", start_local_date: "2026-11-20", end_local_date: "2026-11-23", note: "Lisbon trip" } }] },
-      { text: "Shall I add it?" },
-    ], NOTES_ON);
+    expect(Object.values(CHAT_OUTCOME_KIND)).not.toContain("period");
+    for (const sources of [NOTES_ON, NOTES_OFF]) {
+      const live = liveExecutor(sources);
+      expect(await live.executor("create_period", { label: "Travel", start_local_date: "2026-11-20" }, { idempotencyKey: "chat:c1:0" }))
+        .toEqual({ ok: false, error: { code: "not_found", message: "No tool named create_period." } });
+      expect(await live.executor("update_period", { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z", label: "Flu" }, { idempotencyKey: "chat:c1:1" }))
+        .toMatchObject({ ok: false, error: { code: "not_found" } });
+      expect(await live.executor("end_period", { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z" }, { idempotencyKey: "chat:c1:2" }))
+        .toMatchObject({ ok: false, error: { code: "not_found" } });
+    }
     expect(rpcCalls).toEqual([]);
-    expect(result.writes).toEqual([]);
-    expect(result.pending?.confirm.items).toEqual([{ kind: "period", text: "Add the period \"Travel\" from Fri Nov 20 to Mon Nov 23, with a note" }]);
-    expect(JSON.stringify(result.pending?.confirm)).not.toContain("Lisbon");
-    const run = await runChatConfirm({ confirmId: "c1", writes: result.pending!.writes, executor: live.executor });
-    expect(run.state).toBe("accepted");
-    expect(run.refusals).toEqual([]);
-    expect(run.writes).toHaveLength(1);
-    expect(run.writes[0]!.outcome).toMatchObject({ kind: "period", confirmed: true, undo: "unavailable", text: "Added the period \"Travel\" from Fri Nov 20 to Mon Nov 23." });
-    expect(run.writes[0]!.undo).toBeNull();
-    expect(rpcCalls).toHaveLength(1);
-    expect(rpcCalls[0]).toMatchObject({ p_operation: "create_period", p_key: "chat:c1:0", p_label: "Travel", p_note: "Lisbon trip" });
-    expect(periods).toHaveLength(2);
-  });
-
-  it("ends a Period on Yes, reading its label and revision first, and expires the Yes when it changed", async () => {
-    const steps: Step[] = [{ calls: [{ name: "end_period", input: { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z" } }] }, { text: "End it?" }];
-    const first = await turn(steps, NOTES_ON);
-    expect(first.result.pending?.confirm.items).toEqual([{ kind: "period", text: "End the period \"Sick\" today" }]);
-    expect(first.result.pending!.writes[0]!.guard).toEqual({ kind: "period", id: SICK, revision: "2026-11-17T09:00:00Z" });
-    // The person edits the Period in the app before answering: the Yes does nothing.
-    periods[0] = { ...periods[0]!, label: "Flu", updated_at: "2026-11-19T14:59:00+00:00" };
-    expect(await runChatConfirm({ confirmId: "c1", writes: first.result.pending!.writes, executor: first.live.executor })).toEqual({ state: "expired", writes: [], refusals: [] });
-    expect(rpcCalls).toEqual([]);
-
-    const second = await turn([{ calls: [{ name: "end_period", input: { period_id: SICK, expected_revision: "2026-11-19T14:59:00Z" } }] }, { text: "End it?" }], NOTES_ON);
-    const run = await runChatConfirm({ confirmId: "c2", writes: second.result.pending!.writes, executor: second.live.executor });
-    expect(run.writes[0]!.outcome).toMatchObject({ kind: "period", undo: "unavailable", text: "Ended the period \"Flu\" today." });
-    expect(rpcCalls[0]).toMatchObject({ p_operation: "end_period", p_period_id: SICK, p_end_on: TODAY, p_label: "Flu", p_note: SECRET });
-    expect(periods[0]!.end_on).toBe(TODAY);
-  });
-
-  it("shows a refusal when a rule stops the write after a Yes", async () => {
-    periods[0] = { ...periods[0]!, end_on: "2026-11-18" };
-    const { result, live } = await turn([{ calls: [{ name: "end_period", input: { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z" } }] }, { text: "End it?" }], NOTES_ON);
-    const run = await runChatConfirm({ confirmId: "c1", writes: result.pending!.writes, executor: live.executor });
-    expect(run.writes).toEqual([]);
-    expect(run.refusals).toEqual([expect.objectContaining({ kind: "period", reason: "invalid_state" })]);
-    expect(rpcCalls).toEqual([]);
+    expect(periods).toEqual([expect.objectContaining({ id: SICK, label: "Sick", end_on: null, note: SECRET })]);
   });
 });
 
@@ -304,55 +194,6 @@ describe("a Period note with Notes off (Ticket 370)", () => {
         expect(leaked(read), name).toBe(false);
       }
     }
-  });
-
-  it("a confirmed write shows, sends and returns no note", async () => {
-    // The model sends a note although the tool offered none. It is dropped before anything is described or stored.
-    const { result, live, prompts } = await turn([
-      { calls: [{ name: "update_period", input: { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z", label: "Flu", note: "model-written note" } }] },
-      { text: "Change it?" },
-    ], NOTES_OFF);
-    expect(result.pending?.confirm.items).toEqual([{ kind: "period", text: "Change the period \"Sick\": label \"Flu\"" }]);
-    expect(result.pending!.writes[0]!.call.args).not.toHaveProperty("note");
-    expect(JSON.stringify(result.pending)).not.toContain("model-written note");
-    expect(leaked(result)).toBe(false);
-
-    const run = await runChatConfirm({ confirmId: "c1", writes: result.pending!.writes, executor: live.executor });
-    expect(run.state).toBe("accepted");
-    expect(run.writes[0]!.outcome).toMatchObject({ kind: "period", undo: "unavailable", text: "Changed the period \"Flu\"." });
-    // The stored note is kept, not cleared and not replaced: chat sent none.
-    expect(rpcCalls).toEqual([expect.objectContaining({ p_operation: "update_period", p_label: "Flu", p_note: SECRET })]);
-    expect(periods[0]).toMatchObject({ label: "Flu", note: SECRET });
-    // Nothing chat received, stored or showed holds the note: not the facts read, not the write result.
-    expect(leaked(live.results)).toBe(false);
-    expect(noteKeys(live.results.map((entry) => entry.result))).toBe(0);
-    expect(leaked(run)).toBe(false);
-    expect(leaked(prompts)).toBe(false);
-    const written = live.results.find((entry) => entry.name === "update_period")!;
-    expect(written.result).toMatchObject({ ok: true, result: { changed: true, period: { id: SICK, label: "Flu" } } });
-  });
-
-  it("creates a Period without the note the model tried to add", async () => {
-    const { result, live } = await turn([
-      { calls: [{ name: "create_period", input: { label: "Travel", start_local_date: "2026-11-20", note: "model-written note" } }] }, { text: "Add it?" },
-    ], NOTES_OFF);
-    expect(result.pending?.confirm.items).toEqual([{ kind: "period", text: "Add the period \"Travel\" from Fri Nov 20, with no last day" }]);
-    await runChatConfirm({ confirmId: "c1", writes: result.pending!.writes, executor: live.executor });
-    expect(rpcCalls).toEqual([expect.objectContaining({ p_operation: "create_period", p_label: "Travel", p_note: null })]);
-    expect(JSON.stringify(live.results)).not.toContain("model-written note");
-  });
-
-  it("answers that Notes are off when an edit names only the note, and asks for nothing", async () => {
-    const { result, live } = await turn([
-      { calls: [{ name: "update_period", input: { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z", note: null } }] }, { text: "Notes are off." },
-    ], NOTES_OFF);
-    expect(result.pending).toBeNull();
-    expect(live.results).toEqual([]);
-    // The executor refuses the same call on its own, for a Yes that outlived the setting.
-    expect(await live.executor("update_period", { period_id: SICK, expected_revision: "2026-11-17T09:00:00Z", note: null }, { idempotencyKey: "chat:late:0" }))
-      .toEqual({ ok: false, error: { code: "source_off", message: "Notes are off in Settings." } });
-    expect(rpcCalls).toEqual([]);
-    expect(periods[0]!.note).toBe(SECRET);
   });
 });
 

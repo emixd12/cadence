@@ -74,10 +74,6 @@ function sameRecordAsEarlier(writes: readonly ChatPendingWrite[], index: number)
 
 function revisionOf(facts: ChatWriteFacts, kind: NonNullable<ChatPendingWrite["guard"]>["kind"]): string | null {
   if (kind === "day_note") return facts.dayNote === undefined ? null : facts.dayNoteRevision ?? "none";
-  if (kind === "period") {
-    const period = facts.period as Record<string, unknown> | null | undefined;
-    return period && typeof period.revision === "string" ? period.revision : null;
-  }
   const record = (facts.occurrence ?? facts.behavior) as Record<string, unknown> | null | undefined;
   return record && typeof record.revision === "string" ? record.revision : null;
 }

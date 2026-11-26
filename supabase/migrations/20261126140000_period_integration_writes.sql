@@ -7,7 +7,7 @@
 -- 500 Periods per account all apply. The output is built here because a Period has no
 -- Behavior or Occurrence for the two-phase serializer to bind.
 --
--- Additive: one function patched by text, one new function, one widened check.
+-- Additive: one function patched by text and one new function. Nothing is dropped.
 begin;
 
 -- integration_lock_write: allow the three Period writes under cadence.occurrences.write.
@@ -137,12 +137,5 @@ revoke all on function public.integration_apply_period_write(text, text, text, u
   from public, anon, service_role;
 grant execute on function public.integration_apply_period_write(text, text, text, uuid, text, text, date, date, text)
   to authenticated;
-
--- Chat records each write it makes. Period writes get their own kind.
-alter table public.chat_actions drop constraint chat_actions_kind_check;
-alter table public.chat_actions add constraint chat_actions_kind_check check (kind in (
-  'status', 'occurrence_note', 'day_note', 'move', 'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
-  'opportunity', 'period'
-));
 
 commit;

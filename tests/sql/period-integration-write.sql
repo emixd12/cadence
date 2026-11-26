@@ -289,9 +289,6 @@ do $$ declare signature constant text := 'public.integration_apply_period_write(
   if exists (select 1 from cadence_oauth_private.activity where operation = 'delete_period') then
     raise exception 'A remove operation was recorded';
   end if;
-  if (select pg_get_constraintdef(oid) from pg_constraint where conname = 'chat_actions_kind_check') !~ '''period''' then
-    raise exception 'Chat actions do not accept the period kind';
-  end if;
 end $$;
 
 select 'ticket-370 period integration write fixture passed' as result;

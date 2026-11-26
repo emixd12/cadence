@@ -40,7 +40,7 @@ import {
   MAX_CALENDAR_LIVE_SPAN_DAYS,
 } from "./chat-calendar-cache";
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
-import { periodWriteArgs, withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
+import { CHAT_UNOFFERED_OPERATIONS, withoutNotes, type ChatSourceFlags, type ChatToolName } from "./chat-tools";
 import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
 import { CHAT_PLANNING_READS, chatPlanningBehaviorIds, withChatPlanning } from "./chat-planning";
 import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
@@ -589,14 +589,12 @@ export function createLiveChatExecutor(input: Readonly<{
       if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
       return { ok: true, result: searchAdviceCards(args.query.slice(0, 200)) };
     }
+    // Ticket 370: Chat reads Periods and does not write them yet; a call that names one of the writes is refused.
+    if (CHAT_UNOFFERED_OPERATIONS.has(name)) return { ok: false, error: { code: "not_found", message: `No tool named ${name}.` } };
     if (!input.sources.notes && (name === "list_day_notes" || name === "update_occurrence_note" || name === "update_day_note")) {
       return { ok: false, error: { code: "source_off", message: "Notes are off in Settings." } };
     }
-    // Ticket 370: Period tools stay on with Notes off, but chat then sends no Period note,
-    // and `withoutNotes` below takes the note out of every Period result.
-    const allowedArgs = periodWriteArgs(name, args, input.sources.notes);
-    if (!allowedArgs) return { ok: false, error: { code: "source_off", message: "Notes are off in Settings." } };
-    const operationInput = options.idempotencyKey ? { ...allowedArgs, idempotency_key: options.idempotencyKey } : { ...allowedArgs };
+    const operationInput = options.idempotencyKey ? { ...args, idempotency_key: options.idempotencyKey } : { ...args };
     // Adding an opportunity at an exact time passes the same busy times: the handler then
     // checks today's items and events with the shared free-slot rule, as a move does.
     const exactAdd = name === "add_opportunity_occurrence" && typeof args.start_time === "string" && args.end_time === undefined && args.mark_completed !== true;

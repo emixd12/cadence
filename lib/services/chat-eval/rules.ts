@@ -117,8 +117,7 @@ function kindMatches(tool: string, kind: string): boolean {
   const map: Record<string, string> = { set_occurrence_status: "status", update_occurrence_note: "occurrence_note", update_day_note: "day_note",
     move_occurrence_for_day: "move", revert_occurrence_move: "move", create_behavior: "create_behavior", update_behavior: "update_behavior",
     archive_behavior: "archive_behavior", restore_behavior: "restore_behavior",
-    add_opportunity_occurrence: "opportunity", remove_opportunity_occurrence: "opportunity",
-    create_period: "period", update_period: "period", end_period: "period" };
+    add_opportunity_occurrence: "opportunity", remove_opportunity_occurrence: "opportunity" };
   return map[tool] === kind;
 }
 

@@ -2885,9 +2885,9 @@ record `coach-tips-4`. Period labels are never written to application logs.
 
 ### Period integration writes (Ticket 370)
 
-Migration `20261126140000_period_integration_writes.sql` lets an MCP grant, and Cadence
-Chat's own grant, create, edit and end a Period. It adds no table and no column. There
-is no integration operation that removes a Period.
+Migration `20261126140000_period_integration_writes.sql` lets an MCP grant create, edit and
+end a Period. It adds no table and no column, and drops nothing. There is no integration
+operation that removes a Period. Cadence Chat reads Periods and does not write them yet.
 
 - `public.integration_lock_write` is patched by text to allow `create_period`,
   `update_period` and `end_period` under `cadence.occurrences.write`. Every operation it
@@ -2910,7 +2910,6 @@ is no integration operation that removes a Period.
   `lib/services/integration-write.service.ts`, never from the caller.
 - **Cap.** The insert passes the cap trigger. Its SQLSTATE `54000` becomes the contract
   error `limit_exceeded`.
-- `chat_actions.kind` accepts `period` for Chat's Period writes.
 
 Local check: `tests/sql/period-integration-write.sql`, which also re-checks
 `update_day_note` through `integration_lock_write`. The function is in the RLS smoke
@@ -3869,8 +3868,7 @@ them; nothing else expires them.
   next safe point, keeps what it already did and drops changes waiting for a Yes).
 - `chat_actions`: one row per change chat made. `kind` is `status`,
   `occurrence_note`, `day_note`, `move`, `create_behavior`, `update_behavior`,
-  `archive_behavior`, `restore_behavior`, `opportunity` or `period` (a Period write,
-  which has no Undo). `id` is the outcome id the
+  `archive_behavior`, `restore_behavior` or `opportunity`. `id` is the outcome id the
   client sends to Undo. `undo_plan` holds the exact write that reverses it;
   `undo_state` is `available`, `undoing`, `done` or `unavailable`.
 - `chat_confirms`: the writes waiting for one Yes. `state` is `pending`,
