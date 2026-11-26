@@ -20610,7 +20610,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 375: MCP Apps spike: resource handlers and a static view on real hosts
 
-Status: not_started
+Status: in_progress. November 26, 2026: the local answers, the frozen `show_day` schema and the view contract are in `docs/qa/2026-11-26-mcp-apps-spike.md`, so Tickets 376 and 377 can start. The real-host answers are missing: approval prompts on view-initiated writes, the 403 step-up on a view call, and view caching, each for Claude web and ChatGPT web. Remaining steps: (1) the owner completes the four `mcp-web` preflight steps listed in the note; (2) the owner chooses how a real host reaches a flag-on server, a tunnel tool for the local stack or a configured Preview environment, because Preview has no Supabase or MCP variables today; (3) an agent runs the three checks on both hosts and adds the answers to the note. Ticket 381: no gap found for VS Code from documentation; consumer Gemini is undecided until Ticket 378 connects it. Spike code: branch `spike/mcp-apps-375`, local only.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: `docs/plans/2026-11-25-mcp-apps-expansion.md`, package B and section 7.
 
