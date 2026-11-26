@@ -12,6 +12,7 @@ import {
   BRIEF_MOVE_MAX_LINES,
   BRIEF_MOVE_OTHER_TIMES,
   briefMoveBlocksForSubject,
+  briefMoveCalendarBlocks,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   briefMoveRoutineBlocks,
@@ -142,7 +143,8 @@ export function planAlongsidePairings(input: AlongsidePairingInputs): AlongsideP
     && Temporal.Instant.compare(item.start, input.now) >= 0
     && briefMoveStartAllowed(item.start, input.localDate, input.timezone, latest));
 
-  const calendar: BriefMoveBlock[] = input.calendarBusy.map((event) => ({ kind: "calendar", ref: event.ref, title: event.title, start: event.start, end: event.end }));
+  // Ticket 384: each event keeps its coarse place, so a guest is refused during an event elsewhere.
+  const calendar: BriefMoveBlock[] = briefMoveCalendarBlocks(input.calendarBusy);
   const used = new Set<string>();
   const pairings: AlongsidePairing[] = [];
 

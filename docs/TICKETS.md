@@ -20951,7 +20951,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 384: Calendar event places for the same-place rule
 
-Status: not_started
+Status: complete in source on `feat/alongside-384` (November 26, 2026), behind `CADENCE_ALONGSIDE`; no migration. Outlook and iCloud events stay unknown on the Daily Brief paths, whose reads never ask for a location; Chat, the Timeline cue and "Move for today" label every source. Path map: `docs/DATETIME_STRATEGY.md`, "Coarse event places".
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 

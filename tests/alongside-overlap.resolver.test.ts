@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { alongsideMayOverlap, type OverlapPlace } from "@cadence/core/resolvers/alongside.resolver";
 import {
   briefMoveBlocksForSubject,
+  briefMoveCalendarBlocks,
   briefMoveConflicts,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
@@ -75,7 +76,7 @@ describe("alongsideMayOverlap", () => {
     for (const place of [HOME, ANYWHERE, UNKNOWN, null]) expect(may(place, place, "travel")).toBe(false);
   });
 
-  it("treats a calendar event's place as unknown", () => {
+  it("treats a calendar event without a coarse place as unknown", () => {
     expect(alongsideMayOverlap({ where: HOME }, { kind: "calendar" })).toBe(true);
   });
 });
@@ -123,6 +124,37 @@ describe("the free-slot rule with the same-place rule", () => {
     expect(briefMoveBlocksForSubject(others, subject).map((block) => block.ref)).toEqual(["trip"]);
     // A non-alongside subject keeps every block.
     expect(briefMoveBlocksForSubject(others, briefMoveOverlapSubject([reading(HOME)], "reading"))).toEqual(others);
+  });
+
+  // Ticket 384 (D37): a calendar block blocks an alongside subject only at another known place.
+  it("a moved alongside item is refused during an event somewhere else, allowed at the same place or unknown", () => {
+    const event = (eventPlace?: BriefMoveBlock["eventPlace"]): BriefMoveBlock[] =>
+      [{ kind: "calendar", ref: "event", start: local("20:00"), end: local("21:00"), ...(eventPlace ? { eventPlace } : {}) }];
+    const office = { kind: "place" as const, placeKey: OFFICE.placeKey! };
+    const atHome = briefMoveOverlapSubject([helmet(HOME), reading(HOME)], "helmet");
+    expect(briefMoveBlocksForSubject(event(office), atHome).map((block) => block.ref)).toEqual(["event"]);
+    expect(briefMoveBlocksForSubject(event({ kind: "home" }), atHome)).toEqual([]);
+    expect(briefMoveBlocksForSubject(event(), atHome)).toEqual([]);
+    const atOffice = briefMoveOverlapSubject([helmet(OFFICE)], "helmet");
+    expect(briefMoveBlocksForSubject(event(office), atOffice)).toEqual([]);
+    expect(briefMoveBlocksForSubject(event({ kind: "home" }), atOffice).map((block) => block.ref)).toEqual(["event"]);
+    expect(briefMoveBlocksForSubject(event({ kind: "place", placeKey: GYM.placeKey! }), atOffice).map((block) => block.ref)).toEqual(["event"]);
+    // Anywhere, or no Where (flag off): the label changes nothing.
+    expect(briefMoveBlocksForSubject(event(office), briefMoveOverlapSubject([helmet(ANYWHERE)], "helmet"))).toEqual([]);
+    expect(briefMoveBlocksForSubject(event(office), briefMoveOverlapSubject([helmet()], "helmet"))).toEqual(event(office));
+    // A subject that is not alongside keeps every event, whatever its place.
+    expect(briefMoveBlocksForSubject(event({ kind: "home" }), briefMoveOverlapSubject([reading(HOME)], "reading"))).toEqual(event({ kind: "home" }));
+    // The refusal names the calendar event.
+    expect(checkBriefMoveSlot({ interval: { start: local("20:00"), end: local("20:10") }, blocks: briefMoveBlocksForSubject(event(office), atHome) }))
+      .toEqual({ ok: false, reason: "calendar_busy", ref: "event" });
+  });
+
+  it("calendar busy times become blocks that keep their title and place", () => {
+    const start = local("09:00"), end = local("10:00");
+    expect(briefMoveCalendarBlocks([{ ref: "a", start, end }, { ref: "b", start, end, title: "Team sync", eventPlace: { kind: "home" } }])).toEqual([
+      { kind: "calendar", ref: "a", start, end },
+      { kind: "calendar", ref: "b", start, end, title: "Team sync", eventPlace: { kind: "home" } },
+    ]);
   });
 
   it("a routine block's place is its steps' shared Where, otherwise unknown", () => {

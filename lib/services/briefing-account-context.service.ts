@@ -96,6 +96,12 @@ export async function prepareAccountBriefingContexts(
      * `not_supplied`; it never fails the brief. Workbench and history omit it.
      */
     travelConclusions?: Readonly<{ token: unknown; secrets: TravelConclusionsSecrets }>;
+    /**
+     * Ticket 384: only the live Daily Brief passes this, while `CADENCE_ALONGSIDE` is on.
+     * The Google Calendar read fills it with each event's location text by event ref, for
+     * the free-slot rule's coarse event place. The contexts never carry it.
+     */
+    eventLocations?: Map<string, string>;
   }>,
 ): Promise<Readonly<{
   contexts: AdvisorDayContext[];
@@ -155,6 +161,7 @@ export async function prepareAccountBriefingContexts(
     opaqueRefKey: key,
     clock,
     signal: input.signal,
+    ...(input.eventLocations ? { eventLocations: input.eventLocations } : {}),
   });
   input.signal.throwIfAborted();
   const makeOpaqueRef = createAdvisorOpaqueRef(key, authorization);

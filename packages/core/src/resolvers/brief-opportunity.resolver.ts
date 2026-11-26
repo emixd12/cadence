@@ -3,6 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import {
   BRIEF_MOVE_MAX_LINES,
   BRIEF_MOVE_OTHER_TIMES,
+  briefMoveCalendarBlocks,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   checkBriefMoveSlot,
@@ -148,7 +149,7 @@ export function briefOpportunityBlocks(input: Readonly<{
 }>): BriefMoveBlock[] {
   return [
     ...briefMoveItemBlocks(input.items, null, input.movePositions ?? new Map()),
-    ...input.calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
+    ...briefMoveCalendarBlocks(input.calendarBusy),
     ...(input.travel?.spans ?? []).map((span, index) => ({ kind: "travel" as const, ref: span.refs[0] ?? `travel:${index}`, start: span.start, end: span.end })),
   ];
 }

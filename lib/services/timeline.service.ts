@@ -10,6 +10,8 @@ import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
 import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
 import { attachTimelineAlongside } from "@cadence/core/services/timeline-alongside";
 import { alongsideQuestionBehaviorIds, alongsideRowViews, readAlongsideBehaviorFacts } from "@/lib/services/alongside-view.service";
+import { readPlanningPlaceCatalog } from "@/lib/services/planning-places.service";
+import type { PlanningPlaceCatalog } from "@cadence/core/resolvers/alongside.resolver";
 
 import {
   listBehaviorAdvisorEstimates,
@@ -264,13 +266,16 @@ async function getTimelineViewForUser(input: {
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
     readTimelineAlongside(supabase, userId, occurrenceRows, now, timezone),
   ]);
-  return attachTimelineAlongside(attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable), alongside.rows, alongside.questions);
+  return attachTimelineAlongside(attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable), alongside.rows, alongside.questions,
+    alongside.places);
 }
 
 /**
  * Ticket 358 (D33): each alongside Behavior's row label and effective Where. Read only
  * while `CADENCE_ALONGSIDE` is on, so the Timeline's reads are unchanged while it is
  * off. A failed read shows no labels, asks nothing and keeps every overlap cue.
+ * Ticket 384: `places` holds Home's and the saved places' keys, so the screen can give
+ * each Calendar event a coarse place; a failed read leaves every event's place unknown.
  */
 async function readTimelineAlongside(
   supabase: AppSupabaseClient,
@@ -278,16 +283,16 @@ async function readTimelineAlongside(
   occurrences: readonly Occurrence[],
   now: Temporal.Instant,
   timezone: string,
-): Promise<Readonly<{ rows: ReturnType<typeof alongsideRowViews>; questions: ReadonlySet<string> }>> {
-  const none = { rows: {}, questions: new Set<string>() };
+): Promise<Readonly<{ rows: ReturnType<typeof alongsideRowViews>; questions: ReadonlySet<string>; places: PlanningPlaceCatalog | null }>> {
+  const none = { rows: {}, questions: new Set<string>(), places: null };
   if (occurrences.length === 0) return none;
   try {
-    const facts = await readAlongsideBehaviorFacts(supabase, userId, {
+    const [facts, places] = await Promise.all([readAlongsideBehaviorFacts(supabase, userId, {
       behaviorIds: occurrences.map((occurrence) => occurrence.behavior_id),
       localDate: now.toZonedDateTimeISO(timezone).toPlainDate().toString(),
-    });
+    }), readPlanningPlaceCatalog(supabase, userId)]);
     // Ticket 360: the rows whose alongside question is open may ask after a Completed mark.
-    return { rows: alongsideRowViews(facts), questions: alongsideQuestionBehaviorIds(facts) };
+    return { rows: alongsideRowViews(facts), questions: alongsideQuestionBehaviorIds(facts), places };
   } catch {
     return none;
   }

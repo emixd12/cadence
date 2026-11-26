@@ -10,7 +10,7 @@ import {
   type BriefMoveRoutine,
   type BriefMoveTravel,
 } from "../types/brief-moves";
-import { alongsideMayOverlap, resolveRoutineBlockAlongside, type AlongsideSource } from "./alongside.resolver";
+import { alongsideMayOverlap, resolveRoutineBlockAlongside, type AlongsideSource, type CalendarEventPlace } from "./alongside.resolver";
 import type { EffectiveWhere } from "./effective-where.resolver";
 import { localDateAt, localDayBounds } from "./time.resolver";
 import { trackedDurationWins } from "./time-tracking.resolver";
@@ -166,6 +166,8 @@ export type BriefMoveBlock = BriefMoveInterval & Readonly<{
   kind: "item" | "calendar" | "travel";
   ref: string;
   title?: string;
+  /** Ticket 384: a calendar block's coarse place, for this request only. Absent: unknown. */
+  eventPlace?: CalendarEventPlace;
 }>;
 
 export type BriefMoveSlotCheck =
@@ -245,13 +247,28 @@ export function briefMoveItemMayOverlap(other: BriefMoveDayItem, subject: BriefM
 
 /**
  * Calendar and travel blocks as an alongside subject sees them under the same-place
- * rule: a calendar event's place is unknown, so it does not block; travel always does.
- * Item blocks pass through (`briefMoveItemBlocks` already decided them). Without a
- * subject Where (flag off) every block passes through.
+ * rule. A calendar event blocks only at another known place: its coarse place
+ * (`eventPlace`, Ticket 384) is Home or a saved place, and `alongsideMayOverlap` refuses
+ * it against the subject's Where. An event without one (unknown place) does not block.
+ * Travel always does. Item blocks pass through (`briefMoveItemBlocks` already decided
+ * them). Without a subject Where (flag off) every block passes through.
  */
 export function briefMoveBlocksForSubject(blocks: readonly BriefMoveBlock[], subject: BriefMoveOverlapSubject | undefined): BriefMoveBlock[] {
   if (!subject?.where || !subject.alongside) return [...blocks];
-  return blocks.filter((block) => block.kind === "item" || !alongsideMayOverlap(subject, { kind: block.kind }));
+  return blocks.filter((block) => block.kind === "item"
+    || !alongsideMayOverlap(subject, { kind: block.kind, ...(block.kind === "calendar" && block.eventPlace ? { where: block.eventPlace } : {}) }));
+}
+
+/**
+ * Calendar busy times as blocks, each keeping its title and coarse place when it has
+ * them. One mapping for every caller, so a place label is never dropped on the way.
+ */
+export function briefMoveCalendarBlocks(busy: readonly BriefMoveCalendarBusy[]): BriefMoveBlock[] {
+  return busy.map((event) => ({
+    kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end,
+    ...(event.title ? { title: event.title } : {}),
+    ...(event.eventPlace ? { eventPlace: event.eventPlace } : {}),
+  }));
 }
 
 /**
@@ -396,7 +413,11 @@ export type BriefMoveTravelInput = Readonly<{
   unknown: ReadonlySet<string>;
 }>;
 
-export type BriefMoveCalendarBusy = BriefMoveInterval & Readonly<{ ref: string; title?: string }>;
+/**
+ * One busy calendar event for the free-slot rule. `eventPlace` (Ticket 384) is its coarse
+ * place, set only while `CADENCE_ALONGSIDE` is on and only for this request.
+ */
+export type BriefMoveCalendarBusy = BriefMoveInterval & Readonly<{ ref: string; title?: string; eventPlace?: CalendarEventPlace }>;
 
 export type BriefMoveCandidate = Readonly<{
   /** Stable within one plan: the occurrence id. */
@@ -469,7 +490,7 @@ export function planBriefMoveLinesFromInputs(input: BriefMovePlanInputs): BriefM
     && membersOf(item).every((member) => !input.neverMoveBehaviorIds.has(member.behaviorId) && !input.declinedToday.has(member.occurrenceId))
     && !(item.routine && input.neverMoveBehaviorIds.has(item.routine.parentBehaviorId));
   const ordered = [...today].sort((left, right) => Temporal.Instant.compare(left.start, right.start) || left.occurrenceId.localeCompare(right.occurrenceId));
-  const calendarBlocks: BriefMoveBlock[] = input.calendarBusy.map((event) => ({ kind: "calendar", ref: event.ref, title: event.title, start: event.start, end: event.end }));
+  const calendarBlocks: BriefMoveBlock[] = briefMoveCalendarBlocks(input.calendarBusy);
   const candidates: BriefMoveCandidate[] = [];
 
   for (const item of ordered) {

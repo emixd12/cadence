@@ -102,6 +102,26 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 384 complete in source: calendar event places — November 26, 2026
+
+- **Rule:** with `CADENCE_ALONGSIDE` on, each busy calendar event that reaches the free-slot
+  rule carries Home, a saved place's key or nothing (unknown), from its location text by
+  `travelPlaceKey` (`calendarEventPlace`, `planningPlaceCatalog` in `alongside.resolver.ts`).
+  An alongside item is refused during an event at another known place; the Timeline cue
+  shows again for those overlaps only. Calendar events stay out of pairing hosts.
+- **Paths:** Daily Brief lines (Google MCP read, in-memory location sidecar), its answers
+  (`readServerBriefCalendarBusy`, Google MCP), Chat (all sources), the web Timeline's "Move
+  for today" and the web and Mac overlap cues (on the device, from the view's
+  `planningPlaces` keys). Outlook and iCloud stay unknown on the Daily Brief paths: those reads
+  ask for no location. Map: `docs/DATETIME_STRATEGY.md`, "Coarse event places".
+- **Privacy:** no storage, logging, model input or MCP result carries the label, the keys or
+  a location (`tests/calendar-event-place.boundary.test.ts`). Flag off: no new read, and
+  request bodies and outputs are unchanged. No migration, no provider call, no new
+  dependency. Not run in a browser or on an installed Mac.
+
+Platform impact: web implemented; desktop overlap cue through the shared Timeline and
+`local-timeline.service.ts` (the Mac offers no "Move for today" and its brief uses the hosted
+routes); marketing not applicable; future mobile inherits the resolvers. Messaging impact: P-103.
 ## Ticket 383 Mac complete: guessed Where dismissals sync while Completion places is off — November 26, 2026
 
 Branch `feat/alongside-383mac`, on the alongside branch with Ticket 383's web part.

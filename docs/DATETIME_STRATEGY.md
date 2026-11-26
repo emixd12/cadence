@@ -246,12 +246,12 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   Anywhere. It may not share time with travel or with an item somewhere else; there it
   blocks like any other item, with the 10-minute gaps. Each item's place is its effective
   Where (`effective-where.resolver.ts`): the person's Where, else counted completion place
-  labels, else the cached model guess, else unknown. Calendar events carry no place on
-  the free-slot inputs, so their place is unknown. The brief's move lines never move an
+  labels, else the cached model guess, else unknown. A calendar event's place is its
+  coarse event place (below), else unknown. The brief's move lines never move an
   alongside item; when one at another place collides with an item, that item moves. Only a
   pairing line (below) moves an alongside item. A
-  moved alongside item (the Timeline's "Move for today") is checked the same way, and
-  calendar events do not block it. With the flag off, an alongside item blocks nothing
+  moved alongside item (the Timeline's "Move for today") is checked the same way: a
+  calendar event blocks it only at another known place. With the flag off, an alongside item blocks nothing
   and a moved one is blocked like any other item, as before. The effective Where is for
   planning only: routes, departure lines and leave reminders read `where_kind` alone.
   Since Ticket 359 the same rule covers the Daily Brief consumer's overlap and tight-fit
@@ -272,7 +272,34 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it
   for that request and stores nothing. Calendar events and travel are fixed: the
-  brief moves Cadence items around them, never the reverse.
+  brief moves Cadence items around them, never the reverse. Since the Calendar MCP
+  migration the brief and its HTTP answers ignore device-sent busy times and read
+  them on the server (`readServerBriefCalendarBusy`, or the day context's own read).
+- **Coarse event places (Ticket 384, D37).** With `CADENCE_ALONGSIDE` on, each busy
+  event that reaches the free-slot rule carries one coarse place for the same-place
+  rule: Home, a saved place's one-way key, or nothing (unknown).
+  `calendarEventPlace` (`alongside.resolver.ts`) keys the event's location text with
+  `travelPlaceKey` and compares it with the key of Home's text and the keys of the
+  place-Where Behaviors' texts (`planningPlaceCatalog`). Two texts name the same place
+  only when they normalize the same; there is no geocoding and no new provider call or
+  Calendar read. An event whose location matches neither is unknown, so the rule
+  allows the overlap as before. The label is computed where the location text already
+  is, lives for that request only, and is never stored, logged or sent to a model
+  (`tests/calendar-event-place.boundary.test.ts`):
+
+  | Path | Events from | Location text there | Label |
+  |---|---|---|---|
+  | Daily Brief lines (and their pairing lines) | The day context's own Calendar reads | Google Calendar (MCP) read: yes, kept in an in-memory sidecar by event ref, never in the context. Outlook and iCloud reads ask for no location | Google events; Outlook and iCloud unknown |
+  | Yes, Accept all, Other time, Re-plan, Re-check | `readServerBriefCalendarBusy` | Google (MCP): yes. Outlook and iCloud: not asked for (the Daily Brief never reads their locations) | Google events; Outlook and iCloud unknown |
+  | Timeline "Move for today" (web) | The device's Timeline events | Yes, on the device | Computed on the device from the view's `planningPlaces`; the request carries only `eventPlace` |
+  | Chat moves, exact-time adds and `plan_alongside_pairings` | Chat's own Calendar reads | Yes (Google MCP; Outlook and iCloud with location, as Chat already reads them) | All sources; never in a tool result |
+  | Timeline overlap cue (web and Mac) | The screen's events | Yes, on the device | Computed on the device; a refused overlap shows the cue again |
+  | Daily Brief consumer findings, brief opportunity lines | The day context | Not read there | Unknown, unchanged: the consumer builds model input, and opportunity lines apply no same-place rule |
+
+  The Timeline view carries `planningPlaces` (Home's and the saved places' keys, never
+  text) only while the flag is on and a row is alongside; the device sends an
+  `eventPlace` only when the view carried them, and the Server Action reads it only while
+  the flag is on. Calendar events stay out of pairing hosts (D33).
 - **Route lookups.** Planning makes no route lookups of its own. After a Yes the
   moved item changes the Timeline, so the normal travel route refresh on web and
   Mac runs, about two legs per moved item that has a place. That refresh recomputes

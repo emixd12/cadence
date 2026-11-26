@@ -5,6 +5,7 @@ import { effectiveStartInstant } from "@cadence/core/resolvers/time.resolver";
 import {
   BRIEF_MOVE_OTHER_TIMES,
   briefMoveBlocksForSubject,
+  briefMoveCalendarBlocks,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   briefMoveOverlapSubject,
@@ -62,7 +63,8 @@ import {
   DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS, DURATION_ESTIMATE_V1_3_INSTRUCTIONS,
   DURATION_ESTIMATE_V1_3_LENGTH_INSTRUCTIONS,
 } from "@/lib/services/daily-brief-instructions";
-import { alongsideGuessWanted } from "@cadence/core/resolvers/alongside.resolver";
+import { alongsideGuessWanted, calendarEventPlace, type CalendarEventPlace, type PlanningPlaceCatalog } from "@cadence/core/resolvers/alongside.resolver";
+import { eventPlacesFromLocations, readPlanningPlaceCatalog } from "@/lib/services/planning-places.service";
 import { isWhereGuess, type WhereGuess } from "@cadence/core/resolvers/effective-where.resolver";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 // Ticket 361 (D33): pairing lines, behind CADENCE_ALONGSIDE.
@@ -122,6 +124,12 @@ export type BriefMovePlanningInput = Readonly<{
   calendarBusy?: readonly BriefCalendarBusy[];
   /** The signed travel times token from the routes response. Verified here, used once. */
   travelTimes?: string | null;
+  /**
+   * Ticket 384: the day context's event locations by event ref, from the same Calendar
+   * read (`captureLiveDailyBriefContext`), so each busy event gets its coarse place. Set
+   * only while `CADENCE_ALONGSIDE` is on. Used here and dropped: never stored or sent to a model.
+   */
+  eventLocations?: ReadonlyMap<string, string>;
 }>;
 
 export type BriefServerCalendarBusyResult = Readonly<{
@@ -130,16 +138,23 @@ export type BriefServerCalendarBusyResult = Readonly<{
   googleCalendarGrantGeneration: number | null;
 }>;
 
-function busyFromExternalEvents(events: readonly NormalizedExternalEvent[]): BriefMoveCalendarBusy[] {
+/**
+ * Ticket 384: with a catalog (`CADENCE_ALONGSIDE` on), each event also gets its coarse
+ * place from the location text this read already returned. Outlook and iCloud reads here
+ * ask for no location, so their events stay unknown.
+ */
+export function busyFromExternalEvents(events: readonly NormalizedExternalEvent[], catalog: PlanningPlaceCatalog | null = null): BriefMoveCalendarBusy[] {
   const busy: BriefMoveCalendarBusy[] = [];
   for (const event of events) {
     if (event.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
       || event.currentUserResponse === "declined") continue;
+    const eventPlace = calendarEventPlace(event.location, catalog);
     busy.push({
       ref: `${event.source}:${event.calendarId}:${event.providerEventId}`,
       start: Temporal.Instant.from(event.startAt),
       end: Temporal.Instant.from(event.endAt),
       ...(event.title ? { title: event.title } : {}),
+      ...(eventPlace ? { eventPlace } : {}),
     });
   }
   return busy;
@@ -177,6 +192,8 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
   }
   if (!user) return empty;
   const caller: CalendarCaller = { client: input.supabase, user };
+  // Ticket 384: Home's and the saved places' keys, read only while CADENCE_ALONGSIDE is on.
+  const catalogRead = readPlanningPlaceCatalog(input.supabase, input.userId);
 
   const readGoogle = async (): Promise<Readonly<{ busy: BriefMoveCalendarBusy[]; generation: number | null; ok: boolean }>> => {
     if (!dailyBriefSourceAllowed(preferences, "googleCalendar") || !dailyBriefReadsGoogleCalendar(preferences) || !isGoogleCalendarAiTransportEnabled()) {
@@ -185,7 +202,7 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
     try {
       const read = await getCalendarEventsForAdvisor(caller, input.localDate, input.localDate, { ephemeralOnly: true, now: input.now });
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      return { busy: busyFromExternalEvents(snapshot.events), generation: read.connection.generation, ok: true };
+      return { busy: busyFromExternalEvents(snapshot.events, await catalogRead), generation: read.connection.generation, ok: true };
     } catch {
       return { busy: [], generation: null, ok: false };
     }
@@ -196,7 +213,7 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
     try {
       const read = await getOutlookCalendarEventsForCaller(caller, input.localDate, input.localDate);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      return busyFromExternalEvents(snapshot.events);
+      return busyFromExternalEvents(snapshot.events, await catalogRead);
     } catch {
       return [];
     }
@@ -207,7 +224,7 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
     try {
       const read = await getIcloudCalendarEventsForCaller(caller, input.localDate, input.localDate);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      return busyFromExternalEvents(snapshot.events);
+      return busyFromExternalEvents(snapshot.events, await catalogRead);
     } catch {
       return [];
     }
@@ -225,7 +242,9 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
  * The calendar as the one rule sees it: derived from authorized AI context connectors when
  * `context` is present, or from trusted server-side / internal busy intervals when provided.
  */
-export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy?: readonly BriefCalendarBusy[] | undefined)
+export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy?: readonly BriefCalendarBusy[] | undefined,
+  /** Ticket 384: coarse places by the context's event refs. Events without one stay unknown. */
+  eventPlaces?: ReadonlyMap<string, CalendarEventPlace>)
   : Readonly<{ busy: BriefMoveCalendarBusy[]; state: "current" | "stale" | "none" }> {
   const busy: BriefMoveCalendarBusy[] = [];
   let requested = false, stale = false;
@@ -238,7 +257,9 @@ export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy
       for (const event of connector.events) {
         if (event.interval.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
           || event.currentUserResponse === "declined") continue;
-        busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt) });
+        const eventPlace = eventPlaces?.get(event.ref);
+        busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt),
+          ...(eventPlace ? { eventPlace } : {}) });
       }
     }
     return { busy, state: stale ? "stale" : requested ? "current" : "none" };
@@ -289,7 +310,11 @@ export async function planBriefMoveDay(input: Readonly<{
   readPairingEvidence?: PairingEvidenceReader;
 }>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
   const day = input.day ?? await readBriefMoveDay(input.supabase, input.userId, input.localDate);
-  const calendar = briefMoveCalendar(input.context, input.planning.calendarBusy);
+  // Ticket 384: event places only when the capture collected locations (CADENCE_ALONGSIDE on).
+  const eventPlaces = input.planning.eventLocations?.size
+    ? eventPlacesFromLocations(input.planning.eventLocations, await readPlanningPlaceCatalog(input.supabase, input.userId))
+    : undefined;
+  const calendar = briefMoveCalendar(input.context, input.planning.calendarBusy, eventPlaces);
   const travel = briefMoveTravel(input.planning.travelTimes, { secrets: input.travelSecrets, userId: input.userId, localDate: input.localDate, now: input.now });
   const answers = await readDayAnswers(input.supabase, input.userId, input.localDate);
   const inputs = {
@@ -857,7 +882,7 @@ function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonl
   return {
     blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, occurrenceId, positions),
-      ...calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
+      ...briefMoveCalendarBlocks(calendarBusy),
       ...travelBlocksFor(travel, occurrenceId),
     ], briefMoveOverlapSubject(day.items, occurrenceId)),
     before: stop?.beforeSeconds ?? 0,
@@ -1234,7 +1259,8 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
     near: Temporal.Instant.from(old.to.startAt), lengthSeconds: old.length.minutes * 60,
     blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, item.occurrenceId, openLinePositions(latest.values())),
-      ...serverCalendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
+      ...serverCalendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end,
+        ...(event.eventPlace ? { eventPlace: event.eventPlace } : {}) })),
       ...travelBlocksFor(travel, item.occurrenceId),
     ], briefMoveOverlapSubject(day.items, item.occurrenceId)),
     travelBeforeSeconds: stop?.beforeSeconds, travelAfterSeconds: stop?.afterSeconds,

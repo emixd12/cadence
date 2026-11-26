@@ -24,6 +24,7 @@ import type { DepartureModel, DepartureStop } from "@cadence/core/types/departur
 import { DEPARTURE_REFRESH_LABEL, departureMarkerRailLines } from "@cadence/core/services/departure-phrases";
 import { nextTripCrowdsBehavior, resolveDayProgressLayout, resolveNextTripMarkInput } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
+import type { CalendarEventPlace } from "@cadence/core/resolvers/alongside.resolver";
 import type {
   BehaviorDurationEstimate,
   ExternalEventFreshness,
@@ -44,7 +45,7 @@ import { OpportunityBasket } from "./OpportunityBasket";
 import { ParentOccurrenceRow } from "./ParentOccurrenceRow";
 import { SemanticZoomToggle } from "./SemanticZoomToggle";
 import { useSemanticZoom } from "./use-semantic-zoom";
-import { calendarBusyFromEvents, MoveCalendarEventsContext } from "./OccurrenceMoves";
+import { calendarBusyFromEvents, calendarEventPlacesById, MoveCalendarEventsContext, MovePlanningPlacesContext } from "./OccurrenceMoves";
 import { useDayProgressClock } from "./day-progress-clock";
 import { leaveReminderLinkTarget } from "@/lib/ui/leave-reminder-link";
 import styles from "./day-progress-timeline.module.css";
@@ -332,6 +333,9 @@ export function DayProgressTimeline({
   }, [travel, departure, travelEvents, now, timeline.daySections, timeline.todayLocalDate, timeline.timezone]);
   useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
   useEffect(() => () => publishBriefTravel(null), []);
+  // Ticket 384: each event's coarse place from its location, only while the view carries planningPlaces.
+  const planningPlaces = timeline.planningPlaces;
+  const eventPlaces = useMemo(() => calendarEventPlacesById(events, planningPlaces), [events, planningPlaces]);
   // Advisor Phase 3: the brief's move answers send the busy times this screen holds.
   useEffect(() => {
     publishBriefCalendarBusy(calendarBusyFromEvents(events).map((busy) => ({ startAt: busy.start, endAt: busy.end, ...(busy.ref ? { ref: busy.ref } : {}) })));
@@ -548,6 +552,7 @@ export function DayProgressTimeline({
 
   return (
     <MoveCalendarEventsContext.Provider value={events}>
+    <MovePlanningPlacesContext.Provider value={timeline.planningPlaces ?? null}>
     <div
       ref={rootRef}
       className={styles.timeline}
@@ -594,7 +599,7 @@ export function DayProgressTimeline({
         navigationPreference={context?.navigationPreference}
         timezone={timeline.timezone}
         onOpenExternal={onOpenExternal}
-        contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
+        contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure, eventPlaces)}
         nextTrip={nextTrip}
         shortcutsByBehavior={shortcutsByBehavior}
         dayNoteAction={dayNoteAction}
@@ -654,6 +659,7 @@ export function DayProgressTimeline({
       />
       {layout?.days.some((day) => day.movingDot) ? <p className="sr-only">Current time position updates while this timeline is visible.</p> : null}
     </div>
+    </MovePlanningPlacesContext.Provider>
     </MoveCalendarEventsContext.Provider>
   );
 }
@@ -1025,6 +1031,7 @@ function resolveContexts(
   travelLabels?: ReadonlyMap<string, string>,
   timezone?: string,
   departure?: DepartureModel,
+  eventPlaces?: ReadonlyMap<string, CalendarEventPlace>,
 ): ReadonlyMap<string, TimelineOccurrenceContext> {
   const instant = Temporal.Instant.from(now);
   return new Map(section.occurrences.map((occurrence) => [occurrence.id, resolveTimelineOccurrenceContext({
@@ -1040,6 +1047,8 @@ function resolveContexts(
     timezone,
     departure,
     alongside: occurrence.alongside ?? null,
+    // Ticket 384: only alongside rows read event places; an event without one is unknown.
+    ...(occurrence.alongside && eventPlaces?.size ? { eventPlaces } : {}),
     // A timing mutation can arrive between minute ticks. Its timestamp is the
     // earliest instant at which the returned running state can be assessed.
     now: occurrence.timeTracking.runningStartedAt && Temporal.Instant.compare(Temporal.Instant.from(occurrence.timeTracking.runningStartedAt), instant) > 0
