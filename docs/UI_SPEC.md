@@ -636,6 +636,29 @@ the value is Cadence's guess. Its Possible overlap line and Calendar highlight s
 overlaps `alongsideMayOverlap` allows (every Calendar event, whose place is unknown);
 travel still shows. There is no parallel-lane layout. Bench: `composite.occurrence-row`.
 
+Alongside question on a row (Ticket 360, D33; behind `CADENCE_ALONGSIDE`): right after a
+Completed mark that shows no Done at line, a row whose Behavior's alongside question is
+open (not answered and Cadence guesses yes, `alongsideQuestionOpen`) may show the mark
+detail line "Done alongside other things? Yes · No", on the share of marks set in
+`MARK_DETAIL_PROMPTS.alongside` (0.5, fixed per item and day). Yes or No writes the
+Behavior's alongside setting and reads back as `alongside.answer-saved`; a refusal reads
+"Not changed." with an `alongside.answer-*` notice. One line per row at a time; Done at
+keeps priority. The row asks only when the page passes an `alongside` mark-detail action
+(web: `recordAlongsideAnswerAction`); the Mac passes none until Ticket 363. Bench:
+`module.occurrence-mark-details` (the Red light helmet row).
+
+Daily Brief alongside question (Ticket 360, D33; behind `CADENCE_ALONGSIDE`): under the
+brief's move and Add for today lines, one hairline-topped line asks
+`alongside.brief-question` ("Can Red light helmet be done alongside other things?") with
+Yes · No as text links and no typing. At most one question per brief: the earliest of
+today's items whose question is open (`pickBriefAlongsideQuestion`), saved with the
+brief so a reopen asks the same question while it is still open, or nothing. Yes or No
+writes the Behavior's alongside setting (`POST /api/advisor/brief/alongside`), reads back
+as `alongside.answer-saved` and redraws the Timeline; a refusal shows the inline Alert
+notice and keeps Yes · No. Only a client that sends `alongside_question_v1` (the web)
+gets the line; the Mac follows in Ticket 363. Advisor tips carry no alongside card (no
+reviewed source fits; `STATUS.md`).
+
 ### Routine rows and Semantic Zoom (Ticket 349)
 
 - A routine slot renders as one `ParentOccurrenceRow`: disclosure triangle, routine
@@ -811,7 +834,9 @@ hint the form shows one select, "Can be done alongside other things", with Not
 answered, Yes and No. While Not answered is chosen and a current model guess exists,
 one note line follows from `alongside.form-guess` ("Cadence guesses Yes. Planning uses
 the guess until you choose.") with a Use the guess button that fills the select; Save
-stores it like every other field. With the flag off, and on Cadence for Mac until
+stores it like every other field. Ticket 360: the note also shows whenever the question is
+open (`alongsideQuestionOpen`: not answered, guessed yes), the same rule every other
+surface asks under. With the flag off, and on Cadence for Mac until
 Ticket 363, the form has no alongside field and saving keeps the stored answer. While
 the flag is on and Details and Settings is open, the Behavior record's one Where
 suggestion line moves below Where in the form; it returns to the record when Details

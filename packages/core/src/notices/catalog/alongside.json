@@ -21,6 +21,41 @@
       "style": "note",
       "platforms": ["web"],
       "interactions": ["INT-PLACE-008", "INT-PLACE-009"]
+    },
+    "alongside.answer-saved": {
+      "meaning": "Confirms an answer to the alongside question from the Timeline row or the Daily Brief; the Behavior setting now holds it on every surface.",
+      "text": "{answer, select, yes {Saved: it can be done alongside other things.} other {Saved: it needs its own time.}}",
+      "style": "outcome",
+      "platforms": ["web"],
+      "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
+    },
+    "alongside.answer-not-found": {
+      "meaning": "An alongside answer was refused because the Behavior is no longer in the person's account.",
+      "text": "This Behavior is not in your account anymore.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
+    },
+    "alongside.answer-changed": {
+      "meaning": "An alongside answer was refused because the Behavior changed while it was being saved.",
+      "text": "This Behavior changed just now. Try again.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
+    },
+    "alongside.answer-unavailable": {
+      "meaning": "An alongside answer could not be saved, because the setting is unavailable or the save failed.",
+      "text": "Cadence could not save that. Try again.",
+      "style": "error",
+      "platforms": ["web"],
+      "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
+    },
+    "alongside.brief-question": {
+      "meaning": "The Daily Brief's one question line about a Behavior whose alongside question is open, answered with Yes or No.",
+      "text": "Can {title} be done alongside other things?",
+      "style": "question",
+      "platforms": ["web"],
+      "interactions": ["INT-BRIEF-011"]
     }
   }
 }

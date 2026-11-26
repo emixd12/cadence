@@ -177,9 +177,10 @@ describe("readBehaviorPlanningFacts", () => {
     });
     const facts = await readBehaviorPlanningFacts(fake.client, "user", ["helmet", "pill", "gym"], DAY, { env: { CADENCE_ALONGSIDE: "on" } });
     expect(Object.fromEntries(facts)).toEqual({
-      helmet: { alongside: { value: true, source: "guess" }, where: { kind: "home", source: "guess" } },
-      pill: { alongside: { value: true, source: "person" }, where: { kind: "anywhere", source: "guess" } },
-      gym: { alongside: { value: false, source: "guess" }, where: { kind: "elsewhere", source: "guess" } },
+      // Ticket 360: only the helmet's question is open (unanswered, guessed yes).
+      helmet: { alongside: { value: true, source: "guess" }, where: { kind: "home", source: "guess" }, questionOpen: true },
+      pill: { alongside: { value: true, source: "person" }, where: { kind: "anywhere", source: "guess" }, questionOpen: false },
+      gym: { alongside: { value: false, source: "guess" }, where: { kind: "elsewhere", source: "guess" }, questionOpen: false },
     });
   });
 });

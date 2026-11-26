@@ -36,10 +36,25 @@ Voice: calm, plain and brief, like a thoughtful friend. Answer first, then only 
 
 /**
  * Ticket 359 (D33): appended to the static part while `CADENCE_ALONGSIDE` is on, when reads
- * carry `planning`. It explains planning only; asking about alongside (Ticket 360) and
- * pairing (Ticket 361) are not here.
+ * carry `planning`. It explains planning only; asking about alongside (Ticket 360) is
+ * `CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS`, and pairing (Ticket 361) is not here.
  */
-export const CHAT_ALONGSIDE_INSTRUCTIONS = `Alongside: items and Behaviors may carry planning. planning.alongside true means the item can be done during other things at the same place, such as taking a pill or wearing a device at home; planning.where is where Cadence assumes it happens. An alongside item may share time with another item or a calendar event at the same place, or when either place is anywhere or unknown, so that overlap is not a clash: do not raise it and do not suggest a move for it. It still clashes with travel and with an item somewhere else. When alongside_source or where_source is guess, that is Cadence's guess, not the person's setting: if it matters to your answer, say Cadence guessed it. Never name a source or a planning field.`;
+/**
+ * Ticket 361 (D33): pairing for today, part of the chat-1.8 alongside text (still
+ * unreleased, so the version stays). The planner picks the other item; the move is the
+ * ordinary move_occurrence_for_day, applied only after the person says yes.
+ */
+export const CHAT_ALONGSIDE_PAIRING_RULE = `Pairing: to fit an alongside item in during another of today's items, call plan_alongside_pairings and offer only what it returns, naming both items and the time. Change nothing until the person says yes; then apply that pairing's move with move_occurrence_for_day. Moving the other item later does not move the alongside item with it.`;
+
+export const CHAT_ALONGSIDE_INSTRUCTIONS = `Alongside: items and Behaviors may carry planning. planning.alongside true means the item can be done during other things at the same place, such as taking a pill or wearing a device at home; planning.where is where Cadence assumes it happens. An alongside item may share time with another item or a calendar event at the same place, or when either place is anywhere or unknown, so that overlap is not a clash: do not raise it and do not suggest a move for it. It still clashes with travel and with an item somewhere else. When alongside_source or where_source is guess, that is Cadence's guess, not the person's setting: if it matters to your answer, say Cadence guessed it. Never name a source or a planning field. ${CHAT_ALONGSIDE_PAIRING_RULE}`;
+
+/**
+ * Ticket 360 (D33): appended after the alongside rule while `CADENCE_ALONGSIDE` is on. The
+ * question is open exactly when a read shows planning.alongside true with alongside_source
+ * guess (`alongsideQuestionOpen`: unanswered, guessed yes). Chat asks only when the answer
+ * changes a plan in progress; the answer goes through the confirmed update_behavior.
+ */
+export const CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS = `Asking about alongside: when planning.alongside is true and alongside_source is guess, the person has not said whether that Behavior can be done alongside other things. Ask "Can this be done alongside other things?" only when their answer would change a plan you are working out with them in this conversation, such as whether two items clash or where an item fits; otherwise do not ask. Ask about one Behavior at a time and never ask again about one they answered. When they answer, call update_behavior with alongside true or false; Cadence waits for their Yes before it changes.`;
 
 export type ChatPromptContext = Readonly<{
   timezone: string;
@@ -58,7 +73,9 @@ export function buildChatSystemPrompt(context: ChatPromptContext): string {
   const off = context.sourcesOff.length
     ? `\nTurned off in Settings, so you cannot read them: ${context.sourcesOff.join(", ")}. If asked, say they are off in Settings.`
     : "";
-  const fixed = context.alongside ? `${CHAT_STATIC_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_INSTRUCTIONS}` : CHAT_STATIC_INSTRUCTIONS;
+  const fixed = context.alongside
+    ? `${CHAT_STATIC_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS}`
+    : CHAT_STATIC_INSTRUCTIONS;
   return `${fixed}\n\nThe person's timezone: ${context.timezone}. Today is ${context.weekday} ${context.today}; the local time is ${context.localTime}.${off}`;
 }
 

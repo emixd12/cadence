@@ -65,6 +65,11 @@ import {
 import { alongsideGuessWanted } from "@cadence/core/resolvers/alongside.resolver";
 import { isWhereGuess, type WhereGuess } from "@cadence/core/resolvers/effective-where.resolver";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
+// Ticket 361 (D33): pairing lines, behind CADENCE_ALONGSIDE.
+import {
+  briefPairingCandidate, pairingHostStands, planAlongsidePairings, planBriefPairingLines, type AlongsidePairingEvidence,
+} from "@cadence/core/resolvers/alongside-pairing.resolver";
+import { readAlongsidePairingEvidence, type PairingEvidenceReader } from "@/lib/services/alongside-pairing.service";
 import { parseDescriptionEstimates, type DescriptionEstimateItem } from "@cadence/core/services/description-duration";
 import { formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
 import { dailyBriefReadsGoogleCalendar, dailyBriefSourceAllowed } from "@cadence/core/services/daily-brief-sources";
@@ -278,19 +283,25 @@ export async function planBriefMoveDay(input: Readonly<{
   planning: BriefMovePlanningInput;
   travelSecrets: TravelConclusionsSecrets;
   day?: BriefMoveDay;
+  /** Ticket 361: the coach's evidence for pairing lines (tests). Default: read through the coach channel. */
+  readPairingEvidence?: PairingEvidenceReader;
 }>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
   const day = input.day ?? await readBriefMoveDay(input.supabase, input.userId, input.localDate);
   const calendar = briefMoveCalendar(input.context, input.planning.calendarBusy);
   const travel = briefMoveTravel(input.planning.travelTimes, { secrets: input.travelSecrets, userId: input.userId, localDate: input.localDate, now: input.now });
   const answers = await readDayAnswers(input.supabase, input.userId, input.localDate);
-  const plan = planBriefMoveLinesFromInputs({
+  const inputs = {
     localDate: input.localDate, timezone: input.timezone, now: input.now, items: day.items,
     calendarBusy: calendar.busy, calendar: calendar.state, travel,
     placeBehaviorIds: new Set([...day.behaviors.values()].filter((behavior) => behavior.whereKind === "place").map((behavior) => behavior.id)),
     declinedToday: answers.closedToday, neverMoveBehaviorIds: day.neverMoveBehaviorIds,
     offerNeverMoveBehaviorIds: answers.offerNeverMove,
-  });
-  return { ...plan, day };
+  };
+  const plan = planBriefMoveLinesFromInputs(inputs);
+  // Ticket 361: with CADENCE_ALONGSIDE on, pairing lines follow the move lines under the same cap.
+  if (!alongsideEnabled() || plan.calendar === "stale") return { ...plan, day };
+  const evidence: AlongsidePairingEvidence = await (input.readPairingEvidence ?? readAlongsidePairingEvidence)(input.userId, input.localDate);
+  return { ...plan, candidates: [...plan.candidates, ...planBriefPairingLines({ ...inputs, evidence }, plan.candidates)], day };
 }
 
 /**
@@ -506,6 +517,7 @@ function lineFromRow(row: ProposalRow): BriefMoveLine | null {
     moveId: row.move_id,
     appliedTo: null,
     ...(line.routine ? { routine: line.routine } : {}),
+    ...(line.pairing ? { pairing: line.pairing } : {}),
   };
 }
 
@@ -949,11 +961,16 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
       blocks: view.blocks, travelBeforeSeconds: view.before, travelAfterSeconds: view.after,
     });
     const sameItem = item.revision === line.expectedRevision && item.start.toString() === Temporal.Instant.from(line.from.startAt).toString();
-    if (check.ok && !passed && sameItem) continue;
+    // Ticket 361: a pairing line also needs its host where it was.
+    const pairing = line.pairing && alongsideEnabled() ? line.pairing : null;
+    if (check.ok && !passed && sameItem && (!pairing || pairingHostStands(day.items, pairing))) continue;
 
     const time = formatBriefingTime(start.toString(), line.timezone);
     let candidate: BriefMoveCandidate | null;
-    if (check.ok && !passed) {
+    if (pairing) {
+      // The one rule pairs the guest again (the same host at its new time, or another), or the line closes.
+      candidate = repairedPairing(day, row, line, { now: person.now, calendar, travel, positions });
+    } else if (check.ok && !passed) {
       // The time still fits but the item changed (edited, or moved and back): the same
       // move, rebuilt from the item as it is, so Yes is not refused for a stale revision.
       candidate = rebuiltCandidate(row, line, item, start, line.otherTimes.map((value) => Temporal.Instant.from(value)).filter((value) => !value.equals(start)), line.reason);
@@ -1000,6 +1017,39 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
       : newest && newest.id !== id && newest.status === "proposed" ? lineFromRow(newest) : null });
   }
   return { replaced };
+}
+
+/** Ticket 361: the same Google Calendar provenance rule Re-plan and Re-check apply. */
+function googleProvenance(proposal: ProposalRow, serverCalendar: BriefServerCalendarBusyResult) {
+  const prevGoogle = (proposal as { contains_google_calendar?: boolean | null }).contains_google_calendar === true;
+  const containsGoogleCalendar = serverCalendar.containsGoogleCalendar || (prevGoogle && serverCalendar.googleCalendarGrantGeneration !== null);
+  return { containsGoogleCalendar, googleCalendarGrantGeneration: containsGoogleCalendar ? serverCalendar.googleCalendarGrantGeneration : null };
+}
+
+/**
+ * Ticket 361: a pairing line's guest paired again on the day as it is now, holding the
+ * other open lines' times. The need was found when the line was written, so it is not
+ * asked again. Null when no host fits.
+ */
+function repairedPairing(day: BriefMoveDay, row: ProposalRow, line: BriefMoveLine, input: Readonly<{
+  now: Temporal.Instant; calendar: readonly BriefMoveCalendarBusy[]; travel: BriefMoveTravelInput | null;
+  positions: ReadonlyMap<string, BriefMoveInterval>; excludeHosts?: ReadonlySet<string>;
+}>): BriefMoveCandidate | null {
+  const positions = new Map(input.positions);
+  positions.delete(row.occurrence_id);
+  const [next] = planAlongsidePairings({
+    localDate: row.local_date, timezone: line.timezone, now: input.now, items: day.items, calendarBusy: input.calendar,
+    travel: input.travel, evidence: { doneTogether: [], crowdedHours: [] }, positions,
+    onlyGuests: new Set([row.occurrence_id]), requireNeed: false, limit: 1,
+    ...(input.excludeHosts ? { excludeHosts: input.excludeHosts } : {}),
+  });
+  if (!next) return null;
+  const candidate = briefPairingCandidate({ ...next, needs: line.pairing?.needs ?? next.needs }, {
+    timezone: line.timezone, now: input.now, travel: input.travel,
+    placeBehaviorIds: new Set([...day.behaviors.values()].filter((behavior) => behavior.whereKind === "place").map((behavior) => behavior.id)),
+    offerNeverMoveBehaviorIds: line.offerNeverMove ? new Set([line.behaviorId]) : new Set(),
+  });
+  return candidate;
 }
 
 function rebuiltCandidate(row: ProposalRow, line: BriefMoveLine, item: BriefMoveDay["items"][number], next: Temporal.Instant,
@@ -1116,6 +1166,19 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   if (!item || item.status !== "unresolved") throw new BriefMoveError("proposal_closed");
   const serverCalendar = await resolveBriefCalendarBusy(person, proposal.local_date, request.context);
   const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, proposal.local_date));
+  // Ticket 361: Re-plan on a pairing line pairs the guest with another host, or offers nothing.
+  if (old.pairing && alongsideEnabled()) {
+    const candidate = repairedPairing(day, proposal, old, { now: person.now, calendar: serverCalendar.busy, travel,
+      positions: openLinePositions(latest.values()), excludeHosts: new Set([old.pairing.hostOccurrenceId]) });
+    if (!candidate) return { line: null, replacedProposalId: proposal.id };
+    const [line] = await saveBriefProposals(await callers.agent(), {
+      runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false, candidates: [candidate],
+      replaces: new Map([[item.occurrenceId, proposal.id]]),
+      // Google Calendar provenance as the other Re-plan keeps it.
+      ...googleProvenance(proposal, serverCalendar),
+    });
+    return { line: line ?? null, replacedProposalId: proposal.id };
+  }
   const stop = travel?.stops.get(item.occurrenceId);
   const shown = [old.to.startAt, ...old.otherTimes].map((value) => Temporal.Instant.from(value));
   const starts = briefMoveFreeStarts({

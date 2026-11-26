@@ -3,7 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartInstant, zonedInstant } from "@cadence/core/resolvers/time.resolver";
 import { loggedAverageSeconds } from "@cadence/core/resolvers/move.resolver";
 import { resolveBriefMoveLength, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
-import { alongsideGuessWanted, resolveAlongside } from "@cadence/core/resolvers/alongside.resolver";
+import { alongsideGuessWanted, alongsideQuestionOpen, resolveAlongside } from "@cadence/core/resolvers/alongside.resolver";
 import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, resolveEffectiveWhere, type EffectiveWhere, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
@@ -236,6 +236,8 @@ function dayItem(row: Occurrence, behavior: BriefMoveBehaviorFacts, length: Brie
 export type BehaviorPlanningFacts = Readonly<{
   alongside: ReturnType<typeof resolveAlongside>;
   where: EffectiveWhere;
+  /** Ticket 360: `alongsideQuestionOpen` (unanswered, guess yes). Absent from facts built before it. */
+  questionOpen?: boolean;
 }>;
 
 /**
@@ -272,6 +274,7 @@ export async function readBehaviorPlanningFacts(
     const estimate = currentEstimate((estimates.data ?? []).find((item) => item.behavior_id === row.id), behavior, true);
     facts.set(row.id, {
       alongside: resolveAlongside({ setting: behavior.alongside, guess: estimate?.alongside ?? null }),
+      questionOpen: alongsideQuestionOpen(behavior, estimate?.alongside ?? null),
       where: resolveEffectiveWhere({ whereKind: row.where_kind, locationText: row.location_text ?? null,
         labels: labelsByBehavior.get(row.id) ?? [], guess: estimate?.whereGuess ?? null, localDate }),
     });

@@ -12,6 +12,7 @@
  * it is not.
  */
 
+import { Temporal } from "@js-temporal/polyfill";
 import type { EffectiveWhere } from "./effective-where.resolver";
 
 export const ALONGSIDE_SOURCES = ["person", "guess", "default"] as const;
@@ -100,11 +101,16 @@ function open(where: NonNullable<OverlapPlace>): boolean {
  * exists, so the form can offer it as a guess to accept.
  */
 export type AlongsideAnswer = "yes" | "no" | "unanswered";
-export type AlongsideFormView = Readonly<{ answer: AlongsideAnswer; guess: boolean | null }>;
+/**
+ * Ticket 360: `questionOpen` is `alongsideQuestionOpen` for the stored values, so the form
+ * asks exactly when every other surface may ask. Absent from views built before it.
+ */
+export type AlongsideFormView = Readonly<{ answer: AlongsideAnswer; guess: boolean | null; questionOpen?: boolean }>;
 
 export function alongsideFormView(input: AlongsideInput): AlongsideFormView {
-  if (typeof input.setting === "boolean") return { answer: input.setting ? "yes" : "no", guess: null };
-  return { answer: "unanswered", guess: typeof input.guess === "boolean" ? input.guess : null };
+  const questionOpen = alongsideQuestionOpen({ alongside: input.setting }, input.guess);
+  if (typeof input.setting === "boolean") return { answer: input.setting ? "yes" : "no", guess: null, questionOpen };
+  return { answer: "unanswered", guess: typeof input.guess === "boolean" ? input.guess : null, questionOpen };
 }
 
 /**
@@ -117,4 +123,48 @@ export type AlongsideRowView = Readonly<{ source: "person" | "guess"; where?: Ov
 export function alongsideRowView(resolved: ResolvedAlongside, where?: OverlapPlace): AlongsideRowView | null {
   if (!resolved.value || resolved.source === "default") return null;
   return where ? { source: resolved.source, where: { kind: where.kind, ...(where.placeKey ? { placeKey: where.placeKey } : {}) } } : { source: resolved.source };
+}
+
+/**
+ * Ticket 360 (D33): whether Cadence may ask the person "Can this be done alongside other
+ * things?" about a Behavior. Open while the person has not answered (`alongside` is null)
+ * and the current model guess is yes. Every surface asks only while this is true: the
+ * Behavior form, the Timeline row after a Completed mark, the Daily Brief, the advisor's
+ * `setup_gaps` fact and Chat. Any answer writes `behaviors.alongside`, which closes the
+ * question on every surface. A guess of no is never asked about: planning already
+ * treats the Behavior as blocking, the same as the default.
+ */
+export function alongsideQuestionOpen(
+  behavior: Readonly<{ alongside: boolean | null | undefined }>,
+  guess: boolean | null | undefined,
+): boolean {
+  return typeof behavior.alongside !== "boolean" && guess === true;
+}
+
+/** One of today's items the Daily Brief could ask about. */
+export type BriefAlongsideQuestionCandidate = Readonly<{
+  behaviorId: string;
+  title: string;
+  /** The item's start, a UTC instant (ISO 8601). Orders the candidates. */
+  startAt: string;
+  /** `alongsideQuestionOpen` for the item's Behavior. */
+  questionOpen: boolean;
+}>;
+
+/**
+ * Ticket 360 (D33): the Behavior the Daily Brief asks about, or null. At most one
+ * question per brief: the earliest of today's items whose question is open, skipping
+ * any Behavior in `askedBehaviorIds` (already asked in an earlier brief). Ties go to
+ * the title, then the id, so the same day always gives the same question.
+ */
+export function pickBriefAlongsideQuestion(input: Readonly<{
+  items: readonly BriefAlongsideQuestionCandidate[];
+  askedBehaviorIds?: ReadonlySet<string>;
+}>): Readonly<{ behaviorId: string; title: string }> | null {
+  const asked = input.askedBehaviorIds ?? new Set<string>();
+  const open = input.items.filter((item) => item.questionOpen && !asked.has(item.behaviorId));
+  if (!open.length) return null;
+  const [first] = [...open].sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.startAt), Temporal.Instant.from(right.startAt))
+    || left.title.localeCompare(right.title) || left.behaviorId.localeCompare(right.behaviorId));
+  return { behaviorId: first!.behaviorId, title: first!.title };
 }

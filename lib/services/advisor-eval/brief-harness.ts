@@ -1,4 +1,5 @@
 import { planBriefMoveLinesFromInputs, type BriefMoveCandidate } from "@cadence/core/resolvers/brief-move.resolver";
+import { planBriefPairingLines } from "@cadence/core/resolvers/alongside-pairing.resolver";
 import { formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
 import type { DailyBriefGenerator, DailyBriefModelUsage } from "../daily-brief-consumer";
 import { writeBriefWords, type DailyBriefWords } from "../daily-brief.service";
@@ -65,7 +66,9 @@ export async function runBriefEval(input: Readonly<{ run: BriefEvalRun; fixtures
 
 async function runFixture(fixture: BriefEvalFixture, run: BriefEvalRun, clock: () => number): Promise<BriefEvalResult> {
   const plannerStarted = clock();
-  const plan = planBriefMoveLinesFromInputs(fixture.plan);
+  const moves = planBriefMoveLinesFromInputs(fixture.plan);
+  // Ticket 361: flag-on fixtures add pairing lines after the move lines, as planBriefMoveDay does.
+  const plan = fixture.pairing ? { ...moves, candidates: [...moves.candidates, ...planBriefPairingLines({ ...fixture.plan, evidence: fixture.pairing }, moves.candidates)] } : moves;
   const plannerMs = clock() - plannerStarted;
   const layerOne = checkBriefLayerOne(fixture.plan, plan.candidates);
   const usages: DailyBriefModelUsage[] = [];
@@ -120,6 +123,10 @@ export function scoreBriefRubric(input: Readonly<{
   if (fixture.expect.noLines) criteria.push({ id: "no_lines", passed: ids.size === 0 && input.calls === 0, ...(ids.size ? { detail: [...ids].join(",") } : {}) });
   for (const id of fixture.expect.movesOccurrences ?? []) criteria.push({ id: `moves:${id}`, passed: ids.has(id) });
   for (const id of fixture.expect.keepsOccurrences ?? []) criteria.push({ id: `keeps:${id}`, passed: !ids.has(id) });
+  for (const pair of fixture.expect.pairs ?? []) {
+    criteria.push({ id: `pairs:${pair.guest}:${pair.host}`, passed: input.plan.some((line) => line.occurrenceId === pair.guest
+      && line.reasonCode === "alongside_pairing" && line.pairing?.hostOccurrenceId === pair.host) });
+  }
   if (!lines.length) return criteria;
   // Wording, only when there is something to say.
   criteria.push({ id: "model_words_used", passed: words.source === "model" && words.fallbacks.length === 0,

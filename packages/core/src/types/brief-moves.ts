@@ -9,6 +9,8 @@
  *   - A line offers one move of one of today's Unresolved items. Range Behaviors,
  *     "alongside" Behaviors, Behaviors switched to "Don't suggest moving this", and
  *     starts after the latest hour (default 10 pm local) are never offered.
+ *     The one exception (Ticket 361, behind `CADENCE_ALONGSIDE`): a pairing line moves an
+ *     alongside item to the start of another of today's items, its host.
  *   - A line is valid until it is answered, refused at tap time, or the day ends. The
  *     brief as a whole never expires and is never withdrawn by a Timeline change.
  *   - No, and Undo after Yes, mean "no more suggestions for this item today",
@@ -65,6 +67,8 @@ export const BRIEF_MOVE_REASON_CODES = [
   "tight_transition",
   "time_passed",
   "conflict_after_schedule_edit",
+  // Ticket 361 (D33): do an alongside item during another item (its host), today only.
+  "alongside_pairing",
 ] as const;
 export type BriefMoveReasonCode = (typeof BRIEF_MOVE_REASON_CODES)[number];
 
@@ -83,6 +87,28 @@ export type BriefMoveSpan = Readonly<{ startAt: string; endAt: string }>;
  * line's own Occurrence first.
  */
 export type BriefMoveRoutine = Readonly<{ parentBehaviorId: string; title: string; occurrenceIds: readonly string[] }>;
+
+/**
+ * Ticket 361 (D33): why a pairing helps. `crowded_hour`: the guest sits in an hour with
+ * many items; `conflict`: it runs into travel or an item somewhere else; `done_together`:
+ * the coach's done_together signal names the guest and the host.
+ */
+export const BRIEF_MOVE_PAIRING_NEEDS = ["crowded_hour", "conflict", "done_together"] as const;
+export type BriefMovePairingNeed = (typeof BRIEF_MOVE_PAIRING_NEEDS)[number];
+
+/**
+ * Ticket 361 (D33): the host a pairing line was proposed with, kept on the proposal as a
+ * record of what was offered. It is not a link between the two items: Yes applies an
+ * ordinary move of the guest, and a later move of the host does not carry the guest.
+ */
+export type BriefMovePairing = Readonly<{
+  hostOccurrenceId: string;
+  hostBehaviorId: string;
+  hostTitle: string;
+  /** The host's start when the line was written (UTC instant): the line's own `to.startAt`. */
+  hostStartAt: string;
+  needs: readonly BriefMovePairingNeed[];
+}>;
 
 export type BriefMoveLine = Readonly<{
   proposalId: string;
@@ -122,6 +148,8 @@ export type BriefMoveLine = Readonly<{
   appliedTo?: BriefMoveSpan | null;
   /** Set when the line moves a whole routine. Missing from older servers. */
   routine?: BriefMoveRoutine;
+  /** Ticket 361: set on an `alongside_pairing` line. */
+  pairing?: BriefMovePairing;
 }>;
 
 /** An open schedule-edit collision (Phase 2 move_conflicts) shown as a line in the brief. */

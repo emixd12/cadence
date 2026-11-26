@@ -3,7 +3,7 @@
   "schema_version": "1.4.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-21",
+  "updated": "2026-11-25",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -944,10 +944,11 @@
     {
       "path": "components/timeline/OccurrenceMarkDetails.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 16,
+      "interaction_marker_count": 20,
       "interaction_ids": [
         "INT-TIMELINE-018",
-        "INT-TIMELINE-019"
+        "INT-TIMELINE-019",
+        "INT-TIMELINE-028"
       ]
     },
     {
@@ -1102,6 +1103,14 @@
       ]
     },
     {
+      "path": "components/briefing/BriefAlongsideQuestion.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-BRIEF-011"
+      ]
+    },
+    {
       "path": "components/briefing/DailyBriefLauncher.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 4,
@@ -1121,7 +1130,8 @@
         "INT-BRIEF-008",
         "INT-WEATHER-001",
         "INT-SETTINGS-019",
-        "INT-SETTINGS-020"
+        "INT-SETTINGS-020",
+        "INT-BRIEF-011"
       ]
     },
     {
@@ -19596,6 +19606,88 @@
       }
     },
     {
+      "id": "INT-TIMELINE-028",
+      "name": "Answer whether a just-completed item can be done alongside other things",
+      "feature": "alongside-behaviors",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-when-or-why-to-a-mark"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J09"
+      ],
+      "intent": "Tell Cadence whether a Behavior can be done alongside other things, right after marking its item Completed, while Cadence only guesses yes (Ticket 360, D33).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes or No after \"Done alongside other things?\" next to the name of a just-completed row"
+        }
+      ],
+      "availability": "Web Timeline with CADENCE_ALONGSIDE on, right after marking an item Completed when no Done at line shows, while the Behavior's alongside question is open (not answered, guessed yes), on the share of marks set in MARK_DETAIL_PROMPTS.alongside.",
+      "success_result": "Writes the Behavior's alongside setting (Yes true, No false) through the Behavior definition service and says it is saved. The question closes on every surface, and the row label and the Behavior form show the answer after the refresh.",
+      "failure_result": "A Behavior no longer in the account, a change while saving, or a failed save shows under Not changed. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/OccurrenceMarkDetails.tsx#useOccurrenceMarkDetailParts",
+        "components/timeline/OccurrenceRow.tsx",
+        "app/(app)/timeline/mark-detail-actions.ts#recordAlongsideAnswerAction",
+        "lib/services/alongside-answer.service.ts#recordBehaviorAlongsideAnswer",
+        "packages/core/src/resolvers/alongside.resolver.ts#alongsideQuestionOpen"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/alongside-question.dom.test.tsx",
+          "tests/alongside-question.service.test.ts",
+          "tests/alongside.resolver.test.ts"
+        ],
+        "notes": "DOM checks cover the line after an on-time Completed mark, Yes and No with the written value, a refusal, Done at priority on a late mark, and no line without the question, the action, a Completed mark or the share. The service test covers the write through the Behavior definition service, a repeated answer, the flag and refusals."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/OccurrenceMarkDetails.tsx"
+          ],
+          "evidence": [
+            "tests/alongside-question.dom.test.tsx"
+          ],
+          "reason": "Behind CADENCE_ALONGSIDE, off in production until Ticket 365's acceptance passes."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 363. The shared row asks only when the page passes an alongside mark-detail action and rows carry alongsideQuestion; the Mac passes neither yet."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
       "id": "INT-BRIEF-006",
       "name": "Answer a Daily Brief move line",
       "feature": "daily-brief-moves",
@@ -20011,6 +20103,91 @@
           "evidence": [
             "tests/desktop-daily-brief.test.ts"
           ]
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-BRIEF-011",
+      "name": "Answer the Daily Brief's alongside question",
+      "feature": "alongside-behaviors",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#daily-brief"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Answer the brief's one question, \"Can {Behavior} be done alongside other things?\", with Yes or No and no typing (Ticket 360, D33).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Yes or No under the brief's alongside question"
+        }
+      ],
+      "availability": "Web Timeline with CADENCE_ALONGSIDE on, inside a ready Daily Brief whose client sent alongside_question_v1, when one of today's items has an open alongside question (not answered, guessed yes). At most one question per brief; reopening today's brief shows the same question while it is still open.",
+      "success_result": "Writes the Behavior's alongside setting through the Behavior definition service (POST /api/advisor/brief/alongside), says it is saved and redraws the Timeline. The question closes on every surface.",
+      "failure_result": "A Behavior no longer in the account, a change while saving, or a failed or offline request shows under the line in the alert style; Yes and No stay. Nothing changes.",
+      "effects": [
+        "database_write",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/briefing/BriefAlongsideQuestion.tsx#BriefAlongsideQuestion",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble",
+        "lib/ui/daily-brief-alongside.ts",
+        "app/api/advisor/brief/alongside/route.ts",
+        "lib/services/brief-alongside.service.ts#answerBriefAlongsideQuestion",
+        "packages/core/src/resolvers/alongside.resolver.ts#pickBriefAlongsideQuestion"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/alongside-question.dom.test.tsx",
+          "tests/alongside-question.service.test.ts",
+          "tests/daily-brief-alongside.test.ts",
+          "tests/alongside.resolver.test.ts"
+        ],
+        "notes": "DOM checks cover the question, Yes and No with the sent body, the saved outcome, a remount, a refusal and the bubble's gate; the service tests cover the pick, the saved question on reopen, the flag and the client opt-in, the strict body and the error codes."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/briefing/BriefAlongsideQuestion.tsx"
+          ],
+          "evidence": [
+            "tests/alongside-question.dom.test.tsx",
+            "tests/daily-brief-alongside.test.ts"
+          ],
+          "reason": "Behind CADENCE_ALONGSIDE, off in production until Ticket 365's acceptance passes."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 363. The Mac's brief client sets no alongside transport, so it never sends alongside_question_v1 and never receives the line."
         },
         "marketing": {
           "applicability": "not_applicable",

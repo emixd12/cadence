@@ -236,7 +236,7 @@ async function runAndStore(input: Readonly<{
     input.firstTurn ? firstTurnTimeline(context, sources.notes) : Promise.resolve(null),
   ]);
   const now = localNow(timezone);
-  const tools = buildChatToolDefinitions(sources);
+  const tools = buildChatToolDefinitions(sources, { alongside });
   const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources), alongside });
   const onGoogleCalendarRead = async (grantGeneration: number | null) => {
     await markChatConversationGoogleCalendarTouched(client, {

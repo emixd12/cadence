@@ -551,6 +551,7 @@ export function BehaviorForm({
           <AlongsideField
             answer={alongsideAnswer}
             guess={alongside.guess}
+            questionOpen={alongside.questionOpen === true}
             error={fieldErrors.alongside}
             onChange={setAlongsideAnswer}
             onAcceptGuess={(answer) => {
@@ -1089,19 +1090,23 @@ function TimeEntryEditor({
 function AlongsideField({
   answer,
   guess,
+  questionOpen,
   error,
   onChange,
   onAcceptGuess,
 }: Readonly<{
   answer: AlongsideAnswer;
   guess: boolean | null;
+  /** Ticket 360: `alongsideQuestionOpen` for the saved values (unanswered, guess yes). */
+  questionOpen: boolean;
   error?: string;
   onChange: (answer: AlongsideAnswer) => void;
   onAcceptGuess: (answer: AlongsideAnswer) => void;
 }>) {
-  const guessAnswer: AlongsideAnswer | null = guess === null ? null : guess ? "yes" : "no";
+  const guessAnswer: AlongsideAnswer | null = questionOpen ? "yes" : guess === null ? null : guess ? "yes" : "no";
   return (
-    <div className="grid gap-1 sm:max-w-[20rem] lg:max-w-[24rem]" data-alongside-field={answer}>
+    <div className="grid gap-1 sm:max-w-[20rem] lg:max-w-[24rem]" data-alongside-field={answer}
+      data-alongside-question={questionOpen && answer === "unanswered" ? "open" : undefined}>
       <SelectField
         label="Can be done alongside other things"
         name="alongside"

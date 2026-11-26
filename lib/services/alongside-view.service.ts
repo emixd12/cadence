@@ -1,5 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
-import { alongsideFormView, alongsideRowView, resolveAlongside, type AlongsideFormView, type AlongsideRowView } from "@cadence/core/resolvers/alongside.resolver";
+import { alongsideFormView, alongsideQuestionOpen, alongsideRowView, resolveAlongside, type AlongsideFormView, type AlongsideRowView } from "@cadence/core/resolvers/alongside.resolver";
 import {
   EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS,
   isWhereGuess,
@@ -31,6 +31,8 @@ export type AlongsideBehaviorFacts = Readonly<{
   row: AlongsideRowView | null;
   /** The cached Where guess while current and Where is Not set; null otherwise. */
   whereGuess: WhereGuess | null;
+  /** Ticket 360: `alongsideQuestionOpen`, so every surface asks under the same rule. */
+  questionOpen: boolean;
 }>;
 
 type BehaviorRow = Readonly<{
@@ -81,6 +83,7 @@ export async function readAlongsideBehaviorFacts(
       form: alongsideFormView({ setting, guess }),
       row: alongsideRowView(resolveAlongside({ setting, guess }), where),
       whereGuess,
+      questionOpen: alongsideQuestionOpen({ alongside: setting }, guess),
     }] as const;
   }));
 }
@@ -93,6 +96,11 @@ export function alongsideFormViews(facts: ReadonlyMap<string, AlongsideBehaviorF
 /** The Timeline row facts for alongside Behaviors only. Empty while the flag is off. */
 export function alongsideRowViews(facts: ReadonlyMap<string, AlongsideBehaviorFacts> | null): Readonly<Record<string, AlongsideRowView>> {
   return facts ? Object.fromEntries([...facts].flatMap(([id, value]) => value.row ? [[id, value.row] as const] : [])) : {};
+}
+
+/** Ticket 360: Behaviors whose alongside question is open. Empty while the flag is off. */
+export function alongsideQuestionBehaviorIds(facts: ReadonlyMap<string, AlongsideBehaviorFacts> | null): ReadonlySet<string> {
+  return new Set(facts ? [...facts].flatMap(([id, value]) => value.questionOpen ? [id] : []) : []);
 }
 
 /** Current Where guesses for Behaviors with Where Not set. Empty while the flag is off. */

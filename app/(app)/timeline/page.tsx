@@ -35,7 +35,7 @@ import {
 } from "./move-actions";
 import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
 import { OccurrenceMarkDetailsProvider, type OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
-import { recordDoneAtAction, recordNotDoneReasonAction } from "./mark-detail-actions";
+import { recordAlongsideAnswerAction, recordDoneAtAction, recordNotDoneReasonAction } from "./mark-detail-actions";
 import { MoveConflictNotices, type MoveConflictNotice } from "@/components/timeline/MoveConflictNotices";
 import { hasPersonMovedBefore, listOpenMoveConflicts } from "@/lib/services/occurrence-move.service";
 import { systemClock } from "@/lib/services/clock";
@@ -51,6 +51,8 @@ export const dynamic = "force-dynamic";
 const MARK_DETAIL_ACTIONS: OccurrenceMarkDetailActions = {
   doneAt: recordDoneAtAction,
   notDoneReason: recordNotDoneReasonAction,
+  // Ticket 360: asks only on rows the server marked `alongsideQuestion` (CADENCE_ALONGSIDE on).
+  alongside: recordAlongsideAnswerAction,
 };
 
 const MOVE_ACTIONS: OccurrenceMoveActions = {

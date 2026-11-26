@@ -202,6 +202,8 @@ function changedFields(args: Readonly<Record<string, unknown>>, skip: readonly s
   const labels: Readonly<Record<string, string>> = {
     title: "name", description: "description", location_text: "place", category_id: "category", schedules: "schedule",
     reminders: "reminders", default_duration_minutes: "length", end_date: "end date", is_opportunity: "opportunity",
+    // Ticket 360: the answer to "Can this be done alongside other things?" (contract 1.8.0, flag on only).
+    alongside: "alongside",
   };
   const changed = Object.keys(labels).filter((key) => key in args && !skip.includes(key)).map((key) => labels[key]);
   return changed.length ? ` (${changed.join(", ")})` : "";

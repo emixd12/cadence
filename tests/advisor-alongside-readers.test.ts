@@ -12,7 +12,7 @@ import { ADVICE_SIGNAL_FACTS } from "@cadence/core/types/advice-cards";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { generateDailyBrief } from "@/lib/services/daily-brief-consumer";
 import {
-  CHAT_ALONGSIDE_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_STATIC_INSTRUCTIONS, buildChatSystemPrompt, chatPromptVersion,
+  CHAT_ALONGSIDE_INSTRUCTIONS, CHAT_ALONGSIDE_PAIRING_RULE, CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_STATIC_INSTRUCTIONS, buildChatSystemPrompt, chatPromptVersion,
 } from "@/lib/services/chat/chat-prompt";
 import { chatPlanningBehaviorIds, withChatPlanning } from "@/lib/services/chat/chat-planning";
 import { withPlanningFacts } from "@/lib/services/chat/chat-executor";
@@ -100,12 +100,24 @@ describe("Chat", () => {
     expect(sha(buildChatSystemPrompt(promptContext))).toBe(CHAT_1_7_PROMPT_SHA256);
   });
 
-  it("flag on: chat-1.8 adds the alongside rule to the cached part", () => {
+  it("flag on: chat-1.8 adds the alongside rule and the asking rule to the cached part", () => {
     expect(chatPromptVersion(true)).toBe("chat-1.8");
     const prompt = buildChatSystemPrompt({ ...promptContext, alongside: true });
-    expect(prompt.startsWith(`${CHAT_STATIC_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_INSTRUCTIONS}\n\nThe person's timezone:`)).toBe(true);
-    // No asking (Ticket 360) and no pairing (Ticket 361) here.
-    expect(CHAT_ALONGSIDE_INSTRUCTIONS).not.toMatch(/\bask\b|pair/i);
+    expect(prompt.startsWith(`${CHAT_STATIC_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS}\n\nThe person's timezone:`)).toBe(true);
+    // Asking is its own block (Ticket 360). Ticket 361 adds the pairing rule, and only it names the pairing tool.
+    expect(CHAT_ALONGSIDE_INSTRUCTIONS).not.toMatch(/\bask\b/i);
+    expect(CHAT_ALONGSIDE_INSTRUCTIONS.endsWith(` ${CHAT_ALONGSIDE_PAIRING_RULE}`)).toBe(true);
+    expect(CHAT_ALONGSIDE_INSTRUCTIONS.match(/plan_alongside_pairings/g)).toHaveLength(1);
+    expect(CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS).not.toMatch(/pair/i);
+  });
+
+  it("flag on: Chat asks only when the answer changes a plan in progress, and writes through update_behavior", () => {
+    expect(CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS).toContain("Can this be done alongside other things?");
+    expect(CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS).toMatch(/only when their answer would change a plan you are working out with them in this conversation/);
+    expect(CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS).toMatch(/otherwise do not ask/);
+    expect(CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS).toMatch(/update_behavior with alongside true or false/);
+    // Open exactly when alongsideQuestionOpen is: unanswered with a yes guess shows as alongside true from a guess.
+    expect(CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS).toMatch(/planning\.alongside is true and alongside_source is guess/);
   });
 
   const timeline = {
@@ -182,6 +194,43 @@ describe("coach signals version 4", () => {
     expect(v4.map((item) => ({ ...item, facts: { ...item.facts } }))).toEqual(v3.map((item) => ({ ...item, facts: {
       ...item.facts, alongside: item.behaviorId === "helmet", other_alongside: item.behaviorId !== "helmet",
     } })));
+  });
+
+  it("setup_gaps reports an open alongside question only in version 4 (Ticket 360)", () => {
+    const base = { today: TODAY, occurrences: [], decisions: [], moves: [], answers: [] };
+    const set = { hasLength: true, hasPlace: true };
+    const v3 = resolveCoachSignals({ ...base, behaviors: [behavior("helmet", set), behavior("reading", { hasLength: false, hasPlace: true })] })
+      .filter((item) => item.kind === "setup_gaps");
+    expect(v3.every((item) => !("alongside_unanswered" in item.facts) && !("without_alongside_answer" in item.facts))).toBe(true);
+    expect(v3.map((item) => item.behaviorId)).toEqual(["reading", null]);
+    const v4 = resolveCoachSignals({ ...base, behaviors: [
+      behavior("helmet", { ...set, alongside: true, alongsideQuestionOpen: true }),
+      behavior("reading", { hasLength: false, hasPlace: true, alongside: false, alongsideQuestionOpen: false }),
+      behavior("pill", { ...set, alongside: true, alongsideQuestionOpen: false }),
+    ] }).filter((item) => item.kind === "setup_gaps");
+    expect(v4).toEqual([
+      { kind: "setup_gaps", behaviorId: "helmet", facts: { missing_length: false, missing_place: false, alongside_unanswered: true } },
+      { kind: "setup_gaps", behaviorId: "reading", facts: { missing_length: true, missing_place: false, alongside_unanswered: false } },
+      { kind: "setup_gaps", behaviorId: null, facts: { active_behaviors: 3, without_length: 1, without_place: 0, without_alongside_answer: 1 } },
+    ]);
+    expect(ADVICE_SIGNAL_FACTS.setup_gaps).toEqual(expect.arrayContaining(["alongside_unanswered", "without_alongside_answer"]));
+  });
+
+  it("the visit passes the open question from a port that reads it", async () => {
+    const record = vi.fn(async (_run: string, signals: readonly unknown[]) => signals.length);
+    await visitCoachAccount({
+      startRun: async () => ({ runId: "run", localDate: TODAY }),
+      reads: {
+        behaviors: async () => [behavior("helmet", { hasLength: true, hasPlace: true })], occurrences: async () => [],
+        decisions: async () => [], moves: async () => [], answers: async () => ({ source: "proposals" as const, rows: [] }),
+        reminders: async () => [], sessions: async () => [],
+      } as never,
+      alongside: async () => new Map([["helmet", { value: true, questionOpen: true }]]),
+      record, finishRun: async () => undefined,
+    });
+    expect((record.mock.calls[0]![1] as Array<{ kind: string; behaviorId: string | null; facts: object }>)
+      .find((item) => item.kind === "setup_gaps" && item.behaviorId === "helmet")?.facts).toEqual(
+      { missing_length: false, missing_place: false, alongside_unanswered: true });
   });
 
   it("the visit stores version 4 facts only when the port reads alongside", async () => {

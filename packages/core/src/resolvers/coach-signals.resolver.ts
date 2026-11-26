@@ -25,8 +25,10 @@ export const COACH_SIGNAL_VERSION = "coach-signals-3";
 /**
  * Version 4 (Ticket 359, D33), only while `CADENCE_ALONGSIDE` is on: each Behavior carries
  * its effective alongside value. `crowded_hour` does not count alongside items, and
- * `done_together` facts say whether each side is alongside. No new kind. With the flag
- * off the visit stays version 3 and its output is unchanged.
+ * `done_together` facts say whether each side is alongside. Ticket 360 adds the
+ * unanswered alongside question to `setup_gaps` (`alongside_unanswered`,
+ * `without_alongside_answer`). No new kind. With the flag off the visit stays version 3
+ * and its output is unchanged.
  */
 export const COACH_SIGNAL_VERSION_ALONGSIDE = "coach-signals-4";
 
@@ -125,6 +127,11 @@ export type CoachSignalBehavior = Readonly<{
    * current guess, else false). Undefined when not read: `CADENCE_ALONGSIDE` is off.
    */
   alongside?: boolean;
+  /**
+   * Version 4 (Ticket 360): `alongsideQuestionOpen`, the person has not answered and the
+   * guess is yes. `setup_gaps` reports it. Undefined when not read: the flag is off.
+   */
+  alongsideQuestionOpen?: boolean;
 }>;
 
 export type CoachSignalOccurrence = Readonly<{

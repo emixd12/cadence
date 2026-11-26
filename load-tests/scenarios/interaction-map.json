@@ -1529,6 +1529,11 @@
       "reason": "Add for today answers need a stored opportunity proposal, today's clock in the account's timezone and idempotency verification; run serially on a synthetic account."
     },
     {
+      "id": "INT-BRIEF-011",
+      "classification": "destructive_serial_only",
+      "reason": "The brief's alongside question needs a saved brief with an open question (flag on) and writes the Behavior setting; run serially on a synthetic account."
+    },
+    {
       "id": "INT-BRIEF-007",
       "classification": "destructive_serial_only",
       "reason": "Accept all and Undo all write several moves as one batch and need stored proposals from the same serial run."
@@ -1767,6 +1772,11 @@
       "id": "INT-TIMELINE-018",
       "classification": "destructive_serial_only",
       "reason": "The done-at line appears only right after a late Completed mark and appends status history; it needs a seeded late item and serial verification."
+    },
+    {
+      "id": "INT-TIMELINE-028",
+      "classification": "destructive_serial_only",
+      "reason": "The alongside line appears only right after a Completed mark while the Behavior's question is open (flag on) and writes the Behavior setting; it needs a seeded guess and serial verification."
     },
     {
       "id": "INT-TIMELINE-019",

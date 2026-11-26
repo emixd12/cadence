@@ -152,6 +152,13 @@ export type TimelineOccurrenceView = {
    * built without it (the Mac until Ticket 363) render as before.
    */
   alongside?: AlongsideRowView;
+  /**
+   * Ticket 360 (D33): set only while `CADENCE_ALONGSIDE` is on and the Behavior's
+   * alongside question is open (`alongsideQuestionOpen`). After a Completed mark the row
+   * may ask "Done alongside other things? Yes · No" when the page passes an `alongside`
+   * mark-detail action. Absent otherwise.
+   */
+  alongsideQuestion?: true;
 };
 
 export type TimelineSourceEvidence = Readonly<{

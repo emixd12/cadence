@@ -112,6 +112,9 @@ export function hostedDueCoachAccounts(serviceRole: AppSupabaseClient) {
 // ---------------------------------------------------------------------------
 // One visit, as the person, on the coach token channel.
 
+/** Ticket 360: the effective alongside value and whether its question is open (`alongsideQuestionOpen`). */
+export type AlongsideVisitFacts = Readonly<{ value: boolean; questionOpen: boolean }>;
+
 export type CoachVisitPort = Readonly<{
   startRun(): Promise<Readonly<{ runId: string; localDate: string }>>;
   reads: CoachSignalReads;
@@ -119,7 +122,7 @@ export type CoachVisitPort = Readonly<{
    * Ticket 359: each Behavior's effective alongside value, present only while
    * `CADENCE_ALONGSIDE` is on. With it the visit computes and stores signal version 4.
    */
-  alongside?: (behaviorIds: readonly string[], today: string) => Promise<ReadonlyMap<string, boolean>>;
+  alongside?: (behaviorIds: readonly string[], today: string) => Promise<ReadonlyMap<string, boolean | AlongsideVisitFacts>>;
   record(runId: string, signals: readonly CoachSignal[]): Promise<number>;
   finishRun(runId: string, outcome: "success" | "error", errorCode: string | null): Promise<void>;
 }>;
@@ -143,7 +146,13 @@ export async function visitCoachAccount(port: CoachVisitPort): Promise<CoachVisi
     ]);
     // Version 4 (flag on): every Behavior carries its effective alongside value.
     const alongside = port.alongside ? await port.alongside(behaviors.map((behavior) => behavior.id), today) : null;
-    const read = alongside ? behaviors.map((behavior) => ({ ...behavior, alongside: alongside.get(behavior.id) === true })) : behaviors;
+    const read = alongside ? behaviors.map((behavior) => {
+      const entry = alongside.get(behavior.id);
+      // Ticket 360: a port that reads the question also says whether it is open.
+      return typeof entry === "object"
+        ? { ...behavior, alongside: entry.value, alongsideQuestionOpen: entry.questionOpen }
+        : { ...behavior, alongside: entry === true };
+    }) : behaviors;
     const signals = resolveCoachSignals({ today, behaviors: read, occurrences, decisions, moves, answers: answers.rows, reminders, sessions });
     const stored = await port.record(run.runId, signals);
     await port.finishRun(run.runId, "success", null);
@@ -173,7 +182,7 @@ export function createCoachVisitPort(client: AppSupabaseClient, userId: string,
     reads: createCoachSignalReads(client, userId),
     ...(alongside ? { alongside: async (behaviorIds: readonly string[], today: string) => {
       const facts = await readBehaviorPlanningFacts(client, userId, behaviorIds, today, { env });
-      return new Map([...facts].map(([id, item]) => [id, item.alongside.value]));
+      return new Map([...facts].map(([id, item]) => [id, { value: item.alongside.value, questionOpen: item.questionOpen === true }]));
     } } : {}),
     record: (runId, signals) => recordCoachSignals(client, { runId, signalVersion: version, signals }),
     async finishRun(runId, outcome, errorCode) {

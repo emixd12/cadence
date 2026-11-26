@@ -7,6 +7,7 @@ import type {
 } from "@cadence/core/types/daily-brief";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "./daily-brief-moves";
 import { createBriefOpportunityClient, type BriefOpportunityClient } from "./daily-brief-opportunities";
+import { createBriefAlongsideClient, type BriefAlongsideClient } from "./daily-brief-alongside";
 import { ADVISOR_REQUEST_DEADLINE_MS, createAdvisorClient, type AdvisorClient } from "./advisor";
 import { getLocalStorage } from "./browser-storage";
 
@@ -46,6 +47,8 @@ export type DailyBriefClient = Readonly<{
   moves?: BriefMoveClient;
   /** Task 7: "Add for today" answers. Only clients that render opportunity lines set it, and only they ask for them. */
   opportunities?: BriefOpportunityClient;
+  /** Ticket 360: the alongside question line. Only clients that render it set it, and only they ask for it. */
+  alongside?: BriefAlongsideClient;
   /** Advisor Phase 4 (4E): tips and schedule questions. Absent on a Mac not linked to an account. */
   advisor?: AdvisorClient;
 }>;
@@ -58,7 +61,7 @@ export type DailyBriefRequestInput = Readonly<{
   installationId: string;
   retry: boolean;
   travelConclusions?: string;
-  /** Advisor Phase 3: `["move_lines_v1"]` asks for move lines; Task 7 adds `"opportunity_lines_v1"`. Older clients omit them. */
+  /** Advisor Phase 3: `["move_lines_v1"]` asks for move lines; Task 7 adds `"opportunity_lines_v1"`, Ticket 360 `"alongside_question_v1"`. Older clients omit them. */
   features?: readonly string[];
   /** Advisor Phase 3: signed travel times from the latest routes response, passed back unchanged. */
   travelTimes?: string;
@@ -122,6 +125,7 @@ export function createWebDailyBriefClient(fetcher: typeof fetch = fetch): DailyB
     // The web Timeline redraws through the brief UI's own refresh after an applied answer.
     moves: createBriefMoveClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: DAILY_BRIEF_MOVE_DEADLINE_MS })),
     opportunities: createBriefOpportunityClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: DAILY_BRIEF_MOVE_DEADLINE_MS })),
+    alongside: createBriefAlongsideClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: DAILY_BRIEF_MOVE_DEADLINE_MS })),
     // The advisor UI redraws the web Timeline through the runtime refresh after a schedule answer.
     advisor: createAdvisorClient((path, init, signal) => dailyBriefFetch(fetcher, path, init, { signal, deadlineMs: ADVISOR_REQUEST_DEADLINE_MS })),
   };

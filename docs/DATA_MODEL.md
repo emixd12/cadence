@@ -1009,7 +1009,13 @@ tap is kept. Cascades with its move.
 `chat`) and what the person did with it (`status`). Server only, mutable status,
 never synced. Links to the move it produced through `move_id`. The brief's re-check
 on open (`withdraw_brief_move_proposal`, Daily Brief agent token only) closes an
-undecided brief line as `withdrawn` when nothing else fits today.
+undecided brief line as `withdrawn` when nothing else fits today. Ticket 361 (D33): a pairing line
+stores `reason = 'alongside_pairing'` and, in `line`, a `pairing` object
+(`hostOccurrenceId`, `hostBehaviorId`, `hostTitle`, `hostStartAt`, `needs`) recording the
+host it was offered with. That is history, not a link: nothing reads it to move the guest,
+and a later move of the host leaves the guest where it is. A Yes writes an ordinary
+`occurrence_moves` row for the guest with `reason = 'alongside_pairing'`. No schema change:
+both `reason` columns accept any lowercase code.
 
 **`move_conflicts`**: a notice that a later base-schedule change put another
 Occurrence of the same Behavior next to a moved one on the same day. `status`
@@ -3620,7 +3626,12 @@ shown to the person; Phase 4 matches the signals to advice cards.
   (`coach-signals-4`, Ticket 359) is written only while `CADENCE_ALONGSIDE` is on and adds
   no kind: each Behavior carries its effective alongside value, `crowded_hour` leaves
   alongside items out of the hour, and `done_together` facts add booleans `alongside` and
-  `other_alongside` (the signal's Behavior and the other one). `signal_version`'s check is
+  `other_alongside` (the signal's Behavior and the other one). Ticket 360 extends version
+  4: `setup_gaps` also reports an open alongside question (not answered while Cadence
+  guesses yes, `alongsideQuestionOpen`). A Behavior's row adds boolean
+  `alongside_unanswered` and appears when that alone is true; the account-wide row adds
+  the count `without_alongside_answer`. No advice card reads them yet (no reviewed
+  source fits). `signal_version`'s check is
   a pattern, so no migration was needed. With the flag off the visit writes version 3,
   unchanged. At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an

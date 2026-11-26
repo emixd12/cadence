@@ -616,6 +616,16 @@ Hosted web, behind `CADENCE_ALONGSIDE`; the Mac follows in Ticket 363.
    using the guess.
 4. **Timeline.** An alongside row shows "Alongside", or "Alongside · a guess". It stops
    warning about Calendar overlaps; travel overlaps still show.
+5. **Cadence asks (Ticket 360).** While a Behavior is Not answered and Cadence guesses
+   yes, Cadence may ask once on a surface the person is already using. One answer
+   anywhere stores the setting and closes the question everywhere:
+   - Timeline: right after marking the item Completed (when no "Done at" line shows),
+     "Done alongside other things? Yes · No".
+   - Daily Brief: one line, "Can Red light helmet be done alongside other things?
+     Yes · No", at most one per brief.
+   - Chat: only when the answer changes a plan the person is working out there; the
+     change waits for their Yes like every Behavior edit.
+   - Behavior form: the guess note above (step 2).
 
 ## Reminder flow
 
