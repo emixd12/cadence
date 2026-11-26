@@ -14,6 +14,7 @@ import {
   resolvePlaceLabelState,
   savedPlaceRef,
   validMarkerPosition,
+  whereSuggestionDismissible,
   type PlaceLabelOccurrence,
   type PlaceLabelRuleSet,
   type PlaceLabelStatusMark,
@@ -32,6 +33,7 @@ import type {
   PlaceMarkerRecord,
   WhereSuggestionDismissInput,
   WhereSuggestionDismissalRecord,
+  WhereSuggestionKey,
 } from "../types/place-labels";
 import { storedBehaviorWhere } from "./behavior-where";
 import { travelPlaceKey } from "./travel-place-key";
@@ -212,8 +214,15 @@ export function planWhereSuggestionDismissal(input: Readonly<{
   settings: PlaceLabelSettings;
   dismissal: WhereSuggestionDismissInput;
   dismissedAt: string;
+  /**
+   * Ticket 383 (D37): the guess the Behavior's line shows (`shownWhereGuessKey`), passed
+   * only while `CADENCE_ALONGSIDE` is on. Absent or null, a dismissal needs labels on.
+   */
+  shownGuess?: WhereSuggestionKey | null;
 }>): WhereSuggestionDismissalRecord {
-  if (!input.settings.enabled) throw new PlaceLabelError("off", "Completion places are off.");
+  if (!whereSuggestionDismissible({ settingsEnabled: input.settings.enabled, suggestion: input.dismissal.suggestion, shownGuess: input.shownGuess ?? null })) {
+    throw new PlaceLabelError("off", "Completion places are off.");
+  }
   return { id: input.dismissal.behaviorId, suggestion: input.dismissal.suggestion,
     rule_version: input.dismissal.ruleVersion, dismissed_at: instant(input.dismissedAt) };
 }

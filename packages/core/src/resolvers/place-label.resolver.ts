@@ -357,16 +357,22 @@ export function resolvePlaceLabelState(input: Readonly<{
 }>): PlaceLabelState {
   const rules = input.rules ?? CURRENT_WHERE_SUGGESTION_RULES;
   const homePlaceKey = input.homeText?.trim() ? travelPlaceKey(input.homeText) : null;
+  const dismissals = new Map(input.dismissals.map((dismissal) => [dismissal.behaviorId, dismissal]));
+  const guessSuggestion = (behavior: PlaceLabelBehaviorInput) => behavior.active ? resolveWhereGuessSuggestion({
+    whereKind: behavior.whereKind, guess: input.whereGuesses?.get(behavior.id) ?? null,
+    dismissal: dismissals.get(behavior.id) ?? null, rules,
+  }) : null;
   if (!input.settings.enabled) {
+    // Ticket 383 (D37): with labels off, markers, prompts and counts stay hidden, and only
+    // a model guess can fill the suggestion line (evidence needs stored labels).
     return { settings: input.settings, homePlaceKey, homeMarker: null, placeMarkers: [], labelCount: 0,
-      behaviors: input.behaviors.map((behavior) => ({ behaviorId: behavior.id, suggestion: null, suggestedPlaceText: null, markerPrompt: null })) };
+      behaviors: input.behaviors.map((behavior) => ({ behaviorId: behavior.id, suggestion: guessSuggestion(behavior), suggestedPlaceText: null, markerPrompt: null })) };
   }
   const home = input.markers.find((marker) => marker.ref === "home") ?? null;
   const current = currentPlaceMarkers(input.markers, homePlaceKey);
   const markedPlaces = new Set(current.map((marker) => marker.ref));
   const labelsByBehavior = new Map<string, CompletionPlaceLabel[]>();
   for (const label of input.labels) labelsByBehavior.set(label.behaviorId, [...(labelsByBehavior.get(label.behaviorId) ?? []), label]);
-  const dismissals = new Map(input.dismissals.map((dismissal) => [dismissal.behaviorId, dismissal]));
   const placeTexts = new Map<PlaceRef, string>();
   for (const behavior of input.behaviors) {
     const ref = behavior.whereKind === "place" ? placeRefForWhere(behavior) : null;
@@ -397,10 +403,7 @@ export function resolvePlaceLabelState(input: Readonly<{
       // A saved place can be suggested only while some Behavior still names it.
       const suggestedPlaceText = resolved?.kind === "saved_place" ? placeTexts.get(resolved.key as PlaceRef) ?? null : null;
       const counted = resolved?.kind === "saved_place" && !suggestedPlaceText ? null : resolved;
-      const suggestion = counted ?? (behavior.active ? resolveWhereGuessSuggestion({
-        whereKind: behavior.whereKind, guess: input.whereGuesses?.get(behavior.id) ?? null,
-        dismissal: dismissals.get(behavior.id) ?? null, rules,
-      }) : null);
+      const suggestion = counted ?? guessSuggestion(behavior);
       return { behaviorId: behavior.id, suggestion, suggestedPlaceText, markerPrompt };
     }),
   };
@@ -427,6 +430,33 @@ export function resolveWhereGuessSuggestion(input: Readonly<{
   const key = WHERE_GUESS_SUGGESTION_KEYS[input.guess]!;
   if (input.dismissal?.suggestion === key) return null;
   return { ruleVersion: input.rules.version, kind: key, key, placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" };
+}
+
+/**
+ * Ticket 383 (D37): the suggestion keys a guess can produce. While Completion places is
+ * off, only these can be dismissed; the hosted trigger
+ * (`20261126130000_where_guess_dismissal_without_labels.sql`) accepts the same keys.
+ */
+export const WHERE_GUESS_DISMISSAL_KEYS: readonly WhereSuggestionKey[] = Object.freeze([...new Set(Object.values(WHERE_GUESS_SUGGESTION_KEYS))]);
+
+/** The guessed suggestion a Behavior's line shows in this state, or null. */
+export function shownWhereGuessKey(state: Pick<PlaceLabelState, "behaviors">, behaviorId: string): WhereSuggestionKey | null {
+  const suggestion = state.behaviors.find((entry) => entry.behaviorId === behaviorId)?.suggestion ?? null;
+  return suggestion?.basis === "guess" ? suggestion.key : null;
+}
+
+/**
+ * Ticket 383 (D37): whether a dismissal may be stored. While Completion places is on,
+ * any suggestion; while it is off, only the guess the line currently shows.
+ */
+export function whereSuggestionDismissible(input: Readonly<{
+  settingsEnabled: boolean;
+  suggestion: WhereSuggestionKey;
+  /** `shownWhereGuessKey` for the Behavior; null when no guess shows (or alongside is off). */
+  shownGuess: WhereSuggestionKey | null;
+}>): boolean {
+  if (input.settingsEnabled) return true;
+  return input.shownGuess !== null && input.shownGuess === input.suggestion && WHERE_GUESS_DISMISSAL_KEYS.includes(input.suggestion);
 }
 
 export type PlaceLabelCountProjection = Readonly<{
