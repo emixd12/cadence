@@ -2813,10 +2813,11 @@ Constraints: `periods_user_id_key` unique `(user_id, id)`; `periods_label_valid`
 uniqueness rule on label or dates. Index: `periods_user_start_idx (user_id, start_on)`.
 
 RLS allows the owner to select rows. Direct writes are revoked from every Data API
-role, and `service_role` has no grant. Three `security definer` functions with an empty
+role, and `service_role` has no grant. Four `security definer` functions with an empty
 `search_path` bind ownership to `auth.uid()` and are executable by `authenticated` only:
 
 - `public.create_period(p_label, p_start_on, p_end_on, p_note)` returns the new row.
+- `public.create_period_if_absent(p_label, p_start_on, p_end_on, p_note)` (Ticket 373, migration `20261126135000_create_period_if_absent.sql`) takes the cap trigger's per-user lock, then returns the owner's oldest Period with exactly that label, `start_on` and `end_on` (null matches null) unchanged, or inserts one; the extra `created` column says which. BehaviorLog import and restore use it so two overlapping applies store one Period. Check: `tests/sql/periods-if-absent.sql`.
 - `public.update_period(p_id, p_expected_revision, p_label, p_start_on, p_end_on, p_note)`
   compares the stored `revision` with `p_expected_revision`. It returns no row when they
   differ, when the Period is gone, or when it belongs to another account. A write that

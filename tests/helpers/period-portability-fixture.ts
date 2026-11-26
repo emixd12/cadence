@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import type { PeriodDataStore } from "@cadence/core/data-store";
-import { PERIOD_LIMITS, type PeriodRecord } from "@cadence/core/resolvers/period.resolver";
+import { PERIOD_LIMITS, periodNaturalKey, type PeriodRecord } from "@cadence/core/resolvers/period.resolver";
 import { assembleExportBundle, type ExportAssemblyInput } from "@cadence/core/services/export-assembly";
 import { PERIOD_LIMIT_MESSAGE } from "@cadence/core/services/period.service";
 
@@ -61,25 +61,40 @@ export function periodReview(overrides: Row = {}, extension: Row = {}): Row {
   };
 }
 
-/** An in-memory account. `createPeriod` refuses at the cap like the hosted trigger. */
-export function memoryPeriodStore(initial: PeriodRecord[] = [], options: { limit?: number } = {}) {
+/**
+ * An in-memory account. `createPeriod` refuses at the cap like the hosted trigger.
+ * With `ifAbsent`, the store also has `createPeriodIfAbsent`, which looks and
+ * inserts in one synchronous step like `public.create_period_if_absent`.
+ */
+export function memoryPeriodStore(initial: PeriodRecord[] = [], options: { limit?: number; ifAbsent?: boolean } = {}) {
   const rows = initial.map((row) => ({ ...row }));
   const limit = options.limit ?? PERIOD_LIMITS.perAccount;
   let next = 1;
-  const calls = { create: 0, update: 0 };
+  const calls = { create: 0, update: 0, createIfAbsent: 0 };
+  const insert = (input: Parameters<PeriodDataStore["createPeriod"]>[0]): PeriodRecord => {
+    if (rows.length >= limit) throw new Error(PERIOD_LIMIT_MESSAGE);
+    const row = period({
+      id: `local-${String(next++).padStart(4, "0")}`, label: input.label, start_on: input.startOn, end_on: input.endOn, note: input.note,
+      created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
+    });
+    rows.push(row);
+    return { ...row };
+  };
   const store: PeriodDataStore = {
     async listPeriods() { return rows.map((row) => ({ ...row })); },
     async getPeriod(id) { return rows.find((row) => row.id === id) ?? null; },
     async createPeriod(input) {
       calls.create++;
-      if (rows.length >= limit) throw new Error(PERIOD_LIMIT_MESSAGE);
-      const row = period({
-        id: `local-${String(next++).padStart(4, "0")}`, label: input.label, start_on: input.startOn, end_on: input.endOn, note: input.note,
-        created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
-      });
-      rows.push(row);
-      return { ...row };
+      return insert(input);
     },
+    ...(options.ifAbsent ? {
+      async createPeriodIfAbsent(input: Parameters<PeriodDataStore["createPeriod"]>[0]) {
+        calls.createIfAbsent++;
+        const key = periodNaturalKey({ label: input.label, start_on: input.startOn, end_on: input.endOn });
+        const match = rows.find((row) => periodNaturalKey(row) === key);
+        return match ? { period: { ...match }, created: false } : { period: insert(input), created: true };
+      },
+    } : {}),
     async updatePeriod(input) {
       calls.update++;
       const row = rows.find((entry) => entry.id === input.id);

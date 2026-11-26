@@ -48,7 +48,51 @@ describe("BehaviorLog Period import and restore", () => {
     expect(await previewBehaviorLogPeriods(store, files, "import")).toMatchObject({ added: 0, existing: 4 });
     expect(await applyBehaviorLogPeriods(store, files, "import")).toMatchObject({ added: 0, existing: 4, failed: 0 });
     expect(rows).toHaveLength(4);
-    expect(calls).toEqual({ create: 4, update: 0 });
+    expect(calls).toEqual({ create: 4, update: 0, createIfAbsent: 0 });
+  });
+
+  it("stores each Period once when two applies of the same bundle overlap", async () => {
+    const files = exportBundle(SOURCE).behaviorLog.files;
+    for (const [first, second] of [["import", "import"], ["restore", "restore"], ["import", "restore"]] as const) {
+      const { store, rows, calls } = memoryPeriodStore([], { ifAbsent: true });
+      // Both read the empty account before either saves, so both plan four creates.
+      const outcomes = await Promise.all([
+        applyBehaviorLogPeriods(store, files, first),
+        applyBehaviorLogPeriods(store, files, second, { setNotes: false }),
+      ]);
+      expect(calls).toEqual({ create: 0, update: 0, createIfAbsent: 8 });
+      expect(rows).toHaveLength(4);
+      expect(new Set(rows.map(periodNaturalKey)).size).toBe(4);
+      // Each Period is added by one apply and reported as already saved by the other.
+      expect(outcomes[0]!.added + outcomes[1]!.added).toBe(4);
+      expect(outcomes[0]!.existing + outcomes[1]!.existing).toBe(4);
+      expect(outcomes.map((outcome) => outcome!.failed + outcome!.overLimit)).toEqual([0, 0]);
+    }
+  });
+
+  it("keeps the note of the Period that was saved first when overlapping applies disagree", async () => {
+    const { store, rows } = memoryPeriodStore([], { ifAbsent: true });
+    await Promise.all([
+      applyBehaviorLogPeriods(store, reviewFiles([periodReview({}, { note: "First" })]), "import"),
+      applyBehaviorLogPeriods(store, reviewFiles([periodReview({}, { note: "Second" })]), "import"),
+    ]);
+    expect(rows.map((row) => row.note)).toEqual(["First"]);
+  });
+
+  it("without createPeriodIfAbsent, overlapping applies can store a Period twice (store fallback)", async () => {
+    const files = exportBundle(SOURCE.slice(0, 1)).behaviorLog.files;
+    const { store, rows } = memoryPeriodStore();
+    expect(store.createPeriodIfAbsent).toBeUndefined();
+    await Promise.all([applyBehaviorLogPeriods(store, files, "import"), applyBehaviorLogPeriods(store, files, "import")]);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("counts a cap refusal from createPeriodIfAbsent as not fitting, and does not throw", async () => {
+    const files = exportBundle(SOURCE).behaviorLog.files;
+    const { store, rows, calls } = memoryPeriodStore([], { limit: 1, ifAbsent: true });
+    expect(await applyBehaviorLogPeriods(store, files, "import")).toMatchObject({ added: 1, overLimit: 3, failed: 0 });
+    expect(rows).toHaveLength(1);
+    expect(calls.createIfAbsent).toBe(2);
   });
 
   it("finishes a partly saved import on the next run", async () => {
@@ -92,7 +136,7 @@ describe("BehaviorLog Period import and restore", () => {
     const { store, rows, calls } = memoryPeriodStore(initial);
     expect(await applyBehaviorLogPeriods(store, files, "import")).toMatchObject({ added: 0, existing: 1, notesSet: 0 });
     expect(rows).toEqual(initial);
-    expect(calls).toEqual({ create: 0, update: 0 });
+    expect(calls).toEqual({ create: 0, update: 0, createIfAbsent: 0 });
   });
 
   it("restore sets the note of a matching Period: absent keeps, null clears", async () => {

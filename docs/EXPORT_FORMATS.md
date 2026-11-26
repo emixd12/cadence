@@ -155,6 +155,7 @@ and restore follow in Ticket 374.
   never used and never stored. A file from another account, a repeated import and a retry
   after a partial failure therefore behave the same: applying a bundle twice adds nothing
   the second time.
+- Each add goes through `create_period_if_absent`, which looks for the key and inserts under one per-user lock, so two overlapping applies of the same bundle store a Period once.
 - **Import** adds a Period when no stored Period has the same key. It never changes a
   stored Period, including its note.
 - **Restore** does the same. It also sets the note of a matching Period when the file's

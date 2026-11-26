@@ -50,7 +50,9 @@ export async function previewBehaviorLogPeriods(
 
 /**
  * Saves planned Periods after the main import or restore commits. It plans again
- * from the stored Periods, so a repeated call adds nothing twice. A Period the
+ * from the stored Periods, so a repeated call adds nothing twice. Two calls that
+ * overlap both plan before either saves; a store with `createPeriodIfAbsent` then
+ * still stores each Period once, and a store without it may store it twice. A Period the
  * store refuses at the account cap is counted as not fitting. A note is set with a
  * compare-and-set on the revision; a Period that changed since the plan is counted
  * as failed and left as it is. This function never throws: a failed write is
@@ -58,7 +60,7 @@ export async function previewBehaviorLogPeriods(
  * Periods returns an unavailable outcome.
  */
 export async function applyBehaviorLogPeriods(
-  store: Pick<PeriodDataStore, "listPeriods" | "createPeriod" | "updatePeriod">,
+  store: Pick<PeriodDataStore, "listPeriods" | "createPeriod" | "updatePeriod"> & Pick<Partial<PeriodDataStore>, "createPeriodIfAbsent">,
   files: readonly BundleFile[],
   mode: BehaviorLogPeriodMode,
   options: BehaviorLogPeriodOptions = {},
@@ -83,8 +85,18 @@ export async function applyBehaviorLogPeriods(
     }
     try {
       if (action.action === "create") {
-        await store.createPeriod({ label: action.label, startOn: action.startOn, endOn: action.endOn, note: action.note });
-        outcome.added++;
+        const commit = { label: action.label, startOn: action.startOn, endOn: action.endOn, note: action.note };
+        // The plan was read before this save, so an overlapping apply of the same
+        // bundle may have added the Period since. A store with createPeriodIfAbsent
+        // decides in one atomic step; "already existed" counts as existing.
+        if (store.createPeriodIfAbsent) {
+          const result = await store.createPeriodIfAbsent(commit);
+          if (result.created) outcome.added++;
+          else outcome.existing++;
+        } else {
+          await store.createPeriod(commit);
+          outcome.added++;
+        }
         continue;
       }
       const updated = await store.updatePeriod({
