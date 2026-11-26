@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { alongsideMayOverlap, type OverlapPlace } from "@cadence/core/resolvers/alongside.resolver";
 import {
   briefMoveBlocksForSubject,
+  briefMoveConflicts,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   briefMoveOverlapSubject,
@@ -15,6 +16,7 @@ import {
 } from "@cadence/core/resolvers/brief-move.resolver";
 import type { EffectiveWhere } from "@cadence/core/resolvers/effective-where.resolver";
 import { alongsideFindingAllowed } from "@/lib/services/daily-brief-consumer";
+import { findMoveConflicts } from "@cadence/core/resolvers/move.resolver";
 
 // Ticket 357 (D33): an alongside item may overlap a Cadence item or calendar event at
 // the same place, or where either place is unknown or Anywhere; never travel or an item
@@ -181,5 +183,31 @@ describe("Daily Brief overlap and tight-fit findings", () => {
 
   it("without places (the default), every finding with an alongside side is dropped, as before", () => {
     expect(alongsideFindingAllowed(["o-helmet", "o-gym"], alongside, () => undefined)).toBe(true);
+  });
+});
+
+describe("schedule-edit conflicts under the same-place rule (audit fix 4)", () => {
+  const helmet = (where: EffectiveWhere) => item("helmet", "20:00", 10, { alongside: true, where });
+  const reading = (where: EffectiveWhere) => item("reading", "20:00", 45, { where });
+
+  it("a guest paired onto its host at the same place opens no conflict", () => {
+    expect(briefMoveConflicts([helmet(HOME), reading(HOME)], new Set(["helmet"]))).toEqual([]);
+    expect(briefMoveConflicts([helmet(HOME), reading(HOME)], new Set(["reading"]))).toEqual([]);
+    expect(briefMoveConflicts([helmet(ANYWHERE), reading(GYM)], new Set(["helmet"]))).toEqual([]);
+  });
+
+  it("an alongside item at another place still collides, whichever side moved", () => {
+    expect(briefMoveConflicts([helmet(HOME), reading(GYM)], new Set(["helmet"])))
+      .toEqual([{ occurrence_id: "helmet", conflicting_occurrence_id: "reading" }]);
+    expect(briefMoveConflicts([helmet(HOME), reading(GYM)], new Set(["reading"])))
+      .toEqual([{ occurrence_id: "reading", conflicting_occurrence_id: "helmet" }]);
+  });
+
+  it("two ordinary items collide as findMoveConflicts says", () => {
+    const items = [item("walk", "20:00", 30, { where: HOME }), reading(HOME)];
+    const old = findMoveConflicts(items.map((entry) => ({ id: entry.occurrenceId, status: entry.status, moved: entry.occurrenceId === "walk",
+      interval: { start: entry.start, end: entry.end } })));
+    expect(briefMoveConflicts(items, new Set(["walk"]))).toEqual(old);
+    expect(old).toEqual([{ occurrence_id: "walk", conflicting_occurrence_id: "reading" }]);
   });
 });

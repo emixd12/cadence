@@ -1020,6 +1020,10 @@ both `reason` columns accept any lowercase code.
 **`move_conflicts`**: a notice that a later base-schedule change put another
 Occurrence of the same Behavior next to a moved one on the same day. `status`
 `open` until the person keeps, reverts or moves it, or it clears on its own.
+With `CADENCE_ALONGSIDE` on, an overlap the same-place rule allows (an alongside item
+with an item at the same place, or where a place is unknown or Anywhere) opens no
+conflict, and an alongside item at another place collides like any other item
+(`briefMoveConflicts`). With the flag off, an alongside item never collides, as before.
 
 **Account sync.** Contract 6 adds `occurrence_move` rows, read-only, without
 `user_id`, `client_ref`, `idempotency_key`, `request_hash` or `proposal_id`.

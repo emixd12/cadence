@@ -289,6 +289,30 @@ export function briefMoveItemBlocks(
   return placed;
 }
 
+/**
+ * Audit fix 4: schedule-edit conflicts (Phase 2 `move_conflicts`) under the same-place
+ * rule, for a day whose items carry their effective Where (`CADENCE_ALONGSIDE` on). Each
+ * moved, Unresolved, exact-time item (a routine slot as one item) is checked against the
+ * other items as it sees them (`briefMoveItemBlocks` with itself as subject): an overlap
+ * `alongsideMayOverlap` allows (a guest paired onto its host) opens nothing; an alongside
+ * item at another place collides like any other item. The first colliding item by start,
+ * then id, is named, as `findMoveConflicts` does. Without a Where on the items, callers
+ * keep `findMoveConflicts`, where an alongside item never collides.
+ */
+export function briefMoveConflicts(items: readonly BriefMoveDayItem[], movedIds: ReadonlySet<string>)
+  : Readonly<{ occurrence_id: string; conflicting_occurrence_id: string }>[] {
+  return collapseBriefMoveRoutines(items)
+    .filter((item) => item.status === "unresolved" && item.scheduleKind === "exact" && movedIds.has(item.occurrenceId))
+    .flatMap((moved) => {
+      const own = { start: moved.start, end: later(moved.end, moved.start) };
+      const collision = briefMoveItemBlocks(items, moved.occurrenceId)
+        .filter((block) => overlaps(own, block))
+        .sort((left, right) => Temporal.Instant.compare(left.start, right.start) || left.ref.localeCompare(right.ref))[0];
+      return collision ? [{ occurrence_id: moved.occurrenceId, conflicting_occurrence_id: collision.ref }] : [];
+    })
+    .sort((left, right) => left.occurrence_id.localeCompare(right.occurrence_id));
+}
+
 /** Is `interval` (padded by the item's own travel) free of every block, with the gap? */
 export function checkBriefMoveSlot(input: Readonly<{
   interval: BriefMoveInterval;

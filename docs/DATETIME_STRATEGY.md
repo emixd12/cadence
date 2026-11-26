@@ -257,6 +257,10 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   findings with places from the day context's `planning` field, where the person's
   alongside answer outranks the run's own estimate, and an exact-time opportunity add
   (Chat and MCP), which checks the added Behavior's own side. Chat's moves already used it.
+- **Schedule-edit conflicts.** With `CADENCE_ALONGSIDE` on, `move_conflicts` follow the
+  same rule from the moved item's side (`briefMoveConflicts`): a guest paired onto its
+  host opens nothing, and an alongside item at another place collides. With the flag
+  off, an alongside item never collides, as before.
 - **Routine blocks.** A routine slot of two or more steps is one item from the lead's
   start, lasting the sum of its steps' lengths, done one after another. Alongside steps
   run during the other steps and add nothing. When every step is alongside, the block

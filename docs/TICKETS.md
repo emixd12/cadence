@@ -20048,7 +20048,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 357: Effective Where and the same-place overlap rule
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare).
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare). Audit fix (November 26, 2026): schedule-edit conflict notices now follow the same-place rule from the moved item's side, flag on only.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
