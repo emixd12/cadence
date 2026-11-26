@@ -20694,7 +20694,7 @@ Messaging impact: `P-098`, `P-099`.
 
 ## Ticket 377: MCP Apps view: "Cadence day"
 
-Status: complete (November 25, 2026; behind `CADENCE_MCP_APPS`, which Ticket 376 adds; real-host acceptance is Ticket 378)
+Status: complete (November 26, 2026; behind `CADENCE_MCP_APPS`, off in production; real-host acceptance is Ticket 378)
 
 Built: `packages/mcp-views` (Preact 10.27.2, as Ticket 375 recommended, not React), the generated `lib/mcp/apps/day-view-html.ts` (270,864 bytes raw, 72,481 gzip), notices in `packages/core/src/notices/catalog/day-view.json`, the bench `/design-system?preview=mcp-day-view`, and `tests/mcp-day-view.dom.test.ts` and `tests/mcp-day-view-build.test.ts`. Evidence: `docs/qa/2026-11-25-mcp-day-view.md`.
 

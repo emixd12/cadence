@@ -6,9 +6,15 @@ Date: November 25, 2026. Decision: `docs/DECISIONS.md`, 2026-11-25, D36. Contrac
 ## Result
 
 The view is built and passes its tests. It was exercised in the `ext-apps` `basic-host`
-against a fixture MCP server. It was not run against Cadence's own `show_day`, because
-Ticket 376 had not merged, and it was not run in Claude, ChatGPT or any other real host.
-Both belong to Ticket 378.
+against a fixture MCP server. Since Ticket 376 merged, Cadence's server serves this HTML
+when `CADENCE_MCP_APPS=true`, and the fixtures pass the server's `show_day` output schema.
+
+Not verified: the view against Cadence's own server in a host, and any real host (Claude,
+ChatGPT and the others). Both belong to Ticket 378. One attempt at the first was made on
+November 26 on a local acceptance stack (`cadence-accept-377`, flag on). It stopped before
+any token existed: under the stack's `next dev`, `/oauth/consent` reloaded in a Fast Refresh
+loop, so the consent driver found no permission switch (`scope-not-offered`, six tries). The
+cause was not found. The stack was removed with 0 grants.
 
 ## Bundle
 
@@ -93,3 +99,8 @@ Screenshots are not committed: `docs/qa/` holds no images. The bench reproduces 
 - Not checked on any host: approval prompts on view-initiated writes, safe-area insets, the
   150,000-character result limit in Claude, and how each host caches the HTML.
 - `show_day` output larger than the view expects is fine: it reads named fields only.
+- The local stack needed `CADENCE_SUPABASE_CLI` set to the repository's pinned CLI
+  (`node_modules/@supabase/cli-darwin-arm64/bin/supabase-go`). The Homebrew CLI on this Mac
+  refuses `[inbucket]` in `supabase/config.toml`.
+- Each write costs two calls against the per-grant limits: the write and one `show_day`
+  re-read. A refused write also re-reads once, except a rate-limited one, which does not.
