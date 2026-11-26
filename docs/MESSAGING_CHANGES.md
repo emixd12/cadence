@@ -2567,3 +2567,20 @@ cite has not changed.
   Chat's answers may say a value is Cadence's guess.
 - **Related:** P-066, P-067, P-082.
 - **Status:** logged.
+
+## P-094: Intended duration and tracked time (D34)
+
+- **Change:** November 25, 2026 (Ticket 366). The Behavior field "Default duration" is
+  now "Intended duration". From 3 tracked completions Cadence plans with the tracked
+  figure (the median of the 10 most recent) and the intended duration no longer changes
+  the length.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D34); Ticket 366.
+- **Surfaces:** user guide, MCP developer docs.
+- **Conflicting current text:** `docs/user-guide/behaviors-and-review.md`, "Default
+  duration and end date", says Timeline uses the value for planning and that tracked
+  time stays separate. The MCP developer reference describes `default_duration_minutes`
+  without the 3-completion rule.
+- **Update needed:** rename the section and field, state the 3-completion rule and the
+  median, and note the rule beside `default_duration_minutes` in the MCP docs.
+- **Related:** none.
+- **Status:** logged.

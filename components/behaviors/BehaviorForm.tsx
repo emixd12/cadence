@@ -567,7 +567,7 @@ export function BehaviorForm({
 
         <div className="grid min-w-0 gap-4 sm:grid-cols-2">
           <div className="grid min-w-0 gap-1 text-sm">
-            <label htmlFor={`${planningId}-duration`}>Default duration (minutes)</label>
+            <label htmlFor={`${planningId}-duration`}>Intended duration (minutes)</label>
             <input id={`${planningId}-duration`} name="default_duration_minutes"
               type="number" min={1} max={1440} step={1}
               defaultValue={behavior?.defaultDurationMinutes ?? ""}
@@ -575,7 +575,7 @@ export function BehaviorForm({
               aria-describedby={`${planningId}-duration-help`}
               className="min-h-11 min-w-0 w-full border-0 border-b border-line bg-background px-0 text-base" />
             <div id={`${planningId}-duration-help`}>
-              <p className="text-muted-readable">Optional. Used for Timeline planning. Tracked time and averages stay separate.</p>
+              <p className="text-muted-readable">Optional. Cadence plans with this until the Behavior has 3 tracked completions, then with your tracked time.</p>
               <FieldError message={fieldErrors.default_duration_minutes} />
             </div>
           </div>

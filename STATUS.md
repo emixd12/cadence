@@ -48,6 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
@@ -97,6 +98,27 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) — November 25, 2026
+
+- **Owner's decision:** `docs/DECISIONS.md`, 2026-11-25 (D34). From 3 tracked completions the
+  tracked figure (median of the 10 most recent) is the planning length; below 3 the saved
+  duration wins. The saved duration is now the "Intended duration" and stays visible.
+- **Implemented:** one order and one measurement in `@cadence/core`
+  (`time-tracking.resolver.ts`, `timeline-context.resolver.ts`, `brief-move.resolver.ts`,
+  `briefing-config.ts`), read by every move caller through
+  `lib/services/behavior-length.service.ts` (Move for today, Daily Brief moves, Opportunity
+  suggestions, Chat moves). Timeline row and Behavior form copy; the length tip says "Update
+  Gym's intended duration to 45 minutes?". `docs/RULES_REGISTER.md` lists the length rules.
+  No schema change.
+- **Verified:** `dagger check --cadence` (11 passed), `core:check`, and CI's Local Supabase
+  rehearsal. Not done: a look at the Timeline row in a browser.
+- **Open, each needs a ticket:** advisor wording that compares tracked and intended time; rows
+  in the rules register for the rule sets under its "Not yet listed".
+
+Platform impact: web implemented; desktop through shared resolvers and components, in the next
+Mac release; marketing not applicable; future mobile inherits `@cadence/core`. Messaging
+impact: P-094.
 
 ## Ticket 361 complete: pairing for today in the Daily Brief and Chat — November 25, 2026
 

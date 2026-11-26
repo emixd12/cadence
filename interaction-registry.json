@@ -15122,7 +15122,7 @@
     },
     {
       "id": "INT-BEHAVIOR-030",
-      "name": "Set default Behavior duration",
+      "name": "Set intended Behavior duration",
       "feature": "behavior-editor",
       "user_guidance": {
         "audience": "user",
@@ -15141,14 +15141,14 @@
         "J05",
         "J06"
       ],
-      "intent": "Set or clear an optional default duration for Timeline planning, separate from tracked time and measured averages.",
+      "intent": "Set or clear an optional intended duration. Cadence plans with it until the Behavior has 3 tracked completions, then plans with the tracked figure and keeps the intended duration for comparison (Ticket 366).",
       "triggers": [
         {
           "kind": "input",
-          "control": "Default duration (minutes) number input"
+          "control": "Intended duration (minutes) number input"
         }
       ],
-      "availability": "Available in open create and edit forms.",
+      "availability": "Always available in open create and edit forms. Also available inline on a Timeline row (InlineDurationControl), except once the Behavior has 3 tracked completions: tracked time then decides the length and the row shows the intended duration without an action (Ticket 366).",
       "success_result": "Updates only the client form draft until Save behavior is submitted.",
       "failure_result": "Required and server validation errors remain attached to their fields after submission.",
       "effects": [

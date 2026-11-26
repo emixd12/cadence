@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { localDayBounds } from "./time.resolver";
+import { trackedDurationWins } from "./time-tracking.resolver";
 import { noticeText } from "../notices";
 
 /**
@@ -56,36 +57,30 @@ export type MovePersonReason = (typeof MOVE_PERSON_REASONS)[number];
 export type MoveDurationSource = "behavior_duration" | "logged_average" | "planned_length" | "explicit";
 
 /**
- * The length a moved Occurrence keeps: the Behavior's duration, then the person's
- * logged average, then the planned length (30 minutes when the plan has none). A
- * model estimate joins in Phase 3.
+ * The length a moved Occurrence keeps (Ticket 366, D34): the tracked figure once the
+ * Behavior has 3 tracked completions, then the intended duration the person set, then
+ * the tracked figure from fewer, then the planned length (30 minutes when the plan has
+ * none). `logged_average` keeps its stored name; the figure is the Timeline's median
+ * (`resolveBehaviorDurationSources`), never a separate per-session measurement.
  */
 export function resolveMoveDuration(input: Readonly<{
   behaviorDefaultMinutes: number | null;
   loggedAverageSeconds: number | null;
+  /** How many tracked completions the figure rests on. Omitted counts as fewer than 3. */
+  loggedSampleCount?: number | null;
   plannedSeconds: number | null;
 }>): Readonly<{ seconds: number; source: MoveDurationSource }> {
+  const logged = input.loggedAverageSeconds && input.loggedAverageSeconds >= 60
+    ? { seconds: Math.min(Math.round(input.loggedAverageSeconds), 86_400), source: "logged_average" as const } : null;
+  if (logged && trackedDurationWins(input.loggedSampleCount ?? 0)) return logged;
   if (input.behaviorDefaultMinutes && input.behaviorDefaultMinutes > 0) {
     return { seconds: Math.round(input.behaviorDefaultMinutes * 60), source: "behavior_duration" };
   }
-  if (input.loggedAverageSeconds && input.loggedAverageSeconds >= 60) {
-    return { seconds: Math.min(Math.round(input.loggedAverageSeconds), 86_400), source: "logged_average" };
-  }
+  if (logged) return logged;
   if (input.plannedSeconds && input.plannedSeconds > 0) {
     return { seconds: Math.min(Math.round(input.plannedSeconds), 86_400), source: "planned_length" };
   }
   return { seconds: DEFAULT_MOVE_SECONDS, source: "planned_length" };
-}
-
-/** Average length of logged time sessions, or null with fewer than two. */
-export function loggedAverageSeconds(sessions: readonly Readonly<{ started_at: string; stopped_at: string | null }>[]): number | null {
-  const lengths = sessions.flatMap((session) => {
-    if (!session.stopped_at) return [];
-    const seconds = Temporal.Instant.from(session.started_at).until(Temporal.Instant.from(session.stopped_at)).total({ unit: "seconds" });
-    return seconds >= 60 && seconds <= 86_400 ? [seconds] : [];
-  });
-  if (lengths.length < 2) return null;
-  return lengths.reduce((sum, value) => sum + value, 0) / lengths.length;
 }
 
 export type MoveInterval = Readonly<{ start: Temporal.Instant; end: Temporal.Instant }>;

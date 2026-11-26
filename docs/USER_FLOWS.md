@@ -993,7 +993,7 @@ native update or recovery controls. Future mobile remains deferred.
 
 ## Set duration and scheduled archive (Tickets 142–143)
 
-Create or edit a Behavior, optionally enter Default duration (minutes) and Ends after, then Save behavior. Blank fields disable either option. Timeline uses the default ahead of its measured estimate. Ends after is the last local day the Behavior runs; after it the Behavior moves to Not running and generates no Occurrences. Nothing is archived automatically. Save refuses an end that is already in the past. Restoring an archived Behavior keeps its end. End now, Pause and Resume rules: `docs/RECURRENCE_RULES.md`, "Behavior end and pause".
+Create or edit a Behavior, optionally enter Intended duration (minutes) and Ends after, then Save behavior. Blank fields disable either option. Cadence plans with the intended duration until the Behavior has 3 tracked completions; after that it plans with the tracked figure, shows the intended duration beside it, and the Timeline row no longer offers Set intended duration (Ticket 366). Ends after is the last local day the Behavior runs; after it the Behavior moves to Not running and generates no Occurrences. Nothing is archived automatically. Save refuses an end that is already in the past. Restoring an archived Behavior keeps its end. End now, Pause and Resume rules: `docs/RECURRENCE_RULES.md`, "Behavior end and pause".
 
 ## Compare historical completion timing
 

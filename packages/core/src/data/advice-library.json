@@ -645,7 +645,7 @@
     },
     {
       "id": "set-the-length-it-takes",
-      "revision": 3,
+      "revision": 4,
       "status": "active",
       "advice": "If sessions keep running longer than planned, plan for the time they actually take.",
       "applies_when": [
@@ -662,7 +662,7 @@
         }
       ],
       "does_not_apply_when": [],
-      "action": "Change the Behavior's length to the time it usually takes.",
+      "action": "Update the Behavior's intended duration to the time it usually takes.",
       "evidence": {
         "source_id": "buehler-1994",
         "kind": "experiment",
@@ -680,7 +680,7 @@
       "offer": {
         "kind": "set_length"
       },
-      "reviewed_at": "2026-11-20",
+      "reviewed_at": "2026-11-25",
       "reviewer": "Emi"
     },
     {

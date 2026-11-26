@@ -527,20 +527,22 @@ export function formatBehaviorChangeLine(input: Readonly<{ title: string; change
 
 /** "Change the length: Gym to 45 minutes (now 30 minutes)." */
 export function formatLengthChangeLine(input: Readonly<{ title: string; change: BehaviorLengthChange }>): string {
-  return `Change the length: ${input.title} to ${minutesLabel(input.change.toMinutes)} (now ${minutesLabel(input.change.fromMinutes)}).`;
+  return `Update the intended duration: ${input.title} to ${minutesLabel(input.change.toMinutes)} (now ${minutesLabel(input.change.fromMinutes)}).`;
 }
 
 /**
  * The question under a tip that carries an offer, written by code with the value the
- * Yes applies: "Set Gym to 6:30 PM every day?" or "Set Gym to 45 minutes?"
+ * Yes applies: "Set Gym to 6:30 PM every day?" or "Update Gym's intended duration to
+ * 45 minutes?" (Ticket 366: the length offer changes the intended duration, which
+ * tracked time outranks from 3 tracked completions.)
  */
 export function formatTipQuestion(input: Readonly<{ title: string } & ({ change: BehaviorChange } | { length: BehaviorLengthChange })>): string {
-  if ("length" in input) return `Set ${input.title} to ${minutesLabel(input.length.toMinutes)}?`;
+  if ("length" in input) return `Update ${input.title}'s intended duration to ${minutesLabel(input.length.toMinutes)}?`;
   return `Set ${input.title} to ${formatClockTimeLabel(input.change.toTime)} ${everyDays(input.change.weekdays)}?`;
 }
 
 export function formatLengthCheckInQuestion(input: Readonly<{ title: string; change: BehaviorLengthChange }>): string {
-  return `Keep ${input.title} at ${minutesLabel(input.change.toMinutes)}?`;
+  return `Keep ${input.title}'s intended duration at ${minutesLabel(input.change.toMinutes)}?`;
 }
 
 export function minutesLabel(minutes: number): string {
@@ -558,13 +560,13 @@ export function formatCheckInQuestion(input: Readonly<{ title: string; change: B
 
 /** Shown once when the check-in got no answer for seven days. */
 export function formatKeptWithoutAnswer(input: Readonly<{ title: string } & ({ change: BehaviorChange } | { length: BehaviorLengthChange })>): string {
-  if ("length" in input) return `${input.title} stays at ${minutesLabel(input.length.toMinutes)}. You can change it in Behaviors.`;
+  if ("length" in input) return `${input.title}'s intended duration stays at ${minutesLabel(input.length.toMinutes)}. You can change it in Behaviors.`;
   return `${input.title} stays at ${formatClockTimeLabel(input.change.toTime)} ${everyDays(input.change.weekdays)}. You can change it in Behaviors.`;
 }
 
 /** Shown once when the person edited the schedule during the trial (T4). */
 export function formatEditedDuringTrial(input: Readonly<{ title: string; length?: boolean }>): string {
-  return `You changed ${input.title}'s ${input.length ? "length" : "schedule"} during the trial, so it stays as you set it.`;
+  return `You changed ${input.title}'s ${input.length ? "intended duration" : "schedule"} during the trial, so it stays as you set it.`;
 }
 
 /** One line per schedule, for the before and after view. */

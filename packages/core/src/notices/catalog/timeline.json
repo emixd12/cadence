@@ -79,39 +79,40 @@
       "interactions": ["INT-BEHAVIOR-030"]
     },
     "timeline.duration-invalid-minutes": {
-      "meaning": "Says the inline default-duration input needs a whole number of minutes from 1 to 1,440.",
+      "meaning": "Says the inline intended-duration input needs a whole number of minutes from 1 to 1,440.",
       "text": "Enter a whole number from 1 to 1,440 minutes.",
       "style": "error",
       "platforms": ["web"],
       "interactions": ["INT-BEHAVIOR-030"]
     },
     "timeline.duration-unavailable": {
-      "meaning": "Says the Behavior whose default duration is being set is no longer available.",
+      "meaning": "Says the Behavior whose intended duration is being set is no longer available.",
       "text": "This Behavior is no longer available.",
       "style": "error",
       "platforms": ["web"],
       "interactions": ["INT-BEHAVIOR-030"]
     },
     "timeline.duration-revision-changed": {
-      "meaning": "Says the Behavior changed elsewhere while saving its default duration.",
+      "meaning": "Says the Behavior changed elsewhere while saving its intended duration.",
       "text": "This Behavior was just updated. Try saving again.",
       "style": "error",
       "platforms": ["web"],
       "interactions": ["INT-BEHAVIOR-030"]
     },
     "timeline.duration-save-failed": {
-      "meaning": "Says saving the Behavior's default duration failed.",
+      "meaning": "Says saving the Behavior's intended duration failed.",
       "text": "Unable to save duration.",
       "style": "error",
       "platforms": ["web"],
       "interactions": ["INT-BEHAVIOR-030"]
     },
     "timeline.duration-saved": {
-      "meaning": "Confirms the Behavior's default duration was saved from the Timeline row.",
-      "text": "Default duration saved.",
+      "meaning": "Confirms the Behavior's intended duration was saved from the Timeline row.",
+      "text": "Intended duration saved.",
       "style": "outcome",
       "platforms": ["web"],
-      "interactions": ["INT-BEHAVIOR-030"]
+      "interactions": ["INT-BEHAVIOR-030"],
+      "previous": [{ "text": "Default duration saved.", "until": "2026-11-25", "change": "The field is now the intended duration; tracked time decides the length from 3 tracked completions (Ticket 366, D34)." }]
     },
     "timeline.note-saving": {
       "meaning": "Shows beside the note editor while a day note or occurrence note is saving.",

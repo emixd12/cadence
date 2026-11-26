@@ -2253,7 +2253,9 @@ rows remain empty; the migration does not fabricate past archive cycles.
 ## Behavior duration and scheduled archive (Tickets 142–143)
 
 `behaviors.default_duration_minutes` is a nullable integer from 1 through
-1,440. It is independent of measured Occurrence time. `behaviors.end_date` is
+1,440. It is the person's intended duration. Since Ticket 366 it supplies the
+planning length only while the Behavior has fewer than 3 tracked completions; the
+column, its name and its sync and export fields are unchanged. `behaviors.end_date` is
 the nullable four-digit-year local date on which the Behavior first becomes
 archived. `behaviors.auto_archived_at` is the nullable, finite automatic-archive
 instant used by the durable in-app notice. A marker requires an inactive

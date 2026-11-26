@@ -238,3 +238,27 @@ function parseInstant(value: string, field: "started_at" | "stopped_at"): Tempor
     throw new Error(`Time session has invalid ${field}.`);
   }
 }
+
+/**
+ * Ticket 366 (D34): a Behavior's tracked time decides its length once it has this
+ * many tracked samples. Below it, the intended duration the person set decides.
+ */
+export const TRACKED_DURATION_WINS_MIN_SAMPLES = 3;
+/** The tracked figure is the median of this many of the most recent samples. */
+export const TRACKED_DURATION_RECENT_SAMPLES = 10;
+
+export function trackedDurationWins(sampleCount: number): boolean {
+  return sampleCount >= TRACKED_DURATION_WINS_MIN_SAMPLES;
+}
+
+/**
+ * The median of the most recent samples, or null with none. `samples` must be
+ * ordered newest first. An even count takes the mean of the two middle values.
+ */
+export function recentMedianSeconds(samplesNewestFirst: readonly number[]): Readonly<{ seconds: number; sampleCount: number }> | null {
+  const recent = samplesNewestFirst.slice(0, TRACKED_DURATION_RECENT_SAMPLES).sort((left, right) => left - right);
+  if (recent.length === 0) return null;
+  const middle = Math.floor(recent.length / 2);
+  const seconds = recent.length % 2 === 1 ? recent[middle] : (recent[middle - 1] + recent[middle]) / 2;
+  return { seconds, sampleCount: recent.length };
+}
