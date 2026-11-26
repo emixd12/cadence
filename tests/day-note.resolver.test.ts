@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { DAY_NOTE_CONFLICT_MESSAGE, listDayNotes, saveDayNote } from "@cadence/core/services/day-note.service";
 import {
+  BRIEF_DAY_NOTE_LIMITS,
+  briefDayNoteRange,
+  resolveBriefDayNotes,
+  textQuotesDayNote,
   attachTimelineDayNotes,
   timelineDayNoteRange,
   DAY_NOTE_LIMITS,
@@ -176,5 +180,70 @@ describe("day note service", () => {
     expect(timelineDayNoteRange({ daySections: [], needsDecision: { daySections: [] } })).toBeNull();
     expect(attachTimelineDayNotes(view, [record("Shown", "2026-11-02"), record("Hidden", "2026-11-05"), record(null, "2026-11-10")]).dayNotes)
       .toEqual({ "2026-11-02": "Shown" });
+  });
+});
+
+describe("day notes for the Daily Brief (Ticket 367)", () => {
+  it("reads today and the two local days before it, across a month and a year", () => {
+    expect(BRIEF_DAY_NOTE_LIMITS).toMatchObject({ days: 3, characters: 280 });
+    expect(briefDayNoteRange("2026-11-25")).toEqual({ from: "2026-11-23", to: "2026-11-25" });
+    expect(briefDayNoteRange("2026-03-01")).toEqual({ from: "2026-02-27", to: "2026-03-01" });
+    expect(briefDayNoteRange("2027-01-01")).toEqual({ from: "2026-12-30", to: "2027-01-01" });
+    expect(() => briefDayNoteRange("2026-02-30")).toThrow("Choose a valid day for this note.");
+  });
+
+  it("names each day, newest first, and leaves out days with no note and days outside the range", () => {
+    const records = [
+      { local_date: "2026-11-22", note: "Too old" },
+      { local_date: "2026-11-23", note: "Long drive" },
+      { local_date: "2026-11-24", note: null },
+      { local_date: "2026-11-25", note: "  Head cold  " },
+      { local_date: "2026-11-26", note: "Tomorrow" },
+    ];
+    expect(resolveBriefDayNotes({ localDate: "2026-11-25", records })).toEqual([
+      { day: "today", note: "Head cold" },
+      { day: "2 days ago", note: "Long drive" },
+    ]);
+    // A cleared note (null) and a note on a later date are never sent.
+    expect(resolveBriefDayNotes({ localDate: "2026-11-24", records })).toEqual([
+      { day: "yesterday", note: "Long drive" },
+      { day: "2 days ago", note: "Too old" },
+    ]);
+    expect(resolveBriefDayNotes({ localDate: "2026-11-25", records: [{ local_date: "2026-11-25", note: "   " }] })).toEqual([]);
+    expect(resolveBriefDayNotes({ localDate: "2026-11-25", records: [] })).toEqual([]);
+  });
+
+  it("cuts each note to 280 characters, counting an emoji as one", () => {
+    const [long] = resolveBriefDayNotes({ localDate: "2026-11-25", records: [{ local_date: "2026-11-25", note: "a".repeat(2_000) }] });
+    expect(long!.note).toBe("a".repeat(280));
+    const [emoji] = resolveBriefDayNotes({ localDate: "2026-11-25", records: [{ local_date: "2026-11-25", note: "😴".repeat(300) }] });
+    expect([...emoji!.note]).toHaveLength(280);
+    const [short] = resolveBriefDayNotes({ localDate: "2026-11-25", records: [{ local_date: "2026-11-25", note: "b".repeat(280) }] });
+    expect(short!.note).toBe("b".repeat(280));
+  });
+
+  it("finds a whole note of three or more words, whatever the case, spacing or punctuation", () => {
+    const five = ["Head cold, slept four hours."];
+    expect(textQuotesDayNote("You wrote: head cold slept   FOUR hours, so take it easy.", five)).toBe(true);
+    expect(textQuotesDayNote("HEAD COLD, SLEPT FOUR HOURS", five)).toBe(true);
+    // Part of a short note is not the whole note.
+    expect(textQuotesDayNote("A head cold makes today harder.", five)).toBe(false);
+    expect(textQuotesDayNote("You slept four hours.", five)).toBe(false);
+    expect(textQuotesDayNote("Sick again today.", ["Sick again today"])).toBe(true);
+    // One or two words are ordinary language, not a quote.
+    expect(textQuotesDayNote("You are sick today.", ["Sick today"])).toBe(false);
+    expect(textQuotesDayNote("Tired.", ["Tired"])).toBe(false);
+    expect(textQuotesDayNote("Anything at all.", [])).toBe(false);
+    expect(textQuotesDayNote("Anything at all.", ["", "  "])).toBe(false);
+  });
+
+  it("finds six words in a row from a longer note, and not five", () => {
+    const note = ["Flight home was delayed three hours, so dinner and the evening routine both slipped past ten."];
+    expect(textQuotesDayNote("Your flight home was delayed three hours yesterday.", note)).toBe(true);
+    expect(textQuotesDayNote("The evening routine both slipped past ten.", note)).toBe(true);
+    expect(textQuotesDayNote("Your flight home was delayed three times.", note)).toBe(false);
+    expect(textQuotesDayNote("After a late flight, the evening is tight.", note)).toBe(false);
+    // Whole words only.
+    expect(textQuotesDayNote("Flight homes was delayed three hours so.", note)).toBe(false);
   });
 });
