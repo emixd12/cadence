@@ -28,7 +28,11 @@ describe("configuration plan payload and the alongside answer (Ticket 363)", () 
   it("leaves the key out when neither side has an answer, so the database keeps the stored one", () => {
     const baseline = toBehaviorConfigurationEventPlanPayload(planInitialBehaviorConfigurationEvent({ ...context, configuration: configuration(undefined) })) as Payload;
     expect(baseline.next_configuration).not.toHaveProperty("alongside");
-    expect(baseline.changed_fields).toContain("alongside");
+    // A plan without the key names no answer field, as the database expects of it.
+    expect(baseline.changed_fields).not.toContain("alongside");
+    const answered = toBehaviorConfigurationEventPlanPayload(planInitialBehaviorConfigurationEvent({ ...context, configuration: configuration(true) })) as Payload;
+    expect(answered.next_configuration).toMatchObject({ alongside: true });
+    expect(answered.changed_fields).toContain("alongside");
   });
 
   it("converts a Mac snapshot's answer to the hosted shape, and leaves older snapshots alone", () => {
