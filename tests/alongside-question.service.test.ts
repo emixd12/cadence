@@ -56,6 +56,16 @@ describe("recordBehaviorAlongsideAnswer", () => {
     expect(updateBehavior).not.toHaveBeenCalled();
   });
 
+  it("never overwrites an answer made elsewhere since the prompt was shown (audit fix 7)", async () => {
+    getBehavior.mockResolvedValue({ id: HELMET, updated_at: "2026-11-25T12:30:00Z", alongside: false });
+    expect(await recordBehaviorAlongsideAnswer(supabase, "user-1", { behaviorId: HELMET, alongside: true, env: ON }))
+      .toEqual({ behaviorId: HELMET, alongside: false, changed: false, alreadyAnswered: true });
+    expect(updateBehavior).not.toHaveBeenCalled();
+    // The brief's route returns the same result.
+    expect(await answerBriefAlongsideQuestion({ supabase, userId: "user-1" }, { behaviorId: HELMET, alongside: true }, ON))
+      .toMatchObject({ alongside: false, alreadyAnswered: true });
+  });
+
   it("refuses with the flag off, for a missing Behavior, and for a changed revision", async () => {
     await expect(recordBehaviorAlongsideAnswer(supabase, "user-1", { behaviorId: HELMET, alongside: true, env: OFF }))
       .rejects.toMatchObject({ code: "unavailable" });

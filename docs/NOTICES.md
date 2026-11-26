@@ -10,13 +10,14 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | --- | ---: |
 | outcome | 34 |
 | error | 90 |
-| note | 27 |
+| note | 28 |
 | question | 5 |
 
 ## Alongside Behaviors
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
+| `alongside.answer-already` Says a Timeline row or Daily Brief alongside question was already answered elsewhere, so this answer was not saved, and where to change it. | note | {answer, select, yes {Already answered: it can be done alongside other things.} other {Already answered: it needs its own time.}} Change it in the Behavior. | web | INT-BRIEF-011, INT-TIMELINE-028, `app/(app)/timeline/mark-detail-actions.ts`, `apps/desktop/src/local-actions.ts`, `components/briefing/BriefAlongsideQuestion.tsx` |
 | `alongside.answer-changed` An alongside answer was refused because the Behavior changed while it was being saved. | error | This Behavior changed just now. Try again. | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `lib/services/alongside-answer.service.ts` |
 | `alongside.answer-not-found` An alongside answer was refused because the Behavior is no longer in the person's account. | error | This Behavior is not in your account anymore. | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `lib/services/alongside-answer.service.ts` |
 | `alongside.answer-saved` Confirms an answer to the alongside question from the Timeline row or the Daily Brief; the Behavior setting now holds it on every surface. | outcome | {answer, select, yes {Saved: it can be done alongside other things.} other {Saved: it needs its own time.}} | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `components/timeline/OccurrenceMarkDetails.tsx` |

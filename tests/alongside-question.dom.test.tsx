@@ -112,6 +112,13 @@ describe("Timeline row: Done alongside other things?", () => {
     expect(host.querySelector('[data-mark-detail="saved"]')?.textContent).toBe("Saved: it needs its own time.");
   });
 
+  it("shows the server's words when the question was already answered elsewhere (audit fix 7)", async () => {
+    const outcome = "Already answered: it needs its own time. Change it in the Behavior.";
+    await render(row(occurrence(), actions({ alongside: vi.fn(async () => ({ status: "saved" as const, outcome })) })));
+    await click(button("Yes"));
+    expect(host.querySelector('[data-mark-detail="saved"]')?.textContent).toBe(outcome);
+  });
+
   it("shows a refusal in the row's own words", async () => {
     await render(row(occurrence(), actions({ alongside: vi.fn(async () => ({ status: "refused" as const, message: "This Behavior changed just now. Try again." })) })));
     await click(button("Yes"));
@@ -158,6 +165,13 @@ describe("Daily Brief: the alongside question line", () => {
     expect(host.querySelector("[data-brief-outcome]")?.textContent).toBe("Saved: it can be done alongside other things.");
     expect(host.querySelector("[data-brief-alongside-actions]")).toBeNull();
     expect(onRefresh).toHaveBeenCalled();
+  });
+
+  it("says the question was already answered elsewhere, with the stored answer (audit fix 7)", async () => {
+    const answer = vi.fn(async () => ({ behaviorId: question.behaviorId, alongside: false, changed: false, alreadyAnswered: true }));
+    await render(wrap(<BriefAlongsideQuestion question={question} client={client(answer)} />));
+    await click(button("Yes"));
+    expect(host.querySelector("[data-brief-outcome]")?.textContent).toBe("Already answered: it needs its own time. Change it in the Behavior.");
   });
 
   it("saves No", async () => {

@@ -29,6 +29,13 @@
       "platforms": ["web"],
       "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
     },
+    "alongside.answer-already": {
+      "meaning": "Says a Timeline row or Daily Brief alongside question was already answered elsewhere, so this answer was not saved, and where to change it.",
+      "text": "{answer, select, yes {Already answered: it can be done alongside other things.} other {Already answered: it needs its own time.}} Change it in the Behavior.",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
+    },
     "alongside.answer-not-found": {
       "meaning": "An alongside answer was refused because the Behavior is no longer in the person's account.",
       "text": "This Behavior is not in your account anymore.",

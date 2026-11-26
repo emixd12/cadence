@@ -402,6 +402,23 @@ export async function setBehaviorAlongside(
 /** The reason code on the configuration revision an alongside answer writes. */
 export const BEHAVIOR_ALONGSIDE_REASON_CODE = "alongside_answered";
 
+/**
+ * Audit fix 7: a question prompt's answer (the Timeline row). It answers only an
+ * unanswered Behavior: when the setting already holds the other answer (given on another
+ * surface or device since the row asked), nothing is written and `alreadyAnswered`
+ * carries the stored answer. The Behavior form changes an answer.
+ */
+export async function answerBehaviorAlongsideQuestion(
+  store: BehaviorDataStore,
+  input: { behaviorId: string; alongside: boolean; recordedAt: string },
+): Promise<Readonly<{ alongside: boolean; alreadyAnswered: boolean }>> {
+  const existing = await requireBehavior(store, input.behaviorId);
+  const stored = existing.alongside ?? null;
+  if (stored !== null && stored !== input.alongside) return { alongside: stored, alreadyAnswered: true };
+  await setBehaviorAlongside(store, { ...input, expectedUpdatedAt: existing.updated_at });
+  return { alongside: input.alongside, alreadyAnswered: false };
+}
+
 /** The four run actions on a Behavior's menu, in Chat and through MCP. */
 export type BehaviorRunAction =
   | { kind: "end_now" }

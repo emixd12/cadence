@@ -14,6 +14,10 @@ import { serializeIntegrationBehavior } from "@/lib/services/integration-read-se
  * the question on every surface (`alongsideQuestionOpen`). Chat writes the same field
  * through its confirmed `update_behavior`. No new table.
  *
+ * It answers only an unanswered Behavior: once the setting holds an answer, a prompt
+ * shown before it was given writes nothing and says so. The Behavior form changes an
+ * answer through its own save.
+ *
  * Refuses while `CADENCE_ALONGSIDE` is off: nothing reads or writes the setting then.
  */
 
@@ -26,7 +30,12 @@ export class AlongsideAnswerError extends Error {
   }
 }
 
-export type AlongsideAnswerResult = Readonly<{ behaviorId: string; alongside: boolean; changed: boolean }>;
+/**
+ * `alongside` is the setting as stored after the call. `alreadyAnswered` (audit fix 7):
+ * the Behavior already held the other answer, made elsewhere since the prompt was shown,
+ * so nothing was written; the Behavior form is the place to change it.
+ */
+export type AlongsideAnswerResult = Readonly<{ behaviorId: string; alongside: boolean; changed: boolean; alreadyAnswered?: boolean }>;
 
 export async function recordBehaviorAlongsideAnswer(
   supabase: AppSupabaseClient,
@@ -36,10 +45,12 @@ export async function recordBehaviorAlongsideAnswer(
   if (!alongsideEnabled(input.env)) throw new AlongsideAnswerError("unavailable");
   const current = await getBehaviorById(supabase, userId, input.behaviorId);
   if (!current) throw new AlongsideAnswerError("not_found");
+  const stored = (current as { alongside?: boolean | null }).alongside ?? null;
   // The same answer again (another surface, a second tap) changes nothing.
-  if ((current as { alongside?: boolean | null }).alongside === input.alongside) {
-    return { behaviorId: current.id, alongside: input.alongside, changed: false };
-  }
+  if (stored === input.alongside) return { behaviorId: current.id, alongside: input.alongside, changed: false };
+  // Audit fix 7: a question prompt answers only an unanswered Behavior. A stale Timeline
+  // row or brief line never overwrites an answer made elsewhere since it was shown.
+  if (stored !== null) return { behaviorId: current.id, alongside: stored, changed: false, alreadyAnswered: true };
   const update = { behavior_id: current.id, expected_revision: current.updated_at, alongside: input.alongside } as
     IntegrationOperationInput<"update_behavior"> & AlongsideInputField;
   const values = integrationBehaviorInput(update, serializeIntegrationBehavior(current, null));

@@ -25,8 +25,12 @@ export type BriefAlongsideQuestion = Readonly<{
 
 export type BriefAlongsideAnswerRequest = Readonly<{ behaviorId: string; alongside: boolean }>;
 
-/** `changed` is false when the setting already held this answer (another surface or device). */
-export type BriefAlongsideAnswerResponse = Readonly<{ behaviorId: string; alongside: boolean; changed: boolean }>;
+/**
+ * `changed` is false when the setting already held an answer (another surface or device).
+ * `alreadyAnswered` is true when that answer was the other one: nothing was written and
+ * `alongside` is the stored answer. Absent from servers before the audit fix.
+ */
+export type BriefAlongsideAnswerResponse = Readonly<{ behaviorId: string; alongside: boolean; changed: boolean; alreadyAnswered?: boolean }>;
 
 /** Same authentication as the other brief routes (web session or Mac Bearer). */
 export const BRIEF_ALONGSIDE_ROUTE = "/api/advisor/brief/alongside" as const;

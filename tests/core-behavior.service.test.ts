@@ -4,7 +4,7 @@ import type {
   BehaviorDataStore,
 } from "../packages/core/src/behavior-store";
 import {
-  applyBehaviorRunAction, BehaviorRunStateError, createBehavior, setBehaviorActive, setBehaviorAlongside, updateBehavior, updateBehaviorArchiveNote,
+  answerBehaviorAlongsideQuestion, applyBehaviorRunAction, BehaviorRunStateError, createBehavior, setBehaviorActive, setBehaviorAlongside, updateBehavior, updateBehaviorArchiveNote,
 } from "../packages/core/src/services/behavior.service";
 
 import { recordedAt, stored, values } from "./helpers/behavior-graph-fixture";
@@ -278,6 +278,17 @@ describe("the alongside answer in configuration history (Ticket 363)", () => {
       eventKind: "revision", changedFields: ["alongside"], reasonCode: "alongside_answered",
       previousConfiguration: { alongside: null }, nextConfiguration: { alongside: true },
     });
+  });
+
+  it("a question prompt answers only an unanswered Behavior (audit fix 7)", async () => {
+    const answered = store({ ...stored, alongside: false });
+    await expect(answerBehaviorAlongsideQuestion(answered, { behaviorId: "behavior", alongside: true, recordedAt }))
+      .resolves.toEqual({ alongside: false, alreadyAnswered: true });
+    expect(answered.updateBehaviorWithAtomicScheduleGraph).not.toHaveBeenCalled();
+    const open = store({ ...stored, alongside: null });
+    await expect(answerBehaviorAlongsideQuestion(open, { behaviorId: "behavior", alongside: true, recordedAt }))
+      .resolves.toEqual({ alongside: true, alreadyAnswered: false });
+    expect(open.updateBehaviorWithAtomicScheduleGraph.mock.calls[0]![0]).toMatchObject({ behavior: { alongside: true }, expectedUpdatedAt: stored.updated_at });
   });
 
   it("writes nothing for the same answer again", async () => {
