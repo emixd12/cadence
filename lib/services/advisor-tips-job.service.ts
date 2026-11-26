@@ -27,6 +27,8 @@ import {
 } from "@/lib/db/advisor-tips.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { createCoachSignalReads } from "@/lib/db/coach-signals.repo";
+import { listPeriodsOrNone } from "@/lib/db/periods.repo";
+import { resolveTipPeriods, tipPeriodRange, type TipPeriod } from "@cadence/core/resolvers/period.resolver";
 import { createAgentClient } from "@/lib/integrations/agent-caller";
 import { proposeBehaviorChangesForVisit, proposeTipOffers, type CoachVisitOccurrence, type TipOffer, type TipOfferOutcome } from "./behavior-change-proposals.service";
 import { agentModelSetting, generateStructured, type AgentModelSetting, type AgentModelUsage } from "./agent-model";
@@ -150,6 +152,11 @@ export type TipVisitPort = Readonly<{
   history(since: string): Promise<TipHistory>;
   /** Day notes for [since, before). Called only when the notes choice allows it. */
   notes(since: string, before: string): Promise<DayNote[]>;
+  /**
+   * Ticket 371: the Periods with a day in the tip days ending on `localDate`, labels and dates
+   * only. Read under the tips switch, not the notes choice. Absent in ports that read none.
+   */
+  periods?(localDate: string): Promise<TipPeriod[]>;
   reserve(runId: string, estimatedMicrodollars: number): Promise<SpendDecision>;
   settle(reservationId: string, actualMicrodollars: number): Promise<void>;
   generate(input: Readonly<{ instructions: string; prompt: string; timeoutMs: number; onUsage(usage: AgentModelUsage): void }>): Promise<unknown>;
@@ -238,7 +245,9 @@ export async function visitAdvisorTips(port: TipVisitPort, options: TipVisitOpti
     if (chosen.length > 0) {
       const items = tipItems(chosen, setup.titles);
       const notes = settings.notesAllowed ? await port.notes(addDays(today, -7), today) : null;
-      const prompt = buildTipPrompt({ items, notes });
+      // A failed Period read leaves the tips without Periods; it never fails the run.
+      const periods = port.periods ? await port.periods(today).catch(() => []) : [];
+      const prompt = buildTipPrompt({ items, notes, periods });
       // The model call never runs past the job's time; with too little left, the cards' own wording is used.
       const remainingMs = options.deadlineAt === undefined ? options.setting.timeoutMs : options.deadlineAt - (options.now ?? Date.now)();
       const timeoutMs = Math.min(options.setting.timeoutMs, remainingMs);
@@ -381,6 +390,7 @@ export function createHostedTipVisitPort(userId: string, options: Readonly<{ cli
     },
     history: (since) => readTipHistory(client, since),
     notes: (since, before) => readDayNotes(client, userId, since, before),
+    periods: async (localDate) => resolveTipPeriods({ localDate, records: await listPeriodsOrNone(client, userId, tipPeriodRange(localDate)) }),
     async reserve(runId, estimatedMicrodollars) {
       const decision = await reserveAgentSpend(client, { runId, model: setting.model, estimatedMicrodollars });
       return decision.allowed ? { allowed: true, reservationId: decision.reservationId } : { allowed: false };
