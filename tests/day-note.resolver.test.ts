@@ -246,4 +246,18 @@ describe("day notes for the Daily Brief (Ticket 367)", () => {
     // Whole words only.
     expect(textQuotesDayNote("Flight homes was delayed three hours so.", note)).toBe(false);
   });
+
+  it("Ticket 371: lets a sentence name a Period label that a note also uses, and nothing more of the note", () => {
+    // The note is the label: naming the label is allowed.
+    expect(textQuotesDayNote("Sick with flu: Walk needs a new time.", ["Sick with flu"])).toBe(true);
+    expect(textQuotesDayNote("Sick with flu: Walk needs a new time.", ["Sick with flu"], ["Sick with flu"])).toBe(false);
+    expect(textQuotesDayNote("During SICK  with flu, Walk needs a new time.", ["sick with flu"], ["Sick with flu"])).toBe(false);
+    // A short label does not excuse the rest of a note.
+    expect(textQuotesDayNote("Sick again today.", ["Sick again today"], ["Sick"])).toBe(true);
+    // Six words that reach past the label are still a quote.
+    const note = ["Recovering from knee surgery at home this week and very tired."];
+    const label = ["Recovering from knee surgery at home"];
+    expect(textQuotesDayNote("Recovering from knee surgery at home: a slow day.", note, label)).toBe(false);
+    expect(textQuotesDayNote("Recovering from knee surgery at home this week.", note, label)).toBe(true);
+  });
 });
