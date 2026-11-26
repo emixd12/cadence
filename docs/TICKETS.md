@@ -20440,6 +20440,8 @@ Messaging impact: `P-096`.
 
 Status: complete
 
+Editor polish, November 26, 2026 (owner's request): Label is the standard underlined text field; First day and Last day are compact and side by side, with "Still going" beside an empty Last day and Clear beside a set one; Note is the shared note field. The note of an existing Period saves on its own through `NoteEditor` and `savePeriodNote`, so Save stores the label and days and the second action reads Close. Lines that repeat across Period notes are offered as chips by the rule the other notes use (`repeatedNoteLineProposals`); nothing is stored for them (`docs/FUTURE_UPDATES.md`, "Stored Period note shortcuts"). Web only; the Mac gets the same editor with Ticket 374. Messaging impact: none.
+
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 4.
 
 Dependencies: Tickets 368 and 373.
@@ -20468,7 +20470,7 @@ Messaging impact: `P-096`.
 
 Status: complete
 
-Follow-up open: Chat does not write Periods yet. Draft PR #423 holds the Chat writes and migration `20261126150000_chat_period_actions.sql`, which drops and re-adds `chat_actions_kind_check` and so needs the owner's yes before the hosted push.
+Follow-up done November 26, 2026 (PR #423): Chat creates, edits and ends Periods after a Yes. The owner approved migration `20261126150000_chat_period_actions.sql`, which drops and re-adds `chat_actions_kind_check`; it is on the hosted project and the constraint was read back with `period` in its list.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 5.
 
@@ -20586,7 +20588,7 @@ Messaging impact: `P-096`.
 
 Status: blocked
 
-Blocked November 26, 2026: Ticket 363 (account sync contract 10, SQLite 0029) is in draft PR #407, which conflicts with `main`. This ticket takes the next contract and SQLite numbers after it.
+Blocked November 26, 2026: Ticket 363 (account sync contract 10, SQLite 0029) is in draft PR #407, which conflicts with `main`. This ticket takes the next contract and SQLite numbers after it. An hourly scheduled check ("Start Ticket 374 (Periods on Mac) when #407 lands") starts this ticket once Ticket 363 is on `main`. The Mac's Period actions include `saveNote`, the note's own save.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
 

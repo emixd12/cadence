@@ -1,6 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import type { PeriodView } from "../types/period";
+import type { NoteShortcut } from "../types/note-shortcut";
+import { NOTE_SHORTCUT_LIMITS, repeatedNoteLineProposals } from "./note-suggestion.resolver";
 import { resolveNoteUpdate } from "./status.resolver";
 
 /**
@@ -349,6 +351,31 @@ export function splitByPeriods<T>(
   const outside: T[] = [];
   for (const row of rows) (coveredDates.has(localDateOf(row)) ? inside : outside).push(row);
   return { inside, outside };
+}
+
+/**
+ * The key Period note shortcuts take in the record of inline Note shortcuts, beside
+ * Behavior IDs and the day-note pool. It names no stored pool: Period note shortcuts
+ * are worked out from the Periods on each read.
+ */
+export const PERIOD_NOTE_SHORTCUT_KEY = "period_notes";
+
+/**
+ * Note shortcuts for the Period note field: lines that repeat across the account's
+ * Period notes, by the rule Occurrence notes and day notes use
+ * (`repeatedNoteLineProposals`). Nothing is stored, so a shortcut here can be used
+ * but not kept or dismissed. Newest Periods are read first.
+ */
+export function resolvePeriodNoteShortcuts(input: Readonly<{
+  periods: readonly Pick<PeriodRecord, "id" | "start_on" | "note">[];
+  now: Temporal.Instant;
+}>): NoteShortcut[] {
+  const notes = [...input.periods]
+    .filter((period) => Boolean(period.note?.trim()) && [...period.note!].length <= NOTE_SHORTCUT_LIMITS.sourceCharacters)
+    .sort((a, b) => compareText(b.start_on, a.start_on) || compareText(a.id, b.id))
+    .slice(0, NOTE_SHORTCUT_LIMITS.notes)
+    .map((period) => ({ id: period.id, note: period.note, local_date: period.start_on }));
+  return repeatedNoteLineProposals({ notes, now: input.now });
 }
 
 /**

@@ -20,20 +20,25 @@ const SICK: PeriodView = { id: "p-sick", label: "Sick", start_on: "2026-11-03", 
 const TRAVEL: PeriodView = { id: "p-travel", label: "Travel", start_on: "2026-11-09", end_on: "2026-11-12", note: null, revision: 1 };
 const DONE: PeriodView = { id: "p-done", label: "Exams", start_on: "2026-10-01", end_on: "2026-10-05", note: null, revision: 1 };
 
-type Recorded = { kind: "save" | "end" | "remove"; fields: Record<string, string> };
+type Recorded = { kind: "save" | "end" | "remove" | "note"; fields: Record<string, string> };
 
 function recordingActions(reply: (call: Recorded) => PeriodActionState = (call) => ({
   status: "success",
   noticeId: call.kind === "save" ? "period.saved" : call.kind === "end" ? "period.ended" : "period.removed",
   message: "",
-})) {
+}), noteRevision = 3) {
   const calls: Recorded[] = [];
   const make = (kind: Recorded["kind"]): PeriodFormAction => async (_state, form) => {
     const call = { kind, fields: Object.fromEntries([...form.entries()].map(([name, value]) => [name, String(value)])) };
     calls.push(call);
     return reply(call);
   };
-  const actions: PeriodActions = { save: make("save"), end: make("end"), remove: make("remove") };
+  // The note field's own save answers with the Period's next revision.
+  const saveNote: PeriodActions["saveNote"] = async (_state, form) => {
+    calls.push({ kind: "note", fields: Object.fromEntries([...form.entries()].map(([name, value]) => [name, String(value)])) });
+    return { status: "success", message: "", revision: noteRevision };
+  };
+  const actions: PeriodActions = { save: make("save"), end: make("end"), remove: make("remove"), saveNote };
   return { calls, actions };
 }
 
@@ -65,6 +70,7 @@ const field = <T extends HTMLElement = HTMLInputElement>(container: HTMLElement,
   const found = [...container.querySelectorAll("label")].find((item) => item.textContent === label);
   return found ? container.querySelector<T>(`#${CSS.escape(found.htmlFor)}`) : null;
 };
+const noteField = (container: HTMLElement) => container.querySelector<HTMLTextAreaElement>('[data-period-editor] textarea[name="note"]');
 const click = (element: Element | null | undefined) => act(async () => { (element as HTMLElement).click(); });
 
 function dayControls(overrides: Partial<React.ComponentProps<typeof PeriodDayControls>> = {}) {
@@ -102,12 +108,13 @@ describe("Period day controls (Ticket 369)", () => {
       const label = field(view.container, "Label")!;
       const first = field(view.container, "First day")!;
       const last = field(view.container, "Last day")!;
-      const note = field<HTMLTextAreaElement>(view.container, "Note")!;
+      const note = noteField(view.container)!;
+      expect(note.labels?.[0]?.textContent).toBe("Note");
       expect(first.type).toBe("date");
       expect(first.value).toBe(TODAY);
       expect(last.type).toBe("date");
       expect(last.value).toBe("");
-      expect(document.getElementById(last.getAttribute("aria-describedby")!)?.textContent).toBe("Leave empty if it is still going");
+      expect(document.getElementById(last.getAttribute("aria-describedby")!)?.textContent).toBe("Still going. Set a last day when it ends.");
       const options = [...document.getElementById(label.getAttribute("list")!)!.querySelectorAll("option")].map((item) => item.value);
       expect(options).toEqual(["Sick", "Travel"]);
       // A new Period offers neither End today nor Remove.
@@ -184,7 +191,7 @@ describe("Period day controls (Ticket 369)", () => {
       expect(field(view.container, "Label")!.value).toBe("Sick");
       expect(field(view.container, "First day")!.value).toBe("2026-11-03");
       expect(field(view.container, "Last day")!.value).toBe("");
-      expect(field<HTMLTextAreaElement>(view.container, "Note")!.value).toBe("Stayed home");
+      expect(noteField(view.container)!.value).toBe("Stayed home");
 
       await act(async () => {
         setValue(field(view.container, "Label")!, "Flu");
@@ -193,7 +200,7 @@ describe("Period day controls (Ticket 369)", () => {
       await click(button(view.container, "Save"));
 
       expect(calls).toEqual([{ kind: "save", fields: {
-        period_id: "p-sick", expected_revision: "2", label: "Flu", start_on: "2026-11-03", end_on: "2026-11-08", note: "Stayed home",
+        period_id: "p-sick", expected_revision: "2", label: "Flu", start_on: "2026-11-03", end_on: "2026-11-08",
       } }]);
       expect(view.container.querySelector("[data-period-editor]")).toBeNull();
       expect(view.container.querySelector('[data-notice="period.saved"]')).not.toBeNull();
@@ -272,12 +279,96 @@ describe("Period day controls (Ticket 369)", () => {
     }
   });
 
-  it("closes on Cancel and on Escape without sending anything", async () => {
+  it("saves an existing Period's note on its own, and the next write names the revision that save returned", async () => {
     const { calls, actions } = recordingActions();
     const view = await render(dayControls({ actions, periods: [SICK] }));
     try {
       await click(button(view.container, "Sick"));
-      await click(button(view.container, "Cancel"));
+      const note = noteField(view.container)!;
+      // The shared note editor: no Done of its own inside the Period editor.
+      expect(button(view.container, "Done")).toBeUndefined();
+      expect(note.form).not.toBe(field(view.container, "Label")!.form);
+
+      await act(async () => {
+        setValue(note, "Stayed home\nFever");
+        note.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      });
+      expect(calls).toEqual([{ kind: "note", fields: {
+        period_id: "p-sick", note: "Stayed home\nFever", expected_note: "Stayed home", used_shortcut: "false",
+      } }]);
+      expect(view.container.querySelector('[data-notice="timeline.note-saved"]')).not.toBeNull();
+      expect(view.container.querySelector("[data-period-editor]")).not.toBeNull();
+
+      await act(async () => setValue(field(view.container, "Label")!, "Flu"));
+      await click(button(view.container, "Save"));
+      expect(calls[1]).toEqual({ kind: "save", fields: {
+        period_id: "p-sick", expected_revision: "3", label: "Flu", start_on: "2026-11-03", end_on: "",
+      } });
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("keeps a label being edited when the Period reloads after its note saved", async () => {
+    const { actions } = recordingActions();
+    const view = await render(dayControls({ actions, periods: [SICK] }));
+    try {
+      await click(button(view.container, "Sick"));
+      await act(async () => setValue(field(view.container, "Label")!, "Flu"));
+
+      await view.rerender(dayControls({ actions, periods: [{ ...SICK, note: "Fever", end_on: "2026-11-08", revision: 3 }] }));
+      expect(field(view.container, "Label")!.value).toBe("Flu");
+      expect(field(view.container, "Last day")!.value).toBe("2026-11-08");
+      expect(noteField(view.container)!.value).toBe("Fever");
+      expect(view.container.querySelector<HTMLInputElement>('input[name="expected_revision"]')!.value).toBe("3");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("offers repeated Period note lines as chips and clears the last day", async () => {
+    const { calls, actions } = recordingActions();
+    const shortcut = {
+      key: "a".repeat(64), text: "No training", status: "proposed" as const, source: "repeated_text" as const,
+      evidence: [], created_at: "2026-11-09T12:00:00Z", expires_at: "2026-12-09T12:00:00Z",
+    };
+    const view = await render(dayControls({ actions, noteShortcuts: [shortcut] }));
+    try {
+      await act(async () => {
+        view.container.querySelector("details")!.open = true;
+        view.container.querySelector("details")!.dispatchEvent(new Event("toggle"));
+      });
+      const chips = view.container.querySelector('[aria-label="Period note shortcuts"]')!;
+      // Nothing stores these chips, so there is nothing to dismiss.
+      expect([...chips.querySelectorAll("button")].map((item) => item.textContent)).toEqual(["No training"]);
+
+      const last = field(view.container, "Last day")!;
+      expect(button(view.container, "Clear")).toBeUndefined();
+      await act(async () => {
+        setValue(field(view.container, "Label")!, "Travel");
+        setValue(last, "2026-11-12");
+      });
+      expect(last.min).toBe(TODAY);
+      await click(button(view.container, "Clear"));
+      expect(last.value).toBe("");
+      expect(button(view.container, "Clear")).toBeUndefined();
+
+      await click(button(view.container, "No training"));
+      expect(noteField(view.container)!.value).toBe("No training");
+      await click(button(view.container, "Save"));
+      expect(calls).toEqual([{ kind: "save", fields: { label: "Travel", start_on: TODAY, end_on: "", note: "No training" } }]);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("closes on Close and on Escape without sending anything", async () => {
+    const { calls, actions } = recordingActions();
+    const view = await render(dayControls({ actions, periods: [SICK] }));
+    try {
+      await click(button(view.container, "Sick"));
+      expect(button(view.container, "Cancel")).toBeUndefined();
+      await click(button(view.container, "Close"));
       expect(view.container.querySelector("[data-period-editor]")).toBeNull();
       expect(document.activeElement).toBe(button(view.container, "Sick"));
 

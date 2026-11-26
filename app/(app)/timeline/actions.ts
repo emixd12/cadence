@@ -19,9 +19,10 @@ import {
   deletePeriodFromFormData,
   endPeriodFromFormData,
   periodErrorToActionState,
+  savePeriodNoteFromFormData,
   updatePeriodFromFormData,
 } from "@/lib/services/period.service";
-import type { PeriodActionState, PeriodNoticeId } from "@cadence/core/types/period";
+import type { PeriodActionState, PeriodNoteActionState, PeriodNoticeId } from "@cadence/core/types/period";
 import { setBehaviorDefaultDurationForCurrentUser } from "@/lib/services/timeline.service";
 import type {
   DefaultDurationActionState,
@@ -126,6 +127,22 @@ export async function deletePeriodAction(
     return periodSuccess("period.removed");
   } catch (error) {
     return periodErrorToActionState(error, "Unable to remove this period.");
+  }
+}
+
+/** The Period note field saves on its own, like every note field. */
+export async function savePeriodNoteAction(
+  _previousState: PeriodNoteActionState,
+  formData: FormData,
+): Promise<PeriodNoteActionState> {
+  try {
+    const { period } = await savePeriodNoteFromFormData(formData);
+    revalidatePath("/timeline");
+    revalidatePath("/behaviors");
+    return { status: "success", message: "", revision: period.revision };
+  } catch (error) {
+    const { message } = periodErrorToActionState(error, "Unable to save this note.");
+    return { status: "error", message };
   }
 }
 

@@ -12,7 +12,7 @@ import { getAnalyticsPageData } from "@/lib/services/analytics.service";
 import { getBehaviorPageData } from "@/lib/services/behavior.service";
 import { getPeriodListForCurrentUser } from "@/lib/services/period.service";
 import type { PeriodActions } from "@/lib/types/period";
-import { deletePeriodAction, endPeriodAction, savePeriodAction } from "../timeline/actions";
+import { deletePeriodAction, endPeriodAction, savePeriodAction, savePeriodNoteAction } from "../timeline/actions";
 import { getAlongsideFormViewsForCurrentUser } from "@/lib/services/alongside-view.service";
 import { parentChoices } from "@/components/behaviors/behavior-list-state";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
@@ -45,6 +45,7 @@ const PERIOD_ACTIONS: PeriodActions = {
   save: savePeriodAction,
   end: endPeriodAction,
   remove: deletePeriodAction,
+  saveNote: savePeriodNoteAction,
 };
 
 type BehaviorsPageProps = Readonly<{
@@ -163,6 +164,7 @@ async function BehaviorsContent({
         alongsideViews={alongsideViews}
         periods={periodList.periods}
         periodLabelSuggestions={periodList.labelSuggestions}
+        periodNoteShortcuts={periodList.noteShortcuts}
         periodActions={PERIOD_ACTIONS}
       />
       </NoteShortcutDismissProvider>

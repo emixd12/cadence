@@ -21,7 +21,7 @@ const SICK: PeriodView = { id: "p-sick", label: "Sick", start_on: "2026-11-18", 
 const TRIP: PeriodView = { id: "p-trip", label: "Trip", start_on: "2026-12-01", end_on: null, note: null, revision: 1 };
 
 const unchanged = async <T,>(state: T) => state;
-const actions: PeriodActions = { save: unchanged, end: unchanged, remove: unchanged };
+const actions: PeriodActions = { save: unchanged, end: unchanged, remove: unchanged, saveNote: unchanged };
 
 let root: Root;
 let container: HTMLDivElement;
@@ -99,7 +99,7 @@ describe("Periods on Behaviors (Ticket 369)", () => {
 
     await act(async () => { list.querySelector<HTMLButtonElement>('button[aria-label="Edit period Sick"]')!.click(); });
     expect([...list.querySelectorAll("[data-period-editor] button")].map((item) => item.textContent?.trim()))
-      .toEqual(["Save", "Cancel", "End today", "Remove"]);
+      .toEqual(["Save", "Close", "End today", "Remove"]);
   });
 
   it("hides the Periods section with no Period or no actions", async () => {

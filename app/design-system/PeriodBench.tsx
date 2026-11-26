@@ -1,5 +1,6 @@
 "use client";
 
+import { Temporal } from "@js-temporal/polyfill";
 import { useState } from "react";
 
 import type { PeriodDataStore } from "@cadence/core/data-store";
@@ -10,6 +11,7 @@ import {
   attachTimelinePeriods,
   periodLabelSuggestions,
   periodsNewestFirst,
+  resolvePeriodNoteShortcuts,
   toPeriodView,
   type PeriodRecord,
 } from "@cadence/core/resolvers/period.resolver";
@@ -18,6 +20,7 @@ import {
   createPeriod,
   deletePeriod,
   endPeriod,
+  savePeriodNote,
   updatePeriod,
 } from "@cadence/core/services/period.service";
 
@@ -32,6 +35,7 @@ import type { OccurrenceFormAction } from "@/lib/types/timeline";
 // label "Conflict" always answers with the conflict notice.
 
 const TODAY = "2026-11-09";
+const BENCH_NOW = Temporal.Instant.from("2026-11-09T17:00:00Z");
 const DAYS = [
   { localDate: "2026-11-09", relative: "Today", label: "Monday, November 9" },
   { localDate: "2026-11-10", relative: "Tomorrow", label: "Tuesday, November 10" },
@@ -43,10 +47,10 @@ const record = (id: string, label: string, start_on: string, end_on: string | nu
 });
 
 const INITIAL: PeriodRecord[] = [
-  record("bench-sick", "Sick", "2026-11-03", null, "Stayed home.", "2026-11-03T12:00:00Z"),
+  record("bench-sick", "Sick", "2026-11-03", null, "Stayed home.\nNo training", "2026-11-03T12:00:00Z"),
   record("bench-travel", "Travel", "2026-11-09", "2026-11-10", null, "2026-11-08T12:00:00Z"),
   record("bench-long", "Visiting family over the long weekend in the mountains", "2026-11-10", "2026-11-14", null, "2026-11-07T12:00:00Z"),
-  record("bench-exams", "Exams", "2026-10-12", "2026-10-16", "Two papers and an oral.", "2026-10-10T12:00:00Z"),
+  record("bench-exams", "Exams", "2026-10-12", "2026-10-16", "Two papers and an oral.\nNo training", "2026-10-10T12:00:00Z"),
 ];
 
 const OCCURRENCES = [
@@ -58,7 +62,7 @@ const OCCURRENCES = [
 
 const dayNoteAction: OccurrenceFormAction = async () => ({ status: "success", message: "Day note saved." });
 
-/** The three writes over an in-memory store. `onChange` receives every new list. */
+/** The Period writes over an in-memory store. `onChange` receives every new list. */
 function benchActions(onChange: (records: PeriodRecord[]) => void): PeriodActions {
   let rows = INITIAL;
   let created = 0;
@@ -112,6 +116,17 @@ function benchActions(onChange: (records: PeriodRecord[]) => void): PeriodAction
       : createPeriod(store, fields(form))),
     end: run("period.ended", (form) => endPeriod(store, { ...target(form), today: TODAY })),
     remove: run("period.removed", (form) => deletePeriod(store, target(form))),
+    saveNote: async (_state, form) => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      try {
+        const { period } = await savePeriodNote(store, {
+          id: form.get("period_id"), expectedNote: form.get("expected_note"), note: form.get("note"),
+        });
+        return { status: "success", message: "", revision: period.revision };
+      } catch (error) {
+        return { status: "error", message: error instanceof Error ? error.message : "Unable to save this note." };
+      }
+    },
   };
 }
 
@@ -123,6 +138,8 @@ export function PeriodBench() {
     { daySections: DAYS.map((day) => ({ localDate: day.localDate })), needsDecision: { daySections: [] } },
     records,
   );
+  // "No training" repeats across two Period notes, so the note field offers it as a chip.
+  const noteShortcuts = resolvePeriodNoteShortcuts({ periods: records, now: BENCH_NOW });
   const adherence = resolvePeriodAdherence({
     occurrences: OCCURRENCES, periods: records, startLocalDate: "2026-10-11", endLocalDate: TODAY,
   });
@@ -142,6 +159,7 @@ export function PeriodBench() {
               periods={view.periodsByDate[day.localDate]}
               today={TODAY}
               labelSuggestions={view.periodLabelSuggestions}
+              noteShortcuts={noteShortcuts}
               actions={actions}
             >
               <DayNoteControl localDate={day.localDate} dayLabel={day.label} note="" action={dayNoteAction} />
@@ -163,6 +181,7 @@ export function PeriodBench() {
         periods={periodsNewestFirst(records).map(toPeriodView)}
         today={TODAY}
         labelSuggestions={periodLabelSuggestions(records)}
+        noteShortcuts={noteShortcuts}
         actions={actions}
       />
     </div>

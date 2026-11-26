@@ -9,6 +9,7 @@ import {
   deletePeriod,
   endPeriod,
   listPeriods,
+  savePeriodNote,
   updatePeriod,
 } from "@cadence/core/services/period.service";
 
@@ -134,6 +135,42 @@ describe("updatePeriod", () => {
     await expect(updatePeriod(store, { id: "period-1", expectedRevision: 1, startOn: "2026-11-10" }))
       .rejects.toThrow(PERIOD_MESSAGES.endBeforeStart);
     expect(calls).toEqual(["get"]);
+  });
+});
+
+describe("savePeriodNote", () => {
+  it("saves only the note against the note the field last read", async () => {
+    const { store, calls } = fakeStore([record({ note: "Flu", revision: 4, end_on: "2026-11-09" })]);
+    const result = await savePeriodNote(store, { id: "period-1", expectedNote: "Flu\r\n", note: " Flu\r\nRest " });
+    expect(result).toMatchObject({ changed: true, period: { label: "Sick", end_on: "2026-11-09", note: "Flu\nRest", revision: 5 } });
+    expect(calls).toEqual(["get", "update"]);
+  });
+
+  it("adds a first note and clears one, with an empty expected note meaning none", async () => {
+    const { store } = fakeStore([record()]);
+    expect((await savePeriodNote(store, { id: "period-1", expectedNote: "", note: "Rest" })).period.note).toBe("Rest");
+    expect((await savePeriodNote(store, { id: "period-1", expectedNote: "Rest", note: "  " })).period.note).toBeNull();
+  });
+
+  it("writes nothing when the stored note is already the one being saved", async () => {
+    const { store, calls } = fakeStore([record({ note: "Rest" })]);
+    const repeat = await savePeriodNote(store, { id: "period-1", expectedNote: "Older", note: "Rest" });
+    expect(repeat).toMatchObject({ changed: false, period: { revision: 1 } });
+    expect(calls).toEqual(["get"]);
+  });
+
+  it("reports a conflict when the note changed elsewhere, the Period is gone or the write lost a race", async () => {
+    const { store } = fakeStore([record({ note: "Changed elsewhere" })]);
+    await expect(savePeriodNote(store, { id: "period-1", expectedNote: "Flu", note: "Flu and rest" })).rejects.toThrow(PERIOD_CONFLICT_MESSAGE);
+    await expect(savePeriodNote(store, { id: "missing", expectedNote: "", note: "Rest" })).rejects.toThrow(PERIOD_CONFLICT_MESSAGE);
+    await expect(savePeriodNote({ ...store, updatePeriod: async () => null }, { id: "period-1", expectedNote: "Changed elsewhere", note: "Rest" }))
+      .rejects.toThrow(PERIOD_CONFLICT_MESSAGE);
+  });
+
+  it("applies the note rules before reading", async () => {
+    const { store, calls } = fakeStore([record()]);
+    await expect(savePeriodNote(store, { id: "period-1", expectedNote: "", note: "x".repeat(2001) })).rejects.toThrow(PERIOD_MESSAGES.noteTooLong);
+    expect(calls).toEqual([]);
   });
 });
 
