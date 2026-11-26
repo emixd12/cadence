@@ -2088,7 +2088,7 @@ before Ticket 356: planners read the cached model guess, then false, the estimat
 asks the model about alongside for every Behavior, and no web code reads
 `behaviors.alongside`. Default: off. Server-only.
 
-Turn it on only after all seven alongside migrations are on the database:
+Turn it on only after all nine alongside migrations are on the database:
 
 1. `20261125140000_behavior_alongside.sql`
 2. `20261125150000_advisor_estimate_where_guess.sql`
@@ -2096,8 +2096,9 @@ Turn it on only after all seven alongside migrations are on the database:
 4. `20261125190000_advisor_estimate_where_guess_writer.sql`
 5. `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`
 6. `20261126110000_alongside_schedule_pairing.sql`
-7. `20261126120000_account_sync_alongside.sql`
+7. `20261126120000_account_sync_alongside.sql` (before the Ticket 363 code deploys)
 8. `20261126130000_where_guess_dismissal_without_labels.sql` (Ticket 383)
+9. `20261126150000_account_sync_where_guess_dismissals.sql` (Ticket 383, Cadence for Mac)
 
 The seventh differs: it must reach the database before the Ticket 363 code deploys,
 whatever the flag (below). With the flag on, the move-day read selects the column. The migration is
@@ -2105,6 +2106,15 @@ additive and grants nothing new, so it fits the standing approval for additive
 migrations (`docs/DECISIONS.md`, 2026-11-10) once its conditions hold. The owner turns
 the flag on in Production after Ticket 365's acceptance. Turning it off again restores
 the guess-only behavior at once; stored answers stay.
+
+The ninth must reach the database no later than the eighth. The eighth lets the web store
+a guess dismissal while Completion places is off; without the ninth, Cadence for Mac on
+account sync contracts 8 to 10 (0.1.14 to 0.1.17 and earlier builds of this branch) would
+delete that row on an ordinary sync or fail a first-link replacement on it. The ninth
+hides such rows from those contracts and registers contract 11. It must also reach the
+database before a contract-11 Mac build is used, since the server refuses an unknown
+contract. It inserts one contract-registry row and changes the projection and apply
+functions for older contracts, so it needs the owner's yes before a hosted push.
 
 Since Ticket 363 the column syncs at account sync contract 10 and is part of
 configuration history, whatever the flag (schema is schema). Migration

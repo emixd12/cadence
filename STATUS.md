@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 383 Mac part, 384, 385 and 386 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 complete on web and Mac in source (migrations `20261126130000`, push approved, and `20261126150000`, owner's yes needed; SQLite schema 30, account sync contract 11); 384, 385 and 386 open | 383: owner's yes for `20261126150000`, then push it no later than `20261126130000` and before a contract-11 Mac build is used; installed Mac check in Ticket 365. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
@@ -101,6 +101,33 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 383 Mac complete: guessed Where dismissals sync while Completion places is off — November 26, 2026
+
+Branch `feat/alongside-383mac`, on the alongside branch with Ticket 383's web part.
+
+- **Hazard confirmed by test:** before this change the shared planner deleted a hosted guess
+  dismissal stored while labels were off (an ordinary sync planned a hosted delete), and the
+  schema-29 SQLite trigger refused it (a first-link replacement would fail).
+- **Mac:** SQLite schema 30 (`0030_guess_dismissal_without_labels.sql`) admits `home`,
+  `anywhere` and `add_place` dismissals while labels are off. A linked Mac shows the hosted
+  guessed Where and dismisses the shown guess with Completion places off; local mode has none.
+- **Sync:** account sync contract 11. `retainPlaceLabelInvariants` keeps a guess dismissal
+  while labels are off; turning labels off still deletes every dismissal. Hosted migration
+  `20261126150000_account_sync_where_guess_dismissals.sql` (not applied or pushed) hides such
+  rows from contracts 8 to 10 (Cadence for Mac 0.1.14 to 0.1.17), keeps them out of those
+  contracts' apply results, and lets their own dismissal replace a hidden one. It inserts one
+  registry row and changes the projection and apply functions for older contracts: it needs
+  the owner's yes, and must reach the database no later than `20261126130000`. Minimum writer
+  contract stays 8.
+- **Verification:** resolver, native, store-contract and SQL fixtures
+  (`tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql`) against a scratch database
+  with every migration, and the full check list in AGENTS.md. The web fixture
+  `tests/sql/ticket-383-where-guess-dismissal-smoke.sql` expected a check violation where
+  the trigger raises first; fixed.
+
+Platform impact: web unchanged; desktop implemented (installed check in Ticket 365); marketing
+not applicable; future mobile inherits the planner. Messaging impact: P-103.
 
 ## Ticket 383 web complete: the guessed Where without Completion places — November 26, 2026
 

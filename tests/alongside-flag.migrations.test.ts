@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const root = path.resolve(__dirname, "..");
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
-const ALONGSIDE_MIGRATIONS = ["20261125140000", "20261125150000", "20261125180000", "20261125190000", "20261126100000", "20261126110000", "20261126120000", "20261126130000"];
+const ALONGSIDE_MIGRATIONS = ["20261125140000", "20261125150000", "20261125180000", "20261125190000", "20261126100000", "20261126110000", "20261126120000", "20261126130000", "20261126150000"];
 
 describe("alongside flag migrations", () => {
   const migrations = fs.readdirSync(path.join(root, "supabase/migrations"));

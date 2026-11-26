@@ -471,7 +471,10 @@ switch the Mac renders exactly as before.
   `alongside`. The local actions read the field (`readAlongside`) and write it through
   the DataStore with a configuration revision. A linked Mac's current guess shows with
   one tap to accept, and a guessed Where shares the Where suggestion line
-  (`createLocalPlaceLabelClient` `whereGuesses`).
+  (`createLocalPlaceLabelClient` `whereGuesses`). Since Ticket 383 the line shows, and
+  Dismiss works, whether or not Completion places is on, as on the web; SQLite schema 30
+  and account sync contract 11 carry the dismissal (`docs/DESKTOP_DATA_MODEL.md`,
+  "Guessed Where dismissals"). Local mode has no guess.
 - Timeline: the "Alongside" label (and "Alongside (guess)" for a linked Mac's guess),
   overlap cues under the same-place rule, and the row question "Done alongside other
   things? Yes · No" after a Completed mark, through `attachTimelineAlongside` and the
@@ -484,7 +487,8 @@ switch the Mac renders exactly as before.
   `/api/advisor/brief/alongside` with its session; the answer arrives by account sync.
   Pairing lines are move lines and render through the existing move transport.
 - Data: SQLite schema 29 and account sync contract 10 (`docs/DESKTOP_DATA_MODEL.md`,
-  "Alongside answer"). Guesses stay in memory only.
+  "Alongside answer"); schema 30 and contract 11 for guessed Where dismissals while
+  Completion places is off (Ticket 383). Guesses stay in memory only.
 - Portability: exports, BehaviorLog import and restore carry the stored answer with the
   switch on.
 - Evidence: `tests/desktop-alongside.test.ts`, `tests/account-sync.resolver.test.ts`,

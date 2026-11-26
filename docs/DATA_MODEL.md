@@ -537,12 +537,34 @@ Account sync adds four entity kinds: `place_label_settings` (ID `place_labels`),
 `where_suggestion_dismissal`. Conflicts on these kinds resolve without review: a
 deletion wins over an edit, and otherwise the later record wins. The planner drops
 labels whose merged occurrence is not Completed and every row while labels are
-off, matching the triggers, so the post-apply fingerprint matches. Ticket 383 does
-not change the planner or the Mac's SQLite triggers (migration 0020): both still drop
-or refuse a dismissal while labels are off, so a linked Mac does not keep a guess
-dismissal stored on the web while labels are off. That needs its own desktop change
-before `CADENCE_ALONGSIDE` is on for accounts with a linked Mac. Exports omit
+off, matching the triggers, so the post-apply fingerprint matches. Exports omit
 all four tables (export inclusion is a backlog decision, not Ticket 216).
+
+Guess dismissals while labels are off (Ticket 383, account sync contract 11). The
+planner keeps a `where_suggestion_dismissal` whose suggestion is `home`, `anywhere` or
+`add_place` while labels are off, as the hosted trigger does, and the Mac's SQLite
+schema 30 admits it (`docs/DESKTOP_DATA_MODEL.md`). Turning labels off still deletes
+it: the side that turned labels off deleted the row, so the merge carries the deletion,
+and a guess dismissal made after the turn-off survives. Mac builds on contracts 8 to 10
+would drop such a row (an ordinary sync would delete it from the hosted account) or
+refuse it (a first-link replacement would fail), so migration
+`20261126150000_account_sync_where_guess_dismissals.sql` hides it from them:
+
+- `cadence_private.account_sync_contract_row_rules(contract, kind, rule)` lists rules
+  that hide rows of an existing kind by their values. Its one row is
+  `(11, 'where_suggestion_dismissal', 'guess_dismissal_without_labels')`.
+  `account_sync_current_contract()` is the highest contract in the three registries.
+- `cadence_private.account_sync_hidden_guess_dismissals(snapshot, contract)` returns
+  the IDs that rule hides: every guess dismissal while the snapshot has no
+  `place_label_settings` row with `enabled` true, for a contract below 11.
+- `project_account_sync_snapshot` leaves those rows out of reads, apply comparisons,
+  receipts and fingerprints for contracts below 11.
+- `apply_account_sync_plan`, for such a contract, keeps rows hidden at read time out of
+  its result check unless the plan wrote them, so a plan that turns labels on applies
+  and the next read shows the rows. A dismissal upsert from such a contract for a hidden
+  row (planned against no row) replaces it.
+
+Local check `tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql`.
 
 ### Leave reminders (Ticket 275)
 
