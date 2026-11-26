@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   alongsideFormView,
   alongsideGuessWanted,
+  alongsideQuestionOpen,
+  pickBriefAlongsideQuestion,
   alongsideRowView,
   resolveAlongside,
   resolveRoutineBlockAlongside,
@@ -99,14 +101,14 @@ describe("collapseBriefMoveRoutines reads the block rule", () => {
 // Ticket 358 (D33): the form's three states and the Timeline row's label facts.
 describe("alongsideFormView", () => {
   it("shows the person's answer and no guess once answered", () => {
-    expect(alongsideFormView({ setting: true, guess: false })).toEqual({ answer: "yes", guess: null });
-    expect(alongsideFormView({ setting: false, guess: true })).toEqual({ answer: "no", guess: null });
+    expect(alongsideFormView({ setting: true, guess: false })).toEqual({ answer: "yes", guess: null, questionOpen: false });
+    expect(alongsideFormView({ setting: false, guess: true })).toEqual({ answer: "no", guess: null, questionOpen: false });
   });
 
   it("offers the current guess only while unanswered", () => {
-    expect(alongsideFormView({ setting: null, guess: true })).toEqual({ answer: "unanswered", guess: true });
-    expect(alongsideFormView({ setting: undefined, guess: false })).toEqual({ answer: "unanswered", guess: false });
-    expect(alongsideFormView({ setting: null, guess: null })).toEqual({ answer: "unanswered", guess: null });
+    expect(alongsideFormView({ setting: null, guess: true })).toEqual({ answer: "unanswered", guess: true, questionOpen: true });
+    expect(alongsideFormView({ setting: undefined, guess: false })).toEqual({ answer: "unanswered", guess: false, questionOpen: false });
+    expect(alongsideFormView({ setting: null, guess: null })).toEqual({ answer: "unanswered", guess: null, questionOpen: false });
   });
 });
 
@@ -124,5 +126,60 @@ describe("alongsideRowView", () => {
       .toEqual({ source: "person", where: { kind: "place", placeKey: "k".repeat(43) } });
     expect(alongsideRowView({ value: true, source: "guess" }, { kind: "home" }))
       .toEqual({ source: "guess", where: { kind: "home" } });
+  });
+});
+
+// Ticket 360 (D33): one rule for when any surface may ask, and the brief's one question.
+describe("alongsideQuestionOpen", () => {
+  it("is open only while unanswered and the guess is yes", () => {
+    expect(alongsideQuestionOpen({ alongside: null }, true)).toBe(true);
+    expect(alongsideQuestionOpen({ alongside: undefined }, true)).toBe(true);
+    expect(alongsideQuestionOpen({ alongside: null }, false)).toBe(false);
+    expect(alongsideQuestionOpen({ alongside: null }, null)).toBe(false);
+    expect(alongsideQuestionOpen({ alongside: null }, undefined)).toBe(false);
+  });
+
+  it("closes once the person answers either way", () => {
+    expect(alongsideQuestionOpen({ alongside: true }, true)).toBe(false);
+    expect(alongsideQuestionOpen({ alongside: false }, true)).toBe(false);
+  });
+
+  it("matches a guessed alongside row exactly", () => {
+    for (const setting of [true, false, null] as const) {
+      for (const guess of [true, false, null] as const) {
+        const row = alongsideRowView(resolveAlongside({ setting, guess }));
+        expect(alongsideQuestionOpen({ alongside: setting }, guess)).toBe(row?.source === "guess");
+      }
+    }
+  });
+});
+
+describe("pickBriefAlongsideQuestion", () => {
+  const item = (behaviorId: string, startAt: string, questionOpen = true, title = behaviorId) => ({ behaviorId, title, startAt, questionOpen });
+
+  it("asks about the earliest open item only", () => {
+    expect(pickBriefAlongsideQuestion({ items: [
+      item("reading", "2026-11-25T23:00:00Z"),
+      item("gym", "2026-11-25T12:00:00Z", false),
+      item("helmet", "2026-11-25T14:00:00Z", true, "Red light helmet"),
+    ] })).toEqual({ behaviorId: "helmet", title: "Red light helmet" });
+  });
+
+  it("compares instants, not text", () => {
+    expect(pickBriefAlongsideQuestion({ items: [item("later", "2026-11-25T14:00:00.5Z"), item("sooner", "2026-11-25T14:00:00Z")] })?.behaviorId).toBe("sooner");
+  });
+
+  it("skips Behaviors already asked and returns null with nothing open", () => {
+    const items = [item("helmet", "2026-11-25T14:00:00Z"), item("pill", "2026-11-25T15:00:00Z")];
+    expect(pickBriefAlongsideQuestion({ items, askedBehaviorIds: new Set(["helmet"]) })?.behaviorId).toBe("pill");
+    expect(pickBriefAlongsideQuestion({ items, askedBehaviorIds: new Set(["helmet", "pill"]) })).toBeNull();
+    expect(pickBriefAlongsideQuestion({ items: [item("gym", "2026-11-25T12:00:00Z", false)] })).toBeNull();
+    expect(pickBriefAlongsideQuestion({ items: [] })).toBeNull();
+  });
+
+  it("breaks a tie by title, then id, so a day always asks the same question", () => {
+    const at = "2026-11-25T14:00:00Z";
+    expect(pickBriefAlongsideQuestion({ items: [item("b", at, true, "Pill"), item("a", at, true, "Helmet")] })?.behaviorId).toBe("a");
+    expect(pickBriefAlongsideQuestion({ items: [item("b", at, true, "Pill"), item("a", at, true, "Pill")] })?.behaviorId).toBe("a");
   });
 });

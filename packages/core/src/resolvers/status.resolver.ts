@@ -250,11 +250,21 @@ export type NotDoneReason = (typeof NOT_DONE_REASONS)[number];
 export type MarkDetailPromptSettings = Readonly<{
   doneAt: Readonly<{ lateAfterMinutes: number; share: number }>;
   notDoneReason: Readonly<{ share: number }>;
+  /**
+   * Ticket 360 (D33): "Done alongside other things? Yes · No" after a Completed mark,
+   * only while the Behavior's alongside question is open (`alongsideQuestionOpen`) and
+   * no "Done at" line shows. Optional so settings written before it keep working; a
+   * missing value reads as `MARK_DETAIL_PROMPTS.alongside`.
+   */
+  alongside?: Readonly<{ share: number }>;
 }>;
 
-export const MARK_DETAIL_PROMPTS: MarkDetailPromptSettings = Object.freeze({
+export const MARK_DETAIL_PROMPTS: MarkDetailPromptSettings & Readonly<{ alongside: Readonly<{ share: number }> }> = Object.freeze({
   doneAt: Object.freeze({ lateAfterMinutes: 120, share: 1 }),
   notDoneReason: Object.freeze({ share: 1 }),
+  // Half of eligible marks: the question stays open until answered, so asking on
+  // every Completed mark of a daily Behavior would repeat it daily.
+  alongside: Object.freeze({ share: 0.5 }),
 });
 
 /** Kept for callers that read the late threshold directly. */
@@ -264,7 +274,7 @@ export const LATE_MARK_THRESHOLD_MINUTES = MARK_DETAIL_PROMPTS.doneAt.lateAfterM
  * Whether this item's line is in the shown share: a stable number in [0, 1) from the
  * line kind, Occurrence id and local date, compared with `share`.
  */
-export function markDetailPromptPicked(kind: "done_at" | "not_done_reason", occurrenceId: string, localDate: string, share: number): boolean {
+export function markDetailPromptPicked(kind: "done_at" | "not_done_reason" | "alongside", occurrenceId: string, localDate: string, share: number): boolean {
   if (share >= 1) return true;
   if (share <= 0) return false;
   let hash = 2166136261;

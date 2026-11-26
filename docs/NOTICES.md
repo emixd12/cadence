@@ -8,15 +8,20 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Style | Notices |
 | --- | ---: |
-| outcome | 33 |
-| error | 87 |
+| outcome | 34 |
+| error | 90 |
 | note | 27 |
-| question | 3 |
+| question | 4 |
 
 ## Alongside Behaviors
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
+| `alongside.answer-changed` An alongside answer was refused because the Behavior changed while it was being saved. | error | This Behavior changed just now. Try again. | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `lib/services/alongside-answer.service.ts` |
+| `alongside.answer-not-found` An alongside answer was refused because the Behavior is no longer in the person's account. | error | This Behavior is not in your account anymore. | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `lib/services/alongside-answer.service.ts` |
+| `alongside.answer-saved` Confirms an answer to the alongside question from the Timeline row or the Daily Brief; the Behavior setting now holds it on every surface. | outcome | {answer, select, yes {Saved: it can be done alongside other things.} other {Saved: it needs its own time.}} | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `components/timeline/OccurrenceMarkDetails.tsx` |
+| `alongside.answer-unavailable` An alongside answer could not be saved, because the setting is unavailable or the save failed. | error | Cadence could not save that. Try again. | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `lib/services/alongside-answer.service.ts` |
+| `alongside.brief-question` The Daily Brief's one question line about a Behavior whose alongside question is open, answered with Yes or No. | question | Can {title} be done alongside other things? | web | INT-BRIEF-011, `components/briefing/BriefAlongsideQuestion.tsx` |
 | `alongside.form-guess` Shows Cadence's guess beside the unanswered alongside setting in the Behavior form, which planning uses until the person answers. | note | Cadence guesses {guess, select, yes {Yes} other {No}}. Planning uses the guess until you choose. | web | INT-BEHAVIOR-047, `components/behaviors/BehaviorForm.tsx` |
 | `alongside.row-label` Marks a Timeline row whose Behavior can be done alongside other things, and says when that comes from Cadence's guess rather than the person's answer. | note | {source, select, guess {Alongside · a guess} other {Alongside}} | web | INT-BEHAVIOR-046, INT-BEHAVIOR-047, `components/timeline/OccurrenceRow.tsx` |
 | `alongside.where-guess` The Where suggestion line for a Behavior with Where not set, when planning uses Cadence's guess of where it happens. | note | {kind, select, home {Cadence guesses this happens at Home.} anywhere {Cadence guesses this can happen anywhere.} other {Cadence guesses this happens away from home.}} Planning uses the guess until Where is set. | web | INT-PLACE-008, INT-PLACE-009, `components/travel/PlaceLabels.tsx` |
@@ -119,12 +124,12 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `brief-moves.refused.too-close-moved` Server refusal: the person moved another item too close to this line's time after the brief. | error | Not changed. {time} is too close to {title} now: you moved it after this brief was written. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `lib/services/brief-moves.service.ts` |
 | `brief-moves.replan-explainer` Explains under Re-plan that it plans again with the calendar as it is now. | note | Re-plan finds a new time with what’s on your calendar now. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.request.failed` Says Cadence could not apply a move-line answer for a reason it cannot name. | error | Not changed. Cadence couldn’t apply that. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `components/briefing/BriefMoveLines.tsx` |
-| `brief-moves.request.offline` Says a move-line answer could not be sent because the device appears to be offline. | error | Not changed. You appear to be offline. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `components/briefing/BriefMoveLines.tsx` |
+| `brief-moves.request.offline` Says a move-line answer could not be sent because the device appears to be offline. | error | Not changed. You appear to be offline. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `components/briefing/BriefAlongsideQuestion.tsx`, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.request.proposal-closed` Says another device already answered this move line. | error | Not changed. This suggestion was already answered on another device. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.request.proposal-not-found` Says the move line no longer exists, and that a Refresh shows the current ones. | error | Not changed. This suggestion is no longer available. Refresh the brief for current ones. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.request.rate-limited` Says too many answers arrived at once and asks the person to wait a moment. | error | Not changed. Too many changes at once. Try again in a moment. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.request.revision-changed` Says the item changed after the brief was written, and that a Refresh shows it as it is. | error | Not changed. This item changed since the brief was written; refresh the brief to see it. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
-| `brief-moves.request.timeout` Says a move-line answer took too long and asks the person to try again. | error | Not changed. That took too long; try again. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `components/briefing/BriefMoveLines.tsx` |
+| `brief-moves.request.timeout` Says a move-line answer took too long and asks the person to try again. | error | Not changed. That took too long; try again. | web, Mac | INT-BRIEF-006, INT-BRIEF-007, `components/briefing/BriefAlongsideQuestion.tsx`, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.staying` Says on a brief's move line that No (or Undo) keeps the item at its time. | outcome | Staying at {time}. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 
 ## Daily Brief on your ChatGPT plan

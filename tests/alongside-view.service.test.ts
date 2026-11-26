@@ -74,10 +74,10 @@ describe("readAlongsideBehaviorFacts", () => {
     });
     const facts = await readAlongsideBehaviorFacts(fake.client, "user-1", { localDate: DAY, env: ON });
     expect(alongsideFormViews(facts)).toEqual({
-      pill: { answer: "yes", guess: null },
-      helmet: { answer: "unanswered", guess: true },
-      reading: { answer: "unanswered", guess: false },
-      stale: { answer: "unanswered", guess: null },
+      pill: { answer: "yes", guess: null, questionOpen: false },
+      helmet: { answer: "unanswered", guess: true, questionOpen: true },
+      reading: { answer: "unanswered", guess: false, questionOpen: false },
+      stale: { answer: "unanswered", guess: null, questionOpen: false },
     });
     expect(alongsideRowViews(facts)).toEqual({
       pill: { source: "person", where: { kind: "unknown" } },
