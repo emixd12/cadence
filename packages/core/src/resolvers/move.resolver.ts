@@ -3,6 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { localDayBounds } from "./time.resolver";
 import { trackedDurationWins } from "./time-tracking.resolver";
 import { noticeText } from "../notices";
+import type { CalendarEventPlace } from "./alongside.resolver";
 
 /**
  * Per-day moves (advisor plan, Phase 2A): durations, the tap-time free-slot check,
@@ -85,7 +86,11 @@ export function resolveMoveDuration(input: Readonly<{
 
 export type MoveInterval = Readonly<{ start: Temporal.Instant; end: Temporal.Instant }>;
 export type MoveOccupant = MoveInterval & Readonly<{ occurrenceId: string }>;
-export type MoveCalendarBusy = MoveInterval & Readonly<{ ref?: string }>;
+/**
+ * `eventPlace` (Ticket 384): the event's coarse place under the same-place rule, set only
+ * while `CADENCE_ALONGSIDE` is on and only for this request. Absent: unknown.
+ */
+export type MoveCalendarBusy = MoveInterval & Readonly<{ ref?: string; eventPlace?: CalendarEventPlace }>;
 
 export type MoveSlotCheck =
   | Readonly<{ ok: true }>

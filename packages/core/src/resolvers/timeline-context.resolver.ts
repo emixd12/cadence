@@ -4,7 +4,7 @@ import type { DepartureTrip } from "../types/departure";
 import type { TravelEvidenceResult } from "../types/travel";
 import { resolveTravelCollisions, travelUnreliableSegments } from "./travel.resolver";
 import { RETURN_TIME_UNKNOWN, departureOverlapPhrase, departurePhraseContext } from "../services/departure-phrases";
-import { alongsideMayOverlap, type OverlapPlace } from "./alongside.resolver";
+import { alongsideMayOverlap, type CalendarEventPlace, type OverlapPlace } from "./alongside.resolver";
 
 import type {
   BehaviorDurationEstimate,
@@ -267,6 +267,12 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
    * event `alongsideMayOverlap` allows is not an overlap; travel still is.
    */
   alongside?: Readonly<{ where?: OverlapPlace }> | null;
+  /**
+   * Ticket 384 (D37): each Calendar event's coarse place by event id (`calendarEventPlace`),
+   * for the same-place rule only. An event without one has an unknown place, so an
+   * alongside item's overlap with it is allowed and shows no cue.
+   */
+  eventPlaces?: ReadonlyMap<string, CalendarEventPlace> | null;
   now: Temporal.Instant;
 }>): TimelineOccurrenceContext {
   const scheduledFor = parseInstant(input.scheduledFor, "Occurrence scheduled_for");
@@ -309,8 +315,9 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     eventIds.add(event.id);
     const interval = "interval" in event ? event.interval : event;
     if (interval.kind === "all_day" || event.state === "cancelled" || event.availability === "free" || event.currentUserResponse === "declined") continue;
-    // Calendar events carry no place yet, so the rule reads their place as unknown.
-    if (input.alongside && alongsideMayOverlap(input.alongside, { kind: "calendar" })) continue;
+    // Ticket 384: an event at another known place is still an overlap; one at the same place or unknown is not.
+    const eventPlace = input.eventPlaces?.get(event.id);
+    if (input.alongside && alongsideMayOverlap(input.alongside, { kind: "calendar", ...(eventPlace ? { where: eventPlace } : {}) })) continue;
 
     const eventStart = parseInstant(interval.startAt, "External event start");
     const eventEnd = parseInstant(interval.endAt, "External event end");
