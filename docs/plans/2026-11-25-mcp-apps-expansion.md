@@ -1,7 +1,13 @@
 # MCP Apps expansion: plan (v3, audited)
 
-Date: 2026-11-25. Audited against `origin/main` at `22aa4d85`. The primary checkout is
-far behind `origin/main`; read sources with `git show origin/main:<path>`.
+Date: 2026-11-25. Audited against `origin/main` at `22aa4d85` (PR #403). The primary
+checkout is far behind `origin/main`; read sources with `git show origin/main:<path>`.
+
+Corrected November 26, 2026 by Ticket 375, against `origin/main` at `29e461fe`. The audit
+base predates three merges: the Periods plan (D35, PR #408), PR #406 and the alongside
+follow-ups (D37, PR #412). The corrections: contract edition numbers (sections 3.2 and
+4), a Periods row (section 4), the tool count (section 1) and what gates the production
+flag (sections 5 and 6). Spike results: `docs/qa/2026-11-26-mcp-apps-spike.md`.
 
 Reviewed by two independent auditors: Astra 6.2 (`gpt-6.2-astra`, default effort, 7
 findings) and Gemini 4 Neon (high, 7 findings). Section 10 lists each finding and the
@@ -29,6 +35,10 @@ Cadence already has one remote MCP server, its own OAuth server, 26 annotated to
 with scoped writes, and Claude and ChatGPT plugins. The code change is one new tool, a
 resource handler and one bundled HTML view. Per-host acceptance takes longer than the
 code. Host support below is documented support, not tested behavior.
+
+Tool count: the registry holds 26 tools at contract 1.7.0. Ticket 370 (Periods, contract
+1.8.0) will add four: `list_periods`, `create_period`, `update_period` and `end_period`.
+`show_day` is counted apart while it lives outside the registry.
 
 ## 2. What the documentation says (read 2026-11-25)
 
@@ -143,7 +153,10 @@ version, and `version.ts` requires a minor bump for any new tool.
   the contract registry. Cadence Chat builds its tools from the registry, so it never
   sees `show_day`. No change to `editions.ts`.
 - For general release, `show_day` joins the registry as the next minor version after
-  alongside 1.8.0 folds in (Ticket 365). General release therefore follows Ticket 365.
+  the alongside edition folds in (Ticket 365). D35 gave 1.8.0 to Periods and moved the
+  alongside edition to 1.9.0, so `show_day` takes the minor version after whichever
+  number the alongside edition holds when it folds in. General release therefore follows
+  Ticket 365.
 - A test asserts that Chat neither lists nor executes `show_day`.
 
 ### 3.3 View build
@@ -177,7 +190,8 @@ sessions and no intended duration.
 
 | Ongoing work | State | What the view and tool do |
 |---|---|---|
-| Alongside (D33, Tickets 356–365; PR #407 draft holds 362 and 363) | Flag off; contract 1.8.0 edition | Show "Alongside" only when `alongside` is `true`. Fixtures cover true, false, null and absent. Never show a guess. `show_day` reaches the registry after 1.8.0 folds in. |
+| Alongside (D33, Tickets 356–365; PR #407 draft holds 362 and 363) | Flag off; a flag-selected contract edition, 1.8.0 in source today and 1.9.0 once Ticket 370 lands (D35) | Show "Alongside" only when `alongside` is `true`. Fixtures cover true, false, null and absent. Never show a guess. `show_day` reaches the registry after the alongside edition folds in. |
+| Periods (D35, Tickets 367–374; PR #411 open holds 368) | In progress; Ticket 370, which adds Periods to the contract as 1.8.0, has not started | The first day view does not show Periods. `show_day` is its own projection and ignores the `periods` field that Ticket 370 adds to each `get_timeline` day. A later view can add it (Ticket 382). |
 | Sub-behaviors (Ticket 349) | Shipped | Render `parent_groups` collapsed, each child once; children also appear in `occurrences`. Mark a parent with `set_parent_occurrence_status`. |
 | Behaviors of Opportunity (contract 1.6.0) | Shipped | Label rows whose `origin` is `opportunity`. Add and remove from the view: later ticket. |
 | Day notes (contract 1.1.0) | Shipped | Show `day_note`. Editing: later ticket. |
@@ -187,7 +201,7 @@ sessions and no intended duration.
 | Paused and Ended Behaviors (Ticket 342) | Shipped | Nothing; the server decides what a day contains. |
 | Cadence Chat (`/chat`) | Live on web | Never sees `show_day` (section 3.2). |
 | Plugin skills (`integrations/skills/`), Ticket 291 scenarios | Shipped | `daily-check-in` tells the model to call `get_timeline` and confirm before writing. Draft an unpublished skill update that names `show_day`, with skill-rule tests. Publishing it is listing work and is deferred. |
-| Google Calendar MCP migration (PR #398 merged, PR #406 open; deadline February 1, 2027) | In progress | Separate direction: Cadence as an MCP client. It takes priority when the two compete for acceptance time. PR #406 holds Ticket 245 video evidence that listing preparation can reuse. |
+| Google Calendar MCP migration (PR #398 and PR #406 merged; deadline February 1, 2027) | In progress | Separate direction: Cadence as an MCP client. It takes priority when the two compete for acceptance time. PR #406 holds Ticket 245 video evidence that listing preparation can reuse. |
 | Repository move to `cadence-me` (Ticket 350; PR #365 draft) | Waiting on owner | The MCP URL does not change. Plugin marketplace paths change; deferred listing work. |
 | Consent returns 500 before hydration (finding in the Tickets 247–258 row of `STATUS.md`) | Open, no ticket | Gets its own ticket and is fixed before the flag goes on in production. |
 | iOS plan | Docs only | Each ticket's "Future mobile" line notes that host mobile apps render the view. |
@@ -213,7 +227,11 @@ write from a real host.
 Deferred until the marketing overhaul, each needing the owner's instruction: Claude
 directory screenshots and resubmission; Verified listing and the Artifacts entry point;
 ChatGPT plugin resubmission; Google interest form and console; publishing the skill
-update; `/developers` and marketing copy; Privacy, Terms and Trust text.
+update; and `/developers` and marketing copy.
+
+Privacy, Terms and Trust text is messaging-track work (entries P-097 to P-101, Tickets
+245 and 246). It gates only outward actions: submissions, listings and public launch. It
+does not gate the flag.
 
 Order: A, then B. C and D run in parallel after B freezes the schema. F runs any time.
 E follows C and D. G runs beside E.
@@ -222,9 +240,10 @@ E follows C and D. G runs beside E.
 
 Acceptance ends on a preview deployment. The production flag is not part of package E.
 The server has no per-account allowlist, so turning the flag on in production shows
-views to every user who has already connected Claude or ChatGPT. By owner decision
-that step waits for the marketing overhaul. It also needs the consent fix (package F)
-and the contract fold after Ticket 365.
+views to every user who has already connected Claude or ChatGPT. The owner's decision
+gates that step: D36 holds the flag off until the marketing overhaul. It also needs the
+consent fix (package F) and the contract fold after Ticket 365. Disclosure text does not
+gate it.
 
 ## 7. Unknowns the spike answers
 
