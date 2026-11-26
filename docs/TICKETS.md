@@ -20696,7 +20696,7 @@ Messaging impact: `P-098`, `P-099`.
 
 Status: complete (November 26, 2026; behind `CADENCE_MCP_APPS`, off in production; real-host acceptance is Ticket 378)
 
-Built: `packages/mcp-views` (Preact 10.27.2, as Ticket 375 recommended, not React), the generated `lib/mcp/apps/day-view-html.ts` (270,864 bytes raw, 72,481 gzip), notices in `packages/core/src/notices/catalog/day-view.json`, the bench `/design-system?preview=mcp-day-view`, and `tests/mcp-day-view.dom.test.ts` and `tests/mcp-day-view-build.test.ts`. Evidence: `docs/qa/2026-11-25-mcp-day-view.md`.
+Built: `packages/mcp-views` (Preact 10.27.2, as Ticket 375 recommended, not React), the generated `lib/mcp/apps/day-view-html.ts` (271,236 bytes raw, 72,598 gzip), notices in `packages/core/src/notices/catalog/day-view.json`, the bench `/design-system?preview=mcp-day-view`, and `tests/mcp-day-view.dom.test.ts` and `tests/mcp-day-view-build.test.ts`. Evidence: `docs/qa/2026-11-25-mcp-day-view.md`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.3 and 3.4, package D.
 

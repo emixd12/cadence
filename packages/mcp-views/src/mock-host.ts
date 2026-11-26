@@ -47,6 +47,8 @@ export type MockHost = Readonly<{
   log: readonly MockHostLogEntry[];
   day(): FixtureDay;
   setTheme(theme: "light" | "dark", styleVariables?: Readonly<Record<string, string>>): void;
+  /** Changes one Occurrence's note as another device would, without telling the view. */
+  changeNoteElsewhere(occurrenceId: string, note: string): void;
 }>;
 
 export const FULL_SCOPES = ["cadence.read", "cadence.occurrences.write"] as const;
@@ -163,6 +165,10 @@ export function createMockHost(options: MockHostOptions): MockHost {
   return {
     log,
     day: () => structuredClone(day),
+    changeNoteElsewhere(occurrenceId, note) {
+      const target = find(occurrenceId);
+      if (target) setNote(target, note);
+    },
     setTheme(theme, styleVariables) {
       options.post({ jsonrpc: "2.0", method: "ui/notifications/host-context-changed", params: hostContext(theme, styleVariables) });
     },

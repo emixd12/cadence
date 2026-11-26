@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 import type { Bridge, DayOccurrence, DayParentGroup, ResolvedStatus, ToolResult } from "./contract";
 import { dayLabel, timeLabel } from "./format";
-import { createWriter, groupKey, INITIAL_STATE, receiveDayResult, rows, statusAfterClick, type ViewState, type Write } from "./model";
+import { createWriter, groupKey, INITIAL_STATE, noteSaveRevision, receiveDayResult, rows, statusAfterClick, type NoteBase, type ViewState, type Write } from "./model";
 import { LABELS, notice, noticeLabel, STATUS_LABELS } from "./strings";
 
 export type ConnectHost = (handlers: {
@@ -23,7 +23,8 @@ export function DayView({ connect }: Props) {
   const [state, setState] = useState<ViewState>(INITIAL_STATE);
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState(false);
-  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [noteBase, setNoteBase] = useState<NoteBase | null>(null);
+  const noteFor = noteBase?.occurrenceId ?? null;
   const [draft, setDraft] = useState("");
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
 
@@ -75,8 +76,13 @@ export function DayView({ connect }: Props) {
     inFlightRef.current = false;
     setBusy(false);
     commit(result.state);
-    if (write.tool === "update_occurrence_note" && result.outcome === "saved") setNoteFor(null);
-    if (result.outcome === "reconnect") setNoteFor(null);
+    if (write.tool === "update_occurrence_note" && result.outcome === "saved") setNoteBase(null);
+    if (write.tool === "update_occurrence_note" && result.outcome === "conflict") {
+      // The saved note now shows above the draft, so the next Save note is made knowing it.
+      const now = result.state.day?.occurrences.find((occurrence) => occurrence.id === write.occurrence.id);
+      setNoteBase(now ? { occurrenceId: now.id, note: now.note, revision: now.revision } : null);
+    }
+    if (result.outcome === "reconnect") setNoteBase(null);
     if (result.outcome === "rate_limited") {
       // Honor the server's wait: controls stay off until it ends, then the notice leaves.
       setWaiting(true);
@@ -110,7 +116,7 @@ export function DayView({ connect }: Props) {
 
   const openNote = (occurrence: DayOccurrence) => {
     setDraft(occurrence.note ?? "");
-    setNoteFor(occurrence.id);
+    setNoteBase({ occurrenceId: occurrence.id, note: occurrence.note, revision: occurrence.revision });
     if (stateRef.current.noteConflictFor) commit({ ...stateRef.current, noteConflictFor: null });
   };
 
@@ -143,7 +149,7 @@ export function DayView({ connect }: Props) {
               {statusButton(occurrence, "completed", LABELS.completed)}
               {statusButton(occurrence, "not_completed", LABELS.notCompleted)}
               <button type="button" className="action" disabled={disabled} aria-expanded={editing} data-action="note"
-                aria-label={`${LABELS.note}, ${occurrence.behavior_title}`} onClick={() => (editing ? setNoteFor(null) : openNote(occurrence))}>
+                aria-label={`${LABELS.note}, ${occurrence.behavior_title}`} onClick={() => (editing ? setNoteBase(null) : openNote(occurrence))}>
                 {LABELS.note}
               </button>
             </div>
@@ -158,14 +164,15 @@ export function DayView({ connect }: Props) {
                 <p className="note user-text">{occurrence.note ?? ""}</p>
               </div>
             ) : null}
-            <textarea ref={editorRef} rows={3} value={draft} aria-label={`${LABELS.note}, ${occurrence.behavior_title}`}
+            {/* Read-only while a save is in flight, so nothing typed after Save note is lost. */}
+            <textarea ref={editorRef} rows={3} value={draft} readOnly={busy} aria-label={`${LABELS.note}, ${occurrence.behavior_title}`}
               onInput={(event) => setDraft(event.currentTarget.value)} />
             <div className="actions">
               <button type="button" className="action" disabled={disabled} data-action="save-note"
-                onClick={() => void send({ tool: "update_occurrence_note", occurrence, note: draft })}>
+                onClick={() => void send({ tool: "update_occurrence_note", occurrence, note: draft, expectedRevision: noteBase ? noteSaveRevision(noteBase, occurrence) : occurrence.revision })}>
                 {LABELS.saveNote}
               </button>
-              <button type="button" className="action" disabled={busy} data-action="cancel-note" onClick={() => setNoteFor(null)}>
+              <button type="button" className="action" disabled={busy} data-action="cancel-note" onClick={() => setNoteBase(null)}>
                 {LABELS.cancel}
               </button>
             </div>

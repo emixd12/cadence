@@ -21,8 +21,8 @@ cause was not found. The stack was removed with 0 grants.
 | Measure | Value |
 |---|---|
 | Stack | Preact 10.27.2, `@modelcontextprotocol/ext-apps` 2.0.4, zod 4.6.7, Vite 8.3.6, `vite-plugin-singlefile` 2.3.4 |
-| Raw | 270,864 bytes |
-| gzip -9 | 72,481 bytes |
+| Raw | 271,236 bytes |
+| gzip -9 | 72,598 bytes |
 | Spike measurement (Preact with `ext-apps`) | 261,056 raw, 70,140 gzip |
 
 The 10 KB over the spike is the finished view: the styles, the notices catalog file and
@@ -35,7 +35,7 @@ before that. The same test rebuilds the view and compares it with the committed 
 
 ## Tests
 
-`tests/mcp-day-view.dom.test.ts` (22 tests) runs the shipped bundle in jsdom. The window
+`tests/mcp-day-view.dom.test.ts` (24 tests) runs the shipped bundle in jsdom. The window
 loads no subresource, and `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `Worker`,
 `Image` and `sendBeacon` are replaced by recorders that must stay empty. A mock host
 (`packages/mcp-views/src/mock-host.ts`) answers the MCP Apps protocol.
@@ -47,7 +47,7 @@ loads no subresource, and `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`,
 | Status write | `expected_status` from the row, a key of the form `view-` plus 32 hex digits, a re-read with the displayed date, one model-context line |
 | Parent slot | Collapsed with the server's progress, each step once, `occurrence_ids` and `expected_statuses` of every displayed step |
 | Note save | `expected_revision`, one editor at a time, no note text in the model-context line |
-| Conflict | Re-read, the alert, no second write without a click, a new key on the next click; a refused note save keeps the draft beside the saved note |
+| Conflict | Re-read, the alert, no second write without a click, a new key on the next click; a refused note save keeps the draft beside the saved note; a note changed elsewhere while the editor is open is refused even after a re-read; the person's own mark on the row does not cause a conflict |
 | Rate limit | The wait in the alert, controls held, no call during the wait, the same key on the retry |
 | Missing scope | Read-only `_meta`, an `insufficient_scope` tool error and a rejected call each end in "Reconnect to allow changes" with no write control |
 | Rejected call with a write scope | "Not changed" alert and the same key on the identical retry |

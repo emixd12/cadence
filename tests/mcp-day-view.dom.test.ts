@@ -205,6 +205,39 @@ describe("Cadence day view: refused writes", () => {
     expect(v.host.day().occurrences[1]!.note).toBe("My draft");
   });
 
+  it("refuses a note save when the note changed elsewhere while the editor was open, even after a re-read brought the newer revision", async () => {
+    const v = await mount({ day: FIXTURE_DAYS.normal() });
+    const vitamins = v.host.day().occurrences[1]!;
+    await v.click(action(v.row("Vitamins"), "note"));
+    await v.type(v.row("Vitamins").querySelector("textarea")!, "My draft");
+    v.host.changeNoteElsewhere(vitamins.id, "Written on the phone.");
+    // Marking another row re-reads the day, which now carries the phone's note and revision.
+    await v.click(action(v.row("Morning walk"), "completed"));
+    expect(v.row("Vitamins").querySelector("textarea")!.value).toBe("My draft");
+    await v.click(action(v.row("Vitamins"), "save-note"));
+    const [refused] = v.toolCalls("update_occurrence_note");
+    expect(refused).toMatchObject({ outcome: "conflict", arguments: { expected_revision: vitamins.revision } });
+    expect(v.host.day().occurrences[1]!.note).toBe("Written on the phone.");
+    expect(text(v.row("Vitamins").querySelector("[data-note-current] .note"))).toBe("Written on the phone.");
+    expect(v.row("Vitamins").querySelector("textarea")!.value).toBe("My draft");
+    // Having seen the phone's note, a second Save note is the person's decision.
+    await v.click(action(v.row("Vitamins"), "save-note"));
+    expect(v.toolCalls("update_occurrence_note")[1]?.outcome).toBe("ok");
+    expect(v.host.day().occurrences[1]!.note).toBe("My draft");
+  });
+
+  it("saves a note without a conflict after the person marks the same row with the editor open", async () => {
+    const v = await mount({ day: FIXTURE_DAYS.normal() });
+    await v.click(action(v.row("Morning walk"), "note"));
+    await v.type(v.row("Morning walk").querySelector("textarea")!, "Short one today");
+    await v.click(action(v.row("Morning walk"), "completed"));
+    const revision = v.host.day().occurrences[0]!.revision;
+    expect(revision).not.toBe("r1-1");
+    await v.click(action(v.row("Morning walk"), "save-note"));
+    expect(v.toolCalls("update_occurrence_note")[0]).toMatchObject({ outcome: "ok", arguments: { expected_revision: revision } });
+    expect(v.main().querySelector('[role="alert"]')).toBeNull();
+  });
+
   it("honors the rate limit's wait: says how long, holds the controls, then lets the same action through with the same key", async () => {
     const v = await mount({ day: FIXTURE_DAYS.normal(), writes: "rate-limit-once", retryAfterSeconds: 1 });
     await v.click(action(v.row("Morning walk"), "completed"));

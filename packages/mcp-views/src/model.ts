@@ -95,7 +95,7 @@ export function receiveDayResult(state: ViewState, result: ToolResult): ViewStat
 export type Write =
   | Readonly<{ tool: "set_occurrence_status"; occurrence: DayOccurrence; status: OccurrenceStatus }>
   | Readonly<{ tool: "set_parent_occurrence_status"; group: DayParentGroup; children: readonly DayOccurrence[]; status: ResolvedStatus }>
-  | Readonly<{ tool: "update_occurrence_note"; occurrence: DayOccurrence; note: string }>;
+  | Readonly<{ tool: "update_occurrence_note"; occurrence: DayOccurrence; note: string; expectedRevision: string }>;
 
 /** Clicking the status a row already has returns it to Unresolved. */
 export function statusAfterClick(occurrence: DayOccurrence, clicked: ResolvedStatus): OccurrenceStatus {
@@ -115,7 +115,20 @@ export function writeArguments(write: Write): Record<string, unknown> {
       expected_statuses: write.children.map((child) => ({ occurrence_id: child.id, status: child.status })),
     };
   }
-  return { occurrence_id: write.occurrence.id, note: write.note, expected_revision: write.occurrence.revision };
+  return { occurrence_id: write.occurrence.id, note: write.note, expected_revision: write.expectedRevision };
+}
+
+/** What the person saw when the note editor opened: the saved note and its revision. */
+export type NoteBase = Readonly<{ occurrenceId: string; note: string | null; revision: string }>;
+
+/**
+ * The revision a note save sends. A day re-read while the editor is open may bring a
+ * newer revision. It is adopted only when the saved note still reads as it did when the
+ * editor opened, because then the draft overwrites nothing the person has not seen.
+ * Otherwise the save carries the old revision, so the server refuses it as a conflict.
+ */
+export function noteSaveRevision(base: NoteBase, occurrence: DayOccurrence): string {
+  return occurrence.note === base.note ? occurrence.revision : base.revision;
 }
 
 /**

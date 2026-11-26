@@ -1678,6 +1678,9 @@ Rules the view keeps:
 - Conflict: the view reads the day again and shows "Not changed. This changed somewhere
   else. Check it and try again." It sends nothing again without a new click. After a
   refused note save the draft stays open and the note saved now shows above it.
+- A note save sends the revision read when the editor opened. If the day was re-read since
+  and the saved note still reads the same, it sends the newer revision. If the saved note
+  changed, the save is refused as a conflict. The field is read-only while a save is sent.
 - Rate limit: "Not changed. Too many changes for now. Try again in 8 seconds." The controls
   stay off for that time.
 - No write scope, or a write refused for scope: the reconnect line replaces every write
