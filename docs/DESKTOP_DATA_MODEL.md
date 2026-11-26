@@ -686,6 +686,37 @@ Daily Brief routine moves need no local write: the hosted brief moves a routine'
 together (`docs/PRODUCT_SPEC.md`, "Sub-behaviors and routines"), and their
 `occurrence_moves` rows arrive by account sync like any other move.
 
+## Alongside answer (Ticket 363, D33)
+
+SQLite schema 29 (`apps/desktop/src-tauri/migrations/0029_behavior_alongside.sql`) adds
+`behaviors.alongside` (NULL unanswered, 1 yes, 0 no; a check refuses anything else), the
+hosted `behaviors.alongside` (`docs/DATA_MODEL.md`, "Alongside setting"). Existing rows
+become unanswered; no row is lost from schema 28.
+
+1. The native configuration snapshot carries `alongside`; an older snapshot without the
+   key reads as unanswered. The allowed changed fields add `alongside`, so a change
+   needs a revision whose snapshots carry the answer (`local_store/behavior.rs`).
+2. The DataStore writes the answer through the existing graph commands: the Behavior
+   form's update, and the Timeline row question through core `setBehaviorAlongside`
+   (one revision, reason code `alongside_answered`). No new native command.
+3. **Account sync contract 10.** `ACCOUNT_SYNC_CONTRACT = 10`. Behavior upserts must
+   carry `alongside`; a write without it is refused with "Update Cadence", locally and
+   on the server. A baseline saved under contract 9 has no field and reads as
+   unanswered, so the first contract-10 sync after the upgrade pulls a hosted answer
+   without writing it back (`tests/account-sync.resolver.test.ts`, "the alongside
+   answer"). The minimum writer contract stays 8: the server hides the field from a
+   contract-8 or contract-9 Mac and restores the stored answer on its writes
+   (`tests/sql/behavior-alongside-smoke.sql`), so an older build keeps syncing without
+   clearing it.
+4. **Model guesses are never stored.** A linked Mac reads the account's current guesses
+   (`GET /api/behaviors/alongside`) and keeps the last answer in memory, so it still
+   applies offline within the session. Guesses never reach SQLite, native backups,
+   exports or account sync. A local-only Mac has none: an unanswered Behavior reads as
+   not alongside, and the answer and local completion place labels still apply.
+5. Exports and BehaviorLog import and restore carry the stored answer only with the
+   Mac's alongside build switch on (`VITE_CADENCE_ALONGSIDE=1`), as the web does with
+   `CADENCE_ALONGSIDE` on (Ticket 364).
+
 ## Note shortcut state (Tickets 126–128)
 
 Schema 13 mirrors the owned `note_shortcut_states` contract in DATA_MODEL with

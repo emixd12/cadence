@@ -2545,16 +2545,34 @@ be done alongside other things?". Null means unanswered. Migration:
   (absent: null). `update_behavior_with_schedule_graph` changes it only when the payload
   carries the key; JSON null clears it. A change through the RPC is a revision: the RPC
   sets every column the `updated_at` trigger watches. The trigger itself is unchanged.
-- **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code reads the column and
-  planners read the cached guess, then false, as before Ticket 356.
-- **Hosted-only until Ticket 363.** Account sync contract 9 does not carry the column:
-  `account_sync_snapshot()` leaves it out of each Behavior row, `apply_account_sync_plan`
-  compares a device's expected row without it, and a synced Behavior write neither
-  inserts nor updates it, so a Mac write keeps the stored answer and a Behavior created
-  on the Mac starts unanswered. The configuration snapshot and `changed_fields` do not
-  include it yet either, because configuration history is synced; changing the answer
-  writes no configuration event. Ticket 363 adds the column to the Mac's SQLite, the
-  sync contract and configuration history together.
+- **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code selects the column by
+  name and planners read the cached guess, then false, as before Ticket 356. Since
+  Ticket 363 a web edit built from a stored Behavior (`select *`) carries the stored
+  answer back unchanged, so configuration history compares like with like.
+- **Configuration history and account sync (Ticket 363).** Migration
+  `20261126120000_account_sync_alongside.sql` makes the answer part of the Behavior
+  configuration: `current_behavior_configuration_snapshot` carries `alongside` (true,
+  false or null), `behavior_configuration_changed_fields` and the `changed_fields` check
+  include `alongside` (the last field, after `inherit_parent_schedule`), and changing the
+  answer is a configuration revision. A plan without the key keeps the stored answer
+  (`behavior_configuration_with_run`, `behavior_configuration_planned_fields`), as a plan
+  without `is_opportunity` does; the TypeScript payload leaves the key out only when
+  neither side has an answer. Existing history is not rewritten: a snapshot without the
+  key was unanswered. Core writes the reason code `alongside_answered` for a single
+  answer (`setBehaviorAlongside`); form, MCP and Chat edits keep `behavior_edited`.
+  Account sync contract 10 carries `behavior.alongside`: the snapshot, the expected-row
+  comparison and the synced insert and update lists include it, and a contract-10
+  Behavior write must carry it. Contract-8 and contract-9 writers keep syncing: the
+  projection hides the field and the stored answer is restored on their writes, so an
+  older Cadence for Mac never clears it. The minimum writer contract stays 8. Cadence for
+  Mac stores the answer in SQLite schema 29 (`docs/DESKTOP_DATA_MODEL.md`). Smoke:
+  `tests/sql/behavior-alongside-smoke.sql`.
+- **Guesses for a linked Mac (Ticket 363).** `GET /api/behaviors/alongside`
+  (`readAlongsideGuesses` in `lib/services/alongside-view.service.ts`) returns the
+  account's current guesses (`alongside` and `whereGuess` per Behavior, from
+  `behavior_advisor_estimates` while the `input_hash` is current), or `enabled: false`
+  and no reads while `CADENCE_ALONGSIDE` is off. It reads no place labels; the Mac uses
+  its own. The Mac keeps the answer in memory only.
 - **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
   and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
   import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration

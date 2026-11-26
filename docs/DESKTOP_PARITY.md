@@ -456,3 +456,38 @@ Cadence for Mac has tracking parity for sub-behaviors in local and linked mode:
   opportunity, as hosted `20261122020000` does. Sync apply writes stored children
   first, so a batch that detaches a step and flags its old parent applies cleanly.
 
+## Alongside (Ticket 363, D33)
+
+Cadence for Mac shows the alongside setting in local and linked modes behind two gates:
+the build switch `VITE_CADENCE_ALONGSIDE=1` (`apps/desktop/src/alongside.ts`; release
+and preview builds force it empty and the signing check refuses it, so published builds
+stay dark until the owner turns it on in Ticket 365), and on a linked Mac the server's
+`CADENCE_ALONGSIDE`, read from `GET /api/behaviors/alongside`. While the server answers
+`enabled: false` the Mac hides every alongside surface for that account. Without the
+switch the Mac renders exactly as before.
+
+- Behaviors: the shared `BehaviorForm` field "Can be done alongside other things"
+  (create and edit) through `BehaviorList` `alongsideViews` and `BehaviorCreateSection`
+  `alongside`. The local actions read the field (`readAlongside`) and write it through
+  the DataStore with a configuration revision. A linked Mac's current guess shows with
+  one tap to accept, and a guessed Where shares the Where suggestion line
+  (`createLocalPlaceLabelClient` `whereGuesses`).
+- Timeline: the "Alongside" label (and "Alongside (guess)" for a linked Mac's guess),
+  overlap cues under the same-place rule, and the row question "Done alongside other
+  things? Yes · No" after a Completed mark, through `attachTimelineAlongside` and the
+  local `markDetailActions.alongside` (`apps/desktop/src/local-timeline.service.ts`,
+  `apps/desktop/src/local-actions.ts`). The facts come from
+  `@cadence/core/services/alongside-facts`, the web's builder.
+- Local mode has no model guess: an unanswered Behavior reads as not alongside and no
+  row asks. The person's answer and local completion place labels still apply.
+- Daily Brief: the Mac asks for `alongside_question_v1` and answers on
+  `/api/advisor/brief/alongside` with its session; the answer arrives by account sync.
+  Pairing lines are move lines and render through the existing move transport.
+- Data: SQLite schema 29 and account sync contract 10 (`docs/DESKTOP_DATA_MODEL.md`,
+  "Alongside answer"). Guesses stay in memory only.
+- Portability: exports, BehaviorLog import and restore carry the stored answer with the
+  switch on.
+- Evidence: `tests/desktop-alongside.test.ts`, `tests/account-sync.resolver.test.ts`,
+  `tests/sql/behavior-alongside-smoke.sql` and `cargo test`. Installed acceptance on a
+  dev-signed build is Ticket 365.
+

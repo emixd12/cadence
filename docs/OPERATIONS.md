@@ -2095,8 +2095,16 @@ migrations (`docs/DECISIONS.md`, 2026-11-10) once its conditions hold. The owner
 the flag on in Production after Ticket 365's acceptance. Turning it off again restores
 the guess-only behavior at once; stored answers stay.
 
-The column is hosted-only until Ticket 363: account sync contract 9 leaves it out and
-a Mac write keeps the stored answer (`docs/DATA_MODEL.md`, "Alongside setting").
+Since Ticket 363 the column syncs at account sync contract 10 and is part of
+configuration history, whatever the flag (schema is schema). Migration
+`20261126120000_account_sync_alongside.sql` must reach the database before a build of
+this code deploys: it replaces the `changed_fields` check constraint and inserts one
+contract-registry row, as the sub-behaviors contract did, so it needs the owner's yes
+before a hosted push. With the flag off, web code still selects the column by name
+nowhere; `GET /api/behaviors/alongside` answers `enabled: false`, and a linked Cadence for
+Mac then shows no alongside surface. The Mac's own switch is the build variable
+`VITE_CADENCE_ALONGSIDE`, which release and preview builds force empty
+(`docs/DESKTOP_BUILD.md`). See `docs/DATA_MODEL.md`, "Alongside setting".
 
 Since Ticket 364 the flag also selects the MCP contract edition and the export shape.
 With it on, the MCP endpoint, its errors and Cadence chat's tool list speak contract
