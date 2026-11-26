@@ -100,6 +100,7 @@ import { NoticeBench } from "@/app/design-system/NoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
 import { MarkDetailsBench } from "@/app/design-system/MarkDetailsBench";
 import { OpportunityBasketBench } from "@/app/design-system/OpportunityBasketBench";
+import { PeriodBench } from "@/app/design-system/PeriodBench";
 import { TimelineSubBehaviorsBench } from "@/app/design-system/TimelineSubBehaviorsBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
@@ -2258,6 +2259,7 @@ const previewFactories: Record<
   "module.occurrence-move": () => <ProductPreview maxHeight="48rem"><OccurrenceMoveBench /></ProductPreview>,
   "module.occurrence-mark-details": () => <ProductPreview maxHeight="32rem"><MarkDetailsBench /></ProductPreview>,
   "module.opportunity-basket": () => <ProductPreview maxHeight="40rem"><OpportunityBasketBench /></ProductPreview>,
+  "module.period-control": () => <ProductPreview maxHeight="60rem"><PeriodBench /></ProductPreview>,
   "module.daily-brief-moves": () => <ProductPreview maxHeight="72rem"><DailyBriefMovesBench /></ProductPreview>,
   "module.chat-page": () => <ProductPreview maxHeight="48rem"><ChatBench state="today" /></ProductPreview>,
   "module.trust-and-legal-panel": () => (

@@ -1387,6 +1387,28 @@
       ]
     },
     {
+      "path": "components/periods/PeriodControl.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-PERIOD-001",
+        "INT-PERIOD-002",
+        "INT-PERIOD-003",
+        "INT-PERIOD-004"
+      ]
+    },
+    {
+      "path": "components/periods/PeriodEditor.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 26,
+      "interaction_ids": [
+        "INT-PERIOD-001",
+        "INT-PERIOD-002",
+        "INT-PERIOD-003",
+        "INT-PERIOD-004"
+      ]
+    },
+    {
       "path": "components/timeline/OccurrenceNoteForm.tsx",
       "classification": "cataloged",
       "interaction_marker_count": 3,
@@ -1655,6 +1677,12 @@
       "name": "Alongside Behaviors",
       "meaning": "A Behavior setting for things done during other things at the same place, with Cadence's guess shown as a guess until the person answers (D33).",
       "spec": "docs/DECISIONS.md#2026-11-25-alongside-behaviors-and-the-guessed-where-d33"
+    },
+    {
+      "id": "periods",
+      "name": "Periods",
+      "meaning": "Labeled ranges of days the person declares for the whole account, shown as chips on Timeline days and listed on Behaviors. Annotation only: a Period never changes a status, adherence, a reminder or a schedule (D35).",
+      "spec": "docs/PRODUCT_SPEC.md#periods-planned-tickets-368374"
     },
     {
       "id": "review-and-adherence",
@@ -23220,6 +23248,481 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-001",
+      "name": "Add a Period",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Declare a labeled range of days for the whole account, with a first day, an optional last day and an optional note. A Period is annotation only and changes no status, adherence, reminder or schedule.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Add period disclosure under today's date, beside Add day note"
+        },
+        {
+          "kind": "input",
+          "control": "Label (with past labels offered), First day, Last day and Note fields"
+        },
+        {
+          "kind": "submit",
+          "control": "Save"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel (or Escape)"
+        }
+      ],
+      "availability": "Under today's date on the web Timeline. Other days have no add control. Hidden where no Period actions are passed.",
+      "success_result": "Stores the Period, closes the form, shows period.saved beside the control and refreshes the page; each covered Timeline day then shows the label as a chip.",
+      "failure_result": "A broken rule (no label, a label over 60 characters, an invalid day, a last day before the first day, a note over 2,000 characters, or 500 Periods already) shows its sentence under the form, keeps the draft and writes nothing.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/periods/PeriodControl.tsx#PeriodDayControls",
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "app/(app)/timeline/actions.ts#savePeriodAction",
+        "lib/services/period.service.ts#createPeriodFromFormData",
+        "packages/core/src/services/period.service.ts#createPeriod",
+        "packages/core/src/resolvers/period.resolver.ts#resolvePeriodCreate",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_write",
+          "handler": "app/(app)/timeline/actions.ts#savePeriodAction",
+          "evidence": [
+            "createPeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts"
+        ],
+        "notes": "The DOM test covers the add form on today only, its default first day, past-label options, the submitted fields, the saved notice and inline rule sentences; the action test covers the write, the notice and both revalidated paths."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#savePeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-002",
+      "name": "Edit a Period",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period",
+          "docs/user-guide/behaviors-and-review.md#review-periods-and-adherence-around-them"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline",
+        "behaviors"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07",
+        "J10"
+      ],
+      "intent": "Open a Period from its chip on a Timeline day, or from the Periods list on Behaviors, and change its label, days or note.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Period chip under a Timeline date, or Edit in the Periods list on Behaviors"
+        },
+        {
+          "kind": "input",
+          "control": "Label, First day, Last day and Note fields"
+        },
+        {
+          "kind": "submit",
+          "control": "Save"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel (or Escape, or the chip or Edit again)"
+        }
+      ],
+      "availability": "On every Timeline day a Period covers, including Needs decision days, and for every Period in the Periods list on Behaviors. The list is hidden when there is no Period.",
+      "success_result": "Saves the changed fields against the revision the form read, closes the form, shows period.saved and refreshes the page.",
+      "failure_result": "A broken rule shows its sentence under the form and keeps the draft. A Period that changed elsewhere, or is gone, shows period.conflict, refreshes and fills the form with the latest version; nothing is overwritten.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/periods/PeriodControl.tsx#PeriodDayControls",
+        "components/periods/PeriodControl.tsx#PeriodList",
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "components/behaviors/BehaviorList.tsx#BehaviorList",
+        "app/(app)/timeline/actions.ts#savePeriodAction",
+        "lib/services/period.service.ts#updatePeriodFromFormData",
+        "packages/core/src/services/period.service.ts#updatePeriod",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_write",
+          "handler": "app/(app)/timeline/actions.ts#savePeriodAction",
+          "evidence": [
+            "updatePeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts",
+          "tests/period-behaviors.dom.test.tsx"
+        ],
+        "notes": "The DOM test covers one chip per covering Period, the editor opening in place with the stored values, the submitted id and revision, the conflict notice and the reloaded form; the action test covers the compare-and-set update and the stale save."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#savePeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts",
+            "tests/period-behaviors.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-003",
+      "name": "End a Period today",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period",
+          "docs/user-guide/behaviors-and-review.md#review-periods-and-adherence-around-them"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline",
+        "behaviors"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07",
+        "J10"
+      ],
+      "intent": "Set an ongoing or still-running Period's last day to today in the account timezone.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "End today in a Period's editor"
+        }
+      ],
+      "availability": "In the editor of a Period whose first day is today or earlier and that is ongoing or ends after today. Absent for a Period that has not started or has already ended.",
+      "success_result": "Sets the last day to today, read on the server from the profile timezone, closes the form, shows period.ended and refreshes the page.",
+      "failure_result": "A Period that has not started, has already ended, or changed elsewhere is refused with its sentence or period.conflict under the form; nothing changes.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "app/(app)/timeline/actions.ts#endPeriodAction",
+        "lib/services/period.service.ts#endPeriodFromFormData",
+        "packages/core/src/services/period.service.ts#endPeriod",
+        "packages/core/src/resolvers/period.resolver.ts#resolvePeriodEndState",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_write",
+          "handler": "app/(app)/timeline/actions.ts#endPeriodAction",
+          "evidence": [
+            "endPeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts",
+          "tests/period-behaviors.dom.test.tsx"
+        ],
+        "notes": "The DOM test shows End today only where resolvePeriodEndState allows it and checks the submitted id and revision; the action test ends a Period on the account's local date and refuses an ended one."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#endPeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts",
+            "tests/period-behaviors.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-004",
+      "name": "Remove a Period",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period",
+          "docs/user-guide/behaviors-and-review.md#review-periods-and-adherence-around-them"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline",
+        "behaviors"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07",
+        "J10"
+      ],
+      "intent": "Delete a Period and its note for good. Occurrences, statuses and Notes are untouched.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Remove in a Period's editor"
+        },
+        {
+          "kind": "submit",
+          "control": "Remove this period (the inline second step)"
+        },
+        {
+          "kind": "activate",
+          "control": "Keep"
+        }
+      ],
+      "availability": "In the editor of any Period, from a Timeline chip or the Periods list on Behaviors.",
+      "success_result": "Deletes the Period after the second choice, closes the form, shows period.removed and refreshes the page; its chips and list row go.",
+      "failure_result": "Keep backs out with nothing written. A Period that changed elsewhere, or is already gone, shows period.conflict and stays as it is.",
+      "effects": [
+        "database_delete",
+        "confirmation_gate",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "app/(app)/timeline/actions.ts#deletePeriodAction",
+        "lib/services/period.service.ts#deletePeriodFromFormData",
+        "packages/core/src/services/period.service.ts#deletePeriod",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_delete",
+          "handler": "app/(app)/timeline/actions.ts#deletePeriodAction",
+          "evidence": [
+            "deletePeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "confirmation_gate",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "setConfirmingRemove(true)",
+            "Remove this period"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts"
+        ],
+        "notes": "The DOM test checks that Remove alone sends nothing, that Keep backs out, that the second choice sends the id and revision, and that no modal or undo wording appears; the action test covers the delete and the stale refusal."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#deletePeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
         }
       }
     }

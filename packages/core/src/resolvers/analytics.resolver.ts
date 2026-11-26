@@ -13,6 +13,8 @@ import type {
   AnalyticsOpportunityCounts,
   AnalyticsOverallDayState,
   AnalyticsParentSummary,
+  AnalyticsPeriodAdherence,
+  AnalyticsPeriodAdherenceSide,
   AnalyticsRangeDays,
   AnalyticsSelectedBehaviorDay,
   AnalyticsStatus,
@@ -23,6 +25,7 @@ import type {
 } from "../types/analytics";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
 import { classifyConnectorTiming, selectTimingMatch } from "./activity-match.resolver";
+import { periodCoveredDates, splitByPeriods, type PeriodDates } from "./period.resolver";
 import { compareSubBehaviors, resolveParentSlotRollup } from "./sub-behavior.resolver";
 import {
   formatRecordedDuration,
@@ -48,6 +51,8 @@ export type ResolveAnalyticsInput = {
   rangeDays?: number;
   selectedBehaviorId?: string | null;
   selectedDayLocalDate?: string | null;
+  /** Ticket 369: the account's Periods. With one that overlaps the range, the view gains `periodAdherence`. */
+  periods?: readonly PeriodDates[];
 };
 
 export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
@@ -83,8 +88,15 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
   const trackedTimeByOccurrenceId = resolveTrackedTimeByOccurrenceId(
     input.timeSessions ?? [],
   );
+  const periodAdherence = input.periods ? resolvePeriodAdherence({
+    occurrences: rangeOccurrences,
+    periods: input.periods,
+    startLocalDate: dateRange.startLocalDate,
+    endLocalDate: dateRange.endLocalDate,
+  }) : null;
 
   return {
+    ...(periodAdherence ? { periodAdherence } : {}),
     timezone: dateRange.timezone,
     rangeDays: dateRange.rangeDays,
     rangeOptions: [...ANALYTICS_RANGE_OPTIONS],
@@ -150,6 +162,44 @@ export function resolveAdherenceCounts(input: {
       row.status === "unresolved" && compareLocalDate(row.localDate, input.todayLocalDate) < 0,
     ).length,
   };
+}
+
+/**
+ * Ticket 369 (D35): adherence inside and outside Periods for one inclusive range of
+ * local dates. Null when no Period covers a day in the range. Each side uses the
+ * adherence definition unchanged: Completed over Completed plus Not Completed,
+ * Unresolved left out, no rate when nothing is resolved. Pass the same leaf
+ * Occurrences the range's own summary counts, so the two sides add up to it. A
+ * Period only sorts Occurrences into two groups; it changes no count.
+ */
+export function resolvePeriodAdherence(input: {
+  occurrences: ReadonlyArray<Pick<AnalyticsOccurrenceInput, "status" | "localDate" | "origin">>;
+  periods: readonly PeriodDates[];
+  startLocalDate: string;
+  endLocalDate: string;
+}): AnalyticsPeriodAdherence | null {
+  const covered = periodCoveredDates(input.periods, input.startLocalDate, input.endLocalDate);
+  if (covered.size === 0) return null;
+  const { inside, outside } = splitByPeriods(
+    input.occurrences.filter((occurrence) =>
+      isWithinLocalDateRange(occurrence.localDate, input.startLocalDate, input.endLocalDate)),
+    covered,
+  );
+  const side = (rows: typeof inside): AnalyticsPeriodAdherenceSide => {
+    const counts = resolveAdherenceCounts({ occurrences: [...rows], todayLocalDate: input.endLocalDate });
+    return { completedCount: counts.completedCount, resolvedCount: counts.resolvedCount, rate: counts.rate };
+  };
+  const result = { outside: side(outside), inside: side(inside) };
+  return {
+    ...result,
+    line: `Outside periods: ${periodAdherenceText(result.outside)}. In periods: ${periodAdherenceText(result.inside)}.`,
+  };
+}
+
+function periodAdherenceText(side: AnalyticsPeriodAdherenceSide): string {
+  return side.rate === null
+    ? "nothing marked"
+    : `${formatPercent(side.rate)}% (${side.completedCount} of ${side.resolvedCount})`;
 }
 
 export function resolveAnalyticsDateRange(input: {

@@ -8,6 +8,7 @@ import { DayProgressTimeline, type DayProgressContext } from "@/components/timel
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { BehaviorRunNotices } from "@/components/timeline/BehaviorRunNotices";
 import type { BehaviorFormAction } from "@/lib/types/behavior";
+import type { PeriodActions } from "@/lib/types/period";
 import type {
   DefaultDurationFormAction,
   OccurrenceFormAction,
@@ -25,6 +26,12 @@ type TimelineProps = Readonly<{
   resetTimeTrackingAction: TimeTrackingFormAction;
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
   dayNoteAction?: OccurrenceFormAction;
+  /**
+   * Ticket 369: save, End today and Remove for Periods. With them, day headers show
+   * `timeline.periodsByDate` as chips and today offers "Add period". Without them
+   * no Period control renders.
+   */
+  periodActions?: PeriodActions;
   dayProgress?: DayProgressContext;
   onDayChange?: () => void;
   liveCalendar?: boolean;
@@ -51,6 +58,7 @@ export function Timeline({
   resetTimeTrackingAction,
   shortcutsByBehavior = {},
   dayNoteAction,
+  periodActions,
   dayProgress,
   onDayChange,
   liveCalendar = false,
@@ -93,6 +101,10 @@ export function Timeline({
                   variant="needsDecisionDialog"
                   dayNoteAction={dayNoteAction}
                   dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
+                  periodActions={periodActions}
+                  periods={timeline.periodsByDate?.[section.localDate]}
+                  periodLabelSuggestions={timeline.periodLabelSuggestions}
+                  todayLocalDate={timeline.todayLocalDate}
                   removeOpportunityAction={removeOpportunityAction}
                   parentSlotStatusAction={parentSlotStatusAction}
                 />
@@ -111,6 +123,7 @@ export function Timeline({
           resetTimeTrackingAction={resetTimeTrackingAction}
           shortcutsByBehavior={shortcutsByBehavior}
           dayNoteAction={dayNoteAction}
+          periodActions={periodActions}
           onDayChange={onDayChange}
           liveCalendar={liveCalendar}
           travelAccountId={travelAccountId}

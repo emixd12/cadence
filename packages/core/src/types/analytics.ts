@@ -186,7 +186,26 @@ export type AnalyticsSelectedBehaviorDay = {
   occurrences: AnalyticsSelectedDayOccurrence[];
 };
 
+/** One side of the Period split: Completed over resolved, or no rate when nothing is resolved. */
+export type AnalyticsPeriodAdherenceSide = {
+  completedCount: number;
+  resolvedCount: number;
+  rate: number | null;
+};
+
+/**
+ * Ticket 369 (D35): adherence on days outside every Period and on days inside one,
+ * for the selected range. `line` is the sentence the summary shows.
+ */
+export type AnalyticsPeriodAdherence = {
+  outside: AnalyticsPeriodAdherenceSide;
+  inside: AnalyticsPeriodAdherenceSide;
+  line: string;
+};
+
 export type AnalyticsView = {
+  /** Present only when a Period overlaps the selected range. */
+  periodAdherence?: AnalyticsPeriodAdherence;
   timezone: string;
   rangeDays: AnalyticsRangeDays;
   rangeOptions: AnalyticsRangeDays[];
