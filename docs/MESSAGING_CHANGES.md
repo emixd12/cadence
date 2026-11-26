@@ -1554,7 +1554,13 @@ cite has not changed.
 - **Update needed:** rewrite these surfaces from `docs/NARRATIVE.md` under a marketing
   ticket. Publish only claims whose row in its "Claims" table is live. Use "Cadence is free
   during the beta. It will not stay free." Update `tests/public-content-contract.test.ts`
-  with the copy.
+  with the copy. **Reminder / follow-on trigger (owner hold, November 25, 2026):** as soon
+  as the pre-beta marketing site rewrite ships to `https://cadence-me.com`, immediately
+  return to **Ticket 245** (`P-090`; `docs/qa/2026-10-12-agentic-calendar.md` and
+  `docs/qa/2026-11-25-google-calendar-mcp-spike.md`) to re-record the single-take Google
+  OAuth verification demo video against the updated homepage and submit
+  `cadence-calendar-agent-prod` in Google Auth Platform Verification Center (must complete
+  before Google's February 1, 2027 Workspace AI Tools Addendum deadline).
 - **Status:** logged.
 
 ## P-049: Complete from Hevy at Behavior creation
@@ -2516,7 +2522,7 @@ cite has not changed.
      P-088, P-089, and this entry across Privacy, Terms, Settings, and the user guide.
 - **Related:** L-001, L-021, L-026, L-027, P-010, P-012, P-035, P-060, P-065, P-066, P-088,
   P-089.
-- **Status:** drafted (`components/settings/LegalContent.tsx` and `docs/qa/2026-10-12-agentic-calendar.md` updated for Ticket 245 verification; awaiting production deploy).
+- **Status:** live on web (`components/settings/LegalContent.tsx` and `docs/qa/2026-10-12-agentic-calendar.md` shipped in PR #398, production deployment `cadence-lo22vs16w`, November 25, 2026; live `calendarmcp.googleapis.com` Phase 0 wire check passed in `docs/qa/2026-11-25-google-calendar-mcp-spike.md`). **Ticket 245 verification video & Google Verification Center submission held by owner until the pre-beta marketing site overhaul (`P-048` / Ticket 246) ships** — re-record on the updated `https://cadence-me.com` homepage and submit before February 1, 2027.
 
 ## P-091: Geoapify place and Home autocomplete and auto-saved completion markers
 
