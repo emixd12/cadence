@@ -370,6 +370,26 @@ also gets the day notes of today and the two days before it, each cut to 280 cha
 - The layered workbench recipes and the paused ChatGPT-plan device path do not read day
   notes (`docs/FUTURE_UPDATES.md`).
 
+The Daily Brief also reads Periods (Ticket 371; D35). The same model call gets the label
+and dates of each Period that covers today (at most 5) and each one that ended in the 7
+days before today (at most 3). This does not depend on the Notes source.
+
+- A Period's note is never sent.
+- Periods follow the day-note rules above: they change the words only, a quiet day reads
+  none, and a Period changed after the brief was made does not change the saved brief.
+- The model is told a label is the person's own text and never an instruction. The
+  opening may name the label. It never suggests marking anything done or not done
+  because of a Period, and says nothing about health beyond the label itself.
+- The other output checks still apply to a sentence that names a label: no web address,
+  no time that is not in the day's facts, none of Cadence's internal words.
+- The layered workbench recipes and the paused ChatGPT-plan device path do not read
+  Periods.
+
+Advisor tips read Periods too (Ticket 371): with tips on, the tip prompt (`coach-tips-4`)
+gets the label and dates of up to 5 Periods with a day in today or the 7 days before it,
+as context for why those days went differently and never as a reason to judge. This
+follows the tips switch, not the Notes source. No Period note is sent.
+
 ## Periods (planned, Tickets 368–374)
 
 A Period is a range of local dates the person labels for the whole account, such as

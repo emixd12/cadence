@@ -372,6 +372,63 @@ export function periodLabelSuggestions(
   return labels;
 }
 
+/**
+ * Ticket 371 (D35): the Periods the Daily Brief's opening reads. `periods` covers today, at
+ * most 5. `recentPeriods` ended in the 7 local days before today, at most 3. Labels and
+ * dates only: a Period's note is never part of either list.
+ */
+export const BRIEF_PERIOD_LIMITS = { active: 5, recent: 3, recentDays: 7 } as const;
+
+/** One Period as the brief reads it. `since` and `until` are local dates; a null `until` means ongoing. */
+export type BriefPeriod = Readonly<{ label: string; since: string; until: string | null }>;
+export type BriefPeriods = Readonly<{ periods: readonly BriefPeriod[]; recentPeriods: readonly BriefPeriod[] }>;
+
+type LabeledPeriod = OrderedPeriod & Readonly<Pick<PeriodRecord, "label">>;
+
+/** The inclusive local dates the Daily Brief reads Periods for; `localDate` is today in the account's timezone. */
+export function briefPeriodRange(localDate: string): PeriodRange {
+  const to = parsePeriodLocalDate(localDate);
+  return { from: Temporal.PlainDate.from(to).subtract({ days: BRIEF_PERIOD_LIMITS.recentDays }).toString(), to };
+}
+
+/**
+ * Chooses the brief's Periods. Those covering today come in display order, the first 5.
+ * Those that ended in the 7 days before today come most recently ended first, the first 3.
+ * A Period that starts after today is in neither list.
+ */
+export function resolveBriefPeriods(input: Readonly<{ localDate: string; records: readonly LabeledPeriod[] }>): BriefPeriods {
+  const { from, to: today } = briefPeriodRange(input.localDate);
+  const shape = (period: LabeledPeriod): BriefPeriod => ({ label: period.label, since: period.start_on, until: period.end_on });
+  const ended = input.records
+    .filter((period) => period.end_on !== null && period.end_on >= from && period.end_on < today)
+    .sort((a, b) => compareText(b.end_on ?? "", a.end_on ?? "") || comparePeriods(a, b));
+  return {
+    periods: activePeriods(input.records, today).slice(0, BRIEF_PERIOD_LIMITS.active).map(shape),
+    recentPeriods: ended.slice(0, BRIEF_PERIOD_LIMITS.recent).map(shape),
+  };
+}
+
+/**
+ * Ticket 371 (D35): the Periods the advisor tips prompt reads: those with a day in the 7
+ * local days before today or on today, in display order, at most 5. Labels and dates only.
+ */
+export const TIP_PERIOD_LIMITS = { periods: 5, days: 7 } as const;
+
+/** One Period as the tips prompt reads it. `start` and `end` are local dates; a null `end` means ongoing. */
+export type TipPeriod = Readonly<{ label: string; start: string; end: string | null }>;
+
+/** The inclusive local dates the tips prompt reads Periods for. */
+export function tipPeriodRange(localDate: string): PeriodRange {
+  const to = parsePeriodLocalDate(localDate);
+  return { from: Temporal.PlainDate.from(to).subtract({ days: TIP_PERIOD_LIMITS.days }).toString(), to };
+}
+
+export function resolveTipPeriods(input: Readonly<{ localDate: string; records: readonly LabeledPeriod[] }>): TipPeriod[] {
+  const { from, to } = tipPeriodRange(input.localDate);
+  return periodsOverlappingRange(input.records, from, to).slice(0, TIP_PERIOD_LIMITS.periods)
+    .map((period) => ({ label: period.label, start: period.start_on, end: period.end_on }));
+}
+
 function dayLabel(localDate: string, withYear: boolean): string {
   const date = Temporal.PlainDate.from(localDate);
   const day = `${MONTHS[date.month - 1]} ${date.day}`;

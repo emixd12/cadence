@@ -20,7 +20,8 @@ How to use it:
   implementation default and says so.
 
 Coverage: this first version holds the length rules from Ticket 366 and the rules beside
-them, and the Daily Brief's day-note rules from Ticket 367. The sets in "Not yet listed" still live only in code.
+them, the Daily Brief's day-note rules from Ticket 367, and the Period rules for the Daily Brief
+and advisor tips from Ticket 371. The sets in "Not yet listed" still live only in code.
 
 ## Behavior length
 
@@ -84,6 +85,21 @@ the lengths (`docs/DATA_MODEL.md`, "Periods").
 | PER-03 | Note length | 2,000 characters, as for a day note | `PERIOD_LIMITS.noteCharacters`, `normalizePeriodNote`; check `periods_note_valid` | Periods plan (D35), section 1 | Notes at or near the limit |
 | PER-04 | "End today" applies | first day today or earlier, and ongoing or last day after today | `resolvePeriodEndState` | Periods plan (D35), section 1 | Periods whose last day was later edited by hand to an earlier date |
 | PER-05 | Longest Period query range | 366 days | `PERIOD_LIMITS.rangeDays`, `resolvePeriodRange` | Periods plan (D35), section 1 | Not used by a caller yet |
+
+### Periods the Daily Brief and advisor tips read
+
+Labels and dates only; a Period's note is never sent (Ticket 371). Values live in
+`BRIEF_PERIOD_LIMITS` and `TIP_PERIOD_LIMITS` in
+`packages/core/src/resolvers/period.resolver.ts`.
+
+| ID | Rule | Value | Where | Decided | What to look at |
+|---|---|---|---|---|---|
+| PER-06 | Periods covering today that the brief reads | the first 5 in display order (`comparePeriods`) | `BRIEF_PERIOD_LIMITS.active`, `resolveBriefPeriods` | D35 chose that the brief reads Periods; Periods plan, section 7, set 5 | Accounts with more than 5 Periods covering one day; whether the earliest-started are the ones that matter |
+| PER-07 | How long after its last day a Period still reaches the brief | 7 local days before today | `BRIEF_PERIOD_LIMITS.recentDays`, `briefPeriodRange` | Periods plan (D35), section 7 | Briefs that name a Period that ended 5 to 7 days ago; whether that still describes the day |
+| PER-08 | Recently ended Periods the brief reads | the 3 most recently ended | `BRIEF_PERIOD_LIMITS.recent`, `resolveBriefPeriods` | Periods plan (D35), section 7 | Accounts with more than 3 Periods ending inside one week |
+| PER-09 | Days of Periods the tips prompt reads | today and the 7 local days before it | `TIP_PERIOD_LIMITS.days`, `tipPeriodRange` | Implementation default; matches the 7 days of day notes the tips read | Tips about a slip that a Period older than 7 days explains |
+| PER-10 | Periods the tips prompt reads | the first 5 in display order | `TIP_PERIOD_LIMITS.periods`, `resolveTipPeriods` | Periods plan (D35), section 7 | Accounts with more than 5 Periods in one week |
+| PER-11 | Words a brief sentence may share with a day note because a Period label holds them | words that stand together inside one label the brief was shown | `textQuotesDayNote` (`allowed`), `validateBriefOpening` | Periods plan (D35), section 7: the verbatim check does not apply to labels | Runs with `opening_day_note` or `reason_day_note` on a day that also has a Period |
 
 ## Not yet listed
 

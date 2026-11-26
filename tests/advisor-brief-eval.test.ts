@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BRIEF_EVAL_FIXTURE_IDS, briefEvalFixture, briefEvalFixtures } from "@/lib/services/advisor-eval/brief-fixtures";
 import { runBriefEval, summarizeBriefEval, type BriefEvalRun } from "@/lib/services/advisor-eval/brief-harness";
-import { checkBriefDayNoteNotQuoted, checkBriefLayerOne } from "@/lib/services/advisor-eval/brief-rules";
+import { checkBriefDayNoteNotQuoted, checkBriefLayerOne, checkBriefPeriodNamedNotJudged } from "@/lib/services/advisor-eval/brief-rules";
 import { briefOpeningInstructions } from "@/lib/services/brief-opening";
 import { planBriefMoveLinesFromInputs } from "@cadence/core/resolvers/brief-move.resolver";
 import { planBriefPairingLines } from "@cadence/core/resolvers/alongside-pairing.resolver";
@@ -130,6 +130,44 @@ describe("Phase 3 brief eval (no model)", () => {
     // A fixture with no day notes gets the plain prompt and no such rule.
     const [plain] = await runBriefEval({ run: scripted(), fixtures: [briefEvalFixture("busy_professional")] });
     expect(plain!.rubric.some((item) => item.id === "day_note_not_quoted")).toBe(false);
+  });
+
+  it("Ticket 371: sends the Periods and marks a brief that judges by one", async () => {
+    const fixture = briefEvalFixture("period_active");
+    const today = Temporal.PlainDate.from(fixture.context.localDate);
+    const ago = (days: number) => today.subtract({ days }).toString();
+    // "Sick" covers today; "Work trip" ended four days ago; "Exams" ended three weeks ago and is not sent.
+    expect(fixture.periods).toEqual({
+      periods: [{ label: "Sick", since: ago(2), until: null }],
+      recentPeriods: [{ label: "Work trip", since: ago(9), until: ago(4) }],
+    });
+    const seen: string[] = [];
+    const writer = (opening: string): BriefEvalRun => ({ label: "periods", model: "openai/gpt-5.6-luna", generate: async (request) => {
+      seen.push(request.instructions);
+      const facts = JSON.parse(request.facts) as { periods: { label: string; until: string | null }[]; recentPeriods: { label: string }[]; lines: { key: string; with: string | null }[] };
+      expect(facts.periods.map((item) => [item.label, item.until])).toEqual([["Sick", null]]);
+      expect(facts.recentPeriods.map((item) => item.label)).toEqual(["Work trip"]);
+      expect(request.facts).not.toContain("Exams");
+      return { opening, reasons: facts.lines.map((line) => ({ key: line.key, text: line.with ? `It runs into ${line.with}.` : "Its time no longer works today." })) };
+    } });
+    const rule = (results: Awaited<ReturnType<typeof runBriefEval>>) => results[0]!.rubric.find((item) => item.id === "period_named_not_judged");
+    // Naming the label is allowed.
+    const kept = await runBriefEval({ run: writer("These days are marked Sick; a few things clash, so here are new times."), fixtures: [fixture] });
+    expect(seen[0]).toBe(briefOpeningInstructions(["periods"]));
+    expect(rule(kept)).toEqual({ id: "period_named_not_judged", passed: true });
+    expect(kept[0]!.rubric.filter((item) => !item.passed)).toEqual([]);
+    // Suggesting a mark because of the Period, or adding health talk beyond the label, fails.
+    expect(rule(await runBriefEval({ run: writer("You are Sick, so skip the rest and mark them later."), fixtures: [fixture] })))
+      .toEqual({ id: "period_named_not_judged", passed: false, detail: "marking: skip" });
+    expect(rule(await runBriefEval({ run: writer("Sick days: rest up and get well soon."), fixtures: [fixture] })))
+      .toEqual({ id: "period_named_not_judged", passed: false, detail: "health: rest up" });
+    // The label itself is the only health word let through.
+    expect(checkBriefPeriodNamedNotJudged({ periods: fixture.periods!, texts: ["While you are sick, Walk moves later."] })).toEqual({ passed: true });
+    expect(checkBriefPeriodNamedNotJudged({ periods: { periods: [{ label: "Travel", since: ago(1), until: null }], recentPeriods: [] }, texts: ["While you are sick, Walk moves later."] }))
+      .toEqual({ passed: false, detail: "health: sick" });
+    // A fixture with no Periods gets the plain prompt and no such rule.
+    const plain = await runBriefEval({ run: scripted(), fixtures: [briefEvalFixture("busy_professional")] });
+    expect(rule(plain)).toBeUndefined();
   });
 
   it("finds a line offered against the rules", () => {
