@@ -38,6 +38,7 @@ export const PUBLIC_DATA_API_RELATIONS = [
     selectColumn: "user_id",
   },
   { table: "occurrence_time_sessions", ownerColumn: "user_id" },
+  { table: "periods", ownerColumn: "user_id" },
 ];
 
 export const PUBLIC_AUTHENTICATED_FUNCTIONS = [
@@ -47,11 +48,14 @@ export const PUBLIC_AUTHENTICATED_FUNCTIONS = [
   "bind_behaviorlog_restore_apply_payload",
   "consume_launch_rate_limit",
   "create_behavior_with_schedule_graph",
+  "create_period",
+  "delete_period",
   "get_export_page_read_bundle",
   "list_my_occurrence_time_session_history",
   "list_my_occurrence_time_sessions",
   "mark_occurrence_sync_fresh_if_configuration_current",
   "update_behavior_with_schedule_graph",
+  "update_period",
   "update_profile_and_behavior_timezones_with_config_events",
 ];
 

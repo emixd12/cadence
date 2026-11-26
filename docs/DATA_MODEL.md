@@ -2777,6 +2777,69 @@ The Mac app mirrors the row in SQLite schema 23 (`docs/DESKTOP_DATA_MODEL.md`).
 Local checks `tests/sql/ticket-292-day-note-shortcut-sync.sql` and the account-sync
 contract fixtures.
 
+## Periods (Ticket 368, D35)
+
+`periods` stores labeled ranges of local dates that the person declares for the whole
+account, for example "Sick", November 3 to 9. A Period is annotation only. It has no
+status, Behavior or Occurrence reference and never changes a status, adherence, Needs
+decision, a reminder or a schedule. Periods may overlap and may lie in the future.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid | Primary key. |
+| `user_id` | uuid | Owner; references `profiles(id)`, cascades on account deletion. |
+| `label` | text | One line, 1 to 60 characters, no leading or trailing spaces. |
+| `start_on` | date | First local date, inclusive. Past, today or future. |
+| `end_on` | date, nullable | Last local date, inclusive, on or after `start_on`. Null means ongoing. |
+| `note` | text, nullable | Normalized like a day note; non-blank, at most 2,000 characters, or null. |
+| `revision` | integer | Starts at 1 and increases on each change. |
+| `created_at`, `updated_at` | timestamptz | Server time. |
+
+Dates are local calendar dates, never instants, like Behavior pause and day notes. A
+timezone change does not move a Period.
+
+Constraints: `periods_user_id_key` unique `(user_id, id)`; `periods_label_valid`;
+`periods_range_valid`; `periods_note_valid`; `periods_revision_valid`. There is no
+uniqueness rule on label or dates. Index: `periods_user_start_idx (user_id, start_on)`.
+
+RLS allows the owner to select rows. Direct writes are revoked from every Data API
+role, and `service_role` has no grant. Three `security definer` functions with an empty
+`search_path` bind ownership to `auth.uid()` and are executable by `authenticated` only:
+
+- `public.create_period(p_label, p_start_on, p_end_on, p_note)` returns the new row.
+- `public.update_period(p_id, p_expected_revision, p_label, p_start_on, p_end_on, p_note)`
+  compares the stored `revision` with `p_expected_revision`. It returns no row when they
+  differ, when the Period is gone, or when it belongs to another account. A write that
+  changes nothing returns the row with the same `revision` and `updated_at`. Any other
+  write raises `revision` by 1 and sets `updated_at`.
+- `public.delete_period(p_id, p_expected_revision)` returns the deleted id, or no row on
+  a mismatch.
+
+The functions validate their input and raise SQLSTATE `22023` with a plain message.
+`cadence_private.period_input_error` holds the shared rules. Its label rule is stricter
+than the table check: it also refuses Unicode whitespace at either end and Unicode line
+breaks, as `packages/core/src/resolvers/period.resolver.ts` does. A writer that inserts
+directly is held to the table checks only, so it must send resolver-normalized values.
+
+**Cap.** An account holds at most 500 Periods. The `before insert` trigger
+`periods_enforce_account_cap` (function `cadence_private.periods_enforce_account_cap`)
+takes a per-user advisory transaction lock, counts the owner's rows and raises SQLSTATE
+`54000` at 500. Because it is a trigger, the cap holds for every writer: the user
+functions above and any later function that inserts directly, such as integration
+writes, import or the account sync apply path. The lock makes two concurrent creates at
+499 run one after the other, so only one succeeds. `lib/db/periods.repo.ts` turns `54000`
+from `create_period` into the limit message.
+
+**Hard delete.** Removing a Period deletes its row. Adding it again makes a new Period
+with a new id. There is no soft-delete column and no tombstone: account sync plans a
+delete as "in the saved baseline, absent on one side", which needs no deleted row on the
+server. Account deletion removes Periods through the `profiles` cascade.
+
+Ticket 368 adds no entry point: no Server Action, MCP tool, export field or Mac code
+reads or writes Periods yet. Migration: `20261126130000_periods.sql`; local check
+`tests/sql/periods.sql`. `periods` and the three functions are in the RLS smoke lists
+(`scripts/supabase-rls-smoke.mjs`).
+
 ## Google Calendar connector (Ticket 134)
 
 Migration `20260917002649_google_calendar_connector.sql` adds owner-scoped
