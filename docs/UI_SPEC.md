@@ -597,6 +597,37 @@ quiet "Saved" indicator that fades after ~2.5s. A conflict or error keeps the ed
 open with the draft preserved, shows the factual message, and offers Try again. No
 modal and no status controls.
 
+### Periods (Ticket 369)
+
+A Period is a labeled range of local dates for the whole account. It is annotation
+only. `components/periods/PeriodControl.tsx` draws it on web; Cadence for Mac passes no
+Period actions until Ticket 374, so nothing renders there.
+
+- **Chips.** Under the date of every Timeline day a Period covers, including Needs
+  decision day sections, each covering Period shows as a small square chip with its
+  label. A chip is a button named "Edit period {label}, {dates}". Choosing it opens
+  that Period's editor in place, under the chips; choosing it again closes the editor.
+- **Add period.** Only today's header has a quiet "Add period" disclosure, beside "Add
+  day note" and styled like it. An open disclosure takes the full width, so the other
+  wraps to its own line.
+- **Editor.** One form: Label (text, with a `datalist` of past labels), First day and
+  Last day (native date inputs; the help text under Last day reads "Leave empty if it is
+  still going"), Note, then Save and Cancel. An existing Period also gets "End today",
+  only when the Period resolver allows it, and "Remove". Remove swaps to "Remove this
+  period" and "Keep" in place; the second choice removes. No modal, no date picker of
+  our own, and no wording that suggests an undo.
+- **Outcomes.** "Period saved.", "Period ended today." and "Period removed." show as
+  outcome notices beside the control after the form closes. A broken rule shows the
+  resolver's sentence under the form and keeps the draft. A stale write shows the
+  `period.conflict` notice and reloads the form with the latest version.
+- **Copy.** Nothing here names a status, a streak or a reason. A Period never reads as
+  a pause.
+
+On Behaviors, a "Periods" section sits below Category counts and above the archived
+disclosure. It lists every Period, newest first: label, dates, the first line of the
+note and an "Edit" text action that opens the same editor in the row. The section is
+hidden when there is no Period.
+
 ### Opportunity Basket (Behaviors of Opportunity)
 
 Under today's date, after the day note control, a quiet underlined text action reads
@@ -953,6 +984,12 @@ Overall adherence appears near the top of the Behaviors screen with compact
 7 / 30 / 90 day underlined text-action range controls directly above the
 overall calendar inside that same area. The overall calendar remains passive;
 selecting days for correction starts from an individual behavior row.
+
+When a Period covers a day in the selected range, one muted line under the status
+counts reads, for example, "Outside periods: 85% (17 of 20). In periods: 20% (1 of
+5)." (Ticket 369). Each rate is Completed over Completed plus Not Completed; a side
+with nothing resolved reads "nothing marked". The analytics resolver writes the line.
+No other number changes, and the line is absent when no Period overlaps the range.
 
 Show active behaviors first as compact unboxed rows.
 

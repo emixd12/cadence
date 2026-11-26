@@ -377,6 +377,26 @@ No behaviors on this day
    the draft preserved, shows the factual conflict or error message, and offers
    Try again.
 
+### Add, edit, end or remove a Period (Ticket 369)
+
+1. Under today's date on the Timeline, the user opens "Add period", beside "Add day
+   note". Other days have no add control.
+2. The user enters a Label (past labels are offered), checks First day (today by
+   default), optionally sets Last day (empty means ongoing) and a Note, and chooses
+   Save. Cadence shows "Period saved." and each covered day shows the label as a chip
+   under its date.
+3. To edit, the user chooses a chip (or Edit in the Periods list on Behaviors),
+   changes the fields and chooses Save. Cancel or Escape closes the form unsaved.
+4. To end, the user opens the Period and chooses End today. Cadence sets the last
+   day to today in the account timezone and shows "Period ended today.". End today
+   is absent for a Period that has not started or has already ended.
+5. To remove, the user opens the Period, chooses Remove and then "Remove this
+   period". Keep backs out. There is no modal and no undo.
+6. A broken rule shows the resolver's sentence under the form and keeps the draft. A
+   stale write shows the conflict notice, reloads, and fills the form with the
+   latest version.
+7. No step changes an Occurrence, a status, adherence, a reminder or a schedule.
+
 ## Occurrence card flow
 
 Collapsed unresolved cards show:
@@ -663,6 +683,11 @@ separate boxed section. The date range selector sits directly above the
 overall calendar, the selected date range appears under the adherence
 percentage in compact month-day wording, and the legend is vertically listed
 to the right of the calendar on desktop.
+
+When a Period covers a day in the selected range, the summary adds one line with
+adherence outside Periods and inside them (Ticket 369). Below Category counts, a
+Periods section lists every Period, newest first, with the same editor as the
+Timeline. It is hidden when there is no Period.
 
 The top summary Unresolved count should match the Timeline Needs decision
 count, so it includes only active unresolved occurrences before the current
