@@ -3620,7 +3620,12 @@ shown to the person; Phase 4 matches the signals to advice cards.
   (`coach-signals-4`, Ticket 359) is written only while `CADENCE_ALONGSIDE` is on and adds
   no kind: each Behavior carries its effective alongside value, `crowded_hour` leaves
   alongside items out of the hour, and `done_together` facts add booleans `alongside` and
-  `other_alongside` (the signal's Behavior and the other one). `signal_version`'s check is
+  `other_alongside` (the signal's Behavior and the other one). Ticket 360 extends version
+  4: `setup_gaps` also reports an open alongside question (not answered while Cadence
+  guesses yes, `alongsideQuestionOpen`). A Behavior's row adds boolean
+  `alongside_unanswered` and appears when that alone is true; the account-wide row adds
+  the count `without_alongside_answer`. No advice card reads them yet (no reviewed
+  source fits). `signal_version`'s check is
   a pattern, so no migration was needed. With the flag off the visit writes version 3,
   unchanged. At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an

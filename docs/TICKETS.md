@@ -20141,7 +20141,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 360: The agent asks whether a Behavior is alongside
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. The brief keeps one question per brief and never asks an answered Behavior again; an ignored question can return in a later brief because no "asked" record is stored.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
