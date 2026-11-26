@@ -15,7 +15,7 @@ import {
   planPlaceMarker,
   planWhereSuggestionDismissal,
 } from "@cadence/core/services/place-labels";
-import { isPlaceRef } from "@cadence/core/resolvers/place-label.resolver";
+import { isPlaceRef, shownWhereGuessKey } from "@cadence/core/resolvers/place-label.resolver";
 import type { CompletionCapturePlan, PlaceLabelState } from "@cadence/core/types/place-labels";
 import { DEFAULT_TIMEZONE } from "@cadence/core/types/recurrence";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
@@ -40,7 +40,8 @@ import { readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type { CalendarCaller } from "./google-calendar.service";
-import { alongsideWhereGuesses, readAlongsideBehaviorFacts } from "./alongside-view.service";
+import { alongsideEnabled } from "./alongside-flag";
+import { readAlongsideGuesses } from "./alongside-view.service";
 
 export { PlaceLabelError };
 
@@ -57,12 +58,19 @@ export async function getPlaceLabelState(caller: CalendarCaller, now = Temporal.
     readProfileTimezone(client, user.id),
   ]);
   const today = now.toZonedDateTimeISO(timezone ?? DEFAULT_TIMEZONE).toPlainDate();
-  // Ticket 358: while CADENCE_ALONGSIDE is on and labels are on, a guessed Where shares the suggestion line.
-  const whereGuesses = settings?.enabled
-    ? alongsideWhereGuesses(await readAlongsideBehaviorFacts(client, user.id, { localDate: today.toString() }))
-    : null;
+  // Ticket 358: while CADENCE_ALONGSIDE is on, a guessed Where shares the suggestion line.
+  // Ticket 383 (D37): whether or not labels are on. The guesses read takes no label or
+  // position; it reads nothing while the flag is off.
+  const whereGuesses = await readWhereGuesses(caller);
   return buildPlaceLabelState({ settings, homeText: travel?.base_location_text ?? null, markers, labels, dismissals, behaviors,
     today, ...(whereGuesses?.size ? { whereGuesses } : {}) });
+}
+
+/** Current Where guesses by Behavior id; null, with no reads, while `CADENCE_ALONGSIDE` is off. */
+async function readWhereGuesses(caller: CalendarCaller): Promise<ReadonlyMap<string, string> | null> {
+  const response = await readAlongsideGuesses(caller.client, caller.user.id);
+  if (!response.enabled) return null;
+  return new Map(response.guesses.flatMap(({ behaviorId, whereGuess }) => whereGuess ? [[behaviorId, whereGuess] as const] : []));
 }
 
 export async function savePlaceLabelSettings(caller: CalendarCaller, value: unknown, now = Temporal.Now.instant()): Promise<PlaceLabelState> {
@@ -106,8 +114,12 @@ export async function deleteCompletionPlaceLabels(caller: CalendarCaller): Promi
 export async function dismissWhereSuggestion(caller: CalendarCaller, value: unknown, now = Temporal.Now.instant()): Promise<PlaceLabelState> {
   const dismissal = parseWhereSuggestionDismissInput(value);
   const settings = placeLabelSettingsFromRecord(await readPlaceLabelSettingsRow(caller.client, caller.user.id));
+  // Ticket 383 (D37): with labels off, only the guess the line shows can be dismissed.
+  // The state is read only then, and only while CADENCE_ALONGSIDE is on.
+  const shownGuess = !settings.enabled && alongsideEnabled()
+    ? shownWhereGuessKey(await getPlaceLabelState(caller, now), dismissal.behaviorId) : null;
   await upsertWhereSuggestionDismissalRow(caller.client, caller.user.id,
-    planWhereSuggestionDismissal({ settings, dismissal, dismissedAt: now.toString() }));
+    planWhereSuggestionDismissal({ settings, dismissal, dismissedAt: now.toString(), shownGuess }));
   return getPlaceLabelState(caller, now);
 }
 

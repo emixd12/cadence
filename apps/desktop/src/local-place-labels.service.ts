@@ -77,6 +77,9 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
     const behaviors = [...graphs].sort((left, right) => left.behavior.created_at.localeCompare(right.behavior.created_at) || left.behavior.id.localeCompare(right.behavior.id))
       .map(({ behavior }) => ({ id: behavior.id, active: behavior.active, where_kind: behavior.where_kind ?? null, location_text: behavior.location_text ?? null }));
     // Only a Behavior whose Where is Not set here gets a guessed Where.
+    // Ticket 383: the Mac keeps the guessed Where behind Completion places. Its SQLite
+    // triggers (migration 0020) refuse a dismissal while labels are off, and the shared
+    // sync planner drops dismissals while labels are off; both need their own change.
     const guesses = settings.enabled ? new Map([...(whereGuesses() ?? [])]
       .filter(([id]) => behaviors.some((behavior) => behavior.id === id && behavior.where_kind === null))) : null;
     return buildPlaceLabelState({ settings: stored.settings, homeText: travel.baseLocationText, markers: stored.markers, labels,

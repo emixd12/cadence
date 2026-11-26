@@ -21,7 +21,7 @@ import { useSettingsResult } from "@/components/settings/settings-result";
 
 /**
  * Ticket 216: completion place labels. Every control here is sparse and hidden
- * while labels are off. A completion position is compared on the device and then
+ * while labels are off, except the guessed Where line (Ticket 383). A completion position is compared on the device and then
  * discarded; only "I'm here" sends a position, and only the user's own marker.
  */
 type PlaceLabelContextValue = Readonly<{
@@ -256,7 +256,10 @@ export function PlaceMarkerControl({ place }: Readonly<{ place: MarkerPlace }>) 
 
 export type WhereDraft = Readonly<{ whereKind: BehaviorWhereKind; locationText: string }>;
 
-/** One sparse line on a Behavior record: a Where suggestion, or the first missing-marker prompt. */
+/**
+ * One sparse line on a Behavior record: a Where suggestion, or the first missing-marker
+ * prompt. A guessed Where (Ticket 383) shows whether or not labels are on.
+ */
 export function BehaviorPlaceAssist({ behaviorId, whereKind = null, placeText, onReview }: Readonly<{
   behaviorId: string;
   whereKind?: BehaviorWhereKind | null;
@@ -277,7 +280,9 @@ export function BehaviorPlaceAssist({ behaviorId, whereKind = null, placeText, o
   const { busy, message, record } = useRecordMarker(context);
   const [pending, setPending] = useState(false);
   const entry = context?.state?.behaviors.find((item) => item.behaviorId === behaviorId) ?? null;
-  if (!context?.state?.settings.enabled || !entry || (!entry.suggestion && !entry.markerPrompt)) {
+  // Ticket 383 (D37): the state decides what shows. With labels off it carries no marker
+  // prompt, and a suggestion only when a guessed Where exists (CADENCE_ALONGSIDE on).
+  if (!context?.state || !entry || (!entry.suggestion && !entry.markerPrompt)) {
     return message ? <p role="status" className="text-sm leading-6 text-muted-readable">{message}</p> : null;
   }
   const { state } = context;
