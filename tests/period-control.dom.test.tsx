@@ -309,6 +309,35 @@ describe("Period day controls (Ticket 369)", () => {
     }
   });
 
+  it("saves a note typed while a save was in flight before Close closes the editor", async () => {
+    const { calls, actions } = recordingActions();
+    let release: () => void = () => undefined;
+    const slow: PeriodActions = { ...actions, saveNote: async (state, form) => {
+      const result = await actions.saveNote(state, form);
+      if (calls.filter((call) => call.kind === "note").length === 1) await new Promise<void>((resolve) => { release = resolve; });
+      return result;
+    } };
+    const view = await render(dayControls({ actions: slow, periods: [SICK] }));
+    try {
+      await click(button(view.container, "Sick"));
+      const note = noteField(view.container)!;
+      await act(async () => {
+        setValue(note, "First");
+        note.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      });
+      await act(async () => setValue(note, "First and second"));
+      await click(button(view.container, "Close"));
+      // The first save is still in flight: the editor stays until the latest text is saved.
+      expect(view.container.querySelector("[data-period-editor]")).not.toBeNull();
+
+      await act(async () => { release(); });
+      expect(calls.filter((call) => call.kind === "note").map((call) => call.fields.note)).toEqual(["First", "First and second"]);
+      expect(view.container.querySelector("[data-period-editor]")).toBeNull();
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it("keeps a label being edited when the Period reloads after its note saved", async () => {
     const { actions } = recordingActions();
     const view = await render(dayControls({ actions, periods: [SICK] }));

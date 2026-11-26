@@ -85,6 +85,10 @@ export function PeriodEditor({
   const [seen, setSeen] = useState(period);
   const [resetOnReload, setResetOnReload] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  // An existing Period closes through its note editor, so a note still unsaved, or
+  // typed while a save was in flight, is saved first.
+  const [closeSignal, setCloseSignal] = useState(0);
+  const requestClose = period ? () => setCloseSignal((signal) => signal + 1) : onCancel;
   const removeRef = useRef<HTMLButtonElement>(null);
   const returnToRemove = useRef(false);
   const endRef = useRef<HTMLInputElement>(null);
@@ -177,7 +181,8 @@ export function PeriodEditor({
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
-          onCancel();
+          // The note field handles its own Escape: it saves, then closes through onDone.
+          if (!event.defaultPrevented) requestClose();
         }
       }}
     >
@@ -237,6 +242,8 @@ export function PeriodEditor({
             placeholder="Add a note about this period"
             shortcutsLabel="Period note shortcuts"
             showDone={false}
+            doneSignal={closeSignal}
+            onDone={onCancel}
             compact
           />
         ) : (
@@ -258,7 +265,7 @@ export function PeriodEditor({
 
       <div className="flex flex-wrap items-center gap-x-4">
         <button type="submit" form={formId} disabled={pending} className={`${ACTION} product-action-primary font-bold`}>Save</button>
-        <button type="button" className={`${ACTION} product-action-secondary`} onClick={onCancel}>
+        <button type="button" className={`${ACTION} product-action-secondary`} onClick={requestClose}>
           {period ? "Close" : "Cancel"}
         </button>
       </div>

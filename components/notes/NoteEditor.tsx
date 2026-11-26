@@ -62,6 +62,11 @@ export type NoteEditorProps = Readonly<{
   shortcutsLabel?: string;
   autoFocus?: boolean;
   focusSignal?: number;
+  /**
+   * Each increase asks the editor to finish as Done does: save an unsaved draft, wait for
+   * a save in flight, then call `onDone`. For a parent whose own control closes the note.
+   */
+  doneSignal?: number;
   autoSave?: boolean;
   /** False leaves out Done, for a note that sits inside a larger editor with its own close control. */
   showDone?: boolean;
@@ -111,6 +116,7 @@ export function NoteEditor({
   shortcutsLabel = "Note shortcuts",
   autoFocus = false,
   focusSignal = 0,
+  doneSignal = 0,
   autoSave = true,
   showDone = true,
   onSaved,
@@ -267,6 +273,14 @@ export function NoteEditor({
     savedSinceOpenRef.current = false;
     onDoneRef.current?.({ saved: hadSaved });
   }, [cancelDebounce, state.status, submitCurrentDraft]);
+
+  const handleDoneRef = useRef(handleDone);
+  useEffect(() => {
+    handleDoneRef.current = handleDone;
+  });
+  useEffect(() => {
+    if (doneSignal > 0) handleDoneRef.current();
+  }, [doneSignal]);
 
   const activeBaseline = useCallback(() => (
     isPendingRef.current && submittedDraftRef.current
