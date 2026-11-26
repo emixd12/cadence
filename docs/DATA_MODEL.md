@@ -2610,7 +2610,7 @@ or place key. Ticket 357 added the column and its read path.
   turn's Timeline carry `planning: { alongside, alongside_source, where, where_source }`
   (the Where kind only, never a key); an exact-time opportunity add checks the added
   Behavior's side of the same-place rule; the coach reads the effective alongside value
-  (see "Coach signals in shadow", version 4).
+  (see "Coach signals in shadow", versions 4 and 6).
 - **Planning only.** The free-slot rule uses it for the same-place overlap rule
   (`docs/DATETIME_STRATEGY.md`, "Brief moves"). Travel, departure and leave-reminder code
   reads `where_kind` alone, and `tests/effective-where.boundary.test.ts` pins that. A
@@ -3707,11 +3707,21 @@ shown to the person; Phase 4 matches the signals to advice cards.
   `alongside_unanswered` and appears when that alone is true; the account-wide row adds
   the count `without_alongside_answer`. No advice card reads them yet (no reviewed
   source fits). `signal_version`'s check is
-  a pattern, so no migration was needed. With the flag off the visit writes version 3,
-  unchanged. At most
+  a pattern, so no migration was needed. With the flag off the visit writes the base
+  version, unchanged. Versions 5 and 6 (`coach-signals-5`, and `coach-signals-6` while
+  `CADENCE_ALONGSIDE` is on; Ticket 372, D35) replace versions 3 and 4 and add no kind.
+  The visit reads the first and last day of the account's Periods under RLS (never a
+  label or a note) and every `completion_drop` row gains two counts:
+  `recent_period_days`, the days of the recent 14 that a Period covers, and
+  `baseline_period_days`, the days of the 28 before them. Both are 0 when no Period
+  covers a day. A Period is annotation only: the counts change no rate, no threshold
+  and no decision about which signals fire. Version 6 is version 4 plus these counts.
+  No migration was needed. Rows stored under versions 3 and 4 stay as written and stay
+  readable: no reader branches on `signal_version`, a visit replaces only its own local
+  day, and a `completion_drop` row without the two counts reads as "not counted". At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
-  local times of day only, never titles, notes or calendar data; `signal_version`
+  local times of day only, never titles, notes, Period labels or calendar data; `signal_version`
   names the resolver version; `run_id` links the visit's `agent_runs` row. RLS on,
   no policies, no grants to any API role. Rows older than 180 days are removed when
   the same account is visited again.
@@ -3727,7 +3737,9 @@ shown to the person; Phase 4 matches the signals to advice cards.
   call. Thresholds and definitions: `packages/core/src/resolvers/coach-signals.resolver.ts`.
   Job: `lib/services/coach-signals-job.service.ts` (database access in `lib/db/coach-signals.repo.ts`), hourly cron
   `/api/advisor/coach/signals/process`. It reads `move_proposal_answers` when that
-  table exists (Phase 3A1) and each brief proposal's final status otherwise.
+  table exists (Phase 3A1) and each brief proposal's final status otherwise. It reads
+  `periods` when that table exists (migration `20261126130000`) and counts no Period
+  day otherwise.
 - Account deletion cascades; deleting a Behavior removes its signals.
 
 Local verification: `tests/coach-signals.local-integration.test.ts`.

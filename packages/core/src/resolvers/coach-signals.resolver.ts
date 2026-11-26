@@ -11,7 +11,7 @@ import { resolveCoachSignalsV2, weekdayMoveCounts } from "./coach-signals-v2.res
  * quip can state one counted fact ("Reading got done 9 of 10 times before 9 am").
  *
  * Facts hold counts, dates, weekdays and local times of day only. They never hold a
- * title, a note or calendar data. Thresholds are constants here so a test can derive
+ * title, a note, a Period label or calendar data. Thresholds are constants here so a test can derive
  * expected signals from hand-checked fixtures, and Phase 4 can tune them in one place.
  *
  * Every counting period ends yesterday: the visit runs in the early morning, so today has no
@@ -19,18 +19,25 @@ import { resolveCoachSignalsV2, weekdayMoveCounts } from "./coach-signals-v2.res
  * midnight but before the visit is already a fact.
  */
 
-/** Version 3 adds `sub_behavior_dropoff` and counts a routine's steps at one time as one item. */
-export const COACH_SIGNAL_VERSION = "coach-signals-3";
+/**
+ * Version 3 added `sub_behavior_dropoff` and counts a routine's steps at one time as one item.
+ * Version 5 (Ticket 372, D35) is version 3 plus Period day counts: `completion_drop` facts
+ * carry `recent_period_days` and `baseline_period_days`, 0 when no Period covers a day. A
+ * Period is annotation only, so the counts change no rate, no threshold and no decision
+ * about which signals fire.
+ */
+export const COACH_SIGNAL_VERSION = "coach-signals-5";
 
 /**
  * Version 4 (Ticket 359, D33), only while `CADENCE_ALONGSIDE` is on: each Behavior carries
  * its effective alongside value. `crowded_hour` does not count alongside items, and
  * `done_together` facts say whether each side is alongside. Ticket 360 adds the
  * unanswered alongside question to `setup_gaps` (`alongside_unanswered`,
- * `without_alongside_answer`). No new kind. With the flag off the visit stays version 3
- * and its output is unchanged.
+ * `without_alongside_answer`). No new kind. With the flag off the visit stays on the base
+ * version and its output is unchanged. Version 6 (Ticket 372) is version 4 plus the Period
+ * day counts of version 5.
  */
-export const COACH_SIGNAL_VERSION_ALONGSIDE = "coach-signals-4";
+export const COACH_SIGNAL_VERSION_ALONGSIDE = "coach-signals-6";
 
 export function coachSignalVersion(alongside: boolean): string {
   return alongside ? COACH_SIGNAL_VERSION_ALONGSIDE : COACH_SIGNAL_VERSION;
@@ -203,6 +210,12 @@ export type ResolveCoachSignalsInput = Readonly<{
   reminders?: readonly CoachSignalReminder[];
   /** Version 2: timed sessions, for `session_length`. */
   sessions?: readonly CoachSignalSession[];
+  /**
+   * Versions 5 and 6 (Ticket 372): local dates covered by any of the account's Periods
+   * inside the days the visit reads. Dates only, so a Period's label and note cannot reach a fact.
+   * Missing means no Period was read; the counts are then 0.
+   */
+  periodDates?: readonly string[];
 }>;
 
 /** One reminder that was sent for an Occurrence. */
@@ -235,6 +248,15 @@ function completionDrops(input: ResolveCoachSignalsInput, active: ReadonlyMap<st
     count(row.localDate >= recentStart ? entry.recent : entry.baseline, row.status);
     tallies.set(row.behaviorId, entry);
   }
+  // Period days in each counting period (Ticket 372). Annotation only: nothing below reads
+  // these counts to decide whether a signal fires.
+  let recentPeriodDays = 0;
+  let baselinePeriodDays = 0;
+  for (const date of new Set(input.periodDates ?? [])) {
+    if (date >= input.today || date < baselineStart) continue;
+    if (date >= recentStart) recentPeriodDays += 1;
+    else baselinePeriodDays += 1;
+  }
   const signals: CoachSignal[] = [];
   for (const [behaviorId, { recent, baseline }] of tallies) {
     const recentResolved = recent.completed + recent.notCompleted;
@@ -258,6 +280,8 @@ function completionDrops(input: ResolveCoachSignalsInput, active: ReadonlyMap<st
         baseline_unresolved: baseline.unresolved,
         baseline_rate: round(baselineRate),
         drop: round(baselineRate - recentRate),
+        recent_period_days: recentPeriodDays,
+        baseline_period_days: baselinePeriodDays,
       },
     });
   }
