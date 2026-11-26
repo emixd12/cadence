@@ -5,11 +5,15 @@ import { readOperationHandlers, type ReadOperationName } from "@/lib/integration
 import type { IntegrationContext } from "@/lib/integrations/request-context";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
 import type { Occurrence } from "@/lib/types/database";
+import { periodsOverlappingRange, type PeriodRecord } from "@cadence/core/resolvers/period.resolver";
 
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), occurrences: vi.fn(), categories: vi.fn(), occurrence: vi.fn(),
   events: vi.fn(), sessions: vi.fn(), references: vi.fn(), fresh: vi.fn(), sync: vi.fn(), dayNotes: vi.fn(), dayNote: vi.fn(),
+  periods: vi.fn(), period: vi.fn(),
 }));
+vi.mock("@/lib/services/period.service", () => ({ listPeriodsForUser: mocks.periods }));
+vi.mock("@/lib/db/periods.repo", () => ({ getPeriod: mocks.period }));
 vi.mock("@/lib/db/dayNotes.repo", () => ({ listDayNotesInRange: mocks.dayNotes, listAllDayNotes: () => mocks.dayNotes() }));
 vi.mock("@/lib/services/behavior.service", () => ({ getBehaviorReadDataForUser: mocks.account }));
 vi.mock("@/lib/services/occurrence.service", () => ({ ensureUserOccurrencesFresh: mocks.fresh }));
@@ -45,12 +49,20 @@ function occurrence(n: number, overrides: Partial<Occurrence> = {}): Occurrence 
     schedule_end_time: null, schedule_kind: "exact", schedule_preset: null, schedule_range_identity: null,
     schedule_start_time: "09:00:00", scheduled_for: "2026-03-08T13:00:00Z", status: "unresolved", status_marked_at: null, updated_at: at, ...overrides };
 }
+function period(n: number, overrides: Partial<PeriodRecord> = {}): PeriodRecord {
+  return { id: id(n), user_id: id(1), label: "Sick", start_on: "2026-03-06", end_on: "2026-03-09", note: "Flu note",
+    revision: 2, created_at: at, updated_at: at, ...overrides };
+}
 let behaviors: BehaviorWithCategory[];
 let occurrences: Occurrence[];
+let periods: PeriodRecord[];
 const range = { start_local_date: "2026-03-01", end_local_date: "2026-03-10" };
 
 beforeEach(() => {
-  vi.clearAllMocks(); behaviors = [behavior()]; occurrences = [occurrence(30)];
+  vi.clearAllMocks(); behaviors = [behavior()]; occurrences = [occurrence(30)]; periods = [period(70)];
+  mocks.periods.mockImplementation(async (_client, _user, range?: { from: string; to: string }) =>
+    range ? periodsOverlappingRange(periods, range.from, range.to) : [...periods]);
+  mocks.period.mockImplementation(async (_client, _user, periodId) => periods.find((row) => row.id === periodId) ?? null);
   mocks.account.mockImplementation(async () => ({ behaviors, profileTimezone: "America/New_York" }));
   mocks.occurrences.mockImplementation(async (_client, _user, range) => occurrences.filter((row) => !range || (row.local_date >= range.startLocalDate && row.local_date <= range.endLocalDate)));
   mocks.occurrence.mockImplementation(async (_client, _user, id) => occurrences.find((row) => row.id === id) ?? null);
@@ -73,7 +85,7 @@ beforeEach(() => {
 const inputs: Record<ReadOperationName, unknown> = {
   get_account_context: {}, list_behaviors: {}, get_behavior: { behavior_id: id(10) }, list_categories: {},
   get_timeline: {}, list_occurrences: range, get_occurrence: { occurrence_id: id(30) }, get_adherence_summary: range,
-  list_day_notes: range, search: { query: "air" }, fetch: { id: `occurrence:${id(30)}` },
+  list_day_notes: range, list_periods: range, search: { query: "air" }, fetch: { id: `occurrence:${id(30)}` },
 };
 function assertAllowed(value: unknown): void {
   if (Array.isArray(value)) { value.forEach(assertAllowed); return; }
@@ -246,5 +258,160 @@ describe("integration read handlers", () => {
     expect(mocks.account).not.toHaveBeenCalled();
     expect(await readOperationHandlers.fetch(context, { id: `day_note:${id(61)}` })).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(await readOperationHandlers.fetch(context, { id: `day_note:${id(99)}` })).toMatchObject({ ok: false, error: { code: "not_found" } });
+  });
+
+  describe("Periods (Ticket 370)", () => {
+    const summary = { id: id(70), label: "Sick", start_local_date: "2026-03-06", end_local_date: "2026-03-09", ongoing: false };
+    const noteKeys = (value: unknown): string[] => Array.isArray(value) ? value.flatMap(noteKeys)
+      : value && typeof value === "object" ? Object.entries(value).flatMap(([key, child]) => [...(key === "note" ? [key] : []), ...noteKeys(child)]) : [];
+
+    it("returns the Periods that cover today as summaries without a note", async () => {
+      periods = [period(70), period(71, { label: "Travel", start_on: "2026-03-08", end_on: null, note: "Lisbon" }),
+        period(72, { label: "Later", start_on: "2026-03-09", end_on: null }), period(73, { label: "Over", start_on: "2026-03-01", end_on: "2026-03-07" })];
+      const result = await readOperationHandlers.get_account_context(context, {});
+      expect(result).toMatchObject({ ok: true, value: { more_active_periods: false, active_periods: [
+        summary, { id: id(71), label: "Travel", start_local_date: "2026-03-08", end_local_date: null, ongoing: true },
+      ] } });
+      if (result.ok) expect(noteKeys(result.value)).toEqual([]);
+      periods = [];
+      expect(await readOperationHandlers.get_account_context(context, {})).toMatchObject({ ok: true, value: { active_periods: [], more_active_periods: false } });
+    });
+
+    it("lists the covering Periods on each Timeline day, with inclusive endpoints", async () => {
+      const result = await readOperationHandlers.get_timeline(context, { start_local_date: "2026-03-05", days: 6, include_needs_decision: false });
+      expect(result.ok).toBe(true); if (!result.ok) return;
+      expect(result.value.days.map((day) => [day.local_date, day.periods.map((row) => row.id), day.more_periods])).toEqual([
+        ["2026-03-05", [], false], ["2026-03-06", [id(70)], false], ["2026-03-07", [id(70)], false],
+        ["2026-03-08", [id(70)], false], ["2026-03-09", [id(70)], false], ["2026-03-10", [], false],
+      ]);
+      expect(result.value.days[1].periods[0]).toEqual(summary);
+      expect(noteKeys(result.value.days.map((day) => day.periods))).toEqual([]);
+    });
+
+    it("splits adherence by the union of covered dates and changes no existing number", async () => {
+      behaviors = [behavior(), behavior({ id: id(14), title: "Read" })];
+      occurrences = [
+        occurrence(30, { local_date: "2026-03-05", status: "completed" }), occurrence(31, { local_date: "2026-03-06", status: "not_completed" }),
+        occurrence(32, { local_date: "2026-03-07", status: "completed" }), occurrence(33, { local_date: "2026-03-08" }),
+        occurrence(34, { local_date: "2026-03-10", status: "completed" }),
+        occurrence(35, { local_date: "2026-03-07", status: "not_completed", behavior_id: id(14) }),
+      ];
+      periods = [];
+      const without = await readOperationHandlers.get_adherence_summary(context, range);
+      expect(without).toMatchObject({ ok: true, value: { period_split: null } });
+      // Two overlapping Periods: 2026-03-07 is covered twice and counted once.
+      periods = [period(70), period(71, { label: "Travel", start_on: "2026-03-07", end_on: "2026-03-08" })];
+      const result = await readOperationHandlers.get_adherence_summary(context, range);
+      expect(result.ok && without.ok).toBe(true); if (!result.ok || !without.ok) return;
+      const { period_split: split, ...rest } = result.value;
+      const { period_split: _none, ...before } = without.value;
+      expect(_none).toBeNull();
+      expect(rest).toEqual(before);
+      expect(split).toMatchObject({
+        periods: [summary, { id: id(71), label: "Travel" }], more_periods: false,
+        inside: { completed: 1, not_completed: 2, unresolved: 1, needs_decision: 0, adherence_rate: 1 / 3 },
+        outside: { completed: 2, not_completed: 0, unresolved: 0, needs_decision: 0, adherence_rate: 1 },
+      });
+      const sum = (key: "completed" | "not_completed" | "unresolved") => split!.inside[key] + split!.outside[key];
+      expect([sum("completed"), sum("not_completed"), sum("unresolved")]).toEqual([rest.overall.completed, rest.overall.not_completed, rest.overall.unresolved]);
+      // The split is computed after the behavior_ids filter.
+      const filtered = await readOperationHandlers.get_adherence_summary(context, { ...range, behavior_ids: [id(14)] });
+      expect(filtered).toMatchObject({ ok: true, value: { overall: { not_completed: 1, completed: 0 },
+        period_split: { inside: { not_completed: 1, completed: 0, adherence_rate: 0 }, outside: { not_completed: 0, completed: 0, adherence_rate: null } } } });
+    });
+
+    it("returns full Periods from list_periods, earliest first, with the day-note revision form", async () => {
+      periods = [period(71, { label: "Travel", start_on: "2026-03-08", end_on: null, note: null, updated_at: "2026-03-08T07:30:00.123456+00:00" }), period(70)];
+      const result = await readOperationHandlers.list_periods(context, range);
+      expect(result).toEqual({ ok: true, value: { timezone: "America/New_York", today_local_date: "2026-03-08", next_cursor: null, periods: [
+        { ...summary, note: "Flu note", revision: at, updated_at: at },
+        { id: id(71), label: "Travel", start_local_date: "2026-03-08", end_local_date: null, ongoing: true, note: null,
+          revision: "2026-03-08T07:30:00.123456Z", updated_at: "2026-03-08T07:30:00.123456Z" },
+      ] } });
+      expect(await readOperationHandlers.list_periods(context, { start_local_date: "2026-03-10", end_local_date: "2026-03-20" }))
+        .toMatchObject({ ok: true, value: { periods: [{ id: id(71) }] } });
+      expect(await readOperationHandlers.list_periods(context, { start_local_date: "2026-01-01", end_local_date: "2027-01-02" }))
+        .toMatchObject({ ok: false, error: { code: "limit_exceeded" } });
+    });
+
+    it("pages list_periods 40 at a time with a cursor bound to the account and range", async () => {
+      periods = Array.from({ length: 95 }, (_, index) => period(1000 + index, { label: `Period ${index}` }));
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      const sizes: number[] = [];
+      do {
+        const pageResult = await readOperationHandlers.list_periods(context, { ...range, ...(cursor ? { cursor } : {}) });
+        expect(pageResult.ok).toBe(true); if (!pageResult.ok) return;
+        sizes.push(pageResult.value.periods.length);
+        seen.push(...pageResult.value.periods.map((row) => row.id));
+        cursor = pageResult.value.next_cursor;
+      } while (cursor);
+      expect(sizes).toEqual([40, 40, 15]);
+      expect(new Set(seen).size).toBe(95);
+      const first = await readOperationHandlers.list_periods(context, range);
+      if (!first.ok) return;
+      expect(await readOperationHandlers.list_periods(context, { start_local_date: "2026-03-02", end_local_date: "2026-03-10", cursor: first.value.next_cursor }))
+        .toMatchObject({ ok: false, error: { code: "invalid_input" } });
+      expect(await readOperationHandlers.list_periods({ ...context, userId: id(99) }, { ...range, cursor: first.value.next_cursor }))
+        .toMatchObject({ ok: false, error: { code: "invalid_input" } });
+    });
+
+    it("keeps every read under the result cap with 500 overlapping Periods", async () => {
+      const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), "utf8");
+      // The most an account can hold, all covering every day read, with the longest label and note.
+      periods = Array.from({ length: 500 }, (_, index) => period(2000 + index, {
+        label: `${String(index).padStart(3, "0")} ${"L".repeat(56)}`, start_on: "2026-01-01", end_on: index % 2 ? null : "2026-12-31", note: "é".repeat(2000),
+      }));
+      const contextResult = await readOperationHandlers.get_account_context(context, {});
+      expect(contextResult).toMatchObject({ ok: true, value: { more_active_periods: true } });
+      if (contextResult.ok) expect(contextResult.value.active_periods).toHaveLength(20);
+
+      const timeline = await readOperationHandlers.get_timeline(context, { start_local_date: "2026-03-01", days: 14, include_needs_decision: false });
+      expect(timeline.ok, JSON.stringify(timeline).slice(0, 200)).toBe(true);
+      if (timeline.ok) {
+        expect(timeline.value.days).toHaveLength(14);
+        for (const day of timeline.value.days) { expect(day.periods).toHaveLength(20); expect(day.more_periods).toBe(true); }
+        expect(bytes(timeline.value)).toBeLessThan(100_000);
+      }
+
+      const adherence = await readOperationHandlers.get_adherence_summary(context, { start_local_date: "2026-01-01", end_local_date: "2026-12-31" });
+      expect(adherence).toMatchObject({ ok: true, value: { period_split: { more_periods: true, inside: { unresolved: 1 }, outside: { unresolved: 0 } } } });
+      if (adherence.ok) expect(adherence.value.period_split!.periods).toHaveLength(20);
+
+      // Long notes: a page holds fewer than 40 Periods rather than passing the cap, and paging still reaches all 500.
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const pageResult = await readOperationHandlers.list_periods(context, { start_local_date: "2026-03-01", end_local_date: "2026-03-31", ...(cursor ? { cursor } : {}) });
+        expect(pageResult.ok, JSON.stringify(pageResult).slice(0, 200)).toBe(true); if (!pageResult.ok) return;
+        expect(pageResult.value.periods.length).toBeGreaterThan(0);
+        expect(pageResult.value.periods.length).toBeLessThanOrEqual(40);
+        expect(bytes(pageResult.value)).toBeLessThan(100_000);
+        for (const row of pageResult.value.periods) seen.add(row.id);
+        cursor = pageResult.value.next_cursor;
+        pages += 1;
+      } while (cursor && pages < 600);
+      expect(seen.size).toBe(500);
+      for (const result of [contextResult, adherence]) if (result.ok) expect(bytes(result.value)).toBeLessThan(100_000);
+    });
+
+    it("searches Period labels only and never returns a Period note from search or fetch", async () => {
+      periods = [period(70, { note: "zebra crossing incident" }), period(71, { label: "Zebra week", start_on: "2026-03-08", end_on: null, note: null })];
+      // Text that appears only in a Period note matches nothing.
+      expect(await readOperationHandlers.search(context, { query: "crossing" })).toEqual({ ok: true, value: { results: [] } });
+      // A label matches, case-insensitively, and the result title holds the label and dates.
+      expect(await readOperationHandlers.search(context, { query: "ZEBRA" })).toEqual({ ok: true, value: { results: [
+        { id: `period:${id(71)}`, title: "Period: Zebra week (from 2026-03-08, ongoing)", url: "https://app.cadence-me.com/behaviors" },
+      ] } });
+      const fetched = await readOperationHandlers.fetch(context, { id: `period:${id(70)}` });
+      expect(fetched).toMatchObject({ ok: true, value: { id: `period:${id(70)}`, title: "Period: Sick (2026-03-06 to 2026-03-09)", metadata: { kind: "period" } } });
+      if (!fetched.ok) return;
+      expect(JSON.parse(fetched.value.text)).toEqual({ ...summary, revision: at, updated_at: at });
+      expect(JSON.stringify(fetched.value)).not.toContain("zebra");
+      expect(JSON.stringify(fetched.value)).not.toContain("note");
+      expect(fetched.value.metadata).not.toHaveProperty("behavior_id");
+      expect(await readOperationHandlers.fetch(context, { id: `period:${id(99)}` })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    });
   });
 });

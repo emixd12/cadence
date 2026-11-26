@@ -316,8 +316,8 @@ localDescribe("integration writes on isolated local Supabase", () => {
     expect(productFingerprint()).toEqual(before);
   });
 
-  // update_day_note builds its receipt in one transaction without a prepared preview.
-  it.each((Object.keys(writeOperationHandlers) as (keyof typeof writeOperationHandlers)[]).filter((name): name is Exclude<typeof name, "update_day_note" | "move_occurrence_for_day" | "revert_occurrence_move" | "add_opportunity_occurrence" | "remove_opportunity_occurrence" | "set_parent_occurrence_status"> => name !== "update_day_note" && !name.includes("move") && !name.includes("opportunity") && name !== "set_parent_occurrence_status"))("rejects schema-invalid prepared output before %s commits", async name => {
+  // update_day_note and the Period writes build their receipts in one transaction without a prepared preview.
+  it.each((Object.keys(writeOperationHandlers) as (keyof typeof writeOperationHandlers)[]).filter((name): name is Exclude<typeof name, "update_day_note" | "move_occurrence_for_day" | "revert_occurrence_move" | "add_opportunity_occurrence" | "remove_opportunity_occurrence" | "set_parent_occurrence_status" | "create_period" | "update_period" | "end_period"> => name !== "update_day_note" && !name.includes("move") && !name.includes("opportunity") && !name.endsWith("_period") && name !== "set_parent_occurrence_status"))("rejects schema-invalid prepared output before %s commits", async name => {
     const { id, oid } = await outputFixture();
     const behavior = await getBehaviorById(a.supabase, a.userId, id);
     const inputs = {

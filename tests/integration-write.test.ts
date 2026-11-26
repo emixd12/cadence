@@ -8,11 +8,16 @@ import { getBehaviorById, listUserBehaviors } from "@/lib/db/behaviors.repo";
 import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
 import type { BehaviorWithCategory } from "@/lib/db/behaviors.repo";
 import { updateBehaviorForUser } from "@/lib/services/behavior.service";
+import { getPeriod } from "@/lib/db/periods.repo";
+import { periodTodayForUser } from "@/lib/services/period.service";
+import type { PeriodRecord } from "@cadence/core/resolvers/period.resolver";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db/integration.repo", () => ({
   beginIdempotentWrite: vi.fn(), releaseIdempotentWrite: vi.fn(), recordIntegrationActivity: vi.fn(),
 }));
+vi.mock("@/lib/db/periods.repo", () => ({ getPeriod: vi.fn() }));
+vi.mock("@/lib/services/period.service", () => ({ periodTodayForUser: vi.fn() }));
 vi.mock("@/lib/db/behaviors.repo", () => ({ getBehaviorById: vi.fn(), listBehaviorCategories: vi.fn(), listUserBehaviors: vi.fn() }));
 vi.mock("@/lib/services/behavior.service", async (original) => ({
   ...await original<typeof import("@/lib/services/behavior.service")>(), updateBehaviorForUser: vi.fn(),
@@ -33,7 +38,7 @@ describe("integration write boundary", () => {
       const result = await handler({ ...context, actor: { ...context.actor, grantedScopes: ["cadence.read"] } }, {});
       expect(result).toMatchObject({ ok: false, error: { code: "insufficient_scope" } });
     }
-    expect(recordIntegrationActivity).toHaveBeenCalledTimes(15);
+    expect(recordIntegrationActivity).toHaveBeenCalledTimes(18);
     expect(beginIdempotentWrite).not.toHaveBeenCalled();
     expect(getBehaviorById).not.toHaveBeenCalled();
   });
@@ -149,5 +154,140 @@ describe("structured Behavior input", () => {
       behavior_id: id, expected_revision: current.updated_at,
       schedules: [{ ...create.schedules[0], time_entries: [create.schedules[0].time_entries[0], create.schedules[0].time_entries[0]] }],
     })).toMatchObject({ ok: false, error: { code: "invalid_input", field_errors: [{ path: "$.schedule" }] } });
+  });
+});
+
+describe("Period writes (Ticket 370)", () => {
+  const revision = "2026-10-18T11:00:00Z";
+  const stored: PeriodRecord = { id, user_id: id, label: "Sick", start_on: "2026-10-12", end_on: null, note: "Flu",
+    revision: 4, created_at: "2026-10-12T09:00:00+00:00", updated_at: "2026-10-18T11:00:00+00:00" };
+  const output = (overrides: Record<string, unknown> = {}, changed?: boolean) => ({
+    period: { id, label: "Sick", start_local_date: "2026-10-12", end_local_date: null, ongoing: true, note: "Flu",
+      revision: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z", ...overrides },
+    ...(changed === undefined ? {} : { changed }),
+  });
+  const receiptFor = (value: unknown) => ({ data: { receipt: { version: 2, output_json: JSON.stringify(value) } }, error: null });
+  const withRpc = (rpc: unknown) => ({ ...context, supabase: { rpc } }) as unknown as IntegrationContext;
+
+  beforeEach(() => {
+    vi.mocked(getPeriod).mockResolvedValue(stored);
+    vi.mocked(periodTodayForUser).mockResolvedValue("2026-10-18");
+  });
+
+  it("creates a Period through one transaction with the resolver's normalized fields", async () => {
+    const created = output({ label: "Sick", note: "Flu.\nStayed home." });
+    const rpc = vi.fn().mockResolvedValue(receiptFor(created));
+    const result = await writeOperationHandlers.create_period(withRpc(rpc),
+      { label: "Sick", start_local_date: "2026-10-12", note: "  Flu.\r\nStayed home. " });
+    expect(result).toEqual({ ok: true, value: created });
+    expect(rpc).toHaveBeenCalledWith("integration_apply_period_write", {
+      p_key: null, p_hash: expect.stringMatching(/^[0-9a-f]{64}$/), p_operation: "create_period", p_period_id: null, p_expected_revision: null,
+      p_label: "Sick", p_start_on: "2026-10-12", p_end_on: null, p_note: "Flu.\nStayed home.",
+    });
+    expect(getPeriod).not.toHaveBeenCalled();
+    // A blank note is no note, and an explicit null end is ongoing.
+    await writeOperationHandlers.create_period(withRpc(rpc), { label: "Trip", start_local_date: "2026-10-12", end_local_date: null, note: "  " });
+    expect(rpc).toHaveBeenLastCalledWith("integration_apply_period_write", expect.objectContaining({ p_label: "Trip", p_end_on: null, p_note: null }));
+  });
+
+  it("refuses a create whose last day is before its first, and tells an agent the account is full", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "54000", message: "An account can hold at most 500 periods." } });
+    expect(await writeOperationHandlers.create_period(withRpc(rpc), { label: "Sick", start_local_date: "2026-10-12", end_local_date: "2026-10-11" }))
+      .toMatchObject({ ok: false, error: { code: "invalid_input" } });
+    expect(rpc).not.toHaveBeenCalled();
+    const full = await writeOperationHandlers.create_period(withRpc(rpc), { label: "Sick", start_local_date: "2026-10-12" });
+    expect(full).toMatchObject({ ok: false, error: { code: "limit_exceeded", retry: "after_change" } });
+    if (!full.ok) {
+      expect(full.error.message).toContain("500 Periods");
+      expect(full.error.message).toContain("No tool removes a Period");
+    }
+  });
+
+  it("edits only the fields sent: null makes it ongoing or clears the note, absent keeps", async () => {
+    const rpc = vi.fn().mockResolvedValue(receiptFor(output({ end_local_date: "2026-10-20", ongoing: false }, true)));
+    expect(await writeOperationHandlers.update_period(withRpc(rpc), { period_id: id, expected_revision: revision, end_local_date: "2026-10-20" }))
+      .toMatchObject({ ok: true, value: { changed: true, period: { end_local_date: "2026-10-20" } } });
+    expect(rpc).toHaveBeenLastCalledWith("integration_apply_period_write", expect.objectContaining({
+      p_operation: "update_period", p_period_id: id, p_expected_revision: revision,
+      p_label: "Sick", p_start_on: "2026-10-12", p_end_on: "2026-10-20", p_note: "Flu",
+    }));
+    vi.mocked(getPeriod).mockResolvedValue({ ...stored, end_on: "2026-10-20" });
+    await writeOperationHandlers.update_period(withRpc(rpc), { period_id: id, expected_revision: revision, end_local_date: null, note: null, label: " Flu week " });
+    expect(rpc).toHaveBeenLastCalledWith("integration_apply_period_write", expect.objectContaining({
+      p_label: "Flu week", p_start_on: "2026-10-12", p_end_on: null, p_note: null,
+    }));
+  });
+
+  it("checks the revision and the stored dates before any write", async () => {
+    const rpc = vi.fn();
+    expect(await writeOperationHandlers.update_period(withRpc(rpc), { period_id: id, expected_revision: "2026-10-18T10:00:00Z", label: "Flu" }))
+      .toMatchObject({ ok: false, error: { code: "conflict" } });
+    // The sent first day is after the stored last day.
+    vi.mocked(getPeriod).mockResolvedValue({ ...stored, end_on: "2026-10-14" });
+    expect(await writeOperationHandlers.update_period(withRpc(rpc), { period_id: id, expected_revision: revision, start_local_date: "2026-10-15" }))
+      .toMatchObject({ ok: false, error: { code: "invalid_input", message: "The last day must be on or after the first day." } });
+    expect(await writeOperationHandlers.update_period(withRpc(rpc), { period_id: id, expected_revision: revision }))
+      .toMatchObject({ ok: false, error: { code: "invalid_input" } });
+    vi.mocked(getPeriod).mockResolvedValue(null);
+    for (const name of ["update_period", "end_period"] as const) {
+      expect(await writeOperationHandlers[name](withRpc(rpc), { period_id: id, expected_revision: revision, ...(name === "update_period" ? { label: "Flu" } : {}) }))
+        .toMatchObject({ ok: false, error: { code: "not_found" } });
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("ends a Period on the account's today and takes no date from the caller", async () => {
+    const ended = output({ end_local_date: "2026-10-18", ongoing: false }, true);
+    const rpc = vi.fn().mockResolvedValue(receiptFor(ended));
+    expect(await writeOperationHandlers.end_period(withRpc(rpc), { period_id: id, expected_revision: revision })).toEqual({ ok: true, value: ended });
+    expect(periodTodayForUser).toHaveBeenCalledWith(expect.anything(), id, expect.anything());
+    expect(rpc).toHaveBeenCalledWith("integration_apply_period_write", expect.objectContaining({
+      p_operation: "end_period", p_period_id: id, p_expected_revision: revision,
+      p_label: "Sick", p_start_on: "2026-10-12", p_end_on: "2026-10-18", p_note: "Flu",
+    }));
+    expect(await writeOperationHandlers.end_period(withRpc(rpc), { period_id: id, expected_revision: revision, end_local_date: "2026-10-01" }))
+      .toMatchObject({ ok: false, error: { code: "invalid_input" } });
+  });
+
+  it.each([
+    ["not started", { start_on: "2026-10-19", end_on: null }],
+    ["ended today", { end_on: "2026-10-18" }],
+    ["ended earlier", { end_on: "2026-10-15" }],
+  ])("refuses to end a Period that has %s with invalid_state and writes nothing", async (_label, overrides) => {
+    vi.mocked(getPeriod).mockResolvedValue({ ...stored, ...overrides });
+    const rpc = vi.fn();
+    const result = await writeOperationHandlers.end_period(withRpc(rpc), { period_id: id, expected_revision: revision });
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid_state" } });
+    if (!result.ok) expect(result.error.message).toContain("update_period");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("ends a Period whose last day is still ahead", async () => {
+    vi.mocked(getPeriod).mockResolvedValue({ ...stored, end_on: "2026-10-25" });
+    const rpc = vi.fn().mockResolvedValue(receiptFor(output({ end_local_date: "2026-10-18", ongoing: false }, true)));
+    expect(await writeOperationHandlers.end_period(withRpc(rpc), { period_id: id, expected_revision: revision })).toMatchObject({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("integration_apply_period_write", expect.objectContaining({ p_end_on: "2026-10-18" }));
+  });
+
+  it("maps the transaction's refusals to contract errors", async () => {
+    for (const [message, code] of [["integration_conflict", "conflict"], ["integration_not_found", "not_found"],
+      ["integration_period_end_refused", "invalid_state"], ["integration_insufficient_scope", "insufficient_scope"],
+      ["The period label is invalid.", "invalid_input"]] as const) {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { message } });
+      expect(await writeOperationHandlers.end_period(withRpc(rpc), { period_id: id, expected_revision: revision }))
+        .toMatchObject({ ok: false, error: { code } });
+    }
+  });
+
+  it("replays a stored result by key and records the Period id, never its label or note", async () => {
+    const replayed = output({}, false);
+    vi.mocked(beginIdempotentWrite).mockResolvedValue({ state: "replay", result: { version: 2, output_json: JSON.stringify(replayed) } } as never);
+    const rpc = vi.fn();
+    expect(await writeOperationHandlers.update_period(withRpc(rpc), { period_id: id, expected_revision: revision, label: "Flu", idempotency_key: "period-key-1" }))
+      .toEqual({ ok: true, value: replayed });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(getPeriod).not.toHaveBeenCalled();
+    expect(recordIntegrationActivity).toHaveBeenCalledWith(expect.anything(), { operation: "update_period", targetIds: [id], outcome: "success", errorCode: null });
+    expect(JSON.stringify(vi.mocked(recordIntegrationActivity).mock.calls)).not.toMatch(/Sick|Flu/);
   });
 });

@@ -74,7 +74,7 @@ export function integrationBehaviorInput(
     });
   });
   const values = parseBehaviorFormData(form, { mode: current ? "update" : "create" });
-  // Contract 1.8.0 (Ticket 364): the 1.7.0 schema rejects the field, so it reaches here only
+  // Contract 1.9.0 (Ticket 364): the 1.8.0 schema rejects the field, so it reaches here only
   // with CADENCE_ALONGSIDE on. Omitted keeps the stored answer; null clears it.
   const alongside = (input as AlongsideInputField).alongside;
   return alongside === undefined ? values : { ...values, alongside };

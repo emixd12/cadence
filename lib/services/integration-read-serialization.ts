@@ -22,9 +22,9 @@ export const integrationInstant = (value: string): string => Temporal.Instant.fr
 const nullableInstant = (value: string | null): string | null => value === null ? null : integrationInstant(value);
 
 /**
- * Contract 1.8.0 (Ticket 364): the person's alongside setting, only while
+ * Contract 1.9.0 (Ticket 364): the person's alongside setting, only while
  * `CADENCE_ALONGSIDE` is on. Rows come from `select *`, so the column may be present with
- * the flag off; it is then left out and the output stays 1.7.0. The cached model guess
+ * the flag off; it is then left out and the output stays 1.8.0. The cached model guess
  * lives in another table and never reaches this output.
  */
 function alongsideField(behavior: BehaviorWithCategory): AlongsideOutputField {
