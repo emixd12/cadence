@@ -133,6 +133,7 @@ describe("createBehaviorFromFormData", () => {
             "is_opportunity",
             "parent_behavior_id",
             "inherit_parent_schedule",
+            "alongside",
           ],
           reasonCode: "behavior_created",
           source: "manual",

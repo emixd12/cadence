@@ -6,6 +6,7 @@ import type { Profile } from "../../../lib/types/database";
 import { createDesktopZip } from "./archive";
 import { ensureLocalOccurrencesFresh, toLocalBehaviorGraphRecord } from "./local-generation.service";
 import { localCommand } from "./local-store";
+import { alongsideOption } from "./alongside";
 
 export async function getLocalExportPageData(profile: Profile, options: ExportOptions = {}) {
   const now = options.now ?? Temporal.Now.instant();
@@ -16,6 +17,8 @@ export async function getLocalExportPageData(profile: Profile, options: ExportOp
     includeTimeTracking: options.includeTimeTracking ?? false, throughStartedAt: now.toString(),
   });
   return assembleExportBundle({ ...options, ...snapshot, now, userId: profile.id, timezone: profile.timezone,
+    // Ticket 363 (D33): the person's alongside answer, with the Mac's alongside switch on (as the web with the flag on). Never a guess.
+    ...alongsideOption(),
     behaviors: snapshot.graphs.map((graph) => toLocalBehaviorGraphRecord(graph, snapshot.categories)),
     // Export assembly reads both the local camelCase and the synchronized snake_case snapshot shapes.
     behaviorConfigurationEvents: snapshot.behaviorConfigurationEvents,

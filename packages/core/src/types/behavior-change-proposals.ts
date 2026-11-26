@@ -23,6 +23,9 @@ export type ScheduleProposalTip = Readonly<{
   research: AdvisorTipResearch | null;
 }>;
 
+/** Ticket 362: the host of a pairing proposal. */
+export type ScheduleProposalPairing = Readonly<{ hostBehaviorId: string; hostTitle: string }>;
+
 export type ScheduleProposalView =
   /** Nothing to show. */
   | Readonly<{ kind: "none" }>
@@ -47,6 +50,12 @@ export type ScheduleProposalView =
       changeKind?: "time" | "length";
       /** Present when the question came from a tip. */
       tip?: ScheduleProposalTip | null;
+      /**
+       * Ticket 362 (D33): present when the change puts an alongside Behavior at another
+       * Behavior's set time (its host). The line and reason already name both; a client
+       * may ignore this.
+       */
+      pairing?: ScheduleProposalPairing;
     }>
   /** A trial in progress, before its check-in day. Optional for the UI to show. */
   | Readonly<{ kind: "trial"; proposalId: string; behaviorId: string; line: string; checkInDate: string }>

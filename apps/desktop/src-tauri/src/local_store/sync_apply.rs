@@ -440,6 +440,7 @@ fn validate_write(
                     "parent_behavior_id",
                     "sub_behavior_sort_order",
                     "inherit_parent_schedule",
+                    "alongside",
                 ]
                 .iter()
                     .any(|field| !value.contains_key(*field))
@@ -1149,6 +1150,7 @@ mod tests {
             parent_behavior_id: None,
             sub_behavior_sort_order: 0,
             inherit_parent_schedule: false,
+            alongside: None,
             recurrence_rule: json!({"type":"daily","interval":1}),
             scheduled_time: Some("09:00:00".into()),
             is_opportunity: false,
@@ -2127,7 +2129,7 @@ mod tests {
             "email_reminder_enabled":false,"reminder_offset_minutes":0,"active":true,"archived_at":null,"archive_notes":[],
             "current_configuration_event_id":null,"default_duration_minutes":20,"auto_archived_at":null,"location_text":null,
             "where_kind":"anywhere","end_on":null,"end_time":null,"pause_from_on":null,"pause_from_time":null,"pause_back_on":null,
-            "is_opportunity":true,"parent_behavior_id":null,"sub_behavior_sort_order":0,"inherit_parent_schedule":false,"created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
+            "is_opportunity":true,"parent_behavior_id":null,"sub_behavior_sort_order":0,"inherit_parent_schedule":false,"alongside":true,"created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
         let occurrence = json!({"id":occurrence_id,"behavior_id":behavior_id,"behavior_configuration_event_id":null,
             "behavior_schedule_slot_id":null,"scheduled_for":"2026-09-01T19:00:00.000000Z","local_date":"2026-09-01",
             "schedule_kind":"exact","schedule_preset":null,"schedule_start_time":"15:00:00","schedule_end_time":null,
@@ -2147,6 +2149,11 @@ mod tests {
         old_behavior.as_object_mut().unwrap().remove("is_opportunity");
         assert_eq!(apply(&mut connection, vec![write(AccountSyncEntityKind::Behavior, behavior_id, AccountSyncOperation::Upsert, None, Some(old_behavior))]).unwrap_err(),
             "Update Cadence before synchronizing Behavior changes.");
+        // So does a plan written before contract 10 (no alongside answer).
+        let mut old_behavior = behavior.clone();
+        old_behavior.as_object_mut().unwrap().remove("alongside");
+        assert_eq!(apply(&mut connection, vec![write(AccountSyncEntityKind::Behavior, behavior_id, AccountSyncOperation::Upsert, None, Some(old_behavior))]).unwrap_err(),
+            "Update Cadence before synchronizing Behavior changes.");
 
         apply(&mut connection, vec![
             write(AccountSyncEntityKind::Behavior, behavior_id, AccountSyncOperation::Upsert, None, Some(behavior.clone())),
@@ -2154,6 +2161,8 @@ mod tests {
         ]).unwrap();
         let stored_behavior = db::by_id::<Behavior>(&connection, &profile, behavior_id).unwrap();
         assert!(stored_behavior.is_opportunity);
+        // Contract 10 (Ticket 363): the alongside answer arrives with the row.
+        assert_eq!(stored_behavior.alongside, Some(true));
         assert_eq!((stored_behavior.recurrence_rule.clone(), stored_behavior.scheduled_time.clone()), (Value::Null, None));
         let stored = db::by_id::<Occurrence>(&connection, &profile, occurrence_id).unwrap();
         assert_eq!((stored.origin.as_str(), stored.added_by.as_deref()), ("opportunity", Some("daily_brief")));
@@ -2198,7 +2207,7 @@ mod tests {
             "email_reminder_enabled":false,"reminder_offset_minutes":0,"active":true,"archived_at":null,"archive_notes":[],
             "current_configuration_event_id":null,"default_duration_minutes":20,"auto_archived_at":null,"location_text":null,
             "where_kind":"anywhere","end_on":null,"end_time":null,"pause_from_on":null,"pause_from_time":null,"pause_back_on":null,
-            "is_opportunity":false,"parent_behavior_id":parent,"sub_behavior_sort_order":0,"inherit_parent_schedule":false,
+            "is_opportunity":false,"parent_behavior_id":parent,"sub_behavior_sort_order":0,"inherit_parent_schedule":false,"alongside":null,
             "created_at":"2026-09-01T00:00:00.000000Z","updated_at":"2026-09-01T00:00:00.000000Z"});
         let upsert = |id: &str, expected: Option<Value>, value: Value| AccountSyncWrite {
             kind: AccountSyncEntityKind::Behavior, id: id.into(), operation: AccountSyncOperation::Upsert, expected, value: Some(value),
@@ -2345,6 +2354,7 @@ mod tests {
             parent_behavior_id: None,
             sub_behavior_sort_order: 0,
             inherit_parent_schedule: false,
+            alongside: None,
             recurrence_rule: json!({"type":"daily","interval":1}),
             scheduled_time: Some("09:00:00".into()),
             is_opportunity: false,

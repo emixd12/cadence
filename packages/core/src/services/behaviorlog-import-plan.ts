@@ -51,6 +51,8 @@ export function planBehaviorLogImportWrite(context: PortabilityPlanContext & {
       recurrence_rule: primary?.recurrence_rule ?? null, scheduled_time: primary?.start_time ?? null,
       timezone: schedules[0]?.timezone ?? preview.plan.occurrences.find((occurrence) => occurrence.behaviorExternalId === row.externalId)?.timezone ?? snapshot.profile.timezone,
       is_opportunity: row.cadenceIsOpportunity === true,
+      // Ticket 363: the bundle's alongside answer, when the Mac reads it.
+      ...(context.includeAlongside && row.cadenceAlongside !== undefined ? { alongside: row.cadenceAlongside } : {}),
       browser_reminder_enabled: context.interventionRulesPresent ? rules.some((rule) => rule.channel === "browser_push") : row.cadenceBrowserReminderEnabled ?? true,
       email_reminder_enabled: context.interventionRulesPresent ? rules.some((rule) => rule.channel === "email") : row.cadenceEmailReminderEnabled ?? false,
       reminder_offset_minutes: context.interventionRulesPresent ? Math.max(0, -(rules.filter((rule) => ["browser_push", "email"].includes(rule.channel) && rule.offsetMinutes !== null).sort(byExternal)[0]?.offsetMinutes ?? 0)) : row.cadenceReminderOffsetMinutes ?? 0,

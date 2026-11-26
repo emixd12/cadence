@@ -34,12 +34,20 @@ import {
   type PlannedItemMove,
   type ProposalSchedule,
 } from "@cadence/core/services/behavior-change-proposal";
+import {
+  SCHEDULE_PAIRING_RULES,
+  planSchedulePairings,
+  schedulePairingHostHolds,
+  type SchedulePairingBehavior,
+  type SchedulePairingDoneTogether,
+} from "@cadence/core/resolvers/alongside-schedule-pairing.resolver";
 import { ADVICE_CARDS } from "@cadence/core/services/advice-library";
 import type { AdviceCard } from "@cadence/core/types/advice-cards";
 import type {
   ScheduleProposalAnswer,
   ScheduleProposalAnswerResult,
   ScheduleProposalErrorCode,
+  ScheduleProposalPairing,
   ScheduleProposalTip,
   ScheduleProposalView,
 } from "@cadence/core/types/behavior-change-proposals";
@@ -62,6 +70,9 @@ import {
   type BehaviorWithCategory,
 } from "@/lib/db/behaviors.repo";
 import { listBehaviorOccurrenceTimesOnLocalDate } from "@/lib/db/occurrences.repo";
+import { readAcceptedBriefPairings, readNeverMoveBehaviorIds } from "@/lib/db/alongside-schedule-pairing.repo";
+import { readStoredSignals } from "@/lib/db/advisor-tips.repo";
+import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 import { updateBehaviorForUser } from "@/lib/services/behavior.service";
 import { integrationBehaviorInput } from "@/lib/services/integration-behavior-input";
 import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
@@ -260,7 +271,61 @@ export async function proposeTipOffers(client: AppSupabaseClient, input: VisitIn
   return outcomes;
 }
 
-async function store(client: AppSupabaseClient, input: VisitInput, plan: BehaviorChangePlan | BehaviorLengthPlan) {
+/**
+ * Ticket 362 (D33, "Pairing the schedule"): at most one pairing proposal per visit, on the
+ * tip run's coach run, called only while `CADENCE_ALONGSIDE` is on. Evidence is today's
+ * stored done_together signals and the Daily Brief pairing lines the person said Yes to
+ * in the last 28 days; the rule is `planSchedulePairings`. Never edits a Behavior.
+ */
+export async function proposeSchedulePairingsForVisit(client: AppSupabaseClient, input: Readonly<{
+  userId: string;
+  runId: string;
+  today: string;
+  env?: Readonly<Record<string, string | undefined>>;
+}>): Promise<VisitProposalOutcome> {
+  const signals = await readStoredSignals(client, input.today);
+  const doneTogether: SchedulePairingDoneTogether[] = [];
+  const togetherDays = new Map<string, Readonly<{ days: number; windowDays: number }>>();
+  for (const signal of signals) {
+    const other = signal.facts.other_behavior_id;
+    if (signal.kind !== "done_together" || !signal.behaviorId || typeof other !== "string") continue;
+    const id = Number(signal.id);
+    doneTogether.push({ behaviorId: signal.behaviorId, otherBehaviorId: other, signalId: Number.isSafeInteger(id) && id > 0 ? id : null });
+    const days = Number(signal.facts.together_days), windowDays = Number(signal.facts.window_days);
+    if (Number.isInteger(days) && Number.isInteger(windowDays)) togetherDays.set(`${signal.behaviorId}|${other}`, { days, windowDays });
+  }
+  const yes = await readAcceptedBriefPairings(client, input.userId,
+    { since: addLocalDays(input.today, -(SCHEDULE_PAIRING_RULES.windowDays - 1)), until: input.today });
+  if (doneTogether.length === 0 && yes.length === 0) return { proposed: false, reason: "no_evidence" };
+
+  const ids = [...new Set([...doneTogether.flatMap((pair) => [pair.behaviorId, pair.otherBehaviorId]),
+    ...yes.flatMap((answer) => [answer.guestBehaviorId, answer.hostBehaviorId])])];
+  const [rows, facts, neverMove, state] = await Promise.all([
+    listUserBehaviors(client, input.userId),
+    readBehaviorPlanningFacts(client, input.userId, ids, input.today, { env: input.env }),
+    readNeverMoveBehaviorIds(client, input.userId),
+    readCoachBehaviorChangeState(client),
+  ]);
+  const wanted = new Set(ids);
+  const behaviors: SchedulePairingBehavior[] = rows.filter((row) => wanted.has(row.id)).map((row) => ({
+    id: row.id, title: row.title, active: row.active && row.archived_at === null, schedules: proposalSchedules(row),
+    lengthMinutes: row.default_duration_minutes ?? null,
+    alongside: facts.get(row.id)?.alongside.value ?? false, where: facts.get(row.id)?.where ?? null,
+    isOpportunity: row.is_opportunity === true,
+    followsParentSchedule: row.parent_behavior_id !== null && row.parent_behavior_id !== undefined && row.inherit_parent_schedule === true,
+    neverSuggestMove: neverMove.has(row.id),
+  }));
+  let lastReason = "no_candidate";
+  for (const outcome of planSchedulePairings({ today: input.today, behaviors, evidence: { doneTogether, yes }, declined: declinedOf(state), togetherDays })) {
+    if (!outcome.decision.ok) { lastReason = outcome.decision.reason; continue; }
+    const stored = await store(client, input, outcome.decision.plan);
+    if ("id" in stored) return { proposed: true, proposalId: stored.id, behaviorId: outcome.guestId };
+    lastReason = stored.refused;
+  }
+  return { proposed: false, reason: lastReason };
+}
+
+async function store(client: AppSupabaseClient, input: Pick<VisitInput, "today" | "runId">, plan: BehaviorChangePlan | BehaviorLengthPlan) {
   const proposal = toProposeBehaviorChangeInput(plan, input.today, input.runId);
   const valid = validateProposeBehaviorChangeInput(proposal);
   if (!valid.ok) return { refused: "invalid_proposal" } as const;
@@ -351,6 +416,11 @@ export async function answerScheduleProposal(caller: ScheduleProposalCaller, inp
       const current = proposalSchedules(active);
       if (!schedulesEqual(current, row.schedulesAfter)) {
         if (!schedulesEqual(current, row.schedulesBefore)) {
+          await call(() => answerBehaviorChangeProposal(caller.supabase, { proposalId: row.id, answer: "schedule_changed", today }));
+          throw new ScheduleProposalError("schedule_changed");
+        }
+        // Ticket 362: a pairing still needs its host at the new time.
+        if (row.pairing && !(await pairingHostHolds(caller, row))) {
           await call(() => answerBehaviorChangeProposal(caller.supabase, { proposalId: row.id, answer: "schedule_changed", today }));
           throw new ScheduleProposalError("schedule_changed");
         }
@@ -496,6 +566,12 @@ async function settleAndView(caller: ScheduleProposalCaller, row: BehaviorChange
         firstAffectedDate: today, answers: ["try", "for_good", "no"], tip,
       };
     }
+    // Ticket 362: a pairing whose host moved, dropped a weekday or was archived is stale too.
+    const pairing = row.pairing ? await pairingView(caller, row) : null;
+    if (row.pairing && state === "before" && !pairing) {
+      await call(() => answerBehaviorChangeProposal(caller.supabase, { proposalId: row.id, answer: "schedule_changed", today }));
+      return await viewAfter(caller, today);
+    }
     const change = changeOf(row);
     const first = firstAffectedDate(today, row.weekdays);
     return {
@@ -510,6 +586,7 @@ async function settleAndView(caller: ScheduleProposalCaller, row: BehaviorChange
       firstAffectedDate: first,
       answers: ["try", "for_good", "no"],
       tip,
+      ...(pairing ? { pairing } : {}),
     };
   }
 
@@ -551,6 +628,19 @@ function tipOf(caller: ScheduleProposalCaller, row: BehaviorChangeProposalRow, t
     ? formatTipQuestion({ title, length: { fromMinutes: row.fromMinutes, toMinutes: row.toMinutes } })
     : formatTipQuestion({ title, change: changeOf(row) });
   return { text: row.tip.text, question, research: researchFor(row.tip.cardId, caller.cards ?? ADVICE_CARDS) };
+}
+
+/** The pairing's host, when it still has the proposal's new time on every changed weekday. */
+async function pairingView(caller: ScheduleProposalCaller, row: Extract<BehaviorChangeProposalRow, { changeKind: "time" }>):
+  Promise<ScheduleProposalPairing | null> {
+  if (!row.pairing) return null;
+  const host = await getBehaviorById(caller.supabase, caller.userId, row.pairing.hostBehaviorId);
+  if (!host || !schedulePairingHostHolds({ active: host.active, schedules: proposalSchedules(host) }, changeOf(row))) return null;
+  return { hostBehaviorId: host.id, hostTitle: host.title };
+}
+
+async function pairingHostHolds(caller: ScheduleProposalCaller, row: Extract<BehaviorChangeProposalRow, { changeKind: "time" }>): Promise<boolean> {
+  return (await pairingView(caller, row)) !== null;
 }
 
 function changeOf(row: Extract<BehaviorChangeProposalRow, { changeKind: "time" }>): BehaviorChange {

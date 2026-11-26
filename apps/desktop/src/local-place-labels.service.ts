@@ -43,7 +43,13 @@ export type LocalPlaceLabelMutation =
  * Ticket 216 on desktop: the same core planners as the web route, over SQLite.
  * Works offline; account synchronization carries the rows when a link exists.
  */
-export function createLocalPlaceLabelClient(onChanged: () => void = () => undefined): PlaceLabelClient {
+export function createLocalPlaceLabelClient(onChanged: () => void = () => undefined,
+  /**
+   * Ticket 363 (D33): a linked Mac's current Where guesses by Behavior id, held in memory
+   * from the hosted read, so a guessed Where shares the suggestion line as on the web.
+   * Null or empty: none (always so in local mode).
+   */
+  whereGuesses: () => ReadonlyMap<string, string> | null = () => null): PlaceLabelClient {
   const profile = () => localCommand("readProfile", {});
   const rows = (profileId: string) => localCommand("readPlaceLabels", { profileId }) as Promise<LocalPlaceLabelRows>;
   const now = () => canonicalTravelInstant(Temporal.Now.instant().toString());
@@ -70,8 +76,11 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
     }
     const behaviors = [...graphs].sort((left, right) => left.behavior.created_at.localeCompare(right.behavior.created_at) || left.behavior.id.localeCompare(right.behavior.id))
       .map(({ behavior }) => ({ id: behavior.id, active: behavior.active, where_kind: behavior.where_kind ?? null, location_text: behavior.location_text ?? null }));
+    // Only a Behavior whose Where is Not set here gets a guessed Where.
+    const guesses = settings.enabled ? new Map([...(whereGuesses() ?? [])]
+      .filter(([id]) => behaviors.some((behavior) => behavior.id === id && behavior.where_kind === null))) : null;
     return buildPlaceLabelState({ settings: stored.settings, homeText: travel.baseLocationText, markers: stored.markers, labels,
-      dismissals: stored.dismissals, behaviors, today: today(owner.timezone) });
+      dismissals: stored.dismissals, behaviors, today: today(owner.timezone), ...(guesses?.size ? { whereGuesses: guesses } : {}) });
   };
   const captureContext = async (occurrenceId: string) => {
     const owner = await profile();

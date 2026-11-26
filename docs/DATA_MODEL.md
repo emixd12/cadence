@@ -2547,16 +2547,50 @@ be done alongside other things?". Null means unanswered. Migration:
   (absent: null). `update_behavior_with_schedule_graph` changes it only when the payload
   carries the key; JSON null clears it. A change through the RPC is a revision: the RPC
   sets every column the `updated_at` trigger watches. The trigger itself is unchanged.
-- **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code reads the column and
-  planners read the cached guess, then false, as before Ticket 356.
-- **Hosted-only until Ticket 363.** Account sync contract 9 does not carry the column:
-  `account_sync_snapshot()` leaves it out of each Behavior row, `apply_account_sync_plan`
-  compares a device's expected row without it, and a synced Behavior write neither
-  inserts nor updates it, so a Mac write keeps the stored answer and a Behavior created
-  on the Mac starts unanswered. The configuration snapshot and `changed_fields` do not
-  include it yet either, because configuration history is synced; changing the answer
-  writes no configuration event. Ticket 363 adds the column to the Mac's SQLite, the
-  sync contract and configuration history together.
+- **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code selects the column by
+  name and planners read the cached guess, then false, as before Ticket 356. Since
+  Ticket 363 a web edit built from a stored Behavior (`select *`) carries the stored
+  answer back unchanged, so configuration history compares like with like.
+- **Configuration history and account sync (Ticket 363).** Migration
+  `20261126120000_account_sync_alongside.sql` makes the answer part of the Behavior
+  configuration: `current_behavior_configuration_snapshot` carries `alongside` (true,
+  false or null), `behavior_configuration_changed_fields` and the `changed_fields` check
+  include `alongside` (the last field, after `inherit_parent_schedule`), and changing the
+  answer is a configuration revision. A plan without the key keeps the stored answer
+  (`behavior_configuration_with_run`, `behavior_configuration_planned_fields`), as a plan
+  without `is_opportunity` does; the TypeScript payload leaves the key out only when
+  neither side has an answer. Existing history is not rewritten: a snapshot without the
+  key was unanswered. Core writes the reason code `alongside_answered` for a single
+  answer (`setBehaviorAlongside`); form, MCP and Chat edits keep `behavior_edited`.
+  Account sync contract 10 carries `behavior.alongside`: the snapshot, the expected-row
+  comparison and the synced insert and update lists include it, and a contract-10
+  Behavior write must carry it. Contract-8 and contract-9 writers keep syncing: the
+  projection hides the field and the stored answer is restored on their writes, so an
+  older Cadence for Mac never clears it. The minimum writer contract stays 8. Cadence for
+  Mac stores the answer in SQLite schema 29 (`docs/DESKTOP_DATA_MODEL.md`). Smoke:
+  `tests/sql/behavior-alongside-smoke.sql`.
+- **Guesses for a linked Mac (Ticket 363).** `GET /api/behaviors/alongside`
+  (`readAlongsideGuesses` in `lib/services/alongside-view.service.ts`) returns the
+  account's current guesses (`alongside` and `whereGuess` per Behavior, from
+  `behavior_advisor_estimates` while the `input_hash` is current), or `enabled: false`
+  and no reads while `CADENCE_ALONGSIDE` is off. It reads no place labels; the Mac uses
+  its own. The Mac keeps the answer in memory only.
+- **Brief asks (Ticket 360).** `public.brief_alongside_asks` records that a saved
+  Daily Brief included a Behavior's alongside question, so a later day's brief does not
+  ask about that Behavior again: `user_id`, `behavior_id`, `local_date` (the first
+  saved brief that asked), `created_at`; primary key `(user_id, behavior_id)`, so a
+  repeat keeps the first date. No text. Owner-only RLS: `select` and `insert` policies on
+  `auth.uid() = user_id`, grants `select, insert` to `authenticated`, none to `anon`;
+  no update or delete. Account deletion (the `auth.users` cascade) and Behavior deletion
+  (the `(user_id, behavior_id)` foreign key) remove its rows. Hosted-only: not in
+  account sync, exports, BehaviorLog or MCP. Written on the person's own client
+  (`lib/db/brief-alongside-asks.repo.ts`) after `save_daily_brief` stores a brief whose
+  `alongsideQuestion` is set; read for the pick's `askedBehaviorIds`, counting only
+  rows from earlier local dates, so a refresh the same day may ask again. Only the
+  Daily Brief reads it; the Timeline row, the form and Chat do not, and an answer on any
+  surface still closes the question through `behaviors.alongside`. Nothing reads or
+  writes it while `CADENCE_ALONGSIDE` is off. Migration
+  `20261126100000_alongside_pairing_evidence_and_brief_asks.sql` (additive).
 - **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
   and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
   import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
@@ -3666,6 +3700,20 @@ shown to the person; Phase 4 matches the signals to advice cards.
   `/api/advisor/coach/signals/process`. It reads `move_proposal_answers` when that
   table exists (Phase 3A1) and each brief proposal's final status otherwise.
 - Account deletion cascades; deleting a Behavior removes its signals.
+- `advisor_read_pairing_evidence(local_date)` (Ticket 361, D33; migration
+  `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`): the Daily Brief and
+  Chat agent tokens only (`daily_brief`, `chat`); the person's session, the coach token
+  and MCP grant tokens get `42501`. Security definer, stable, empty `search_path`,
+  execute granted to `authenticated` only. Returns, for the caller's own account,
+  `{"done_together": [{"behavior_id", "other_behavior_id"}], "crowded_hours": [hour]}`
+  and nothing else: no other kind, fact, date or account. A pair counts only when both
+  Behaviors are the caller's; an hour only as a whole number from 0 to 23. It reads the
+  signals of `local_date`, or of the day before while none are stored for `local_date`
+  yet. The pairing planner's I/O (`lib/services/alongside-pairing.service.ts`, through
+  `lib/db/pairing-evidence.repo.ts`) calls it on the caller's own agent client; a
+  refused or failed read means no evidence. Only `coach_read_signals` reads the full
+  rows, on the coach token. Local verification:
+  `tests/sql/alongside-pairing-evidence-and-brief-asks.sql`.
 
 Local verification: `tests/coach-signals.local-integration.test.ts`.
 
@@ -3807,6 +3855,29 @@ carries its question; other tips link to the editor field their card names.
 Local verification: `tests/sql/tips-one-tap-changes-smoke.sql` and
 `tests/tips-one-tap.local-integration.test.ts` (a Yes moves today's unmarked Occurrence;
 a day already moved by hand keeps its move).
+
+### Pairing the schedule (Ticket 362, D33)
+
+Migration `20261126110000_alongside_schedule_pairing.sql`. With `CADENCE_ALONGSIDE` on, the
+coach may propose moving an alongside Behavior (the guest) to the set time of another
+Behavior (the host), as an ordinary time proposal. Rules:
+`packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts` and
+`docs/DATETIME_STRATEGY.md`, "Pairing the schedule".
+
+- Evidence `source` adds `alongside_pairing`: `basis` (`done_together` or `brief_yes`),
+  `host_behavior_id`, `signal_ids`, `yes_days` and `window_days`. Ids and counts only, never
+  titles. The evidence check was dropped and re-added with the new value, as Nov 20 did for
+  `tip`; every existing row still passes.
+- `behavior_change_proposals_pairing_fields`: a pairing row is a `time` change, has a known
+  `basis` and names a host in uuid form that is not the guest. No foreign key: the host is
+  checked when the proposal is shown and before a Yes applies it, and a missing or moved
+  host closes the proposal as `schedule_changed`.
+- No new table, function or grant. The coach reads its evidence on its own channel:
+  `coach_read_signals` for `done_together`, and the person's `move_proposals` rows and
+  `behavior_move_preferences` under RLS. The view (`GET /api/advisor/coach/schedule-proposal`)
+  adds `pairing: {hostBehaviorId, hostTitle}` to such a question; Macs ignore it.
+
+Local verification: `tests/sql/ticket-362-alongside-schedule-pairing-smoke.sql`.
 
 ## Mark details and day load (advisor plan Phase 4, workstream 4G)
 

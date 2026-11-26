@@ -102,6 +102,58 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 363 complete: alongside on Cadence for Mac — November 26, 2026
+
+- **Data:** SQLite schema 29 (`0029_behavior_alongside.sql`), account sync contract 10, writer
+  floor 8. Hosted `20261126120000_account_sync_alongside.sql` (not pushed) removes the
+  contract-9 exclusions, adds the answer to the configuration snapshot and `changed_fields`
+  (constraint replaced, as `20261122010000` did) and registers `(10, behavior, alongside)`.
+  Older Macs keep syncing; the server restores the stored answer on their writes.
+- **Mac UI (switch `VITE_CADENCE_ALONGSIDE=1`; release and preview builds force it off):**
+  form field, Timeline label and overlap cues, row question (`setBehaviorAlongside`), brief
+  question opt-in. A linked Mac follows the server flag and reads guesses from the new
+  `GET /api/behaviors/alongside`, in memory only. Local mode has no guess.
+- **Portability:** Mac exports, BehaviorLog import and restore carry the stored answer with
+  the switch on.
+- **Not done:** installed acceptance on a dev-signed build (Ticket 365). No build, signing or
+  device run in this ticket.
+
+## Ticket 362 complete: pairing the schedule through the coach — November 25, 2026
+
+- **Rule:** `packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts`
+  (`planSchedulePairings`, `evaluateSchedulePairing`, `schedulePairingHostHolds`), re-exported
+  from `lib/resolvers/`, registered, paired tests. Evidence: today's `done_together` signal
+  names the pair, or Yes to the same Daily Brief pairing on 4 local dates in the last 28.
+  Guest alongside, host not, places known or guessed and compatible.
+- **Days:** both schedules daily or weekly every week; the guest's one set time moves to
+  the host's one set time on the shared weekdays only. Every N days, every N weeks, monthly,
+  ranges, two times a day and times that differ by weekday are refused.
+- **Proposal:** an ordinary base schedule proposal on the coach's tip run (flag on only, at
+  most one per run), evidence source `alongside_pairing`. The person sees it in the advisor
+  panel and answers Try for two weeks, Change for good or No; a Yes runs
+  `updateBehaviorForUser`, so configuration history records it. A host that moved or left
+  closes it as `schedule_changed`.
+- **Migration:** `20261126110000_alongside_schedule_pairing.sql` drops and re-adds the
+  evidence check with the new source (the Nov 20 precedent) and adds one check. Not applied
+  anywhere; it needs the owner's yes before a hosted push. Smoke:
+  `tests/sql/ticket-362-alongside-schedule-pairing-smoke.sql`.
+- **Evals (offline):** `lib/services/advisor-eval/coach-pairing-fixtures.ts`: accept,
+  refuse (No and five guards) and no-evidence. No model call.
+- **Not done:** the Mac shows the same route's view (Ticket 363 has no work for this).
+
+## Tickets 360 and 361 follow-up: own-channel pairing evidence and the brief "asked" record — November 26, 2026
+
+- **Pairing evidence (361):** new `advisor_read_pairing_evidence(date)`, Daily Brief and
+  Chat agent tokens only, returns `done_together` pairs and `crowded_hour` hours for the
+  caller's account (today, else yesterday). The brief reads it on its `daily_brief` agent
+  client, Chat on its `chat` context. `alongside-pairing.service.ts` no longer mints a coach
+  client.
+- **Brief asks (360):** new hosted-only `brief_alongside_asks` (ids and a date, owner-only
+  RLS, cascades on account and Behavior deletion), written after a saved brief includes the
+  question and read for `askedBehaviorIds`; earlier days only, so a same-day refresh may ask again.
+- **Migration:** `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`, additive,
+  not applied or pushed. Fixture: `tests/sql/alongside-pairing-evidence-and-brief-asks.sql`
+  (not yet run). Flag off: nothing new read or written.
 ## MCP Apps moved into scope; Tickets 375–382 filed (D36) — November 25, 2026
 
 - **Owner's decision:** `docs/DECISIONS.md`, 2026-11-25 (D36). Cadence's MCP server will
@@ -170,11 +222,12 @@ impact: P-094.
   Re-plan re-pair or close; Yes is an ordinary move (source `daily_brief`). No migration.
 - **Chat (flag on):** tool `plan_alongside_pairings`; the move after the person's yes is
   `move_occurrence_for_day`. `CHAT_ALONGSIDE_INSTRUCTIONS` gains the pairing rule (still `chat-1.8`).
-- **Evidence:** the coach's `done_together` and `crowded_hour` signals, read through the coach
-  agent's read-only channel (no grant changed).
+- **Evidence:** the coach's `done_together` and `crowded_hour` signals. Since the November 26
+  follow-up, read on the brief's and Chat's own agent tokens through
+  `advisor_read_pairing_evidence`, not a coach client.
 - **Evals (offline):** brief fixture `alongside_pairing` and rule `pairing_off_host`; chat world
   `alongside_pairing` and scenario `alongside_pairing`. No live or paid eval run.
-- **Not done:** the Mac (Ticket 363), the schedule proposal (Ticket 362).
+- **Not done:** the Mac (Ticket 363); the schedule proposal is Ticket 362 (entry above).
 
 ## Ticket 360 complete: the agent asks whether a Behavior is alongside — November 25, 2026
 
@@ -192,9 +245,8 @@ impact: P-094.
 - **Gap, advice card:** no tip surface. No source in `advice-library.json` covers doing a
   Behavior alongside other things (`give-it-a-length` rests on Buehler 1994, task-length
   estimates), so the fact ships without a card. A card needs a reviewed source.
-- **Gap, brief "once per Behavior":** the stored answer closes the question for good and
-  the saved brief keeps one question per day. An ignored question can return in a later
-  brief; a durable "asked" record would need a migration.
+- **Brief "once per Behavior":** closed by the November 26 follow-up (`brief_alongside_asks`,
+  migration `20261126100000`).
 - **Flag off:** no reads, no new line, prompts, signals and brief output unchanged. The web
   client sends `alongside_question_v1`; the server ignores it while off.
 

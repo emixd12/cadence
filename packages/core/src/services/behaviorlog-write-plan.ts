@@ -13,13 +13,17 @@ import { assembleBehaviorLogExistingRecords } from "./behaviorlog-existing";
 import { buildRestorePayload } from "./behaviorlog-restore-plan";
 import { withBehaviorLogPortability } from "./behaviorlog-preservation";
 
-export type PortabilityPlanContext = { snapshot: PortabilitySnapshot; applyRun: PortabilityImportRunRow; now: string; newId: () => string };
+export type PortabilityPlanContext = { snapshot: PortabilitySnapshot; applyRun: PortabilityImportRunRow; now: string; newId: () => string;
+  /** Ticket 363: compare and write the alongside answer (Cadence for Mac with its alongside switch on). */
+  includeAlongside?: boolean };
 export function graphRecord(graph: PortabilityGraph, categories: PortabilitySnapshot["categories"]): BehaviorGraphRecord {
   const category = categories.find(({ id }) => id === graph.behavior.category_id) ?? null;
   return { ...graph.behavior, category, schedule_slots: graph.slots, schedules: graph.schedules.map((parent) => ({ ...parent, schedule_slots: graph.slots.filter((slot) => slot.behavior_schedule_id === parent.id) })) };
 }
-export function existingRecords(snapshot: PortabilitySnapshot) {
-  return assembleBehaviorLogExistingRecords({ ...snapshot, behaviors: snapshot.graphs.map((graph) => graphRecord(graph, snapshot.categories)) });
+/** `includeAlongside` (Ticket 363): compare the stored alongside answer, as the hosted reader does with the flag on. */
+export function existingRecords(snapshot: PortabilitySnapshot, options: Readonly<{ includeAlongside?: boolean }> = {}) {
+  return assembleBehaviorLogExistingRecords({ ...snapshot, behaviors: snapshot.graphs.map((graph) => graphRecord(graph, snapshot.categories)),
+    ...(options.includeAlongside ? { includeAlongside: true } : {}) });
 }
 export function emptyWritePlan(context: PortabilityPlanContext, mode: LocalImportWritePlan["mode"]): LocalImportWritePlan {
   return { mode, applyRun: context.applyRun, categoryCreates: [], graphWrites: [], definitionEvents: [], statusEvents: [], occurrenceWrites: [], occurrenceDeletes: [], timeSessionWrites: [], importedNoteWrites: [], importedNoteDeletes: [], importedInterventionWrites: [], importedInterventionDeletes: [], mappings: [], result: {} };
@@ -54,7 +58,7 @@ export function plannedOccurrence(plan: LocalImportWritePlan, context: Portabili
 }
 export function planBehaviorLogRestoreWrite(context: PortabilityPlanContext & { importPreview: BehaviorLogImportPreview; preview: BehaviorLogRestorePreview }): LocalImportWritePlan {
   if (!context.preview.valid || context.preview.errors.length || context.preview.summary.skippedCount || context.preview.summary.unsupportedActionCount || context.preview.statusHistoryPolicy.selected !== "preserve_append_only_history") throw new Error("This restore preview cannot be applied.");
-  const { payload, mappings } = buildRestorePayload({ userId: context.snapshot.profile.id, importRunId: context.applyRun.id, now: context.now, importPreview: context.importPreview, preview: context.preview, existing: existingRecords(context.snapshot) });
+  const { payload, mappings } = buildRestorePayload({ userId: context.snapshot.profile.id, importRunId: context.applyRun.id, now: context.now, importPreview: context.importPreview, preview: context.preview, existing: existingRecords(context.snapshot, { includeAlongside: context.includeAlongside }) });
   const plan = emptyWritePlan(context, "restore_apply");
   plan.applyRun = { ...plan.applyRun, dry_run_summary: withBehaviorLogPortability(plan.applyRun.dry_run_summary, context.importPreview.portability) };
   const user_id = context.snapshot.profile.id;
@@ -94,6 +98,9 @@ export function planBehaviorLogRestoreWrite(context: PortabilityPlanContext & { 
           sub_behavior_sort_order: typeof source.sub_behavior_sort_order === "number" ? source.sub_behavior_sort_order : 0,
           inherit_parent_schedule: source.inherit_parent_schedule === true,
         }),
+        // Ticket 363: only when the bundle carries the answer; otherwise the stored one stays.
+        ...(context.includeAlongside && source.alongside !== undefined
+          ? { alongside: typeof source.alongside === "boolean" ? source.alongside : null } : {}),
         created_at: previous?.behavior.created_at ?? nullable(source.created_at) ?? context.now, updated_at: context.now };
       }
       if (graph.behavior.active && behaviorAction !== "keep") {

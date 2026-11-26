@@ -18,7 +18,7 @@ import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBr
 import { briefOpportunitiesFor, planBriefOpportunityDay, readBriefOpportunities, saveBriefOpportunityProposals } from "./brief-opportunities.service";
 import { BRIEF_OPPORTUNITY_LINES_FEATURE } from "@cadence/core/types/brief-opportunities";
 import { BRIEF_ALONGSIDE_QUESTION_FEATURE, type BriefAlongsideQuestion } from "@cadence/core/types/brief-alongside";
-import { planBriefAlongsideQuestion, reopenBriefAlongsideQuestion } from "./brief-alongside.service";
+import { planBriefAlongsideQuestion, recordBriefAlongsideQuestionAsked, reopenBriefAlongsideQuestion } from "./brief-alongside.service";
 import { alongsideEnabled } from "./alongside-flag";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator, type DailyBriefModelUsage } from "./daily-brief-consumer";
@@ -396,7 +396,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           ensureBehaviorEstimates(agentClient, context, estimateGenerator, signal),
           readOpenBriefConflicts(caller.client, { userId: caller.user.id, localDate: context.localDate }),
         ]);
-        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
+        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id,
+          agentClient: agentRun?.client ?? agentClient });
         return [planned, open] as const;
       });
       signal.throwIfAborted();
@@ -452,6 +453,12 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       }, signal));
       if (!stored) throw new DailyBriefError("context_changed");
       successful = true;
+      // Ticket 360: the saved brief asked, so a later day's brief does not ask about this Behavior again. A failed write asks again later.
+      if (alongsideQuestion) {
+        await phase("alongside_asked", () => recordBriefAlongsideQuestionAsked(caller.client, caller.user.id, {
+          localDate: context.localDate, question: alongsideQuestion,
+        })).catch(() => undefined);
+      }
       const used = (admission.refreshesUsed ?? 0) + (refreshing ? 1 : 0);
       const briefing: DailyBriefing = {
         ...saved,

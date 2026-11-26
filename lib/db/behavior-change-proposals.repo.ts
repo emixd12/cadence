@@ -26,6 +26,9 @@ export type BehaviorChangeCloseReason = "unanswered" | "schedule_changed" | "kep
 /** A tip-backed proposal's tip: its card and its sentence, which the question shows. */
 export type ProposalTip = Readonly<{ cardId: string; text: string }>;
 
+/** Ticket 362: a pairing proposal's host, from its evidence (ids only). */
+export type ProposalPairing = Readonly<{ hostBehaviorId: string }>;
+
 type ProposalRowBase = Readonly<{
   id: string;
   behaviorId: string;
@@ -38,6 +41,8 @@ type ProposalRowBase = Readonly<{
   checkInDate: string | null;
   noticeShownAt: string | null;
   tip: ProposalTip | null;
+  /** Ticket 362: set on an alongside pairing proposal. Absent from rows built before it. */
+  pairing?: ProposalPairing | null;
   replayed: boolean;
 }>;
 
@@ -143,6 +148,8 @@ function toRow(data: Json): BehaviorChangeProposalRow {
     noticeShownAt: (row.notice_shown_at ?? null) as string | null,
     tip: evidence.source === "tip" && typeof evidence.card_id === "string" && typeof evidence.tip_text === "string"
       ? { cardId: evidence.card_id, text: evidence.tip_text } : null,
+    ...(evidence.source === "alongside_pairing" && typeof evidence.host_behavior_id === "string"
+      ? { pairing: { hostBehaviorId: evidence.host_behavior_id } } : {}),
     replayed: row.replayed === true,
   };
   if (row.change_kind === "length") {

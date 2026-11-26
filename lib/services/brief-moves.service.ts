@@ -283,7 +283,9 @@ export async function planBriefMoveDay(input: Readonly<{
   planning: BriefMovePlanningInput;
   travelSecrets: TravelConclusionsSecrets;
   day?: BriefMoveDay;
-  /** Ticket 361: the coach's evidence for pairing lines (tests). Default: read through the coach channel. */
+  /** Ticket 361: the Daily Brief agent's own client, which reads the pairing evidence. Null or absent: no evidence. */
+  evidenceClient?: AppSupabaseClient | null;
+  /** Ticket 361: the evidence reader (tests). Default: `advisor_read_pairing_evidence` on `evidenceClient`. */
   readPairingEvidence?: PairingEvidenceReader;
 }>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
   const day = input.day ?? await readBriefMoveDay(input.supabase, input.userId, input.localDate);
@@ -300,7 +302,7 @@ export async function planBriefMoveDay(input: Readonly<{
   const plan = planBriefMoveLinesFromInputs(inputs);
   // Ticket 361: with CADENCE_ALONGSIDE on, pairing lines follow the move lines under the same cap.
   if (!alongsideEnabled() || plan.calendar === "stale") return { ...plan, day };
-  const evidence: AlongsidePairingEvidence = await (input.readPairingEvidence ?? readAlongsidePairingEvidence)(input.userId, input.localDate);
+  const evidence: AlongsidePairingEvidence = await (input.readPairingEvidence ?? readAlongsidePairingEvidence)(input.evidenceClient ?? null, input.localDate);
   return { ...plan, candidates: [...plan.candidates, ...planBriefPairingLines({ ...inputs, evidence }, plan.candidates)], day };
 }
 
@@ -315,9 +317,12 @@ export async function planBriefMoveLines(input: Readonly<{
   supabase: AppSupabaseClient;
   userId?: string;
   travelSecrets?: TravelConclusionsSecrets;
+  /** Ticket 361: the Daily Brief agent's client, for the pairing evidence. */
+  agentClient?: AppSupabaseClient | null;
 }>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
   return planBriefMoveDay({
     supabase: input.supabase, userId: input.userId ?? await ownUserId(input.supabase),
+    evidenceClient: input.agentClient ?? null,
     localDate: input.context.localDate, timezone: input.context.timezone,
     now: typeof input.now === "string" ? Temporal.Instant.from(input.now) : input.now,
     context: input.context, planning: input.planning,
