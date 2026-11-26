@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-21.2",
+  "version": "2026-11-25.1",
   "sources": [
     {
       "id": "gollwitzer-sheeran-2006",
@@ -90,6 +90,15 @@
       "year": 1994,
       "kind": "experiment",
       "checked_at": "2026-11-19"
+    },
+    {
+      "id": "milkman-minson-volpp-2014",
+      "citation": "Milkman KL, Minson JA, Volpp KGM (2014). Holding the Hunger Games Hostage at the Gym: An Evaluation of Temptation Bundling. Management Science 60(2), 283-299.",
+      "url": "https://doi.org/10.1287/mnsc.2013.1784",
+      "doi": "10.1287/mnsc.2013.1784",
+      "year": 2014,
+      "kind": "randomized_trial",
+      "checked_at": "2026-11-25"
     }
   ],
   "cards": [
@@ -918,6 +927,47 @@
       },
       "reviewed_at": "2026-11-21",
       "reviewer": "Emi"
+    },
+    {
+      "id": "do-it-during-something-else",
+      "revision": 1,
+      "status": "draft",
+      "advice": "Tying one activity to another done at the same time, such as an audiobook kept for the gym, helped people go more often at first; the effect faded over time.",
+      "applies_when": [
+        {
+          "signal": "setup_gaps",
+          "scope": "behavior",
+          "facts": [
+            {
+              "fact": "alongside_unanswered",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "does_not_apply_when": [],
+      "action": "Say whether this Behavior can be done alongside other things, so Cadence can book it during something else.",
+      "evidence": {
+        "source_id": "milkman-minson-volpp-2014",
+        "kind": "randomized_trial",
+        "strength": "limited",
+        "claim": "People who could listen to tempting audiobooks only at the gym visited the gym more often than a control group at first, and the effect declined over time.",
+        "quote": "Initially, full and intermediate treatment participants visited the gym 51% and 29% more frequently, respectively, than control participants, but treatment effects declined over time (particularly following Thanksgiving).",
+        "locator": "Abstract"
+      },
+      "limitation": "One study of gym visits paired with audiobooks; the effect faded; applying it to a passive item such as a device is Cadence's reading, not what was tested.",
+      "quip_seeds": [
+        "Cadence guesses {behavior} can be done alongside other things, but you have not said. Your answer lets Cadence book it during something else.",
+        "Can {behavior} be done during something else? Your answer decides whether Cadence books it alongside other things."
+      ],
+      "audience": "any_account",
+      "offer": {
+        "kind": "open",
+        "target": "alongside"
+      },
+      "reviewed_at": null,
+      "reviewer": null
     }
   ]
 }

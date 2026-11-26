@@ -102,6 +102,29 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 385 complete in code: an advice card for the alongside question — November 26, 2026
+
+Branch `feat/alongside-385`. Closes the advisor-tip gap Ticket 360 recorded: `setup_gaps`'s
+`alongside_unanswered` now has a card, awaiting the owner's review.
+
+- **Card:** `do-it-during-something-else` in `packages/core/src/data/advice-library.json`
+  (library version `2026-11-25.1`), resting on Milkman, Minson and Volpp (2014), kind
+  `randomized_trial`, strength limited. Behavior-scoped rule on `alongside_unanswered`
+  (coach-signals version 4, so only with `CADENCE_ALONGSIDE` on). Ships as `draft` with no
+  `reviewer` or `reviewed_at`: the matcher and the tip run skip it, and no tip shows.
+- **Link:** new tip link target `alongside` opens the Behavior form at "Can be done
+  alongside other things" (`?edit=<id>&field=alongside`); an account-wide tip picks the
+  first Behavior whose question is open.
+- **Migration:** `20261126140000_alongside_tip_link_target.sql` replaces the
+  `coach_tips.link_target` check to allow `alongside`. Not applied locally; not additive,
+  so the hosted push needs the owner's yes. It must be on the database before the card is
+  activated. Smoke: `tests/sql/alongside-tip-link-target-smoke.sql` (not run).
+- **To activate:** push the migration, then set the card's `status` to `active` and fill
+  `reviewer` and `reviewed_at` (owner only).
+
+Platform impact: web implemented; desktop not applicable (tips come from the hosted server;
+the Mac opens the same shared form field); marketing not applicable; future mobile inherits
+the resolvers. Messaging impact: P-103.
 ## Ticket 384 complete in source: calendar event places — November 26, 2026
 
 - **Rule:** with `CADENCE_ALONGSIDE` on, each busy calendar event that reaches the free-slot

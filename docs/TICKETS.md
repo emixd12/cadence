@@ -20155,7 +20155,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 360: The agent asks whether a Behavior is alongside
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. The brief keeps one question per brief and never asks an answered Behavior again. Follow-up (migration `20261126100000`): `brief_alongside_asks` records the first saved brief that asked about each Behavior (ids and a date, owner-only RLS, hosted-only), so an ignored question does not return on a later day; a refresh the same day may ask it again. The requirement's "No new table" refers to the answer, which stays `behaviors.alongside`.
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. Ticket 385 adds the card `do-it-during-something-else`, a draft awaiting the owner's review. The brief keeps one question per brief and never asks an answered Behavior again. Follow-up (migration `20261126100000`): `brief_alongside_asks` records the first saved brief that asked about each Behavior (ids and a date, owner-only RLS, hosted-only), so an ignored question does not return on a later day; a refresh the same day may ask it again. The requirement's "No new table" refers to the answer, which stays `behaviors.alongside`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20982,7 +20982,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 385: An advice card for the alongside question
 
-Status: not_started
+Status: complete in code November 25, 2026, awaiting the owner's card review. The card `do-it-during-something-else` ships with `status: "draft"` and no `reviewer` or `reviewed_at`, so the matcher and the tip run skip it. Source kind `randomized_trial` (no field-experiment kind exists). The offer's link target `alongside` opens the Behavior form at "Can be done alongside other things" (`?edit=<id>&field=alongside`). Migration `20261126140000_alongside_tip_link_target.sql` replaces the `coach_tips.link_target` check to allow it; it is not additive, so its hosted push needs the owner's yes, and it must be on the database before the card is activated. Smoke: `tests/sql/alongside-tip-link-target-smoke.sql`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 

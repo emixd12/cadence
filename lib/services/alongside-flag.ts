@@ -15,6 +15,9 @@
  * 20261126130000, and 20261126150000 no later than it: account sync contract 11 hides
  * such a dismissal from Cadence for Mac builds on contracts 8 to 10, which would
  * otherwise delete it or fail to apply it.
+ * Ticket 385's advice card `do-it-during-something-else` needs 20261126140000 (the
+ * `alongside` tip link target) on the database before the card is activated; the flag
+ * itself does not.
  */
 export const ALONGSIDE_FLAG = "CADENCE_ALONGSIDE";
 

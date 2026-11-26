@@ -362,6 +362,7 @@ function linkBehaviorFor(target: AdviceOfferLinkTarget, setup: TipSetup): string
   const active = setup.behaviors.filter((behavior) => behavior.active);
   if (target === "length") return active.find((behavior) => behavior.hasLength === false)?.id ?? null;
   if (target === "where") return active.find((behavior) => behavior.hasPlace === false)?.id ?? null;
+  if (target === "alongside") return active.find((behavior) => behavior.alongsideQuestionOpen === true)?.id ?? null;
   return null;
 }
 

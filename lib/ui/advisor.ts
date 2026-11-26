@@ -215,8 +215,8 @@ export function writeBriefSeen(storage: Pick<Storage, "setItem"> | null, key: st
 // ---------------------------------------------------------------- tip links (one-tap changes)
 
 /** The editor field a tip's link opens on the Behaviors page. */
-export type BehaviorEditField = "time" | "length" | "where" | "description";
-export const BEHAVIOR_EDIT_FIELDS: readonly BehaviorEditField[] = ["time", "length", "where", "description"];
+export type BehaviorEditField = "time" | "length" | "where" | "description" | "alongside";
+export const BEHAVIOR_EDIT_FIELDS: readonly BehaviorEditField[] = ["time", "length", "where", "description", "alongside"];
 
 /** Open this Behavior's Details and Settings, with the field focused when one is named. */
 export type BehaviorEditTarget = Readonly<{ behaviorId: string; field: BehaviorEditField | null }>;

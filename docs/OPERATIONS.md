@@ -2116,6 +2116,14 @@ database before a contract-11 Mac build is used, since the server refuses an unk
 contract. It inserts one contract-registry row and changes the projection and apply
 functions for older contracts, so it needs the owner's yes before a hosted push.
 
+One more alongside migration is not needed for the flag but orders a content change:
+`20261126140000_alongside_tip_link_target.sql` (Ticket 385) lets a tip link open a
+Behavior's alongside control. It must be on the database before the advice card
+`do-it-during-something-else` is activated (status `active`, with `reviewer` and
+`reviewed_at`). While the card is a draft, no code path writes that link target. It
+replaces a check constraint, so it is not additive and the standing approval does not
+cover its hosted push; the owner approves it.
+
 Since Ticket 363 the column syncs at account sync contract 10 and is part of
 configuration history, whatever the flag (schema is schema). Migration
 `20261126120000_account_sync_alongside.sql` must reach the database before a build of

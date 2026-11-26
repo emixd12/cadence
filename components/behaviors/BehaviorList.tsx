@@ -113,6 +113,8 @@ const EDIT_FIELD_SELECTOR: Readonly<Record<BehaviorEditField, string>> = {
   length: '[name="default_duration_minutes"]',
   where: '[name="where_kind"]',
   description: '[name="description"]',
+  // Ticket 385: "Can be done alongside other things"; absent while CADENCE_ALONGSIDE is off.
+  alongside: '[name="alongside"]',
 };
 
 /** Ticket 358: a Behavior the alongside read did not return (just created) starts unanswered. */
