@@ -301,10 +301,16 @@ export type BehaviorDurationEstimate =
       durationLabel: string;
       sampleCount: number;
       lookbackDays: number | null;
+      /**
+       * "completed_stopped_occurrence_mean" keeps its stored name; since Ticket 366 it
+       * is the median of the 10 most recent tracked completions, not a mean.
+       */
       provenance:
         | "completed_stopped_occurrence_mean"
         | "behavior_default"
         | "description_estimate";
+      /** The intended duration the person set, when the tracked figure decides instead (Ticket 366). */
+      intendedSeconds?: number;
     }>
   | Readonly<{
       kind: "unknown";

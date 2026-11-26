@@ -25,6 +25,7 @@ import type { AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-co
 import type { AdvisorTravelContext } from "../types/briefing-travel";
 import { validateAdvisorDayContext, validateVersionedAdvisorDayContext } from "./advisor-day-context";
 import { projectBriefingTravelFacts } from "./briefing-travel";
+import { trackedDurationWins } from "../resolvers/time-tracking.resolver";
 
 const TONES: readonly BriefingTone[] = ["calm", "warm", "matter_of_fact"];
 const DIRECTNESS: readonly BriefingDirectness[] = ["gentle", "balanced", "direct"];
@@ -412,6 +413,11 @@ function selectDuration(occurrence: AdvisorOccurrence, config: BriefingConfig): 
   const candidate = (source: "configured_default" | "historical_average") => source === "configured_default"
     ? candidates.configuredDefault
     : candidates.historicalAverage;
+  // Ticket 366 (D34): from 3 tracked completions the tracked figure decides, whatever the preference.
+  const tracked = candidates.historicalAverage;
+  if (enabled.historical_average && tracked.kind === "known" && trackedDurationWins(tracked.sampleCount)) {
+    return { duration: tracked, source: "historical_average", reason: null };
+  }
   const preferred = config.context.duration.preference;
   const alternative = preferred === "configured_default" ? "historical_average" : "configured_default";
   const sources = config.context.duration.fallback === "other_enabled_source" ? [preferred, alternative] as const : [preferred] as const;

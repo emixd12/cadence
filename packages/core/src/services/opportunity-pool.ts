@@ -4,7 +4,7 @@ import type { BehaviorGraphRecord } from "../behavior-store";
 import { runFieldsFromStored } from "../resolvers/behavior-run.resolver";
 import {
   briefMoveItemBlocks,
-  resolveBriefMoveLength,
+  briefMoveLengthFromEstimate,
   type BriefMoveBlock,
   type BriefMoveDayItem,
 } from "../resolvers/brief-move.resolver";
@@ -35,7 +35,7 @@ export function resolveOpportunityPool(input: Readonly<{
   const onToday = new Set(todayRows.map((row) => row.behaviorId));
 
   return pool.map((behavior) => {
-    const lengthMinutes = lengthFor(behavior.id, behavior.default_duration_minutes ?? null, input.timeline).minutes;
+    const lengthMinutes = lengthFor(behavior.id, input.timeline).minutes;
     const slot = suggestDefaultOpportunitySlot({ localDate: today, timezone: input.timezone, now: input.now, lengthMinutes, blocks });
     const where = readWhere(behavior);
     return {
@@ -89,20 +89,15 @@ function todayItemBlocks(timeline: TimelineView, timezone: string): BriefMoveBlo
   return briefMoveItemBlocks(todayOccurrences(timeline).flatMap((row) => dayItem(row, timeline, timezone)), null);
 }
 
-function lengthFor(behaviorId: string, defaultMinutes: number | null, timeline: TimelineView) {
-  const estimate = timeline.durationEstimates?.[behaviorId];
-  return resolveBriefMoveLength({
-    behaviorDefaultMinutes: defaultMinutes,
-    loggedAverageSeconds: estimate?.kind === "known" ? estimate.seconds : null,
-    estimateMinutes: null,
-  });
+/** The Timeline's own estimate already holds the length order (Ticket 366). */
+function lengthFor(behaviorId: string, timeline: TimelineView) {
+  return briefMoveLengthFromEstimate(timeline.durationEstimates?.[behaviorId]);
 }
 
 function dayItem(row: TimelineOccurrenceView, timeline: TimelineView, timezone: string): BriefMoveDayItem[] {
   if (row.status !== "unresolved") return [];
   const start = Temporal.Instant.from(row.scheduledFor);
-  // The estimate already folds in the Behavior's default duration.
-  const length = lengthFor(row.behaviorId, null, timeline);
+  const length = lengthFor(row.behaviorId, timeline);
   const scheduleKind = row.scheduleKind === "range" && row.scheduleEndTime ? "range" : "exact";
   const end = scheduleKind === "range"
     ? rangeEnd(start, row.localDate, row.scheduleEndTime as string, timezone)

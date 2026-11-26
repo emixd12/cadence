@@ -41,6 +41,12 @@ describe("resolveBriefMoveLength", () => {
     expect(resolveBriefMoveLength({ behaviorDefaultMinutes: null, loggedAverageSeconds: 20, estimateMinutes: null }))
       .toEqual({ minutes: 30, source: "fallback", assumed: true });
   });
+
+  it("lets the logged figure outrank the intended duration from 3 samples only (Ticket 366)", () => {
+    const input = { behaviorDefaultMinutes: 45, loggedAverageSeconds: 600, estimateMinutes: 20 };
+    expect(resolveBriefMoveLength({ ...input, loggedSampleCount: 2 })).toEqual({ minutes: 45, source: "behavior_duration", assumed: false });
+    expect(resolveBriefMoveLength({ ...input, loggedSampleCount: 3 })).toEqual({ minutes: 10, source: "logged_average", assumed: false });
+  });
 });
 
 describe("checkBriefMoveSlot", () => {

@@ -3323,3 +3323,41 @@ Scope is unchanged. Native mobile and Mac App Store implementation stay out of s
 Platform impact: planning process and blueprint docs only. Web, desktop and marketing:
 not applicable. Future mobile: `docs/IOS_PLAN.md` and `docs/ios-plan/`. Messaging impact:
 none.
+## 2026-11-25: Tracked time decides a Behavior's length from 3 tracked completions (D34)
+
+The owner decided this in chat on November 25, 2026 (Ticket 366). Tracked time is a
+measurement; a duration the person typed is a statement of intent. Before this decision
+a saved default duration outranked tracked time for good, and the Timeline row offered
+"Set default" in every state.
+
+The choices:
+
+- **The floor is 3.** From 3 tracked completions, the tracked figure is the Behavior's
+  planning length. Below 3, a saved duration wins, and without one the tracked figure
+  from 1 or 2 completions still shows.
+- **The saved duration becomes the intended duration.** From 3 tracked completions it
+  no longer changes the length. Cadence keeps it, shows it beside the tracked figure,
+  and the advisor may compare the two ("this takes longer than intended"). The UI says
+  "Intended duration"; the column stays `default_duration_minutes`.
+- **The Timeline row stops asking.** From 3 tracked completions the row has no
+  "Set intended duration" action. The Behavior form keeps the field.
+- **A median replaces the mean.** The tracked figure is the median of the 10 most
+  recent tracked completions, so one timer left running cannot move it.
+
+Added the same day, after the first review:
+
+- **One measurement.** Moves measure the way the Timeline does: one sample is one
+  Completed Occurrence before today with its time sessions added together. Move for
+  today, Daily Brief moves, Opportunity suggestions and Chat moves share one function.
+- **Chat moves follow the rule.** The owner's reason: the tracked figure is closer to
+  what the person actually does.
+- **The length tip updates the intended duration** and says so.
+- **A rules register.** `docs/RULES_REGISTER.md` lists these rules, their values and
+  what to look at in real use, so they can be changed later with a reason.
+
+Not decided here: the wording the Daily Brief, coach and Chat use to compare tracked
+and intended time. That is prompt work with its own ticket.
+
+Platform impact: web and desktop in Ticket 366 (shared resolvers and components; the
+Mac gets it in its next release); marketing not applicable; future mobile inherits the
+`@cadence/core` resolvers. Messaging impact: P-094.

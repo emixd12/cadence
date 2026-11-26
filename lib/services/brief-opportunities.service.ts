@@ -85,7 +85,7 @@ export async function readBriefOpportunityPool(supabase: AppSupabaseClient, inpu
     behaviorId: item.behaviorId,
     title: item.title,
     behaviorRevision: item.behaviorRevision,
-    length: resolveBriefMoveLength({ behaviorDefaultMinutes: item.defaultDurationMinutes, loggedAverageSeconds: item.loggedAverageSeconds, estimateMinutes: null }),
+    length: resolveBriefMoveLength({ behaviorDefaultMinutes: item.defaultDurationMinutes, loggedAverageSeconds: item.loggedAverageSeconds, loggedSampleCount: item.loggedSampleCount ?? 0, estimateMinutes: null }),
     whereKind: item.whereKind,
     daysSinceLastCompleted: item.daysSinceLastCompleted,
     onToday: item.onToday,

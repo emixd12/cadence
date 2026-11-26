@@ -11,6 +11,7 @@ import type { Occurrence } from "@/lib/types/database";
 
 const mocks = vi.hoisted(() => ({ occurrences: [] as Occurrence[] }));
 vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: async () => mocks.occurrences }));
+vi.mock("@/lib/services/behavior-length.service", async () => ({ readBehaviorLengths: (await import("./helpers/no-tracked-history")).readBehaviorLengthsWithoutHistory }));
 
 import { behaviorEstimateInputHash, readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 import { ensureBehaviorEstimates } from "@/lib/services/brief-moves.service";
