@@ -20306,7 +20306,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 365: Alongside acceptance and release
 
-Status: not_started
+Status: in_progress. November 26, 2026: local-stack acceptance passed (9 of 10 cases clean, defect D1 fixed on `feat/alongside-history-fix` with `20261126260000`; evidence in `docs/qa/2026-11-26-alongside-local-acceptance.md`). Remaining: hosted Preview acceptance as test account A, installed Mac dev-signed acceptance, MCP Tier 1 acceptance, and the user guide section.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
