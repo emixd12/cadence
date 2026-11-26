@@ -445,7 +445,11 @@ function issuerServer() {
         }
         redirect = `${r.ret}?connected=1`;
       }
-      if (native) { res.writeHead(303, { location: redirect }); return res.end(); }
+      if (native) {
+        // The stub chat sites listen on loopback; redirect nowhere else.
+        if (new URL(redirect).hostname !== '127.0.0.1') { res.writeHead(400, { 'content-type': 'text/plain' }); return res.end('bad return'); }
+        res.writeHead(303, { location: redirect }); return res.end();
+      }
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ redirect }));
     }
