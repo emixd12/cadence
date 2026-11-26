@@ -130,6 +130,12 @@ type AdvisorDayContextReadInput = Readonly<{
   opaqueRefKey: string | Uint8Array;
   deadlineMs?: number;
   signal?: AbortSignal;
+  /**
+   * Ticket 384: when given, the Google Calendar read also puts each event's location text
+   * here, by the event's opaque ref, for the free-slot rule's coarse event place. The
+   * context itself stays location-free; the caller drops the map after planning.
+   */
+  eventLocations?: Map<string, string>;
 }>;
 
 export async function readAdvisorDayContext(input: AdvisorDayContextReadInput & Readonly<{
@@ -221,6 +227,7 @@ async function assembleDayContexts(
     localDate?: string;
     opaqueRefKey: string | Uint8Array;
     deadlineMs?: number;
+    eventLocations?: Map<string, string>;
   }>,
   authorization: AdvisorAuthorizationFence,
   now: Temporal.Instant,
@@ -347,7 +354,7 @@ async function assembleDayContexts(
   const sourceController = new AbortController();
   const sourceSignal = AbortSignal.any([signal, sourceController.signal]);
   const reads = Promise.all([
-    input.includeGoogleCalendar ? readCalendar(input.caller, authorization, localDate, now, opaqueRef, signal) : Promise.resolve(connector),
+    input.includeGoogleCalendar ? readCalendar(input.caller, authorization, localDate, now, opaqueRef, signal, input.eventLocations) : Promise.resolve(connector),
     sourceRequest?.outlookCalendar && authorization.outlookCalendar
       ? readConnectorCalendar("outlook_calendar", input.caller, authorization.outlookCalendar, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
     sourceRequest?.icloudCalendar && authorization.icloudCalendar
@@ -509,6 +516,7 @@ async function readCalendar(
   now: Temporal.Instant,
   makeOpaqueRef: AdvisorOpaqueRef,
   signal: AbortSignal,
+  eventLocations?: Map<string, string>,
 ): Promise<AdvisorCalendarConnector> {
   if (!authorization.calendar) throw new AdvisorDayContextServiceError("access_denied");
   const calendarAuthorization = authorization.calendar;
@@ -522,6 +530,12 @@ async function readCalendar(
       signal,
     });
     const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
+    // Ticket 384: the same read's location text, keyed as the projection keys each event.
+    if (eventLocations) {
+      for (const event of snapshot.events) {
+        if (event.location?.trim()) eventLocations.set(makeOpaqueRef("event", `${event.calendarId}\0${event.providerEventId}`), event.location);
+      }
+    }
     return projectAdvisorCalendarConnector({
       snapshot,
       selectionRevision: read.connection.selectionRevision,

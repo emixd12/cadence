@@ -378,7 +378,9 @@ function slotInputs(occurrenceId: string, day: BriefMoveDay, calendarBusy: reado
   return {
     blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, occurrenceId),
-      ...(calendarBusy ?? []).map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
+      // Ticket 384: an event keeps its coarse place, for the same-place rule only.
+      ...(calendarBusy ?? []).map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end,
+        ...(event.eventPlace ? { eventPlace: event.eventPlace } : {}) })),
       ...travelBlocksFor(travel, occurrenceId),
     ], briefMoveOverlapSubject(day.items, occurrenceId)),
     before: stop?.beforeSeconds ?? 0,

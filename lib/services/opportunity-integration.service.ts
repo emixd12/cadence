@@ -200,7 +200,8 @@ async function slotRefusal(
   const lengthSeconds = (behavior.default_duration_minutes ?? BRIEF_MOVE_FALLBACK_MINUTES) * 60;
   const blocks: BriefMoveBlock[] = briefMoveBlocksForSubject([
     ...briefMoveItemBlocks(day.items, null, new Map(), subject),
-    ...calendarBusy.map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
+    ...calendarBusy.map((event, index) => ({ kind: "calendar" as const, ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end,
+      ...(event.eventPlace ? { eventPlace: event.eventPlace } : {}) })),
   ], subject);
   const check = checkBriefMoveSlot({ interval: { start, end: start.add({ seconds: lengthSeconds }) }, blocks });
   if (check.ok) return null;

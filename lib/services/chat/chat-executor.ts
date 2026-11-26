@@ -46,6 +46,8 @@ import { CHAT_PLANNING_READS, chatPlanningBehaviorIds, withChatPlanning } from "
 import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { planChatPairings } from "@/lib/services/alongside-pairing.service";
+import { readPlanningPlaceCatalog } from "@/lib/services/planning-places.service";
+import { calendarEventPlace, type PlanningPlaceCatalog } from "@cadence/core/resolvers/alongside.resolver";
 
 /**
  * Advisor plan Phase 5 (5A): the live executor. Cadence tools run through
@@ -528,12 +530,17 @@ function projectEvent(event: NormalizedExternalEvent, source: ChatCalendarSource
   return [{ ...common, start: event.startLocalDate, end: event.endLocalDate, all_day: true }];
 }
 
-/** Today's busy times for the move check, from the calendars chat may read. */
-export function calendarBusyFrom(events: readonly ChatCalendarEvent[]): MoveCalendarBusy[] {
+/**
+ * Today's busy times for the move check, from the calendars chat may read. With a
+ * catalog (`CADENCE_ALONGSIDE` on, Ticket 384) each also gets its coarse place from the
+ * location this read returned. The place stays in the check: tool results never carry it.
+ */
+export function calendarBusyFrom(events: readonly ChatCalendarEvent[], catalog: PlanningPlaceCatalog | null = null): MoveCalendarBusy[] {
   return events.flatMap((event, index) => {
     if (event.all_day || !event.busy || !event.end) return [];
     const start = Temporal.Instant.from(event.start), end = Temporal.Instant.from(event.end);
-    return Temporal.Instant.compare(end, start) > 0 ? [{ ref: `chat:${index}`, start, end }] : [];
+    const eventPlace = calendarEventPlace(event.location, catalog);
+    return Temporal.Instant.compare(end, start) > 0 ? [{ ref: `chat:${index}`, start, end, ...(eventPlace ? { eventPlace } : {}) }] : [];
   });
 }
 
@@ -559,9 +566,10 @@ export function createLiveChatExecutor(input: Readonly<{
     timezone,
   );
   let todayBusy: Promise<Readonly<{ busy: MoveCalendarBusy[]; partial: boolean }>> | null = null;
-  const busyToday = () => (todayBusy ??= sessionCache.readSpan(input.today(), input.today())
-    .then((read) => ({
-      busy: calendarBusyFrom(read.events),
+  const busyToday = () => (todayBusy ??= Promise.all([sessionCache.readSpan(input.today(), input.today()),
+    readPlanningPlaceCatalog(input.context.supabase, input.context.userId)])
+    .then(([read, catalog]) => ({
+      busy: calendarBusyFrom(read.events, catalog),
       partial: read.sources.some((s) => s.state === "partial" || s.state === "failed" || s.state === "unavailable"),
     }))
     .catch(() => ({ busy: [], partial: true })));
@@ -639,7 +647,8 @@ async function pairingTool(context: IntegrationContext, args: Readonly<Record<st
     const result = await planChatPairings({
       supabase: context.supabase, userId: context.userId, localDate: today, timezone,
       now: Temporal.Instant.fromEpochMilliseconds(context.now.getTime()),
-      calendarBusy: busy.busy.map((event, index) => ({ ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
+      calendarBusy: busy.busy.map((event, index) => ({ ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end,
+        ...(event.eventPlace ? { eventPlace: event.eventPlace } : {}) })),
       occurrenceId,
     });
     return { ok: true, result: { ...result, ...(busy.partial ? { calendar_check_partial: true } : {}) } };
