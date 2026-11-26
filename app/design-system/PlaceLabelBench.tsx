@@ -22,7 +22,20 @@ const state: PlaceLabelState = {
       suggestion: { ruleVersion: "where-suggestion-rules@1", kind: "home", key: "home", placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" } },
   ],
 };
+// Ticket 383: Completion places off. Only the guessed Where line can show.
+const offState: PlaceLabelState = {
+  settings: { enabled: false, retention: "90_days", enabledAt: null, markerPromptDismissedAt: null, updatedAt: "2026-10-01T12:00:00Z" },
+  homePlaceKey: travelPlaceKey("10 Bench Road"),
+  homeMarker: null,
+  placeMarkers: [],
+  labelCount: 0,
+  behaviors: [
+    { behaviorId: "bench-where-guess-off", suggestedPlaceText: null, markerPrompt: null,
+      suggestion: { ruleVersion: "where-suggestion-rules@1", kind: "anywhere", key: "anywhere", placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" } },
+  ],
+};
 const unavailable = async () => { throw new Error("Bench previews make no requests."); };
+const offClient = (): PlaceLabelClient => ({ ...client, load: async () => offState });
 const client: PlaceLabelClient = {
   load: async () => state,
   saveSettings: unavailable,
@@ -35,6 +48,8 @@ const client: PlaceLabelClient = {
   locationAllowed: async () => false,
   readLocation: async () => ({ state: "denied" as const }),
 };
+
+const offPlaceLabelClient = offClient();
 
 /** Synthetic place-label state for any bench that renders place-label controls. */
 export function PlaceLabelBench({ children }: Readonly<{ children: ReactNode }>) {
@@ -57,5 +72,8 @@ export function BehaviorPlaceAssistBench() {
     <BehaviorPlaceAssist behaviorId="bench-suggestion" placeText={null} onReview={() => undefined} />
     <BehaviorPlaceAssist behaviorId="bench-prompt" placeText={null} onReview={() => undefined} />
     <BehaviorPlaceAssist behaviorId="bench-where-guess" placeText={null} onReview={() => undefined} />
+    <PlaceLabelProvider client={offPlaceLabelClient}>
+      <BehaviorPlaceAssist behaviorId="bench-where-guess-off" placeText={null} onReview={() => undefined} />
+    </PlaceLabelProvider>
   </div></PlaceLabelBench>;
 }

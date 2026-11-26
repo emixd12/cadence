@@ -20921,7 +20921,7 @@ Messaging impact: none until a view is ticketed.
 
 ## Ticket 383: The guessed Where shows without Completion places
 
-Status: not_started
+Status: web complete November 26, 2026, behind `CADENCE_ALONGSIDE`; migration `20261126130000` not applied or pushed (hosted push approved, D37). Turning Completion places off still deletes every dismissal, guess dismissals included. Desktop deferred: Cadence for Mac keeps the guessed line behind Completion places, because its SQLite triggers (migration 0020) refuse a dismissal while labels are off and the shared sync planner (`retainPlaceLabelInvariants`) drops dismissals while labels are off. Until both change, a linked Mac deletes or fails to apply a web guess dismissal stored while labels are off.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 

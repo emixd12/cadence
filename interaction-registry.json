@@ -18792,7 +18792,7 @@
           "control": "Review Where"
         }
       ],
-      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form.",
+      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form. Ticket 383: on the web the guessed line shows whether or not Completion places is on; Cadence for Mac still shows it only while Completion places is on.",
       "success_result": "Opens Details and Settings with Where filled in and a note to save; the Behavior changes only when the user saves.",
       "failure_result": "No change is stored.",
       "effects": [
@@ -18887,8 +18887,8 @@
           "control": "Dismiss"
         }
       ],
-      "availability": "On an active Behavior with a suggestion.",
-      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies. Ticket 358: dismissing a guessed Where stores the same dismissal and hides that guess; planning keeps using the guess.",
+      "availability": "On an active Behavior with a suggestion. Ticket 383: on the web a guessed Where can be dismissed while Completion places is off (CADENCE_ALONGSIDE on); then only the guess the line shows is accepted, and the hosted trigger admits only the keys home, anywhere and add_place.",
+      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies. Ticket 358: dismissing a guessed Where stores the same dismissal and hides that guess; planning keeps using the guess. Turning Completion places off still deletes every dismissal.",
       "failure_result": "Keeps the suggestion visible.",
       "effects": [
         "database_write",
@@ -18897,7 +18897,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+        "lib/services/place-labels.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
@@ -18907,7 +18908,7 @@
           "tests/place-label.resolver.test.ts",
           "tests/alongside-ui.dom.test.tsx"
         ],
-        "notes": "DOM, resolver and service tests cover the dismissal and its return rule."
+        "notes": "DOM, resolver and service tests cover the dismissal and its return rule, with Completion places off and on (Ticket 383). The psql smoke tests/sql/ticket-383-where-guess-dismissal-smoke.sql covers the relaxed trigger."
       },
       "platforms": {
         "web": {
