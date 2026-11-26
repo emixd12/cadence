@@ -50,7 +50,7 @@ Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026; all `not_started` | 386 and 383 first, then 384; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. Others not started; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 377 replaces the placeholder `lib/mcp/apps/day-view-html.ts`; 378 tests hosts; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
-| Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
+| Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) blocked | Owner: say yes or no to draft PR #423 (Chat writes Periods; its migration drops and re-adds a check constraint). 374 starts when Ticket 363 (PR #407) is on `main`. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
@@ -101,6 +101,40 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Periods: Tickets 367–373 — November 26, 2026
+
+- **Owner's decision:** `docs/DECISIONS.md`, 2026-11-25 (D35). Plan with its outside review
+  record: `docs/plans/2026-11-25-periods.md`.
+- **Merged:** 367 (PR #410, the brief reads day notes), 368 (#411, table, resolver, services),
+  372 (#415, Period day counts in `completion_drop`; `coach-signals-5` and `-6`), 371 (#416,
+  the brief and tips read Periods; `coach-tips-4`), 373 (#414, export, import, restore),
+  369 (#420, web Timeline and Behaviors), 370 (#422, MCP contract 1.8.0; the alongside
+  edition is now 1.9.0).
+- **Hosted migrations pushed under the standing approval**, each read back (RLS on,
+  `authenticated` only): `20261126130000_periods.sql`,
+  `20261126135000_create_period_if_absent.sql`,
+  `20261126140000_period_integration_writes.sql`. The clean replay ran in CI's Local
+  Supabase rehearsal, not on the shared local stack; the SQL smokes also ran locally in
+  rolled-back transactions.
+- **Review findings fixed:** two overlapping imports could duplicate a Period (now
+  `create_period_if_absent`); the OAuth persistence smoke needed the Period write wrapper
+  on its list.
+- **Open:** draft PR #423 (Chat writes Periods) needs the owner's yes for a migration with
+  a `drop constraint`. Ticket 374 (Mac) is blocked on Ticket 363 in draft PR #407.
+- **Also fixed:** PR #424, `tests/sql/google-calendar-agent-mcp-contract.sql` used fixed
+  November dates and failed the rehearsal on every branch from November 26.
+- **Verification:** each PR passed the eight required checks locally with Node 24 and CI
+  `verify`. Dagger was not run. Web UI seen only on the `/design-system` bench. Not run: a
+  browser pass on the real pages, a live MCP protocol or client run, a live brief or eval,
+  `*.local-integration` suites.
+- **Seen, not fixed:** `tests/desktop-controls.dom.test.tsx` ("persists the rail
+  preference…") fails intermittently in full runs.
+
+Platform impact: web implemented; desktop follow-up Ticket 374 (a linked Mac shows hosted
+brief words that may name a Period); marketing: the generated developer reference;
+future mobile inherits `@cadence/core` and the hosted functions. Messaging impact: P-095,
+P-096.
 
 ## Ticket 376: MCP Apps server behind `CADENCE_MCP_APPS` — November 26, 2026
 

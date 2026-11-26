@@ -20373,7 +20373,7 @@ Messaging impact: `P-094`.
 
 ## Ticket 367: The Daily Brief reads day notes
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: `docs/plans/2026-11-25-periods.md`, section 6.
 
@@ -20407,7 +20407,7 @@ Messaging impact: `P-095`.
 
 ## Ticket 368: Period foundation: table, resolver and services
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: sections 1 to 3.
 
@@ -20438,7 +20438,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 369: Periods on the web Timeline and Behaviors
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 4.
 
@@ -20466,7 +20466,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 370: Periods in the MCP contract and Chat
 
-Status: not_started
+Status: complete
+
+Follow-up open: Chat does not write Periods yet. Draft PR #423 holds the Chat writes and migration `20261126150000_chat_period_actions.sql`, which drops and re-adds `chat_actions_kind_check` and so needs the owner's yes before the hosted push.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 5.
 
@@ -20497,7 +20499,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 371: The Daily Brief and advisor tips read Periods
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 7.
 
@@ -20526,7 +20528,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 372: Period days in coach signals
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 8.
 
@@ -20554,7 +20556,7 @@ Messaging impact: none.
 
 ## Ticket 373: Periods in export, BehaviorLog import and restore
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 9.
 
@@ -20582,7 +20584,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 374: Periods on Cadence for Mac
 
-Status: not_started
+Status: blocked
+
+Blocked November 26, 2026: Ticket 363 (account sync contract 10, SQLite 0029) is in draft PR #407, which conflicts with `main`. This ticket takes the next contract and SQLite numbers after it.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
 
