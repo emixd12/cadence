@@ -12,7 +12,7 @@ import {
   alongsideFormViews, alongsideQuestionBehaviorIds, alongsideRowViews, buildAlongsideBehaviorFacts,
 } from "@cadence/core/services/alongside-facts";
 import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
-import type { AlongsideFormView } from "@cadence/core/resolvers/alongside.resolver";
+import { planningPlaceCatalog, type AlongsideFormView } from "@cadence/core/resolvers/alongside.resolver";
 import type { DesktopAlongsideContext } from "./alongside";
 import type { LocalPlaceLabelRows } from "./local-place-labels.service";
 
@@ -70,8 +70,22 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
     guesses: alongside.guesses, labels: await readLocalAlongsideLabels(profileId, view.todayLocalDate), localDate: view.todayLocalDate,
   });
   const alongsideViews: Readonly<Record<string, AlongsideFormView>> = alongsideFormViews(facts) ?? {};
+  // Ticket 384: Home's and the saved places' keys from local rows, so the shared Timeline
+  // gives each Calendar event a coarse place for its overlap cues. Nothing is stored.
+  const places = planningPlaceCatalog({ homeText: await readLocalHomeText(profileId),
+    placeTexts: behaviors.filter((behavior) => behavior.where_kind === "place").map((behavior) => behavior.location_text ?? null) });
   return { profile, behaviors, categories, alongsideViews,
-    timeline: attachTimelineAlongside(timeline, alongsideRowViews(facts), alongsideQuestionBehaviorIds(facts)) };
+    timeline: attachTimelineAlongside(timeline, alongsideRowViews(facts), alongsideQuestionBehaviorIds(facts), places) };
+}
+
+/** The local Home text, or null when it cannot be read (every event's place is then unknown unless saved). */
+async function readLocalHomeText(profileId: string): Promise<string | null> {
+  try {
+    const settings = await localCommand("readTravelSettings", { profileId });
+    return settings?.baseLocationText ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Completion place labels inside the evidence period, by Behavior (labels only, never positions). */
