@@ -2590,3 +2590,38 @@ cite has not changed.
   median, and note the rule beside `default_duration_minutes` in the MCP docs.
 - **Related:** none.
 - **Status:** logged.
+
+## P-095: Day notes in the Daily Brief model input (D35)
+
+- **Change:** planned under Ticket 367. With the Notes source on, the Daily Brief sends
+  the day notes for today and the two days before it, the first 280 characters of each,
+  to the model provider.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D35); Ticket 367.
+- **Surfaces:** Privacy, the AI features source text in Settings, user guide.
+- **Conflicting current text:** `components/settings/LegalContent.tsx` describes the Notes
+  the brief sends as Notes from Not Completed occurrences only. `docs/PRODUCT_SPEC.md`
+  said the Daily Brief does not read day notes.
+- **Update needed:** state that the brief reads recent day notes when Notes is on, with
+  the 3-day window and the 280-character limit.
+- **Related:** P-096.
+- **Status:** logged.
+
+## P-096: Periods (D35)
+
+- **Change:** planned under Tickets 368–374. A person can label a range of dates. The
+  Daily Brief and advisor tips send Period labels and dates to the model provider; they
+  do not send Period notes. MCP clients can read Periods and, with the existing
+  "Change Occurrence statuses and notes" permission, create, edit and end them. Exports
+  carry Periods.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D35); Tickets 368–374.
+- **Surfaces:** Privacy, OAuth consent and Connected apps permission text, the AI
+  features source text, user guide, MCP developer docs, Trust.
+- **Conflicting current text:** `lib/types/oauth-ui.ts` names the permission "Change
+  Occurrence statuses and notes", which does not mention day notes or Periods. Privacy
+  does not list Period labels among model input or stored data. A label can describe
+  health.
+- **Update needed:** name Periods in the permission text, in the model-input list and in
+  the stored-data list; add a user guide section; say that Period notes are not sent to
+  the model.
+- **Related:** P-028, P-095.
+- **Status:** logged.

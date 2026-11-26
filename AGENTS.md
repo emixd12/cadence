@@ -366,6 +366,10 @@ In scope:
   Planning also uses a guessed Where, which never requests a route or a reminder. The
   Daily Brief and Chat may pair items for today; the coach may propose a schedule change
   the person confirms. Behind `CADENCE_ALONGSIDE`, off in production
+- Periods under Tickets 367–374 (`docs/DECISIONS.md`, 2026-11-25, D35): the person labels
+  a range of local dates for the whole account, such as "Sick". A Period is annotation
+  only. The Daily Brief, advisor tips, Chat and MCP clients read Periods; the Daily Brief
+  also reads day notes. MCP clients can create, edit and end a Period, not remove one
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -429,6 +433,8 @@ Use these terms consistently:
 - Effective Where: the place planning uses for a Behavior: the person's Where, else
   counted completion places, else a model guess (D33).
 - Pairing: a proposal to do an alongside item during another item, the host.
+- Period: a range of local dates the person labels for the whole account to say
+  something affected those days (D35). It is not a status and not a Behavior pause.
 
 Do not use “missed” as a stored status in v1.
 
@@ -499,6 +505,7 @@ Rules:
 - Notes can be added or edited.
 - Needs decision is derived from `status === "unresolved"` and `local_date` before the current local date.
 - Unresolved is shown separately and excluded from final adherence calculations.
+- A Period (D35) never changes a status, adherence, a reminder or a schedule.
 - Connector completion (D28) may mark an Unresolved occurrence Completed from a linked
   source. It never changes a status the user set and never marks Not Completed. After the
   user changes a connector completion, no activity completes that occurrence again.

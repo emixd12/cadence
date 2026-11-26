@@ -20370,3 +20370,240 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers. |
 
 Messaging impact: `P-094`.
+
+## Ticket 367: The Daily Brief reads day notes
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: `docs/plans/2026-11-25-periods.md`, section 6.
+
+Dependencies: none.
+
+Goal: Let the Daily Brief's words take the person's recent day notes into account.
+
+Requirements:
+
+- With the AI Notes source on, the production opening facts (`lib/services/brief-opening.ts`) gain `dayNotes` for today and the two days before it, each cut to 280 characters. The key is absent when there is none.
+- The day-note instructions are appended only when the key is present. A brief without day notes keeps today's pinned prompt revision and exact request bytes.
+- The revision recorded in the run log and the saved brief is derived from the instructions actually sent.
+- A quiet day still makes no model call. Day notes never reach the move planner, Re-check or Re-plan. A changed day note does not invalidate a saved brief.
+- The output check covers the opening and every reason: fall back when the text holds a whole note of three or more words, or shares six consecutive tokens with a note.
+- Day notes are never written to application logs. Run content follows the existing expiring store.
+- Offline eval fixture `day_notes` and rule `day_note_not_quoted`. New rows in `docs/RULES_REGISTER.md`.
+- No schema change.
+
+Out of scope: the layered recipes and the ChatGPT-plan device path (`docs/FUTURE_UPDATES.md`).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/brief-opening.ts`, `lib/services/daily-brief.service.ts`, `lib/services/advisor-eval/` |
+| Desktop | A linked Mac shows the hosted brief, so it gets the change with the web deploy. No Mac code. |
+| Marketing | Not applicable: no public claim lists the brief's inputs. |
+| Future mobile | Deferred (no mobile track active); inherits the hosted brief. |
+
+Messaging impact: `P-095`.
+
+## Ticket 368: Period foundation: table, resolver and services
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: sections 1 to 3.
+
+Dependencies: none.
+
+Goal: Store Periods and hold every Period rule in one resolver, with no entry point yet.
+
+Requirements:
+
+- Migration for `public.periods` with RLS, a select policy for the owner, direct writes revoked, and the functions `create_period`, `update_period` and `delete_period` (compare-and-set on `revision`).
+- A `before insert` trigger holds the cap of 500 Periods per account for every writer.
+- Core resolver `period.resolver.ts` with tests, registered and documented; core and web services; `lib/db/periods.repo.ts`; `PeriodDataStore`.
+- `docs/DATA_MODEL.md`, regenerated database types, RLS smoke lists, `tests/sql/periods.sql`, a `docs/RULES_REGISTER.md` row for the cap.
+- Hosted push under the standing approval for additive migrations.
+
+Out of scope: any UI, MCP tool, export or Mac code.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `supabase/migrations/`, `packages/core/src/resolvers/period.resolver.ts`, `packages/core/src/services/period.service.ts`, `lib/db/periods.repo.ts`, `lib/services/period.service.ts` |
+| Desktop | Follow-up Ticket 374. The resolver is shared. |
+| Marketing | Not applicable: nothing visible. |
+| Future mobile | Deferred (no mobile track active); inherits the resolver and the hosted functions. |
+
+Messaging impact: `P-096`.
+
+## Ticket 369: Periods on the web Timeline and Behaviors
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 4.
+
+Dependencies: Tickets 368 and 373.
+
+Goal: Let the person add, edit, end and remove a Period, and see which days one covers.
+
+Requirements:
+
+- Timeline day headers show a chip for each Period covering the day. Today's header has "Add period". A chip opens the editor: Label with past-label suggestions, First day, Last day, Note, End today and Remove.
+- `/behaviors` lists every Period, newest first, with the same editor, and shows "Outside periods" and "In periods" adherence when a Period overlaps the selected range.
+- One shared component, in the design-system manifest and bench. Notices from the notices library. Interaction registry, load-test map, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, user guide and `DESIGN.md` updated.
+- Mobile-responsive. `npm run desktop:build` still passes.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `components/periods/PeriodControl.tsx`, `components/timeline/`, `app/(app)/timeline/actions.ts`, `app/(app)/behaviors/` |
+| Desktop | Follow-up Ticket 374. Until then the shared controls render nothing on the Mac. |
+| Marketing | Not applicable until a claim is written (`P-096`). |
+| Future mobile | Deferred (no mobile track active); the shared component is the reference. |
+
+Messaging impact: `P-096`.
+
+## Ticket 370: Periods in the MCP contract and Chat
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 5.
+
+Dependencies: Tickets 368 and 373.
+
+Goal: Give agents a well-scoped view of Periods and the three writes the owner allowed.
+
+Requirements:
+
+- Contract 1.8.0 in the base registry: `list_periods`, `create_period`, `update_period`, `end_period`; `active_periods` on `get_account_context`; `periods` on each `get_timeline` day; `period_split` on `get_adherence_summary`; record kind `period` in `search` and `fetch`. No remove tool.
+- Every description states that a Period changes nothing else and is not a reason to mark an Occurrence.
+- Search matches the label only. Fetched text never holds the note. Embedded lists are summaries without notes, capped at 20. `list_periods` pages.
+- The alongside edition moves from 1.8.0 to 1.9.0 in every place the plan lists.
+- Migration: the three tools in `integration_lock_write` and `integration_apply_period_write` with receipts. Hosted push under the standing approval.
+- Chat: confirmation and outcome text for the three writes, no Undo, and Notes-off tests for `list_periods`, `search`, `fetch` and a confirmed write.
+- Plugin skills updated and copied. Generated contract docs regenerated. `npm run test:web-client`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/integration/`, `lib/integrations/operations/`, `lib/services/integration-*.service.ts`, `lib/services/chat/`, `supabase/migrations/` |
+| Desktop | Not applicable: the MCP server is hosted. Chat on the Mac follows advisor Phase 5C. |
+| Marketing | The generated developer reference changes (`apps/marketing/src/data/developer-reference.json`). |
+| Future mobile | Not applicable: no MCP client on mobile. |
+
+Messaging impact: `P-096`.
+
+## Ticket 371: The Daily Brief and advisor tips read Periods
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 7.
+
+Dependencies: Tickets 367 and 368.
+
+Goal: Let the brief and tips know that a Period covers today or the recent days.
+
+Requirements:
+
+- Opening facts gain `periods` (covering today, at most 5) and `recentPeriods` (ended in the last 7 days, at most 3): label and dates, no note. Not gated by the Notes source.
+- Period instructions are appended only when a key is present. Labels are untrusted text. The brief may name a label and never suggests marking anything because of a Period.
+- Pins, recorded revision, call budget and stored content follow Ticket 367.
+- Advisor tips: the tip prompt gains Periods for its window; `TIP_PROMPT_VERSION` becomes `coach-tips-4`.
+- Offline eval fixture `period_active` and rule `period_named_not_judged`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/brief-opening.ts`, `lib/services/daily-brief.service.ts`, `lib/services/advisor-tips-writer.ts`, `lib/services/advisor-tips-job.service.ts` |
+| Desktop | A linked Mac shows the hosted brief and tips. No Mac code. |
+| Marketing | Not applicable. |
+| Future mobile | Deferred (no mobile track active); inherits the hosted brief. |
+
+Messaging impact: `P-096`.
+
+## Ticket 372: Period days in coach signals
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 8.
+
+Dependencies: Ticket 368.
+
+Goal: Record how many days of a completion drop a Period covered, without changing which signals fire.
+
+Requirements:
+
+- The coach visit reads the local dates covered by Periods under RLS and passes them to the resolver.
+- `completion_drop` facts gain `recent_period_days` and `baseline_period_days`. No signal is suppressed. Facts hold counts only, never a label.
+- Signal versions move to `coach-signals-5` and, with the alongside flag, `coach-signals-6`.
+- Eval account `period_sick_week`; resolver tests.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/resolvers/coach-signals.resolver.ts`, `lib/services/coach-signals-job.service.ts`, `lib/db/coach-signals.repo.ts` |
+| Desktop | Not applicable: the coach runs on the hosted app. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable: hosted job. |
+
+Messaging impact: none.
+
+## Ticket 373: Periods in export, BehaviorLog import and restore
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 9.
+
+Dependencies: Ticket 368.
+
+Goal: Carry Periods out of and back into an account before anything can create one.
+
+Requirements:
+
+- Full JSON gains a `periods` array, emitted only when at least one Period overlaps the range, so existing export bytes do not change. The note follows the notes option.
+- BehaviorLog writes each Period as a `review` record with a Cadence extension. An ongoing Period's end is the later of the export's last date and its start, with `ongoing: true`.
+- Import and restore match by label, first day and last day. Import adds and never changes. Restore also sets the note when the file carries one. Neither removes a Period or passes the cap. Preview reports counts.
+- JSONL, CSV and Markdown carry no Periods. `docs/EXPORT_FORMATS.md` updated.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/resolvers/export.resolver.ts`, `packages/core/src/resolvers/behaviorlog-period.resolver.ts`, `packages/core/src/services/behaviorlog-period.service.ts`, `lib/services/export.service.ts`, `lib/services/behaviorlog-import.service.ts`, `lib/services/behaviorlog-restore.service.ts` |
+| Desktop | Follow-up Ticket 374 (local export, import and restore). |
+| Marketing | Not applicable. |
+| Future mobile | Deferred (no mobile track active); inherits the core resolvers. |
+
+Messaging impact: `P-096`.
+
+## Ticket 374: Periods on Cadence for Mac
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
+
+Dependencies: Tickets 368, 369 and 373; Ticket 363 on `main`.
+
+Goal: Show, change and synchronize Periods on the Mac, offline and linked.
+
+Requirements:
+
+- A SQLite migration for `periods`, the local store commands, the cap, tombstoned delete, and the local service and actions. Run `npm run ids:next` first.
+- Account sync entity kind `period` on the next contract, additive, with the hosted registry migration, the Rust kind and row struct, and the smokes. The writer floor does not move. Older contracts keep hosted Periods.
+- The Timeline and Behaviors screens pass Period data and actions to the shared component. Local export, import and restore carry Periods.
+- Two pull requests: store and sync, then screens. `npm run desktop:build`, `npm run desktop:contract:test` and the `Desktop native` workflow pass. A dev-signed installed check. A release needs the owner's instruction.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | The hosted sync registry migration only. |
+| Desktop | `apps/desktop/src-tauri/migrations/`, `apps/desktop/src-tauri/src/local_store/`, `apps/desktop/src/` |
+| Marketing | Not applicable. |
+| Future mobile | Deferred (no mobile track active). |
+
+Messaging impact: `P-096`.

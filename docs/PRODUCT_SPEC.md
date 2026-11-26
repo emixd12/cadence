@@ -352,8 +352,18 @@ Occurrence. It never changes adherence, Needs decision, reminders or analytics.
 Day notes use the same editor as Occurrence notes, the same normalization, and a
 2,000-character limit. Repeated day notes feed a separate `day_notes` Note shortcuts
 pool. Full JSON and BehaviorLog exports include day notes; MCP clients can read and
-write them (`docs/MCP_CONTRACT.md`). Daily Brief does not read day notes yet
-(`docs/FUTURE_UPDATES.md`).
+write them (`docs/MCP_CONTRACT.md`). Daily Brief does not read day notes until Ticket
+367 lands (`docs/DECISIONS.md`, 2026-11-25, D35).
+
+## Periods (planned, Tickets 368–374)
+
+A Period is a range of local dates the person labels for the whole account, such as
+"Sick" from November 3 to 9, to say something affected those days. It has a label, a
+first day, an optional last day and an optional note; no last day means ongoing. A
+Period is annotation only: it never changes a status, adherence, a reminder or a
+schedule. Adherence views show counts inside and outside Periods. The Daily Brief,
+advisor tips, Chat and MCP clients can read Periods. Plan:
+`docs/plans/2026-11-25-periods.md`.
 
 ## Behavior review and adherence
 
