@@ -789,6 +789,7 @@ paid call supports that readback.
 - 2026-11-16: Added "Advisor agent budget" (advisor plan Phase 1A): Postgres reservations
   for every agent model call, the owner's starting shares and a US$25 daily breaker.
 - 2026-11-25: Ticket 367. With the Notes source on, the Daily Brief's one model call also carries up to three day notes of 280 characters and one instruction block: about 330 more input tokens at most (assumed, 4 characters per token), under US$0.0001 per brief. No new call; a quiet day still makes none.
+- 2026-11-25: Ticket 371. The Daily Brief's one model call also carries up to 8 Period labels with dates (5 covering today, 3 recently ended) and one instruction block of 606 characters, whatever the Notes source: about 500 more input tokens at most (assumed, 4 characters per token). The advisor tips call carries up to 5 Period labels with dates and one more instruction sentence: about 200 more input tokens at most (same assumption). No new call; a quiet day and a day with no tip still make none.
 
 ### Tickets 213–214 production measurements — October 18, 2026
 

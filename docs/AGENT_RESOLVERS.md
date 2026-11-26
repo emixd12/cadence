@@ -304,7 +304,16 @@ import and restore services call it. Paired checks live in
 note normalization, the limits (`PERIOD_LIMITS`), create and edit validation, the
 "End today" rule, date coverage, range overlap, display order, the union of covered
 dates, the inside and outside split used with `resolveAdherenceCounts`, label
-suggestions, the date-range text and the natural key used by import.
+suggestions, the date-range text and the natural key used by import. It also owns what
+the Daily Brief and advisor tips read (Ticket 371): `briefPeriodRange` and
+`resolveBriefPeriods` (Periods covering today, at most 5, and those that ended in the 7
+days before it, at most 3), and `tipPeriodRange` and `resolveTipPeriods` (Periods with a
+day in today or the 7 days before it, at most 5). Both return labels and dates only.
+`lib/services/daily-brief.service.ts` (`readBriefPeriods`) and
+`lib/services/advisor-tips-job.service.ts` read the rows through
+`lib/db/periods.repo.ts` (`listPeriodsOrNone`) and must not choose or cap Periods
+themselves. `textQuotesDayNote` in the day-note resolver takes the labels as text a
+sentence may repeat.
 `lib/resolvers/period.resolver.ts` re-exports it. `tests/period.resolver.test.ts`
 pairs its checks; table and functions are in `docs/DATA_MODEL.md`, "Periods".
 
