@@ -45,6 +45,7 @@ export const CHAT_ONLY_TOOLS = ["list_calendar_events", "list_calendar_load", "l
 
 export const WRITE_OPERATIONS: ReadonlySet<string> = new Set([
   "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move", "update_day_note",
+  "create_period", "update_period", "end_period",
   "create_behavior", "update_behavior", "archive_behavior", "restore_behavior",
   "add_opportunity_occurrence", "remove_opportunity_occurrence",
 ]);
@@ -468,10 +469,42 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
     return ok({ local_date: date, day_note: dayNoteOutput(world, date), changed });
   },
 
-  // Chat does not offer the Period writes yet (Ticket 370); the fake answers as the live executor does.
-  create_period: () => fail("not_found", "No tool named create_period."),
-  update_period: () => fail("not_found", "No tool named update_period."),
-  end_period: () => fail("not_found", "No tool named end_period."),
+  create_period: (world, input) => {
+    const rows = periodsOf(world);
+    if (rows.length >= 500) return fail("limit_exceeded", "This account already holds 500 Periods.");
+    const row: WorldPeriod = { id: newId(world), label: (input.label as string).trim(), startOn: input.start_local_date as string,
+      endOn: (input.end_local_date as string | null | undefined) ?? null, note: periodNote(input.note), revision: 1 };
+    rows.push(row);
+    return ok({ period: periodOutput(world, row) });
+  },
+
+  update_period: (world, input) => {
+    const row = periodsOf(world).find((item) => item.id === input.period_id);
+    if (!row) return fail("not_found", "No Period with this id.");
+    if (input.expected_revision !== `r${row.revision}`) return fail("conflict", "The Period changed since you read it.");
+    const before = JSON.stringify(row);
+    const startOn = typeof input.start_local_date === "string" ? input.start_local_date : row.startOn;
+    const endOn = "end_local_date" in input ? (input.end_local_date as string | null) : row.endOn;
+    if (endOn !== null && endOn < startOn) return fail("invalid_input", "The last day must be on or after the first day.");
+    if (typeof input.label === "string") row.label = input.label.trim();
+    row.startOn = startOn;
+    row.endOn = endOn;
+    if ("note" in input) row.note = periodNote(input.note);
+    const changed = JSON.stringify(row) !== before;
+    if (changed) row.revision += 1;
+    return ok({ period: periodOutput(world, row), changed });
+  },
+
+  end_period: (world, input) => {
+    const row = periodsOf(world).find((item) => item.id === input.period_id);
+    if (!row) return fail("not_found", "No Period with this id.");
+    if (input.expected_revision !== `r${row.revision}`) return fail("conflict", "The Period changed since you read it.");
+    if (row.startOn > world.today) return fail("invalid_state", "This Period has not started yet.");
+    if (row.endOn !== null && row.endOn <= world.today) return fail("invalid_state", "This Period has already ended.");
+    row.endOn = world.today;
+    row.revision += 1;
+    return ok({ period: periodOutput(world, row), changed: true });
+  },
 
   create_behavior: (world, input) => {
     const schedule = (input.schedules as Record<string, unknown>[])[0] as Record<string, unknown> | undefined;
@@ -714,6 +747,10 @@ function searchAdvice(world: ChatWorld, args: unknown): ChatToolResult {
 }
 
 /** Ids for records made during a run, distinct from the world's own ids. */
+function periodNote(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
 function newId(world: ChatWorld): string {
   const used = world.behaviors.length + world.dayNotes.size + world.occurrences.length + (world.periods?.length ?? 0);
   return `00000000-0000-4000-9000-${String(used).padStart(12, "0")}`;
