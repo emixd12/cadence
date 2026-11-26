@@ -1,17 +1,15 @@
 import { noticeText } from "@cadence/core/notices";
-import type { AlongsideInputField, IntegrationOperationInput } from "@cadence/core/integration";
 import { getBehaviorById, type AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
-import { updateBehaviorForUser } from "@/lib/services/behavior.service";
-import { integrationBehaviorInput } from "@/lib/services/integration-behavior-input";
-import { serializeIntegrationBehavior } from "@/lib/services/integration-read-serialization";
+import { answerBehaviorAlongsideQuestionForUser } from "@/lib/services/behavior.service";
 
 /**
  * Ticket 360 (D33): the one writer for an answer to "Can this be done alongside other
  * things?" from the Timeline row and the Daily Brief. It writes `behaviors.alongside`
- * through the Behavior definition service (`updateBehaviorForUser`), as the person, the
- * same path the Behavior form and the coach's schedule change use, so the answer closes
- * the question on every surface (`alongsideQuestionOpen`). Chat writes the same field
+ * through the Behavior definition service (`answerBehaviorAlongsideQuestionForUser`, the
+ * core `setBehaviorAlongside` the Mac's row uses), as the person, with one configuration
+ * revision whose reason code is `alongside_answered`, so the answer closes the question
+ * on every surface (`alongsideQuestionOpen`). Chat writes the same field
  * through its confirmed `update_behavior`. No new table.
  *
  * It answers only an unanswered Behavior: once the setting holds an answer, a prompt
@@ -51,15 +49,16 @@ export async function recordBehaviorAlongsideAnswer(
   // Audit fix 7: a question prompt answers only an unanswered Behavior. A stale Timeline
   // row or brief line never overwrites an answer made elsewhere since it was shown.
   if (stored !== null) return { behaviorId: current.id, alongside: stored, changed: false, alreadyAnswered: true };
-  const update = { behavior_id: current.id, expected_revision: current.updated_at, alongside: input.alongside } as
-    IntegrationOperationInput<"update_behavior"> & AlongsideInputField;
-  const values = integrationBehaviorInput(update, serializeIntegrationBehavior(current, null));
+  let answer: Awaited<ReturnType<typeof answerBehaviorAlongsideQuestionForUser>>;
   try {
-    await updateBehaviorForUser(supabase, userId, { behaviorId: current.id, values, expectedUpdatedAt: current.updated_at },
+    // Audit fix 12: the core writer the Mac's row uses, so history records `alongside_answered`.
+    answer = await answerBehaviorAlongsideQuestionForUser(supabase, userId, { behaviorId: current.id, alongside: input.alongside },
       input.recordedAt ?? new Date().toISOString());
   } catch (error) {
     if (error instanceof Error && /reload|revision|changed/i.test(error.message)) throw new AlongsideAnswerError("revision_changed");
     throw error;
   }
-  return { behaviorId: current.id, alongside: input.alongside, changed: true };
+  return answer.alreadyAnswered
+    ? { behaviorId: current.id, alongside: answer.alongside, changed: false, alreadyAnswered: true }
+    : { behaviorId: current.id, alongside: input.alongside, changed: true };
 }

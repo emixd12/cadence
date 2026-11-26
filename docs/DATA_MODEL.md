@@ -2561,7 +2561,9 @@ be done alongside other things?". Null means unanswered. Migration:
   without `is_opportunity` does; the TypeScript payload leaves the key out only when
   neither side has an answer. Existing history is not rewritten: a snapshot without the
   key was unanswered. Core writes the reason code `alongside_answered` for a single
-  answer (`setBehaviorAlongside`); form, MCP and Chat edits keep `behavior_edited`.
+  answer to the question (`setBehaviorAlongside`): the Mac's Timeline row and, since the
+  audit fixes, the web Timeline row and the Daily Brief line. A question answers only an
+  unanswered Behavior. Form, MCP and Chat edits keep `behavior_edited`.
   Account sync contract 10 carries `behavior.alongside`: the snapshot, the expected-row
   comparison and the synced insert and update lists include it, and a contract-10
   Behavior write must carry it. Contract-8 and contract-9 writers keep syncing: the
