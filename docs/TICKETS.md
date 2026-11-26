@@ -20921,7 +20921,7 @@ Messaging impact: none until a view is ticketed.
 
 ## Ticket 383: The guessed Where shows without Completion places
 
-Status: web complete November 26, 2026, behind `CADENCE_ALONGSIDE`; migration `20261126130000` not applied or pushed (hosted push approved, D37). Turning Completion places off still deletes every dismissal, guess dismissals included. Desktop deferred: Cadence for Mac keeps the guessed line behind Completion places, because its SQLite triggers (migration 0020) refuse a dismissal while labels are off and the shared sync planner (`retainPlaceLabelInvariants`) drops dismissals while labels are off. Until both change, a linked Mac deletes or fails to apply a web guess dismissal stored while labels are off.
+Status: complete November 26, 2026, behind `CADENCE_ALONGSIDE` on the web and `VITE_CADENCE_ALONGSIDE` on the Mac; migrations `20261126130000` and `20261126150000` not applied or pushed. `20261126130000`'s hosted push is approved (D37); `20261126150000` inserts one contract-registry row and changes the sync projection and apply functions for older contracts, so it needs the owner's yes, and it must reach the database no later than `20261126130000`. Turning Completion places off still deletes every dismissal, guess dismissals included. Mac: SQLite schema 30 (migration 0030) admits a guess dismissal while labels are off; account sync contract 11 keeps it in the shared planner (`retainPlaceLabelInvariants`), and the server hides it from contracts 8 to 10 so Cadence for Mac 0.1.14 to 0.1.17 neither deletes it nor fails on it; minimum writer contract 8. A linked Mac shows and dismisses the hosted guess with Completion places off; local mode has none. Installed check on a dev-signed build moves to Ticket 365.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 
@@ -20943,7 +20943,7 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | `place-label.resolver.ts`, `place-labels.service.ts`, `components/travel/PlaceLabels.tsx`, migration. |
-| Desktop | Same components; `local-place-labels.service.ts`. |
+| Desktop | Same components; `local-place-labels.service.ts`; SQLite migration 0030; account sync contract 11 (planner rule and hosted migration `20261126150000`). |
 | Marketing | Not applicable: no public claim changes until the messaging pass. |
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
 

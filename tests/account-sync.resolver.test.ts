@@ -1079,6 +1079,77 @@ describe("Ticket 216 place label synchronization", () => {
     expect(result.localWrites.some(({ kind, operation }) => kind === "completion_place_label" && operation === "delete")).toBe(true);
   });
 
+  describe("Ticket 383 guess dismissals while labels are off", () => {
+    const dismissal = (suggestion: string, dismissedAt = "2026-11-26T12:00:00Z"): AccountSyncEntity => ({ kind: "where_suggestion_dismissal", id: "b", value: {
+      id: "b", user_id: "owner", suggestion, rule_version: "where-suggestion-rules@1", dismissed_at: dismissedAt,
+    } });
+    const off = settings(false, "2026-11-20T00:00:00Z");
+    const offBase = snapshot(completeRows([completed, off]));
+    const writes = (list: readonly { kind: string; operation: string }[]) => list.map(({ kind, operation }) => `${kind}:${operation}`).sort();
+
+    it.each(["home", "anywhere", "add_place"])("keeps a web dismissal of the %s guess and copies it to the Mac", (suggestion) => {
+      const hosted = snapshot(completeRows([completed, off, dismissal(suggestion)]));
+      const result = plan(offBase, offBase, hosted);
+      expect(result.conflicts).toEqual([]);
+      expect(result.hostedWrites).toEqual([]);
+      expect(writes(result.localWrites)).toEqual(["where_suggestion_dismissal:upsert"]);
+      // The next sync from the merged state changes nothing on either side.
+      const merged = snapshot(result.mergedEntities as AccountSyncEntity[]);
+      expect(plan(merged, merged, merged).hostedWrites).toEqual([]);
+    });
+
+    it("also keeps a no-settings account's guess dismissal", () => {
+      const bare = snapshot(completeRows([completed]));
+      const result = plan(bare, bare, snapshot(completeRows([completed, dismissal("home")])));
+      expect(result.hostedWrites).toEqual([]);
+      expect(writes(result.localWrites)).toEqual(["where_suggestion_dismissal:upsert"]);
+    });
+
+    it("uploads a guess dismissal made on the Mac while labels are off", () => {
+      const result = plan(offBase, snapshot(completeRows([completed, off, dismissal("anywhere")])), offBase);
+      expect(result.localWrites).toEqual([]);
+      expect(writes(result.hostedWrites)).toEqual(["where_suggestion_dismissal:upsert"]);
+    });
+
+    it("applies the hosted guess dismissal on a first-link replacement", () => {
+      const hosted = snapshot(completeRows([completed, off, dismissal("home")]));
+      const result = resolveFirstLinkReplacement({ accountLinkId: "link", baseline: empty, local: offBase, hosted });
+      expect(writes(result.localWrites)).toEqual(["where_suggestion_dismissal:upsert"]);
+    });
+
+    it("still drops a saved-place dismissal while labels are off", () => {
+      const saved = dismissal(`saved_place:${key}`);
+      const result = plan(offBase, offBase, snapshot(completeRows([completed, off, saved])));
+      expect(result.localWrites).toEqual([]);
+      expect(writes(result.hostedWrites)).toEqual(["where_suggestion_dismissal:delete"]);
+    });
+
+    it("turning labels off still clears every dismissal, guess dismissals included", () => {
+      const on = settings(true, "2026-10-01T00:00:00Z");
+      const withDismissals = snapshot(completeRows([completed, on, dismissal("home")]));
+      // Off on the Mac: the store deleted the dismissal; the plan deletes the hosted one.
+      const offOnMac = plan(withDismissals, snapshot(completeRows([completed, off])), withDismissals);
+      expect(writes(offOnMac.hostedWrites)).toEqual(["place_label_settings:upsert", "where_suggestion_dismissal:delete"]);
+      // Off on the web: the hosted trigger deleted it; the plan deletes the Mac's copy.
+      const offOnWeb = plan(withDismissals, withDismissals, snapshot(completeRows([completed, off])));
+      expect(writes(offOnWeb.localWrites)).toEqual(["place_label_settings:upsert", "where_suggestion_dismissal:delete"]);
+      // A guess dismissal made after the turn-off survives the next sync.
+      const after = snapshot(completeRows([completed, off, dismissal("home", "2026-11-21T00:00:00Z")]));
+      const next = plan(offOnWeb.mergedEntities.length ? snapshot(offOnWeb.mergedEntities as AccountSyncEntity[]) : offBase, offBase, after);
+      expect(next.hostedWrites).toEqual([]);
+      expect(writes(next.localWrites)).toEqual(["where_suggestion_dismissal:upsert"]);
+    });
+
+    it("lets a deletion win over a concurrent guess re-dismissal", () => {
+      const on = settings(true, "2026-10-01T00:00:00Z");
+      const withDismissal = snapshot(completeRows([completed, on, dismissal("home")]));
+      const redismissed = snapshot(completeRows([completed, on, dismissal("anywhere", "2026-11-26T13:00:00Z")]));
+      const result = plan(withDismissal, snapshot(completeRows([completed, off])), redismissed);
+      expect(result.conflicts).toEqual([]);
+      expect(result.mergedEntities.some(({ kind }) => kind === "where_suggestion_dismissal")).toBe(false);
+    });
+  });
+
   it("carries learned habits and place labels in one plan in either direction (Tickets 216 and 217)", () => {
     const habits = (minutes: number): AccountSyncEntity => ({ kind: "profile", id: "profile", value: {
       timezone: "UTC", travel_preparation_minutes: minutes, travel_arrival_buffer_minutes: null,

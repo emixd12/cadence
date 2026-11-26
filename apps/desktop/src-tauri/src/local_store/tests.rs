@@ -2588,6 +2588,67 @@ fn place_label_migration_adds_constrained_tables_without_touching_tracking() {
 }
 
 #[test]
+fn guess_dismissals_are_stored_and_synced_while_labels_are_off() {
+    use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let profile = fixture.profile.clone();
+    let saved = format!("saved_place:{}", "a".repeat(43));
+    let value = |suggestion: &str| json!({"id":id(1),"suggestion":suggestion,"rule_version":"where-suggestion-rules@1","dismissed_at":NOW});
+    let write = |suggestion: &str| AccountSyncWrite { kind: Kind::WhereSuggestionDismissal, id: id(1), operation: Op::Upsert, expected: None, value: Some(value(suggestion)) };
+    // Ticket 383 (migration 0030): a first-link replacement applies a web guess dismissal
+    // stored while labels are off (no settings row here).
+    let tx = fixture.db.transaction().unwrap();
+    super::sync_apply::apply_first_link(&tx, &profile, &[write("home")]).unwrap();
+    tx.commit().unwrap();
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
+    // The DataStore updates it to another guess key while off, and refuses a saved place.
+    let dismiss = |suggestion: &str| place_mutation(json!({"kind":"upsertDismissal","dismissal":{
+        "user_id":profile,"id":id(1),"suggestion":suggestion,"rule_version":"where-suggestion-rules@1","dismissed_at":NOW}}));
+    fixture.run(dismiss("add_place"), 320).unwrap();
+    assert!(fixture.run(dismiss(&saved), 321).unwrap_err().contains("constraint"));
+    // A saved-place dismissal still needs labels on, in either sync mode.
+    fixture.db.execute("DELETE FROM where_suggestion_dismissals", []).unwrap();
+    assert!(execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(&saved)] }).is_err());
+    let tx = fixture.db.transaction().unwrap();
+    assert!(super::sync_apply::apply_first_link(&tx, &profile, &[write(&saved)]).is_err());
+    drop(tx);
+    // An ordinary sync inserts a guess dismissal while off.
+    execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write("anywhere")] }).unwrap();
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
+    // Turning labels on and off again still deletes it.
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":null,
+        "next":place_settings(&profile, true),"retentionCutoff":null})), 322).unwrap();
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":NOW,
+        "next":place_settings(&profile, false),"retentionCutoff":null})), 323).unwrap();
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 0);
+    // Markers keep requiring labels on.
+    let marker = json!({"user_id":profile,"id":"home","place_key":"k".repeat(43),"latitude_e6":1,
+        "longitude_e6":2,"accuracy_meters":3,"rule_version":"place-label-rules@1","recorded_at":NOW});
+    assert!(fixture.run(place_mutation(json!({"kind":"upsertMarker","marker":marker})), 324).unwrap_err().contains("constraint"));
+}
+
+#[test]
+fn migration_0030_keeps_dismissals_and_relaxes_only_guess_keys() {
+    let mut fixture = Fixture::at_schema(29);
+    fixture.create();
+    let profile = fixture.profile.clone();
+    let insert = |db: &rusqlite::Connection, suggestion: &str| db.execute("INSERT INTO where_suggestion_dismissals VALUES(?1,?2,?3,'where-suggestion-rules@1',?4)",
+        params![id(1), profile, suggestion, NOW]);
+    // Schema 29 refuses every dismissal while labels are off.
+    assert!(insert(&fixture.db, "home").is_err());
+    fixture.db.execute("INSERT INTO place_label_settings(user_id,enabled,retention,enabled_at,updated_at) VALUES(?1,1,'90_days',?2,?2)", params![profile, NOW]).unwrap();
+    insert(&fixture.db, "home").unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
+    fixture.db.execute("UPDATE place_label_settings SET enabled=0,enabled_at=NULL", []).unwrap();
+    fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion='anywhere'", []).unwrap();
+    assert!(fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion=?1", [format!("saved_place:{}", "a".repeat(43))]).is_err());
+    assert!(fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion='nearby'", []).is_err());
+}
+
+#[test]
 fn account_sync_applies_place_label_rows_in_dependency_order() {
     use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
     let mut fixture = Fixture::new();
@@ -2835,7 +2896,7 @@ fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
     let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
         .map(|table| (table, fixture.count(table)));
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 29);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
     for (table, count) in before {
         assert_eq!(fixture.count(table), count, "{table}");
     }
@@ -3027,7 +3088,7 @@ fn migration_0029_leaves_every_schema_28_behavior_unanswered() {
     let profile = fixture.profile.clone();
     fixture.db.execute("INSERT INTO behaviors(id,user_id,category_id,title,description,recurrence_rule,scheduled_time,timezone,browser_reminder_enabled,email_reminder_enabled,reminder_offset_minutes,active,created_at,updated_at,archived_at,current_configuration_event_id) VALUES(?1,?2,NULL,'Helmet',NULL,'{\"type\":\"daily\",\"interval\":1}','09:00:00','America/New_York',1,0,0,1,?3,?3,NULL,NULL)", params![id(1), profile, NOW]).unwrap();
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 29);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
     let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].alongside, None);

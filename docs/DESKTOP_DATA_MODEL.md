@@ -97,6 +97,11 @@ labels past retention when it loads them. `commitPlaceLabels` journals only a re
 hash and a null result, so the outbox never keeps marker positions. Domain-revision
 triggers cover all four tables. Account snapshots carry them as four entity kinds;
 older builds fail closed with "Update Cadence". Native backups include the tables.
+Schema version 30 (`0030_guess_dismissal_without_labels.sql`, Ticket 383) relaxes the
+two dismissal triggers as hosted `20261126130000` does: a dismissal of a model guess
+(`home`, `anywhere`, `add_place`) is admitted while labels are off. Saved-place
+dismissals and markers keep requiring the opt-in, and turning labels off still deletes
+every dismissal. See "Guessed Where dismissals (Ticket 383, D37)".
 
 Schema version 18 adds the optional Behavior Where (Ticket 215). Migration
 `0018_behavior_where.sql` adds nullable `behaviors.where_kind` (`anywhere`,
@@ -716,6 +721,37 @@ become unanswered; no row is lost from schema 28.
 5. Exports and BehaviorLog import and restore carry the stored answer only with the
    Mac's alongside build switch on (`VITE_CADENCE_ALONGSIDE=1`), as the web does with
    `CADENCE_ALONGSIDE` on (Ticket 364).
+
+## Guessed Where dismissals (Ticket 383, D37)
+
+SQLite schema 30 (`apps/desktop/src-tauri/migrations/0030_guess_dismissal_without_labels.sql`)
+admits a `where_suggestion_dismissals` row with suggestion `home`, `anywhere` or
+`add_place` while Completion places is off. No column changes and no row is lost from
+schema 29.
+
+1. A linked Mac shows the hosted guessed Where in the Behavior form whether or not
+   Completion places is on (`createLocalPlaceLabelClient` `whereGuesses`), with the
+   build switch on and the server answering `enabled: true`. `dismissSuggestion`
+   passes the shown guess (`shownWhereGuessKey`) to the core planner, so while labels
+   are off only that guess can be dismissed, as on the web. Local mode has no guess,
+   so nothing new shows and nothing can be dismissed while off. The dismissal row is
+   the person's own choice; no guess is stored.
+2. **Account sync contract 11.** `ACCOUNT_SYNC_CONTRACT = 11`. No field or kind
+   changes. The planner keeps a guess dismissal while labels are off and still drops
+   markers, labels and saved-place dismissals. Turning labels off on either side still
+   deletes every dismissal: that side removed the row, so the merge carries the
+   deletion, and a guess dismissal made after the turn-off survives
+   (`tests/account-sync.resolver.test.ts`, "Ticket 383 guess dismissals while labels
+   are off"). A baseline saved under contract 10 lacks a hidden row, so the first
+   contract-11 sync downloads it without a hosted write.
+3. **Older builds.** Contracts 8 to 10 (Cadence for Mac 0.1.14 to 0.1.17, and builds of
+   the alongside branch before this change) would delete such a row on an ordinary
+   sync, because their planner drops every dismissal while labels are off, and fail a
+   first-link replacement, because their schema-29 trigger refuses it. The server hides
+   it from them (`docs/DATA_MODEL.md`, "Guess dismissals while labels are off"); their
+   writes keep it, and a plan of theirs that turns labels on applies and shows it on the
+   next read (`tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql`). The minimum
+   writer contract stays 8.
 
 ## Note shortcut state (Tickets 126–128)
 

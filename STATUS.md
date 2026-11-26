@@ -102,6 +102,32 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 383 Mac complete: guessed Where dismissals sync while Completion places is off — November 26, 2026
+
+Branch `feat/alongside-383mac`, on the alongside branch with Ticket 383's web part.
+
+- **Hazard confirmed by test:** before this change the shared planner deleted a hosted guess
+  dismissal stored while labels were off (an ordinary sync planned a hosted delete), and the
+  schema-29 SQLite trigger refused it (a first-link replacement would fail).
+- **Mac:** SQLite schema 30 (`0030_guess_dismissal_without_labels.sql`) admits `home`,
+  `anywhere` and `add_place` dismissals while labels are off. A linked Mac shows the hosted
+  guessed Where and dismisses the shown guess with Completion places off; local mode has none.
+- **Sync:** account sync contract 11. `retainPlaceLabelInvariants` keeps a guess dismissal
+  while labels are off; turning labels off still deletes every dismissal. Hosted migration
+  `20261126150000_account_sync_where_guess_dismissals.sql` (not applied or pushed) hides such
+  rows from contracts 8 to 10 (Cadence for Mac 0.1.14 to 0.1.17), keeps them out of those
+  contracts' apply results, and lets their own dismissal replace a hidden one. It inserts one
+  registry row and changes the projection and apply functions for older contracts: it needs
+  the owner's yes, and must reach the database no later than `20261126130000`. Minimum writer
+  contract stays 8.
+- **Verification:** resolver, native, store-contract and SQL fixtures
+  (`tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql`) against a scratch database
+  with every migration, and the full check list in AGENTS.md. The web fixture
+  `tests/sql/ticket-383-where-guess-dismissal-smoke.sql` expected a check violation where
+  the trigger raises first; fixed.
+
+Platform impact: web unchanged; desktop implemented (installed check in Ticket 365); marketing
+not applicable; future mobile inherits the planner. Messaging impact: P-103.
 ## Ticket 386 complete in source: the estimate hash leaves Where out — November 25, 2026
 
 - **Hash:** `behaviorEstimateInputHash` hashes the title, description and the recipe

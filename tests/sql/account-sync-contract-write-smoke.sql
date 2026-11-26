@@ -72,7 +72,7 @@ begin
       where entity ->> 'kind' in ('place_label_settings', 'place_marker', 'completion_place_label', 'where_suggestion_dismissal')) then
     raise exception 'The legacy projection contains a newer entity kind';
   end if;
-  foreach invalid_contract in array array[null::integer, 0, 11] loop
+  foreach invalid_contract in array array[null::integer, 0, 12] loop
     begin
       perform public.read_account_sync_snapshot(invalid_contract);
       raise exception 'An invalid read contract was accepted: %', invalid_contract;

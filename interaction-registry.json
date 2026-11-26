@@ -18792,7 +18792,7 @@
           "control": "Review Where"
         }
       ],
-      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form. Ticket 383: on the web the guessed line shows whether or not Completion places is on; Cadence for Mac still shows it only while Completion places is on.",
+      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form. Ticket 383: the guessed line shows whether or not Completion places is on, on the web and on a linked Cadence for Mac whose server answers enabled (local mode has no guess).",
       "success_result": "Opens Details and Settings with Where filled in and a note to save; the Behavior changes only when the user saves.",
       "failure_result": "No change is stored.",
       "effects": [
@@ -18843,9 +18843,10 @@
             "tests/place-labels.dom.test.tsx",
             "tests/place-labels.service.test.ts",
             "tests/place-label.resolver.test.ts",
-            "tests/account-sync.resolver.test.ts"
+            "tests/account-sync.resolver.test.ts",
+            "tests/desktop-store-contract.test.ts"
           ],
-          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+          "reason": "Shared Behavior list. A linked Mac shows the hosted guess with Completion places off (Ticket 383); local mode has none. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -18887,7 +18888,7 @@
           "control": "Dismiss"
         }
       ],
-      "availability": "On an active Behavior with a suggestion. Ticket 383: on the web a guessed Where can be dismissed while Completion places is off (CADENCE_ALONGSIDE on); then only the guess the line shows is accepted, and the hosted trigger admits only the keys home, anywhere and add_place.",
+      "availability": "On an active Behavior with a suggestion. Ticket 383: a guessed Where can be dismissed while Completion places is off (CADENCE_ALONGSIDE on, and on a linked Cadence for Mac with VITE_CADENCE_ALONGSIDE on and the server answering enabled); then only the guess the line shows is accepted, and the hosted trigger and SQLite migration 0030 admit only the keys home, anywhere and add_place. Account sync contract 11 carries the row; the server hides it from Mac builds on contracts 8 to 10.",
       "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies. Ticket 358: dismissing a guessed Where stores the same dismissal and hides that guess; planning keeps using the guess. Turning Completion places off still deletes every dismissal.",
       "failure_result": "Keeps the suggestion visible.",
       "effects": [
@@ -18908,7 +18909,7 @@
           "tests/place-label.resolver.test.ts",
           "tests/alongside-ui.dom.test.tsx"
         ],
-        "notes": "DOM, resolver and service tests cover the dismissal and its return rule, with Completion places off and on (Ticket 383). The psql smoke tests/sql/ticket-383-where-guess-dismissal-smoke.sql covers the relaxed trigger."
+        "notes": "DOM, resolver and service tests cover the dismissal and its return rule, with Completion places off and on (Ticket 383). The psql smoke tests/sql/ticket-383-where-guess-dismissal-smoke.sql covers the relaxed trigger. Account sync: tests/account-sync.resolver.test.ts (\"Ticket 383 guess dismissals while labels are off\"), native tests for migration 0030, and tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql for the contract-11 projection."
       },
       "platforms": {
         "web": {
@@ -18936,9 +18937,10 @@
             "tests/place-labels.dom.test.tsx",
             "tests/place-labels.service.test.ts",
             "tests/place-label.resolver.test.ts",
-            "tests/account-sync.resolver.test.ts"
+            "tests/account-sync.resolver.test.ts",
+            "tests/desktop-store-contract.test.ts"
           ],
-          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+          "reason": "Shared Behavior list. A linked Mac dismisses the shown guess while Completion places is off; SQLite migration 0030 admits it and account sync contract 11 carries it (Ticket 383). Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
         },
         "marketing": {
           "applicability": "not_applicable",
