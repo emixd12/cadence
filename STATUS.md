@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 383 Mac part, 384, 385 and 386 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 384 complete in source on `feat/alongside-384` (no migration); 383 Mac part, 385 and 386 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
@@ -101,6 +101,27 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 384 complete in source: calendar event places — November 26, 2026
+
+- **Rule:** with `CADENCE_ALONGSIDE` on, each busy calendar event that reaches the free-slot
+  rule carries Home, a saved place's key or nothing (unknown), from its location text by
+  `travelPlaceKey` (`calendarEventPlace`, `planningPlaceCatalog` in `alongside.resolver.ts`).
+  An alongside item is refused during an event at another known place; the Timeline cue
+  shows again for those overlaps only. Calendar events stay out of pairing hosts.
+- **Paths:** Daily Brief lines (Google MCP read, in-memory location sidecar), its answers
+  (`readServerBriefCalendarBusy`, Google MCP), Chat (all sources), the web Timeline's "Move
+  for today" and the web and Mac overlap cues (on the device, from the view's
+  `planningPlaces` keys). Outlook and iCloud stay unknown on the Daily Brief paths: those reads
+  ask for no location. Map: `docs/DATETIME_STRATEGY.md`, "Coarse event places".
+- **Privacy:** no storage, logging, model input or MCP result carries the label, the keys or
+  a location (`tests/calendar-event-place.boundary.test.ts`). Flag off: no new read, and
+  request bodies and outputs are unchanged. No migration, no provider call, no new
+  dependency. Not run in a browser or on an installed Mac.
+
+Platform impact: web implemented; desktop overlap cue through the shared Timeline and
+`local-timeline.service.ts` (the Mac offers no "Move for today" and its brief uses the hosted
+routes); marketing not applicable; future mobile inherits the resolvers. Messaging impact: P-103.
 
 ## Ticket 383 web complete: the guessed Where without Completion places — November 26, 2026
 

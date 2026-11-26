@@ -633,8 +633,10 @@ Alongside rows (Ticket 358, D33; behind `CADENCE_ALONGSIDE`): a row whose Behavi
 alongside keeps its place in the list and shows one muted line under its title from
 `alongside.row-label`: "Alongside" for the person's answer, "Alongside · a guess" when
 the value is Cadence's guess. Its Possible overlap line and Calendar highlight stop for
-overlaps `alongsideMayOverlap` allows (every Calendar event, whose place is unknown);
-travel still shows. There is no parallel-lane layout. Bench: `composite.occurrence-row`.
+overlaps `alongsideMayOverlap` allows: a Calendar event at the same place, or whose place
+is unknown (Ticket 384). They show for an event at another known place: an item at Home
+during an event whose location is a saved place, or the reverse. Travel still shows.
+There is no parallel-lane layout. Bench: `composite.occurrence-row`.
 
 Alongside question on a row (Ticket 360, D33; behind `CADENCE_ALONGSIDE`): right after a
 Completed mark that shows no Done at line, a row whose Behavior's alongside question is

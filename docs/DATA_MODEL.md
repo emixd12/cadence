@@ -2668,6 +2668,16 @@ or place key. Ticket 357 added the column and its read path.
   (`docs/DATETIME_STRATEGY.md`, "Brief moves"). Travel, departure and leave-reminder code
   reads `where_kind` alone, and `tests/effective-where.boundary.test.ts` pins that. A
   dismissed Where suggestion does not change it.
+- **Calendar event places (Ticket 384, D37).** The other side of the rule for a calendar
+  event: `calendarEventPlace` gives each busy event Home, a saved place's key or nothing
+  (unknown), from its location text keyed with `travelPlaceKey`. A saved place is a
+  place-Where Behavior's `location_text`; Home is `travel_settings.base_location_text`.
+  `lib/services/planning-places.service.ts` reads both only while `CADENCE_ALONGSIDE` is
+  on and keeps only their keys. Nothing new is stored: the label lives for one request,
+  the Daily Brief's location sidecar stays outside the day context, and no label, key or
+  location reaches a model, a log, a repository or an MCP result
+  (`tests/calendar-event-place.boundary.test.ts`). The Timeline view's `planningPlaces`
+  (keys only) lets the web and Mac Timelines label events on the device. No migration.
 
 ## Note shortcut state (Tickets 126–128)
 
