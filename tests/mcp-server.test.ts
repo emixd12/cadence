@@ -23,6 +23,8 @@ function request(method: string, params = {}, extra: Record<string, string> = {}
 }
 beforeEach(() => {
   vi.stubEnv("CADENCE_MCP_ENABLED", "true"); vi.stubEnv("CADENCE_OAUTH_ISSUER", "http://127.0.0.1:4321");
+  // The MCP Apps trial is off here, as in production; tests/mcp-apps-server.test.ts covers it on (Ticket 376).
+  vi.stubEnv("CADENCE_MCP_APPS", "");
   vi.mocked(verifyMcpAccessToken).mockResolvedValue(grant);
   vi.mocked(createIntegrationContext).mockReturnValue({ userId: grant.userId, now: new Date(), tokenExpiresAt: new Date(),
     supabase: {} as ReturnType<typeof createIntegrationContext>["supabase"], actor: { ...grant, grantedScopes: grant.scopes } });
@@ -59,6 +61,7 @@ describe("MCP route with official SDK", () => {
     const { result } = await response.json();
     expect(result).toMatchObject({ _meta: { "io.modelcontextprotocol/serverInfo": { name: "cadence" } }, supportedVersions: ["2026-07-28"], capabilities: { tools: {} } });
     expect(result.capabilities.resources).toBeUndefined();
+    expect(result.capabilities.extensions).toBeUndefined();
     expect(result.capabilities.prompts).toBeUndefined();
     expect(result.instructions).toContain("idempotency key");
     expect(result.instructions.length).toBeLessThanOrEqual(512);
