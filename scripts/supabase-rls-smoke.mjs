@@ -52,6 +52,7 @@ export const PUBLIC_AUTHENTICATED_FUNCTIONS = [
   "create_period_if_absent",
   "delete_period",
   "get_export_page_read_bundle",
+  "integration_apply_period_write",
   "list_my_occurrence_time_session_history",
   "list_my_occurrence_time_sessions",
   "mark_occurrence_sync_fresh_if_configuration_current",

@@ -36,7 +36,7 @@
   ],
   "valid_outputs": [
     {
-      "name": "three record kinds",
+      "name": "four record kinds",
       "value": {
         "results": [
           {
@@ -53,6 +53,11 @@
             "id": "day_note:00000009-1111-4111-8111-000000000009",
             "title": "Day note for 2026-10-18",
             "url": "https://app.cadence-me.com/timeline"
+          },
+          {
+            "id": "period:00000007-1111-4111-8111-000000000007",
+            "title": "Period: Sick (2026-03-06 to 2026-03-09)",
+            "url": "https://app.cadence-me.com/behaviors"
           }
         ]
       }

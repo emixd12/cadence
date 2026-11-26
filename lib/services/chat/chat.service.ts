@@ -386,6 +386,8 @@ export function compactTimeline(value: unknown): unknown {
     timezone: out.timezone, today: out.today_local_date,
     items: days.flatMap((day) => Array.isArray(day.occurrences) ? day.occurrences.map(item) : []),
     ...(days[0] && "day_note" in days[0] ? { day_note: days[0].day_note } : {}),
+    // Ticket 370: the Periods that cover the day (label and dates, never a note), only when there are any.
+    ...(days[0] && Array.isArray(days[0].periods) && days[0].periods.length > 0 ? { periods: days[0].periods } : {}),
     needs_decision: needs && Array.isArray(needs.occurrences) ? { items: needs.occurrences.map(item), total: needs.total_count } : null,
   };
 }

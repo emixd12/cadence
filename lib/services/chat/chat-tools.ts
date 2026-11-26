@@ -41,6 +41,12 @@ export const CHAT_IMMEDIATE_WRITES = [
 export const CHAT_CONFIRM_WRITES = [
   "create_behavior", "update_behavior", "archive_behavior", "restore_behavior", "move_occurrence_to_date",
 ] as const;
+/**
+ * Period writes in the MCP catalog that Chat does not offer yet (Ticket 370). Chat reads
+ * Periods; creating, editing and ending one from Chat is the follow-up on branch
+ * `feat/370-chat-period-writes`, which needs the `period` kind in `chat_actions`.
+ */
+export const CHAT_UNOFFERED_OPERATIONS: ReadonlySet<string> = new Set(["create_period", "update_period", "end_period"]);
 export type ChatWriteName = (typeof CHAT_IMMEDIATE_WRITES)[number] | (typeof CHAT_CONFIRM_WRITES)[number];
 
 const WRITES: ReadonlySet<string> = new Set([...CHAT_IMMEDIATE_WRITES, ...CHAT_CONFIRM_WRITES]);
@@ -62,6 +68,7 @@ export const CHAT_OUTCOME_KIND: Readonly<Record<ChatWriteName, ChatOutcomeKind>>
 export const CHAT_TOOL_SUBJECT: Readonly<Record<string, ChatToolSubject>> = {
   get_account_context: "account", list_behaviors: "behaviors", get_behavior: "behaviors", list_categories: "behaviors",
   get_timeline: "timeline", list_occurrences: "occurrences", get_occurrence: "occurrences", list_day_notes: "notes",
+  list_periods: "periods",
   get_adherence_summary: "adherence", search: "search", fetch: "search", list_calendar_events: "calendar", list_calendar_load: "calendar", list_workouts: "workouts",
   search_advice: "advice", plan_travel_horizon: "travel", get_longitudinal_patterns: "patterns",
   plan_alongside_pairings: "timeline",
@@ -71,6 +78,7 @@ const SUBJECT_TEXT: Readonly<Record<ChatToolSubject, string>> = {
   timeline: "your Timeline", behaviors: "your Behaviors", occurrences: "your items", notes: "your notes",
   adherence: "how your week went", account: "your account", search: "your records", calendar: "your calendar",
   workouts: "your Hevy workouts", advice: "Cadence's advice library", travel: "your travel horizon", patterns: "your schedule patterns",
+  periods: "your periods",
 };
 
 export function chatToolLineText(subject: ChatToolSubject, state: "done" | "failed" | "off"): string {
@@ -192,6 +200,7 @@ export function buildChatToolDefinitions(sources: ChatSourceFlags, options: Read
   // The same contract edition the MCP endpoint validates against (Ticket 364).
   const cadence = listIntegrationToolDescriptors(integrationContractOptions())
     .filter((descriptor) => sources.notes || !NOTE_TOOLS.has(descriptor.name))
+    .filter((descriptor) => !CHAT_UNOFFERED_OPERATIONS.has(descriptor.name))
     .map((descriptor) => ({ name: descriptor.name, description: descriptor.description, inputSchema: withoutServerKeys(descriptor.inputSchema) }));
   const anyCalendar = sources.googleCalendar || sources.outlookCalendar || sources.icloudCalendar;
   const connectors = CHAT_CONNECTOR_TOOLS

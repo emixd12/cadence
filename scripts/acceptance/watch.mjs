@@ -34,10 +34,12 @@ export const TEST_ACCOUNTS = Object.freeze({
 // Mirrors packages/core/src/integration/operations.ts; a test keeps them equal.
 export const OPERATION_ACCESS = Object.freeze({
   get_account_context: 'read', list_behaviors: 'read', get_behavior: 'read', list_categories: 'read',
-  get_timeline: 'read', list_occurrences: 'read', get_occurrence: 'read', list_day_notes: 'read', get_adherence_summary: 'read',
+  get_timeline: 'read', list_occurrences: 'read', get_occurrence: 'read', list_day_notes: 'read', list_periods: 'read',
+  get_adherence_summary: 'read',
   search: 'read', fetch: 'read',
   set_occurrence_status: 'write', set_parent_occurrence_status: 'write', update_occurrence_note: 'write',
   move_occurrence_for_day: 'write', revert_occurrence_move: 'write', update_day_note: 'write',
+  create_period: 'write', update_period: 'write', end_period: 'write',
   add_opportunity_occurrence: 'write', remove_opportunity_occurrence: 'write',
   create_behavior: 'write',
   update_behavior: 'write', archive_behavior: 'write', restore_behavior: 'write',

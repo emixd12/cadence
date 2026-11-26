@@ -70,13 +70,13 @@ Use this workflow when the user asks to add a recurring routine to Cadence.
    (null to ungroup) or `sub_behavior_sort_order`. A sub-behavior can't have
    sub-behaviors, and a Behavior with sub-behaviors can't become one.
 
-   When `get_account_context()` reports `contract_version` 1.8.0 or later,
+   When the `create_behavior` tool lists an `alongside` input field,
    Behaviors also carry `alongside`: the user's answer to whether the Behavior can
    be done alongside other things, such as a red-light helmet worn while reading.
    It is true, false, or null when unanswered. Send `alongside` on
    `create_behavior()` or `update_behavior()` only when the user says it; never
-   guess it for them. Null clears an answer. Earlier contract versions reject the
-   field, so leave it out there.
+   guess it for them. Null clears an answer. A server that does not list the
+   field rejects it, so leave it out there.
 4. Preview the title, category, schedule, account timezone, any description or end
    date, and reminder settings in plain language. For a routine with steps, list
    each step and say which ones follow the parent's schedule. Browser reminders default on

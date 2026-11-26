@@ -37,8 +37,8 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 - Calendar days are `local_date` values (`YYYY-MM-DD`) in the account's IANA
   timezone. Outputs give instants in UTC (ending in `Z`). Inputs accept any
   RFC 3339 offset.
-- Entity ids are UUIDs. Editable records (Behaviors and Occurrences) carry an
-  opaque `revision` token.
+- Entity ids are UUIDs. Editable records (Behaviors, Occurrences, day notes and
+  Periods) carry an opaque `revision` token.
 - `needs_decision` is derived (Unresolved and `local_date` before today). It is
   never stored.
 - Adherence is Completed divided by Completed plus Not Completed. Unresolved is
@@ -56,7 +56,8 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
   and input returns the first result. Reusing a key with different input
   returns `idempotency_key_reused`.
 - Concurrency: `set_occurrence_status` accepts `expected_status`; the other
-  writes accept `expected_revision`. `update_behavior` requires it. A stale
+  writes accept `expected_revision`. `update_behavior`, `update_period` and
+  `end_period` require it. `create_period` adds a record and takes none. A stale
   value returns `conflict` and changes nothing.
 - `create_behavior` accepts an optional `external_ref`, stored for the calling
   client only.
@@ -74,8 +75,9 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
   or hard-to-reverse outcomes. It also asks for the standard `search` and
   `fetch` input shapes, absolute user-openable URLs, and internal ids in `id`.
 - Cadence applies the stricter rule. Every write that modifies an existing
-  record sets `destructiveHint: true`. `create_behavior` and
-  `add_opportunity_occurrence` only add a record, so they set `false`. No tool reaches the open internet, so every tool sets
+  record sets `destructiveHint: true`, `end_period` included.
+  `create_behavior`, `add_opportunity_occurrence` and `create_period` only add a
+  record, so they set `false`. No tool reaches the open internet, so every tool sets
   `openWorldHint: false`. Each tool's rationale is listed in the tool reference
   below.
 
@@ -94,7 +96,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
 
 <!-- BEGIN GENERATED: integration contract reference. Do not edit by hand. -->
 
-Contract version: `1.7.0`. Generated from `packages/core/src/integration/`.
+Contract version: `1.8.0`. Generated from `packages/core/src/integration/`.
 
 ## Operations
 
@@ -108,6 +110,7 @@ Contract version: `1.7.0`. Generated from `packages/core/src/integration/`.
 | `list_occurrences` | List Occurrences | `cadence.read` | yes | no | yes |
 | `get_occurrence` | Get Occurrence | `cadence.read` | yes | no | yes |
 | `list_day_notes` | List day notes | `cadence.read` | yes | no | yes |
+| `list_periods` | List Periods | `cadence.read` | yes | no | yes |
 | `get_adherence_summary` | Get adherence summary | `cadence.read` | yes | no | yes |
 | `search` | Search Cadence | `cadence.read` | yes | no | yes |
 | `fetch` | Fetch Cadence record | `cadence.read` | yes | no | yes |
@@ -117,6 +120,9 @@ Contract version: `1.7.0`. Generated from `packages/core/src/integration/`.
 | `move_occurrence_for_day` | Move Occurrence for today | `cadence.occurrences.write` | no | yes | no |
 | `revert_occurrence_move` | Undo Occurrence move | `cadence.occurrences.write` | no | yes | no |
 | `update_day_note` | Update day note | `cadence.occurrences.write` | no | yes | yes |
+| `create_period` | Create Period | `cadence.occurrences.write` | no | no | no |
+| `update_period` | Update Period | `cadence.occurrences.write` | no | yes | yes |
+| `end_period` | End Period today | `cadence.occurrences.write` | no | yes | yes |
 | `add_opportunity_occurrence` | Add opportunity to today | `cadence.occurrences.write` | no | no | no |
 | `remove_opportunity_occurrence` | Remove added opportunity | `cadence.occurrences.write` | no | yes | yes |
 | `create_behavior` | Create Behavior | `cadence.behaviors.write` | no | no | no |
@@ -133,8 +139,8 @@ Every tool sets `openWorldHint: false`.
 
 | Scope | Required | Grants | Tools |
 |---|---|---|---|
-| `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `get_adherence_summary`, `search`, `fetch` |
-| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, and edit Occurrence notes and day notes. | `set_occurrence_status`, `set_parent_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
+| `cadence.read` | yes | Read Behaviors, categories, Occurrences, statuses, notes, day notes, Periods, time sessions, adherence, and the profile timezone. | `get_account_context`, `list_behaviors`, `get_behavior`, `list_categories`, `get_timeline`, `list_occurrences`, `get_occurrence`, `list_day_notes`, `list_periods`, `get_adherence_summary`, `search`, `fetch` |
+| `cadence.occurrences.write` | no | Mark Occurrences Completed, Not Completed, or Unresolved, edit Occurrence notes and day notes, and create, edit, and end Periods. No Period is removed. | `set_occurrence_status`, `set_parent_occurrence_status`, `update_occurrence_note`, `move_occurrence_for_day`, `revert_occurrence_move`, `update_day_note`, `create_period`, `update_period`, `end_period`, `add_opportunity_occurrence`, `remove_opportunity_occurrence` |
 | `cadence.behaviors.write` | no | Create and edit Behaviors, and archive or restore them. Nothing is deleted. | `create_behavior`, `update_behavior`, `archive_behavior`, `restore_behavior`, `end_behavior`, `pause_behavior`, `resume_behavior` |
 
 ## Error catalog
@@ -181,6 +187,13 @@ Every tool sets `openWorldHint: false`.
 | Day note length | 2000 |
 | `list_day_notes` maximum date range (days, inclusive) | 92 |
 | Archive note length | 2000 |
+| Period label length | 60 |
+| Period note length | 2000 |
+| `list_periods` maximum date range (days, inclusive) | 366 |
+| Periods per `list_periods` page | 40 |
+| Period summaries per embedded list (`active_periods`, `period_split.periods`) | 20 |
+| Period summaries per `get_timeline` day (`periods`) | 10 |
+| Periods per account | 500 |
 | Cursor length | 512 |
 | Revision length | 128 |
 | Idempotency key minimum length | 8 |
@@ -201,6 +214,7 @@ Included:
 - Occurrences, stored statuses, and status history
 - Occurrence notes and archive notes
 - Day notes (one note per calendar date, separate from Occurrence notes and statuses)
+- Periods (date ranges the user labeled for the whole account; annotation only, separate from statuses, adherence, reminders and schedules)
 - Occurrence time sessions
 - Adherence analytics (Unresolved excluded, no streaks)
 - Per-Behavior reminder settings
@@ -237,7 +251,7 @@ Excluded:
 
 ### `get_account_context`
 
-**Get Cadence account context.** Returns the account's timezone, today's local date and time, the permissions this connection has, and how fresh the data is. Use it first to learn what "today" means for this user and which Cadence tools the connection may call.
+**Get Cadence account context.** Returns the account's timezone, today's local date and time, the Periods that cover today, the permissions this connection has, and how fresh the data is. Use it first to learn what "today" means for this user and which Cadence tools the connection may call. A Period in `active_periods` is the user's own label for these days; it changes no status, adherence, reminder or schedule.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -259,7 +273,9 @@ Output:
 | `local_time` | yes | string |
 | `now` | yes | string (date-time) |
 | `granted_scopes` | yes | array of `cadence.read`, `cadence.occurrences.write`, `cadence.behaviors.write` |
-| `contract_version` | yes | `"1.7.0"` |
+| `contract_version` | yes | `"1.8.0"` |
+| `active_periods` | yes | array of object |
+| `more_active_periods` | yes | boolean |
 | `freshness` | yes | object |
 
 ### `list_behaviors`
@@ -341,7 +357,7 @@ Output:
 
 ### `get_timeline`
 
-**Get Timeline.** Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in `parent_groups`. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to 14 days from the start date.
+**Get Timeline.** Returns the Timeline as the Cadence web app groups it: Needs decision (Unresolved Occurrences from before today) plus each day's Occurrences, with parent Behavior slots and their derived progress in `parent_groups`. Use it for questions such as "what's on today" or "what still needs a decision". Covers up to 14 days from the start date. Each day also lists the Periods that cover it, the user's own labels for those days; a Period changes no status.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -445,9 +461,36 @@ Output:
 | `timezone` | yes | string |
 | `day_notes` | yes | array of object |
 
+### `list_periods`
+
+**List Periods.** Lists the user's Periods that overlap a date range of up to 366 days, earliest first, up to 40 per page, each with its note and revision. A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it. No tool removes a Period: the user removes one in the Cadence app.
+
+- Scope: `cadence.read`
+- Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
+- Annotation rationale: Reads account data and changes nothing, so readOnlyHint is true. Claude runs read-only tools without per-call confirmation, and OpenAI asks for readOnlyHint on every read. openWorldHint is false because the tool reaches only the user's own Cadence account.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `limit_exceeded`
+- Since: 1.8.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `start_local_date` | yes | string (date) |
+| `end_local_date` | yes | string (date) |
+| `cursor` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `timezone` | yes | string |
+| `today_local_date` | yes | string (date) |
+| `periods` | yes | array of object |
+| `next_cursor` | yes | string or null |
+
 ### `get_adherence_summary`
 
-**Get adherence summary.** Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to 366 days. Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved. Counts and the rate cover scheduled Occurrences; opportunity_completed_count counts added opportunities apart. Use it for "how am I doing" questions. Cadence does not compute streaks.
+**Get adherence summary.** Returns Completed, Not Completed, and Unresolved counts and the adherence rate, overall and per Behavior, for a date range of up to 366 days. Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved. Counts and the rate cover scheduled Occurrences; opportunity_completed_count counts added opportunities apart. `period_split` gives the same counts for days inside and outside the user's Periods. Use it for "how am I doing" questions. Cadence does not compute streaks.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -473,10 +516,11 @@ Output:
 | `adherence_definition` | yes | `"Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved."` |
 | `overall` | yes | object |
 | `behaviors` | yes | array of object |
+| `period_split` | yes | object or null |
 
 ### `search`
 
-**Search Cadence.** Searches the user's Behaviors (titles, descriptions, archive notes), Occurrence notes, and day notes by text. Returns ids for `fetch` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.
+**Search Cadence.** Searches the user's Behaviors (titles, descriptions, archive notes), Occurrence notes, day notes, and Period labels by text. Returns ids for `fetch` and links into the Cadence web app. Use it to find a habit, routine, or note by keyword. A Period's note is not searched. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -498,7 +542,7 @@ Output:
 
 ### `fetch`
 
-**Fetch Cadence record.** Returns the full text of one `search` result: a Behavior's definition, an Occurrence and its note, or a day note. Use it after `search` to read a result. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.
+**Fetch Cadence record.** Returns the full text of one `search` result: a Behavior's definition, an Occurrence and its note, a day note, or a Period's label and dates (list_periods returns a Period's note). Use it after `search` to read a result. A day note is the user's one note about a whole calendar date (for example "Travel day" or "Sick"). It is not an Occurrence note, has no status, and never changes Completed, Not Completed, Unresolved, Needs decision, adherence, or reminders.
 
 - Scope: `cadence.read`
 - Annotations: readOnlyHint true, destructiveHint false, idempotentHint true, openWorldHint false
@@ -690,6 +734,88 @@ Output:
 |---|---|---|
 | `local_date` | yes | string (date) |
 | `day_note` | yes | object or null |
+| `changed` | yes | boolean |
+
+### `create_period`
+
+**Create Period.** Adds a Period from start_local_date through end_local_date, or an ongoing one when no end is sent. Past, current and future dates are allowed, and Periods may overlap. A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it. No tool removes a Period: the user removes one in the Cadence app.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint false, idempotentHint false, openWorldHint false
+- Annotation rationale: Adds a new Period and changes no existing record, like create_behavior, so destructiveHint is false under both Claude's and OpenAI's guidance; readOnlyHint is false, so clients still treat it as a write. Calling it twice without an idempotency_key adds two Periods, and no tool removes one, so idempotentHint is false. openWorldHint is false: only the user's own Cadence account is touched.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `limit_exceeded`, `idempotency_key_reused`
+- Since: 1.8.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `label` | yes | string |
+| `start_local_date` | yes | string (date) |
+| `end_local_date` | no | string (date) or null |
+| `note` | no | string or null |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `period` | yes | object |
+
+### `update_period`
+
+**Update Period.** Edits a Period's label, dates or note. Only the fields sent change: end_local_date null makes it ongoing, and note null clears the note. The revision comes from list_periods. A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it. No tool removes a Period: the user removes one in the Cadence app.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Overwrites the Period's label, dates or note, and Cadence keeps no history of the earlier values, so destructiveHint is true under both Claude's and OpenAI's guidance. The same arguments leave the same Period, so idempotentHint is true. openWorldHint is false.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`
+- Since: 1.8.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `period_id` | yes | string (uuid) |
+| `expected_revision` | yes | string |
+| `label` | no | string |
+| `start_local_date` | no | string (date) |
+| `end_local_date` | no | string (date) or null |
+| `note` | no | string or null |
+| `idempotency_key` | no | string |
+
+At least one of `label`, `start_local_date`, `end_local_date`, `note` is required.
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `period` | yes | object |
+| `changed` | yes | boolean |
+
+### `end_period`
+
+**End Period today.** Ends a Period today: its last day becomes today in the account timezone. It takes no date. A Period that has not started, or has already ended, fails with invalid_state; update_period changes its dates. A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it. No tool removes a Period: the user removes one in the Cadence app.
+
+- Scope: `cadence.occurrences.write`
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Changes an existing Period: it sets the last day to today and overwrites a later last day, so destructiveHint is true under Claude's review criteria, which ask for it on tools that modify data. update_period can set the day back, so the hint is conservative for ChatGPT. Repeating it leaves the same Period, ended today, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.
+- Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`, `invalid_state`
+- Since: 1.8.0
+
+Input:
+
+| Field | Required | Type |
+|---|---|---|
+| `period_id` | yes | string (uuid) |
+| `expected_revision` | yes | string |
+| `idempotency_key` | no | string |
+
+Output:
+
+| Field | Required | Type |
+|---|---|---|
+| `period` | yes | object |
 | `changed` | yes | boolean |
 
 ### `add_opportunity_occurrence`
@@ -964,22 +1090,62 @@ Output:
 
 A status change written from a connected service's recorded activity appears in `status_history` with `semantics` `system_rule_declared` and `capture_method` `derived`; a revert after the activity is deleted at the source carries the same pair with `status` `unresolved`. Both values were already in the enums, so the tool's schema is unchanged. The user's own marks keep `explicit_user_mark` or `explicit_user_correction` with `manual_tap` or `manual_text`. Clients must not describe a `derived` entry as something the user did.
 
-## Alongside (contract 1.8.0, available when `CADENCE_ALONGSIDE` is on)
+## Periods (contract 1.8.0)
+
+Ticket 370 (`docs/DECISIONS.md`, 2026-11-25, D35). A Period is a range of local dates the
+user labeled for the whole account, such as "Sick", November 3 to 9. It is annotation
+only: it never changes a status, adherence, a reminder or a schedule.
+
+- **Tools.** `list_periods` (read), and `create_period`, `update_period` and `end_period`
+  under `cadence.occurrences.write`. There is no remove tool: removing a Period stays in
+  the Cadence app. Every Period tool description carries the same sentence about what a
+  Period is (`PERIOD_MEANING` in `operations.ts`).
+- **Two shapes.** The full Period (`id`, `label`, `start_local_date`, `end_local_date`,
+  `ongoing`, `note`, `revision`, `updated_at`) comes only from `list_periods` and the three
+  writes. Every other place returns the summary: the same fields without `note`,
+  `revision` and `updated_at`.
+- **Embedded lists.** `get_account_context.active_periods` (Periods that cover today),
+  `periods` on each `get_timeline` day, and `get_adherence_summary.period_split.periods`
+  hold summaries, earliest first: at most 20, and at most 10 on a `get_timeline` day, so
+  a 14-day read of the longest labels fits. `more_active_periods` and `more_periods` say
+  when more exist. With the 500 Periods an account can hold, every result stays under the
+  100,000-byte cap.
+- **`list_periods`.** A range of at most 366 days and an optional `cursor`. It returns the
+  Periods with a day in the range, earliest first, at most 40 per page. A page holds fewer
+  when long notes would pass the result cap, and `next_cursor` continues.
+- **`period_split`.** Null when no Period overlaps the range. Otherwise `inside` counts the
+  Occurrences on dates at least one Period covers, and `outside` the rest, in the shape
+  `overall` uses. A date under several Periods counts once. The split comes after the
+  `behavior_ids` filter. `overall`, `behaviors` and `adherence_definition` do not change.
+- **Search and fetch.** `search` matches a Period's label, never its note, and returns
+  `period:<uuid>` ids. `fetch` returns the label, dates and revision as quoted JSON with
+  `metadata.kind: "period"`. The note is returned only in the `note` field of
+  `list_periods` and the write results.
+- **Writes.** `update_period` and `end_period` require `expected_revision`, the opaque
+  form day notes use; a stale value returns `conflict`. `update_period` changes only the
+  fields sent: `end_local_date: null` makes the Period ongoing and `note: null` clears the
+  note. `end_period` takes no date. It sets the last day to today in the account timezone
+  and returns `invalid_state` when the Period has not started or has already ended.
+  `create_period` returns `limit_exceeded` when the account already holds 500 Periods.
+- **Annotations.** `create_period` only adds a record. `update_period` and `end_period`
+  change an existing one and set `destructiveHint: true`.
+
+## Alongside (contract 1.9.0, available when `CADENCE_ALONGSIDE` is on)
 
 Ticket 364 (`docs/DECISIONS.md`, 2026-11-25, D33). The generated reference above stays
-the published contract 1.7.0. Contract 1.8.0 is a minor edition of it that the hosted
+the published contract 1.8.0. Contract 1.9.0 is a minor edition of it that the hosted
 endpoint serves only while the server flag `CADENCE_ALONGSIDE` is `on`; with the flag
-off, `tools/list`, every output and every error are byte-identical to 1.7.0
-(`tests/integration-alongside-contract.test.ts` pins the 1.7.0 tool list's digest).
+off, `tools/list`, every output and every error are byte-identical to 1.8.0
+(`tests/integration-alongside-contract.test.ts` pins the 1.8.0 tool list's digest).
 
-- **How it is built.** `packages/core/src/integration/editions.ts` derives the 1.8.0
+- **How it is built.** `packages/core/src/integration/editions.ts` derives the 1.9.0
   edition from the registry. Callers pass `{ alongside: true }` to
   `listIntegrationToolDescriptors`, `validateOperationInput`, `validateOperationOutput`
-  and `integrationContractVersion`; no options means 1.7.0. The web app reads the flag
+  and `integrationContractVersion`; no options means 1.8.0. The web app reads the flag
   once per call in `lib/services/integration-contract-options.ts`. A test checks that
-  the edition differs from 1.7.0 only by the fields below and the version.
+  the edition differs from 1.8.0 only by the fields below and the version.
 - **Version.** `get_account_context.contract_version`, the MCP server `version` and
-  every error's `contract_version` are `"1.8.0"`.
+  every error's `contract_version` are `"1.9.0"`.
 - **Outputs.** Behaviors (`list_behaviors`, `get_behavior` and every Behavior write)
   carry `alongside` after `is_opportunity`. Occurrences, including `get_timeline` days
   and Needs decision, `list_occurrences`, `get_occurrence` and every Occurrence write,
@@ -996,13 +1162,17 @@ off, `tools/list`, every output and every error are byte-identical to 1.7.0
 - **Writes.** The confirmed, scoped write path is unchanged: `cadence.behaviors.write`,
   `destructiveHint` as before, idempotency keys and `expected_revision`. No new tool and
   no delete.
-- **Rollback.** Turning the flag off serves 1.7.0 again, and a replayed result recorded
-  under 1.8.0 drops `alongside` (`fitOutputToContract`).
+- **Rollback.** Turning the flag off serves 1.8.0 again, and a replayed result recorded
+  under 1.9.0 drops `alongside` (`fitOutputToContract`).
 - **Turning it on.** Needs migrations `20261125140000_behavior_alongside.sql` and
   `20261125180000_alongside_mcp_and_portability.sql`. When the owner turns the flag on
   for good (Ticket 365), fold the edition into the registry, bump
-  `INTEGRATION_CONTRACT_VERSION` to 1.8.0 and regenerate this reference and the
+  `INTEGRATION_CONTRACT_VERSION` to 1.9.0 and regenerate this reference and the
   developer reference.
+- **Renumbered.** Until Ticket 370 this edition called itself 1.8.0. Periods took
+  1.8.0 in the published registry (D35), so the edition is 1.9.0. The flag was off in
+  Production throughout, so only preview and local test clients saw the edition as
+  1.8.0. The edition is derived from the registry, so it serves the Period tools too.
 
 ## MCP Apps trial: `show_day`, a transport tool outside this contract
 
@@ -1012,7 +1182,7 @@ developer reference or the plugins, and it has no contract version. The MCP endp
 adds it to `tools/list`, after the registry tools, only while the server flag
 `CADENCE_MCP_APPS` is exactly `true`. The flag is off in production. With it off,
 `tools/list` is byte-identical to the contract (`tests/mcp-apps-server.test.ts` pins the
-1.7.0 digest on both protocol paths). The frozen schema and view contract are in
+1.8.0 digest on both protocol paths). The frozen schema and view contract are in
 `docs/qa/2026-11-26-mcp-apps-spike.md`; `tests/mcp-apps-show-day.test.ts` compares the
 served schemas with that note.
 

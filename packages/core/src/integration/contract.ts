@@ -52,12 +52,15 @@ export function validateOperationInput<N extends IntegrationOperationName>(
       checkTimeRanges((item as { schedules?: unknown }).schedules, issues, `$.sub_behaviors[${index}]`));
   }
   checkSubBehaviorRules(name, record, issues);
+  if (name === "create_period" || name === "update_period") checkPeriodDates(record, issues);
   if (issues.length) return { ok: false, error: invalidInputError(issues), issues };
 
   const maxRange = name === "list_occurrences"
     ? INTEGRATION_LIMITS.maxOccurrenceRangeDays
     : name === "list_day_notes"
       ? INTEGRATION_LIMITS.maxDayNoteRangeDays
+    : name === "list_periods"
+      ? INTEGRATION_LIMITS.maxPeriodRangeDays
     : name === "get_adherence_summary"
       ? INTEGRATION_LIMITS.maxAdherenceRangeDays
       : null;
@@ -210,6 +213,15 @@ function checkSubBehaviorRules(name: IntegrationOperationName, record: Record<st
         seen.add(id);
       });
     }
+  }
+}
+
+/** A Period's last day is on or after its first day. An update that sends one date is checked against the stored one later. */
+function checkPeriodDates(record: Record<string, unknown>, issues: ValidationIssue[]): void {
+  const start = record.start_local_date;
+  const end = record.end_local_date;
+  if (typeof start === "string" && typeof end === "string" && end < start) {
+    issues.push({ path: "$.end_local_date", keyword: "dateRange", message: "must be on or after start_local_date" });
   }
 }
 

@@ -18,6 +18,12 @@
       "value": {
         "id": "day_note:00000009-1111-4111-8111-000000000009"
       }
+    },
+    {
+      "name": "period id",
+      "value": {
+        "id": "period:00000007-1111-4111-8111-000000000007"
+      }
     }
   ],
   "invalid_inputs": [
@@ -64,6 +70,18 @@
         "metadata": {
           "kind": "day_note",
           "local_date": "2026-10-18"
+        }
+      }
+    },
+    {
+      "name": "period",
+      "value": {
+        "id": "period:00000007-1111-4111-8111-000000000007",
+        "title": "Period: Sick (2026-03-06 to 2026-03-09)",
+        "text": "{\n  \"id\": \"00000007-1111-4111-8111-000000000007\",\n  \"label\": \"Sick\",\n  \"start_local_date\": \"2026-03-06\",\n  \"end_local_date\": \"2026-03-09\",\n  \"ongoing\": false,\n  \"revision\": \"2026-03-08T07:30:00Z\",\n  \"updated_at\": \"2026-03-08T07:30:00Z\"\n}",
+        "url": "https://app.cadence-me.com/behaviors",
+        "metadata": {
+          "kind": "period"
         }
       }
     }

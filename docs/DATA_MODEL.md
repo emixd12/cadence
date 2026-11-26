@@ -2559,7 +2559,7 @@ be done alongside other things?". Null means unanswered. Migration:
   sync contract and configuration history together.
 - **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
   and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
-  import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
+  import and restore write it, and MCP contract 1.9.0 returns and accepts it. Migration
   `20261125180000_alongside_mcp_and_portability.sql` (additive function patches) keeps
   it in MCP write receipts, `cadence_private.apply_behaviorlog_import` (from the plan
   row's `cadenceAlongside`) and `apply_behaviorlog_restore_product_writes` (changed only
@@ -2850,8 +2850,7 @@ with a new id. There is no soft-delete column and no tombstone: account sync pla
 delete as "in the saved baseline, absent on one side", which needs no deleted row on the
 server. Account deletion removes Periods through the `profiles` cascade.
 
-Ticket 368 adds no entry point: no Server Action, MCP tool, export field or Mac code
-reads or writes Periods yet. Migration: `20261126130000_periods.sql`; local check
+Ticket 368 added no entry point. Migration: `20261126130000_periods.sql`; local check
 `tests/sql/periods.sql`. `periods` and the three functions are in the RLS smoke lists
 (`scripts/supabase-rls-smoke.mjs`).
 
@@ -2883,6 +2882,39 @@ until that row expires, as Behavior titles and day notes are.
 `agent_runs.prompt_version` records the revision of the brief instructions that were
 sent, so a brief with Periods carries a different revision from one without; tip runs
 record `coach-tips-4`. Period labels are never written to application logs.
+
+### Period integration writes (Ticket 370)
+
+Migration `20261126140000_period_integration_writes.sql` lets an MCP grant create, edit and
+end a Period. It adds no table and no column, and drops nothing. There is no integration
+operation that removes a Period. Cadence Chat reads Periods and does not write them yet.
+
+- `public.integration_lock_write` is patched by text to allow `create_period`,
+  `update_period` and `end_period` under `cadence.occurrences.write`. Every operation it
+  allowed before keeps its scope. The patch raises when its anchor line is missing.
+- `public.integration_apply_period_write(p_key, p_hash, p_operation, p_period_id,
+  p_expected_revision, p_label, p_start_on, p_end_on, p_note)` is `security invoker` with
+  an empty `search_path`, executable by `authenticated` only. In one transaction it
+  locks or replays by idempotency key, writes as the grant's user through
+  `create_period` or `update_period`, stores a version-2 receipt of at most 100,000
+  bytes and records the activity with the Period id.
+- **Revision.** The contract's revision is the row's `updated_at` as a UTC instant, the
+  form day notes use. The function refuses a write whose `p_expected_revision` differs
+  from the stored row (`integration_conflict`), then passes the row's integer
+  `revision` to `update_period`, which compares and sets it. A missing Period, or
+  another account's, is `integration_not_found`.
+- **End.** The service sends the full planned row. For `end_period` the function
+  accepts only a change of `end_on`, to a day on or after `start_on` and earlier than
+  the stored `end_on` (or any such day when the Period is ongoing). Anything else is
+  `integration_period_end_refused`. "Today" comes from the profile timezone in
+  `lib/services/integration-write.service.ts`, never from the caller.
+- **Cap.** The insert passes the cap trigger. Its SQLSTATE `54000` becomes the contract
+  error `limit_exceeded`.
+
+Local check: `tests/sql/period-integration-write.sql`, which also re-checks
+`update_day_note` through `integration_lock_write`. The function is in the RLS smoke
+function list. Period labels and notes are never written to logs or to the activity
+record, which holds the operation name and the Period id.
 
 ## Google Calendar connector (Ticket 134)
 

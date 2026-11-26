@@ -1,0 +1,68 @@
+{
+  "operation": "end_period",
+  "valid_inputs": [
+    {
+      "name": "end today",
+      "value": {
+        "period_id": "00000008-1111-4111-8111-000000000008",
+        "expected_revision": "2026-03-08T07:45:00Z",
+        "idempotency_key": "period-0003"
+      }
+    },
+    {
+      "name": "without a key",
+      "value": {
+        "period_id": "00000008-1111-4111-8111-000000000008",
+        "expected_revision": "2026-03-08T07:45:00Z"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "a date is not an input",
+      "value": {
+        "period_id": "00000008-1111-4111-8111-000000000008",
+        "expected_revision": "2026-03-08T07:45:00Z",
+        "end_local_date": "2026-03-07"
+      },
+      "code": "invalid_input",
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "missing revision",
+      "value": {
+        "period_id": "00000008-1111-4111-8111-000000000008"
+      },
+      "code": "invalid_input",
+      "path": "$.expected_revision"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "ended today",
+      "value": {
+        "period": {
+          "id": "00000008-1111-4111-8111-000000000008",
+          "label": "Travel",
+          "start_local_date": "2026-03-08",
+          "end_local_date": "2026-03-08",
+          "ongoing": false,
+          "note": null,
+          "revision": "2026-03-08T12:00:00Z",
+          "updated_at": "2026-03-08T12:00:00Z"
+        },
+        "changed": true
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing period",
+      "value": {
+        "changed": true
+      },
+      "code": "internal_error",
+      "path": "$.period"
+    }
+  ]
+}

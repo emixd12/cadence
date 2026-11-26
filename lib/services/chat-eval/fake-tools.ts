@@ -5,7 +5,7 @@ import {
 } from "@cadence/core/integration";
 import {
   clockLabel, effectiveTime, minutesOf, timeOf, toInstant,
-  type ChatWorld, type WorldBehavior, type WorldOccurrence, type Weekday,
+  type ChatWorld, type WorldBehavior, type WorldOccurrence, type WorldPeriod, type Weekday,
 } from "./world";
 import { CHAT_PLANNING_READS, withChatPlanning } from "../chat/chat-planning";
 import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
@@ -90,7 +90,7 @@ function withWorldPlanning(world: ChatWorld, name: string, outcome: ChatToolResu
 }
 
 function snapshot(world: ChatWorld): string {
-  return JSON.stringify([world.behaviors, world.occurrences, [...world.dayNotes]]);
+  return JSON.stringify([world.behaviors, world.occurrences, [...world.dayNotes], world.periods ?? []]);
 }
 
 function run(world: ChatWorld, name: string, args: unknown): ChatToolResult {
@@ -191,6 +191,39 @@ function dayNoteOutput(world: ChatWorld, localDate: string) {
   return row ? { id: row.id, local_date: localDate, note: row.note, revision: `r${row.revision}`, updated_at: toInstant(world, localDate, "12:00") } : null;
 }
 
+// Periods (Ticket 370). The embedded lists carry summaries without the note: at most 20, or 10 on a Timeline day.
+function periodsOf(world: ChatWorld): WorldPeriod[] {
+  return (world.periods ??= []);
+}
+
+function sortedPeriods(rows: readonly WorldPeriod[]): WorldPeriod[] {
+  return [...rows].sort((a, b) => a.startOn.localeCompare(b.startOn) || a.id.localeCompare(b.id));
+}
+
+function periodCovers(row: WorldPeriod, date: string): boolean {
+  return row.startOn <= date && (row.endOn === null || date <= row.endOn);
+}
+
+function periodsOverlapping(world: ChatWorld, from: string, to: string): WorldPeriod[] {
+  return sortedPeriods(periodsOf(world).filter((row) => row.startOn <= to && (row.endOn === null || row.endOn >= from)));
+}
+
+function periodSummary(row: WorldPeriod) {
+  return { id: row.id, label: row.label, start_local_date: row.startOn, end_local_date: row.endOn, ongoing: row.endOn === null };
+}
+
+function periodOutput(world: ChatWorld, row: WorldPeriod) {
+  return { ...periodSummary(row), note: row.note, revision: `r${row.revision}`, updated_at: nowInstant(world) };
+}
+
+function embeddedPeriods(rows: readonly WorldPeriod[], limit = 20) {
+  return { periods: rows.slice(0, limit).map(periodSummary), more: rows.length > limit };
+}
+
+function periodTitle(row: WorldPeriod): string {
+  return `Period: ${row.label} (${row.endOn === null ? `from ${row.startOn}, ongoing` : `${row.startOn} to ${row.endOn}`})`;
+}
+
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -218,10 +251,14 @@ function daysBetween(start: string, end: string): string[] {
 type Handler = (world: ChatWorld, input: Record<string, unknown>) => ChatToolResult;
 
 const HANDLERS: Record<IntegrationOperationName, Handler> = {
-  get_account_context: (world) => ok({
-    account_ref: "chat_eval_account_ref", timezone: world.timezone, today_local_date: world.today, local_time: world.now,
-    now: nowInstant(world), granted_scopes: [...INTEGRATION_SCOPE_LIST], contract_version: INTEGRATION_CONTRACT_VERSION, freshness: freshness(world),
-  }),
+  get_account_context: (world) => {
+    const active = embeddedPeriods(periodsOverlapping(world, world.today, world.today));
+    return ok({
+      account_ref: "chat_eval_account_ref", timezone: world.timezone, today_local_date: world.today, local_time: world.now,
+      now: nowInstant(world), granted_scopes: [...INTEGRATION_SCOPE_LIST], contract_version: INTEGRATION_CONTRACT_VERSION,
+      active_periods: active.periods, more_active_periods: active.more, freshness: freshness(world),
+    });
+  },
 
   list_behaviors: (world, input) => {
     const state = (input.state as string | undefined) ?? "all";
@@ -249,8 +286,12 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
       timezone: world.timezone, today_local_date: world.today,
       needs_decision: input.include_needs_decision === false ? null : { occurrences: needs.map((item) => occurrenceOutput(world, item)), total_count: needs.length,
         truncated: false, lookback_start_local_date: Temporal.PlainDate.from(world.today).subtract({ days: 90 }).toString() },
-      days: dates.map((date) => ({ local_date: date, is_today: date === world.today, day_note: world.dayNotes.get(date)?.note ?? null,
-        occurrences: sortedOccurrences(world.occurrences.filter((item) => item.localDate === date)).map((item) => occurrenceOutput(world, item)) })),
+      days: dates.map((date) => {
+        const covering = embeddedPeriods(periodsOverlapping(world, date, date), 10);
+        return { local_date: date, is_today: date === world.today, day_note: world.dayNotes.get(date)?.note ?? null,
+          occurrences: sortedOccurrences(world.occurrences.filter((item) => item.localDate === date)).map((item) => occurrenceOutput(world, item)),
+          periods: covering.periods, more_periods: covering.more };
+      }),
       freshness: freshness(world),
     });
   },
@@ -275,6 +316,14 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
       return row && row.note !== null ? [row] : [];
     }) }),
 
+  list_periods: (world, input) => {
+    const rows = periodsOverlapping(world, input.start_local_date as string, input.end_local_date as string);
+    // Pages like the server: 40 per page, and an opaque cursor for the next page.
+    const offset = typeof input.cursor === "string" && /^p\d+$/.test(input.cursor) ? Number(input.cursor.slice(1)) : 0;
+    return ok({ timezone: world.timezone, today_local_date: world.today, periods: rows.slice(offset, offset + 40).map((row) => periodOutput(world, row)),
+      next_cursor: offset + 40 < rows.length ? `p${offset + 40}` : null });
+  },
+
   get_occurrence: (world, input) => {
     const item = findOccurrence(world, input.occurrence_id);
     return item ? ok({ occurrence: occurrenceDetail(world, item) }) : fail("not_found", "No Occurrence with this id.");
@@ -293,11 +342,16 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
         adherence_rate: completed + notCompleted ? completed / (completed + notCompleted) : null,
         opportunity_completed_count: all.filter((item) => item.origin === "opportunity" && item.status === "completed").length };
     };
+    const overlapping = periodsOverlapping(world, input.start_local_date as string, input.end_local_date as string);
+    const listed = embeddedPeriods(overlapping);
+    const inPeriod = (date: string) => overlapping.some((row) => periodCovers(row, date));
     const behaviors = world.behaviors.filter((item) => !filter || filter.includes(item.id));
     const scoped = inRange.filter((item) => behaviors.some((row) => row.id === item.behaviorId));
     return ok({ start_local_date: input.start_local_date, end_local_date: input.end_local_date, timezone: world.timezone, adherence_definition: ADHERENCE_DEFINITION,
       overall: counts(scoped), behaviors: behaviors.map((row) => ({ behavior_id: row.id, behavior_title: row.title, state: row.state,
-        ...counts(scoped.filter((item) => item.behaviorId === row.id)) })) });
+        ...counts(scoped.filter((item) => item.behaviorId === row.id)) })),
+      period_split: overlapping.length === 0 ? null : { periods: listed.periods, more_periods: listed.more,
+        inside: counts(scoped.filter((item) => inPeriod(item.localDate))), outside: counts(scoped.filter((item) => !inPeriod(item.localDate))) } });
   },
 
   search: (world, input) => {
@@ -308,6 +362,8 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
       ...world.occurrences.filter((item) => hit(item.note)).map((item) => ({ id: `occurrence:${item.id}`,
         title: `${findBehavior(world, item.behaviorId)!.title} on ${item.localDate}`, url: `${APP_URL}/timeline?date=${item.localDate}` })),
       ...[...world.dayNotes].filter(([, row]) => hit(row.note)).map(([date, row]) => ({ id: `day_note:${row.id}`, title: `Day note ${date}`, url: `${APP_URL}/timeline?date=${date}` })),
+      // Label only: a Period's note is never searched.
+      ...sortedPeriods(periodsOf(world)).filter((row) => hit(row.label)).map((row) => ({ id: `period:${row.id}`, title: periodTitle(row), url: `${APP_URL}/behaviors` })),
     ].slice(0, 20);
     return ok({ results });
   },
@@ -327,6 +383,13 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
       return ok({ id: input.id, title: `${title} on ${item.localDate}`, url: `${APP_URL}/timeline?date=${item.localDate}`,
         text: `Occurrence of "${title}" on ${item.localDate}, status ${item.status}. Note: ${item.note ? JSON.stringify(item.note) : "none"}.`,
         metadata: { kind, behavior_id: item.behaviorId, local_date: item.localDate, status: item.status } });
+    }
+    if (kind === "period") {
+      const row = periodsOf(world).find((item) => item.id === id);
+      if (!row) return fail("not_found", "Not found.");
+      // Label and dates only, as on the server: the note is never part of the fetched text.
+      return ok({ id: input.id, title: periodTitle(row), url: `${APP_URL}/behaviors`,
+        text: JSON.stringify({ ...periodSummary(row), revision: `r${row.revision}`, updated_at: nowInstant(world) }, null, 2), metadata: { kind: "period" } });
     }
     const entry = [...world.dayNotes].find(([, row]) => row.id === id);
     if (!entry) return fail("not_found", "Not found.");
@@ -404,6 +467,11 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
     else if (changed) { row.note = note; row.revision += 1; }
     return ok({ local_date: date, day_note: dayNoteOutput(world, date), changed });
   },
+
+  // Chat does not offer the Period writes yet (Ticket 370); the fake answers as the live executor does.
+  create_period: () => fail("not_found", "No tool named create_period."),
+  update_period: () => fail("not_found", "No tool named update_period."),
+  end_period: () => fail("not_found", "No tool named end_period."),
 
   create_behavior: (world, input) => {
     const schedule = (input.schedules as Record<string, unknown>[])[0] as Record<string, unknown> | undefined;
@@ -647,7 +715,7 @@ function searchAdvice(world: ChatWorld, args: unknown): ChatToolResult {
 
 /** Ids for records made during a run, distinct from the world's own ids. */
 function newId(world: ChatWorld): string {
-  const used = world.behaviors.length + world.dayNotes.size + world.occurrences.length;
+  const used = world.behaviors.length + world.dayNotes.size + world.occurrences.length + (world.periods?.length ?? 0);
   return `00000000-0000-4000-9000-${String(used).padStart(12, "0")}`;
 }
 

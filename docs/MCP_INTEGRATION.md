@@ -606,11 +606,11 @@ appear. Both descriptions repeat that a day note is separate from Occurrence not
 and statuses. The minor bump follows the versioning table: a relaxed id pattern and
 a new `metadata.kind` value.
 
-## 16. Alongside (Ticket 364, contract 1.8.0 behind a flag)
+## 16. Alongside (Ticket 364, contract 1.9.0 behind a flag)
 
 `CADENCE_ALONGSIDE` selects the contract edition the endpoint serves (`docs/MCP_CONTRACT.md`,
 "Alongside"). There was no earlier flag-gated contract change, so the registry stays
-1.7.0 and the 1.8.0 edition is derived from it in `editions.ts`. The flag is read per
+1.8.0 and the 1.9.0 edition is derived from it in `editions.ts`. The flag is read per
 request in `lib/services/integration-contract-options.ts` by `lib/mcp/server.ts`
 (`tools/list`, server version, errors), the read handlers, the write, move and
 opportunity services, and Cadence chat's tool list, so chat and MCP stay on one
@@ -619,8 +619,13 @@ person's answer only with the flag on, although `select *` may return the column
 it off. Write receipts carry the answer through `cadence_private.integration_write_source`
 (migration `20261125180000`). Evidence: `tests/integration-alongside-contract.test.ts`,
 `tests/integration-alongside-write.test.ts` and the protocol suite's
-`alongside-*` checks, which run when a server reports 1.8.0. Live client acceptance
+`alongside-*` checks, which run when a server reports 1.9.0. Live client acceptance
 for the field is Ticket 365.
+
+Ticket 370 renumbered this edition from 1.8.0 to 1.9.0, because Periods took 1.8.0 in
+the published registry (section 18). The flag was off in Production throughout, so only
+preview and local test clients saw the edition as 1.8.0. The plugin skills detect the
+field by the `alongside` input that `create_behavior` lists, not by a version number.
 
 ## 17. MCP Apps (D36, Tickets 375–382)
 
@@ -728,3 +733,57 @@ linked Mac receives view-made changes through existing account sync. Marketing: 
 developer reference and `/developers` change at general release (`P-099`). Future
 mobile: not applicable; host mobile apps render the view. Messaging impact: `P-098`,
 `P-099`.
+
+## 18. Periods (Ticket 370, contract 1.8.0)
+
+Contract 1.8.0 adds Periods (`docs/DECISIONS.md`, 2026-11-25, D35) to the published
+registry: `list_periods` (`cadence.read`), and `create_period`, `update_period` and
+`end_period` under `cadence.occurrences.write`, the scope the owner chose. There is no
+remove tool; removing a Period stays in the app. Existing tools gain
+`get_account_context.active_periods` with `more_active_periods`, `periods` with
+`more_periods` on each `get_timeline` day, `get_adherence_summary.period_split`, and the
+record kind `period` in `search` and `fetch`. `docs/MCP_CONTRACT.md`, "Periods", holds
+the shapes.
+
+What keeps an outside agent from misusing a Period:
+
+- Every Period tool description carries one sentence, `PERIOD_MEANING`: a Period changes
+  no status, adherence, reminder or schedule; it is not a reason to mark an Occurrence
+  Not Completed; pausing a Behavior is `pause_behavior`; a Period is created or changed
+  only when the user states it. The descriptions also say that no tool removes one.
+- A Period note leaves Cadence only in the structured `note` field of `list_periods` and
+  the three write results. Search matches the label only, and fetched text holds the
+  label, dates and revision. The embedded lists return summaries without the note, at
+  most 20, and at most 10 on a Timeline day, so every result stays under the 100,000-byte
+  cap with 500 overlapping Periods, even with the longest labels over 14 days.
+- `period_split` adds counts and changes none: the adherence definition and every
+  existing number stay as they were.
+- `end_period` takes no date, and the database refuses an end that would extend a Period.
+
+The writes run as the grant's user through `public.integration_apply_period_write`
+(migration `20261126140000_period_integration_writes.sql`), on the day-note pattern:
+`integration_lock_write` checks the scope and the idempotency key, the function compares
+the opaque revision with the stored row, writes through `create_period` or
+`update_period`, stores a version-2 receipt and records the activity. The same migration
+adds the three operations to `integration_lock_write` by a text patch that raises when
+its anchor is missing. It drops nothing. The service plans
+each write with the Period resolver, so the app and MCP follow the same rules, and reads
+"today" for `end_period` from the profile timezone. The cap trigger's SQLSTATE `54000`
+maps to `limit_exceeded`.
+
+Cadence Chat reads Periods and does not write them yet. It takes `list_periods` and the
+new fields from the registry; `buildChatToolDefinitions` leaves `create_period`,
+`update_period` and `end_period` out, and Chat's executor refuses them. With the Notes
+source off, `list_periods` stays (a label is not a note) and `withoutNotes` removes the
+note from every result. Chat's Period writes are a follow-up on branch
+`feat/370-chat-period-writes`: they need the `period` kind in `chat_actions`, a
+constraint change outside the standing approval for hosted pushes.
+
+Evidence: `tests/integration-contract.test.ts`, `tests/integration-read.test.ts`
+(including 500 overlapping Periods), `tests/integration-write.test.ts`,
+`tests/chat-periods.test.ts` and `tests/sql/period-integration-write.sql`, run inside
+one rolled-back transaction on the local stack (November 25, 2026). Not run: the
+`*.local-integration` suites and a live protocol run. The protocol suite reads
+`list_periods` and checks that a read-only grant cannot call the three writes; it
+creates no Period, because no tool could remove it from the test account. The consent
+screen text in `lib/types/oauth-ui.ts` does not name Periods yet (messaging entry P-096).

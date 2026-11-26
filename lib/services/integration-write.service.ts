@@ -39,10 +39,18 @@ import { invalidateBehaviorData } from "@/lib/cache/stable-user-data.cache";
 import type { Occurrence } from "@/lib/types/database";
 import { integrationBehaviorInput } from "./integration-behavior-input";
 import { resolveDayNoteUpdate } from "@cadence/core/resolvers/day-note.resolver";
+import {
+  resolvePeriodCreate, resolvePeriodEnd, resolvePeriodEndState, resolvePeriodUpdate, type PeriodFields,
+} from "@cadence/core/resolvers/period.resolver";
+import { getPeriod } from "@/lib/db/periods.repo";
+import { periodTodayForUser } from "@/lib/services/period.service";
 
 export type WriteOperationName = "set_occurrence_status" | "set_parent_occurrence_status" | "update_occurrence_note" |
-  "update_day_note" | "create_behavior" | "update_behavior" | "archive_behavior" | "restore_behavior" | RunOperationName;
+  "update_day_note" | PeriodOperationName | "create_behavior" | "update_behavior" | "archive_behavior" | "restore_behavior" | RunOperationName;
 type RunOperationName = "end_behavior" | "pause_behavior" | "resume_behavior";
+type PeriodOperationName = "create_period" | "update_period" | "end_period";
+const PERIOD_OPERATION_NAMES: readonly string[] = ["create_period", "update_period", "end_period"];
+const isPeriodOperation = (name: string): name is PeriodOperationName => PERIOD_OPERATION_NAMES.includes(name);
 export type WriteOperationResult<N extends WriteOperationName> =
   | { ok: true; value: IntegrationOperationOutput<N> }
   | { ok: false; error: IntegrationError };
@@ -80,7 +88,7 @@ function outputFromSnapshot(name: WriteOperationName, snapshot: IntegrationWrite
   return name === "create_behavior" ? { behavior } : { behavior, changed: snapshot.changed };
 }
 
-/** A stored result in the caller's contract edition: a 1.8.0 receipt replayed after the flag turns off drops `alongside`. */
+/** A stored result in the caller's contract edition: a 1.9.0 receipt replayed after the flag turns off drops `alongside`. */
 function readWriteOutput(
   name: WriteOperationName, receipt: unknown, contract: IntegrationContractOptions,
 ): IntegrationOperationOutput<WriteOperationName> {
@@ -168,6 +176,7 @@ function replayTargetIds(replay: IntegrationOperationOutput<WriteOperationName>)
   if ("occurrences" in replay) return replay.occurrences.map((occurrence) => occurrence.id);
   if ("occurrence" in replay) return [replay.occurrence.id];
   if ("behavior" in replay) return [replay.behavior.id];
+  if ("period" in replay) return [replay.period.id];
   return replay.day_note ? [replay.day_note.id] : [];
 }
 
@@ -192,7 +201,7 @@ const DEFINITION_FIELDS = [
 ] as const;
 
 function hasDefinitionChange(input: IntegrationOperationInput<"update_behavior">): boolean {
-  // `alongside` (contract 1.8.0) passes input validation only with CADENCE_ALONGSIDE on.
+  // `alongside` (contract 1.9.0) passes input validation only with CADENCE_ALONGSIDE on.
   return DEFINITION_FIELDS.some((field) => input[field] !== undefined)
     || (input as AlongsideInputField).alongside !== undefined;
 }
@@ -413,6 +422,65 @@ async function applyDayNoteWrite(
   return data.receipt;
 }
 
+/** The stored row a Period write must still match, and the full row to store. */
+type PeriodWritePlan = PeriodFields & Readonly<{ id: string | null; expectedRevision: string | null }>;
+
+/** A resolver's refusal is the caller's input problem, in the resolver's own words. */
+function periodInput<T>(resolve: () => T): T {
+  try { return resolve(); }
+  catch (error) { return fail("invalid_input", error instanceof Error ? error.message : "Check the Period fields."); }
+}
+
+/**
+ * Plans a Period write with the Period resolver, so MCP follows the rules the app
+ * follows. An edit keeps every field the input leaves out. "End today" takes today
+ * from the profile timezone at the time of the write, never from the caller.
+ */
+async function planPeriodWrite(
+  name: PeriodOperationName, context: IntegrationContext, input: IntegrationOperationInput<PeriodOperationName>,
+): Promise<PeriodWritePlan> {
+  if (name === "create_period") {
+    const value = input as IntegrationOperationInput<"create_period">;
+    const plan = periodInput(() => resolvePeriodCreate({
+      label: value.label, startOn: value.start_local_date, endOn: value.end_local_date, note: value.note,
+    }));
+    return { ...plan, id: null, expectedRevision: null };
+  }
+  const target = input as IntegrationOperationInput<"update_period"> | IntegrationOperationInput<"end_period">;
+  const current = await getPeriod(context.supabase, context.userId, target.period_id);
+  if (!current) return fail("not_found", "This Period does not exist in your account. The user may have removed it in the Cadence app.");
+  checkRevision(target.expected_revision, current.updated_at);
+  const stored = { id: current.id, expectedRevision: target.expected_revision };
+  if (name === "update_period") {
+    const value = input as IntegrationOperationInput<"update_period">;
+    const plan = periodInput(() => resolvePeriodUpdate({ period: current, changes: {
+      label: value.label, startOn: value.start_local_date, endOn: value.end_local_date, note: value.note,
+    } }));
+    return { label: plan.label, startOn: plan.startOn, endOn: plan.endOn, note: plan.note, ...stored };
+  }
+  const today = await periodTodayForUser(context.supabase, context.userId, Temporal.Instant.from(context.now.toISOString()));
+  const state = resolvePeriodEndState({ period: current, today });
+  if (state === "not_started") fail("invalid_state", "This Period has not started yet, so it cannot be ended today. update_period changes its dates.");
+  if (state === "already_ended") fail("invalid_state", "This Period has already ended. update_period changes its last day.");
+  const plan = resolvePeriodEnd({ period: current, today });
+  return { label: plan.label, startOn: plan.startOn, endOn: plan.endOn, note: plan.note, ...stored };
+}
+
+/** Periods have no Behavior or Occurrence graph; the transaction builds its own receipt, as for day notes. */
+async function applyPeriodWrite(
+  name: PeriodOperationName, context: IntegrationContext, input: IntegrationOperationInput<PeriodOperationName>, requestHash: string,
+): Promise<unknown> {
+  const plan = await planPeriodWrite(name, context, input);
+  const { data, error } = await context.supabase.rpc("integration_apply_period_write", {
+    p_key: (input.idempotency_key ?? null) as string, p_hash: requestHash, p_operation: name,
+    p_period_id: plan.id as string, p_expected_revision: plan.expectedRevision as string,
+    p_label: plan.label, p_start_on: plan.startOn, p_end_on: plan.endOn as string, p_note: plan.note as string,
+  });
+  if (error) throw Object.assign(new Error(error.message), error);
+  if (!data || typeof data !== "object" || Array.isArray(data) || !("receipt" in data)) throw new Error("Invalid write result");
+  return data.receipt;
+}
+
 function checkRevision(expected: string | undefined, actual: string) {
   if (expected !== undefined && expected !== integrationInstant(actual)) {
     fail("conflict", "This record changed. Read it again before saving.");
@@ -430,6 +498,14 @@ const SUB_BEHAVIOR_STATE_MESSAGES = new Set([
   "Every Occurrence must belong to a sub-behavior of this parent.", "A parent slot covers one local day.",
 ]);
 
+/** SQLSTATE the `periods_enforce_account_cap` trigger raises at 500 Periods. */
+const PERIOD_CAP_SQLSTATE = "54000";
+/** What `cadence_private.period_input_error` raises. The resolver refuses the same input first. */
+const PERIOD_INPUT_MESSAGES = new Set([
+  "The period label is invalid.", "Choose a valid first day for this period.",
+  "The last day must be on or after the first day.", "The period note is invalid.",
+]);
+
 function mapError(error: unknown): IntegrationError {
   if (error instanceof WriteError) return error.contractError;
   if (error instanceof BehaviorRunStateError) return createIntegrationError("invalid_state", error.message);
@@ -438,6 +514,12 @@ function mapError(error: unknown): IntegrationError {
     fieldErrors: Object.entries(error.fieldErrors).map(([path, message]) => ({ path: `$.${path}`, message })),
   });
   const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : "";
+  // The cap trigger on public.periods (SQLSTATE 54000) holds for every writer.
+  if (typeof error === "object" && error !== null && "code" in error && error.code === PERIOD_CAP_SQLSTATE) {
+    return createIntegrationError("limit_exceeded", `This account already holds ${INTEGRATION_LIMITS.maxPeriodsPerAccount} Periods, the most it can. Nothing was added. No tool removes a Period: the user can remove one in the Cadence app.`);
+  }
+  if (PERIOD_INPUT_MESSAGES.has(message)) return createIntegrationError("invalid_input", message);
+  if (message === "integration_period_end_refused") return createIntegrationError("invalid_state", "This Period cannot be ended today. Read it again with list_periods.");
   if (message === "integration_output_limit_exceeded") return createIntegrationError("limit_exceeded", "The result is larger than 100000 bytes. Narrow the request and try again.");
   if (message === "integration_idempotency_key_reused") return createIntegrationError("idempotency_key_reused", "Use a new key for different input.");
   if (message === "integration_insufficient_scope") return createIntegrationError("insufficient_scope", "Reconnect Cadence and allow this write permission.");
@@ -488,6 +570,10 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
       receipt = await applyDayNoteWrite(context, input as IntegrationOperationInput<"update_day_note">, requestHash);
       committed = true;
     }
+    if (!receipt && isPeriodOperation(name)) {
+      receipt = await applyPeriodWrite(name, context, input as IntegrationOperationInput<PeriodOperationName>, requestHash);
+      committed = true;
+    }
     if (!receipt && await usesDirectWrite(name, context, input)) {
       const result = await performDirectWrite(name, context, input, () => { committed = true; });
       const checked = validateOperationOutput(name, result.output, contract);
@@ -530,7 +616,7 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
     }
     invalidateBehaviorData(context.userId);
     revalidatePath("/timeline");
-    if (name.includes("behavior") && name !== "create_behavior") revalidatePath("/behaviors");
+    if ((name.includes("behavior") && name !== "create_behavior") || isPeriodOperation(name)) revalidatePath("/behaviors");
     const output = validateOperationOutput(name, projected, contract);
     if (!output.ok) throw new WriteError(output.error);
     return { ok: true, value: output.value };

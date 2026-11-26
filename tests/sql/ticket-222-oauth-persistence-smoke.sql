@@ -47,7 +47,7 @@ begin
     where n.nspname = 'public'
       and (p.proname like 'oauth\_%' or p.proname like 'integration\_%')
       -- The product write wrappers run as the grant's user so RLS applies (Ticket 292 adds the day-note one).
-      and (p.prosecdef is distinct from (p.proname not in ('integration_apply_write', 'integration_apply_day_note_write'))
+      and (p.prosecdef is distinct from (p.proname not in ('integration_apply_write', 'integration_apply_day_note_write', 'integration_apply_period_write'))
         or p.proconfig is distinct from array['search_path=""'])
   ) then
     raise exception 'OAuth functions require an empty search_path; only the product write wrappers must be SECURITY INVOKER';

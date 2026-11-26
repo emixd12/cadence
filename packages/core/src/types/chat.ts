@@ -153,6 +153,7 @@ export type ChatConversationView = Readonly<{
 /** What chat looked at, shown as a small muted line ("Looked at your Timeline"). */
 export const CHAT_TOOL_SUBJECTS = [
   "timeline", "behaviors", "occurrences", "notes", "adherence", "account", "search", "calendar", "workouts", "advice", "travel", "patterns",
+  "periods",
 ] as const;
 export type ChatToolSubject = (typeof CHAT_TOOL_SUBJECTS)[number];
 

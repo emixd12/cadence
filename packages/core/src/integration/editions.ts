@@ -1,13 +1,13 @@
 /**
- * Alongside (Ticket 364, D33): contract 1.8.0 adds the person's alongside setting to
+ * Alongside (Ticket 364, D33): contract 1.9.0 adds the person's alongside setting to
  * Behaviors and Occurrences and accepts it on `create_behavior` and `update_behavior`.
  *
  * The field ships behind the hosted `CADENCE_ALONGSIDE` flag. The registry in
- * `operations.ts` stays the published 1.7.0 contract, so the generated reference, the
+ * `operations.ts` stays the published 1.8.0 contract, so the generated reference, the
  * developer docs and every caller that passes no options are unchanged. A caller that
- * passes `{ alongside: true }` gets the 1.8.0 edition built here from the same registry:
+ * passes `{ alongside: true }` gets the 1.9.0 edition built here from the same registry:
  * the same tools with the alongside properties added. With the flag off the endpoint
- * serves 1.7.0 byte for byte.
+ * serves 1.8.0 byte for byte.
  *
  * Only the person's setting crosses the contract. The cached model guess
  * (`behavior_advisor_estimates.alongside`) is never exposed.
@@ -29,23 +29,23 @@ export type IntegrationContractOptions = Readonly<{
   alongside?: boolean;
 }>;
 
-export const INTEGRATION_ALONGSIDE_CONTRACT_VERSION = "1.8.0" as const;
+export const INTEGRATION_ALONGSIDE_CONTRACT_VERSION = "1.9.0" as const;
 
 /** The value a client reads as alongside: true, false, or null when the person has not answered. */
 export type AlongsideSetting = boolean | null;
-/** The output field the 1.8.0 edition adds to Behaviors and Occurrences. */
+/** The output field the 1.9.0 edition adds to Behaviors and Occurrences. */
 export type AlongsideOutputField = { alongside?: AlongsideSetting };
-/** The optional input field the 1.8.0 edition adds to `create_behavior` and `update_behavior`. */
+/** The optional input field the 1.9.0 edition adds to `create_behavior` and `update_behavior`. */
 export type AlongsideInputField = { alongside?: AlongsideSetting };
 
 const BEHAVIOR_ALONGSIDE_DESCRIPTION =
-  "The person's answer to \"Can this be done alongside other things?\": true, false, or null when they have not answered. Cadence's own guess is never returned (contract 1.8.0).";
+  "The person's answer to \"Can this be done alongside other things?\": true, false, or null when they have not answered. Cadence's own guess is never returned (contract 1.9.0).";
 const OCCURRENCE_ALONGSIDE_DESCRIPTION =
-  "The Behavior's alongside setting: true, false, or null when the person has not answered (contract 1.8.0).";
+  "The Behavior's alongside setting: true, false, or null when the person has not answered (contract 1.9.0).";
 const CREATE_ALONGSIDE_DESCRIPTION =
-  "Optional: true when the Behavior can be done alongside other things, false when it can't. Omit or send null to leave it unanswered (contract 1.8.0).";
+  "Optional: true when the Behavior can be done alongside other things, false when it can't. Omit or send null to leave it unanswered (contract 1.9.0).";
 const UPDATE_ALONGSIDE_DESCRIPTION =
-  "Optional: true or false sets the person's alongside answer; null clears it to unanswered. Omit to keep it (contract 1.8.0).";
+  "Optional: true or false sets the person's alongside answer; null clears it to unanswered. Omit to keep it (contract 1.9.0).";
 
 const outputField = (description: string) => nullable(boolean(), { description }).schema;
 
@@ -134,7 +134,7 @@ export function integrationOperationFor(name: IntegrationOperationName, options:
 
 /**
  * Removes `alongside` from a stored result when the edition does not carry it, so an
- * idempotent replay recorded while the flag was on still matches 1.7.0 after a rollback.
+ * idempotent replay recorded while the flag was on still matches 1.8.0 after a rollback.
  * No other contract field is named `alongside`.
  */
 export function fitOutputToContract<T>(value: T, options: IntegrationContractOptions = {}): T {

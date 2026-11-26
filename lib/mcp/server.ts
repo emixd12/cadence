@@ -16,7 +16,7 @@ import { listAppResources, readAppResource } from "./apps/view-resources";
 export const MCP_BODY_LIMIT = 65_536;
 export const MCP_DEADLINE_MS = 45_000;
 
-/** The tools of the edition the app serves: 1.7.0, or 1.8.0 while CADENCE_ALONGSIDE is on (Ticket 364). */
+/** The tools of the edition the app serves: 1.8.0, or 1.9.0 while CADENCE_ALONGSIDE is on (Ticket 364). */
 export function mcpTools(): Tool[] {
   return listIntegrationToolDescriptors(integrationContractOptions()).map(tool => {
     const securitySchemes = [{ type: "oauth2", scopes: ["cadence.read", ...(

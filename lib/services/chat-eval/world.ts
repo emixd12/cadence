@@ -83,6 +83,9 @@ export type WorldWorkout = Readonly<{ id: string; title: string; localDate: stri
 
 export type AdviceCard = Readonly<{ id: string; title: string; claim: string; source: string; topics: readonly string[] }>;
 
+/** A labeled range of local dates (D35). `endOn` null means ongoing. */
+export type WorldPeriod = { id: string; label: string; startOn: string; endOn: string | null; note: string | null; revision: number };
+
 export type ChatWorld = {
   id: ChatEvalWorldId;
   description: string;
@@ -94,6 +97,8 @@ export type ChatWorld = {
   behaviors: WorldBehavior[];
   occurrences: WorldOccurrence[];
   dayNotes: Map<string, { id: string; note: string | null; revision: number }>;
+  /** Ticket 370: the person's Periods. Absent means none. */
+  periods?: WorldPeriod[];
   events: WorldEvent[];
   workouts: WorldWorkout[];
   /** Sources the person turned off in Settings. Their tools return nothing. */
