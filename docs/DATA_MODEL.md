@@ -2598,19 +2598,50 @@ be done alongside other things?". Null means unanswered. Migration:
   include `alongside` (the last field, after `inherit_parent_schedule`), and changing the
   answer is a configuration revision. A plan without the key keeps the stored answer
   (`behavior_configuration_with_run`, `behavior_configuration_planned_fields`), as a plan
-  without `is_opportunity` does; the TypeScript payload leaves the key out only when
-  neither side has an answer. Existing history is not rewritten: a snapshot without the
-  key was unanswered. Core writes the reason code `alongside_answered` for a single
+  without `is_opportunity` does. Existing history is not rewritten: a snapshot without
+  the key was unanswered. Core writes the reason code `alongside_answered` for a single
   answer to the question (`setBehaviorAlongside`): the Mac's Timeline row and, since the
   audit fixes, the web Timeline row and the Daily Brief line. A question answers only an
   unanswered Behavior. Form, MCP and Chat edits keep `behavior_edited`.
-  Account sync contract 10 carries `behavior.alongside`: the snapshot, the expected-row
-  comparison and the synced insert and update lists include it, and a contract-10
-  Behavior write must carry it. Contract-8 and contract-9 writers keep syncing: the
-  projection hides the field and the stored answer is restored on their writes, so an
-  older Cadence for Mac never clears it. The minimum writer contract stays 8. Cadence for
-  Mac stores the answer in SQLite schema 29 (`docs/DESKTOP_DATA_MODEL.md`). Smoke:
-  `tests/sql/behavior-alongside-smoke.sql`.
+- **History rule: an unanswered Behavior leaves no trace (defect D1).** A stored event
+  carries the answer only when either side has one, flag on or off. A baseline names
+  `alongside` only for a Behavior created with an answer. A revision names it only when
+  the answer changes, and then both snapshots carry it (null for an unanswered side). A
+  revision of an answered Behavior that keeps the answer carries it on both sides without
+  naming it. An event whose two sides are both unanswered has no `alongside` key in
+  either snapshot and no such changed field, so it is stored byte for byte as before the
+  setting existed. The rule lives in `withHistoryAlongside`
+  (`packages/core/src/resolvers/behavior-configuration.resolver.ts`, used by every plan,
+  web and Mac) and, for events the database writes itself, in
+  `cadence_private.behavior_configuration_history_snapshot` (the configuration event
+  writer and the BehaviorLog import baseline rewrite) and the baseline branch of
+  `behavior_configuration_changed_fields`. The live snapshot that plans are compared with
+  still always carries the key. Checks: `tests/sql/behavior-alongside-smoke.sql` and
+  `tests/alongside-history.local-integration.test.ts` (the real write path against a
+  local database).
+- **Account sync (Ticket 363).** Account sync contract 10 carries `behavior.alongside`:
+  the snapshot, the expected-row comparison and the synced insert and update lists
+  include it, and a contract-10 Behavior write must carry it. Contract-8 and contract-9
+  writers keep syncing: the projection hides the field and the stored answer is restored
+  on their writes, so an older Cadence for Mac never clears it. The minimum writer
+  contract stays 8. Cadence for Mac stores the answer in SQLite schema 29
+  (`docs/DESKTOP_DATA_MODEL.md`). Smoke: `tests/sql/behavior-alongside-smoke.sql`.
+- **Answer history and older contracts.** Cadence for Mac 0.1.14 to 0.1.17 (contracts 8
+  and 9) fail every export on a changed field they do not know, and their SQLite table
+  refuses a revision with no changed field or identical snapshots. Migration
+  `20261126260000_account_sync_alongside_history.sql` registers the row rule
+  `('configuration_event', 'alongside_history')` at contract 10 in
+  `cadence_private.account_sync_contract_row_rules`. For contracts below 10 the
+  projection removes `alongside` from every configuration event's `changed_fields` and
+  snapshots, hides each revision whose only changed field is `alongside`
+  (`cadence_private.account_sync_hidden_configuration_events`), and presents a Behavior's
+  `current_configuration_event_id` or an Occurrence's `behavior_configuration_event_id`
+  that points at a hidden revision as the closest earlier visible revision of the same
+  Behavior (by `recorded_at`, `created_at`, `id`). The next visible revision's previous
+  snapshot then equals that revision's next snapshot. Such a contract's apply maps a
+  pointer it read back to the stored hidden revision when its write keeps it, so its
+  compare-and-set and result checks pass and the stored pointer stays. A revision such a
+  build writes itself carries no answer in its snapshots; the Behavior keeps its answer.
 - **Guesses for a linked Mac (Ticket 363).** `GET /api/behaviors/alongside`
   (`readAlongsideGuesses` in `lib/services/alongside-view.service.ts`) returns the
   account's current guesses (`alongside` and `whereGuess` per Behavior, from
@@ -2634,7 +2665,9 @@ be done alongside other things?". Null means unanswered. Migration:
   writes it while `CADENCE_ALONGSIDE` is off. Migration
   `20261126200000_alongside_pairing_evidence_and_brief_asks.sql` (additive).
 - **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
-  and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
+  and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, configuration
+  history carries the answer in every snapshot of an event that carries or names it
+  (Ticket 363, defect D1), BehaviorLog
   import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
   `20261125180000_alongside_mcp_and_portability.sql` (additive function patches) keeps
   it in MCP write receipts, `cadence_private.apply_behaviorlog_import` (from the plan

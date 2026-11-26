@@ -102,6 +102,34 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Alongside history fix: an unanswered Behavior leaves no trace (defect D1, Ticket 363) — November 26, 2026
+
+Branch `feat/alongside-history-fix` (main plus the unmerged alongside feature). Fixes D1 of
+`docs/qa/2026-11-26-alongside-local-acceptance.md` and a release blocker found with it.
+
+- **Finding (local database, before the fix).** With `CADENCE_ALONGSIDE` unset, every
+  baseline listed `alongside` and every snapshot held `"alongside": null`; contracts 8 and
+  9 read those events unchanged. Cadence for Mac 0.1.14 to 0.1.17 export rejects that
+  changed field, so deploying the branch with the flag off would have broken their export.
+- **History rule.** An event carries the answer only when either side has one; a baseline
+  names it only for an answered Behavior. Planner `withHistoryAlongside`, the web payload,
+  the Mac store and, in `20261126220000` (edited in place, unpushed),
+  `behavior_configuration_history_snapshot` and the changed-fields baseline.
+- **Older contracts.** New `20261126260000_account_sync_alongside_history.sql` (unpushed,
+  needs the owner's yes, must be on the database before the flag turns on): contracts 8
+  and 9 read no `alongside` in history, answer-only revisions are hidden, and pointers at
+  them read as the revision before.
+- **Exports.** Flag on: snapshots carry the answer wherever an event names it. Flag off:
+  history names it nowhere and answer-only revisions are left out; an unanswered account
+  exports the pre-363 bytes (digest pinned).
+- **Checks:** agents, interactions, map, resolvers, lint (warnings only), typecheck,
+  desktop typecheck, test (7,979 passed, 212 skipped), build, desktop build, `cargo test --offline`
+  (186), all 71 SQL fixtures after `db reset`, and the new local-database test.
+
+Platform impact: web and hosted database implemented; desktop follows through the shared
+planner (no SQLite change, schema 30); marketing not applicable; future mobile inherits the
+planner rule. Messaging impact: none.
+
 ## MCP Apps spike: local answers and the frozen `show_day` contract (Ticket 375) — November 26, 2026
 
 - **In progress.** Note: `docs/qa/2026-11-26-mcp-apps-spike.md`. Tickets 376 and 377 can

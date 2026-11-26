@@ -78,7 +78,7 @@ Supporting automated runs, against the same stack:
 
 ## Defects
 
-### D1. Exported configuration history names `alongside` but never carries its value (should fix)
+### D1. Exported configuration history names `alongside` but never carries its value (fixed)
 
 - **What the agent did.** Changed Vitamin pill's answer three times, created Behaviors with
   the flag on and off, then downloaded Full JSON and BehaviorLog with the flag on and again
@@ -105,6 +105,19 @@ Supporting automated runs, against the same stack:
   projection in the same resolver has the same gap.
 - **Effect seen.** Restoring the account's own flag-on or flag-off bundle into the same
   account still succeeded, so restore tolerates these records.
+- **Status: fixed** on branch `feat/alongside-history-fix` (November 26, 2026), commits
+  `0e467bf5` (planner), `9fb24ba3` (database) and `aec66691` (export). A re-check against
+  the local database found the second half worse than an export defect: every baseline,
+  including a flag-off one, listed `alongside` and every snapshot carried
+  `"alongside": null`, and contract 8 and 9 projections passed those events unchanged, so
+  a released Mac would have failed its export after the next Behavior was created. Now an
+  unanswered Behavior's history names the answer nowhere, flag on or off; an answer
+  change carries it in both snapshots and in every export with the flag on; with the flag
+  off exports name it nowhere and leave out answer-only revisions; and migration
+  `20261126260000` hides the answer's history from contracts 8 and 9. Tests:
+  `tests/alongside-history.local-integration.test.ts`,
+  `tests/sql/behavior-alongside-smoke.sql` and
+  `tests/export-import-restore-alongside.test.ts`.
 
 ## Observations (not judged defects)
 

@@ -700,7 +700,12 @@ become unanswered; no row is lost from schema 28.
 
 1. The native configuration snapshot carries `alongside`; an older snapshot without the
    key reads as unanswered. The allowed changed fields add `alongside`, so a change
-   needs a revision whose snapshots carry the answer (`local_store/behavior.rs`).
+   needs a revision whose snapshots carry the answer (`local_store/behavior.rs`). The
+   Mac follows the hosted history rule (`docs/DATA_MODEL.md`, "Alongside setting"): the
+   shared planner (`withHistoryAlongside`) leaves the key and the changed field out of an
+   unanswered Behavior's events, and the native store compares snapshots with the key
+   read as null but stores each event as planned, so synced history agrees with the
+   hosted one (`unanswered_configuration_history_is_stored_without_the_answer`).
 2. The DataStore writes the answer through the existing graph commands: the Behavior
    form's update, and the Timeline row question through core `setBehaviorAlongside`
    (one revision, reason code `alongside_answered`). No new native command.
@@ -712,7 +717,11 @@ become unanswered; no row is lost from schema 28.
    answer"). The minimum writer contract stays 8: the server hides the field from a
    contract-8 or contract-9 Mac and restores the stored answer on its writes
    (`tests/sql/behavior-alongside-smoke.sql`), so an older build keeps syncing without
-   clearing it.
+   clearing it. Hosted migration `20261126260000` also hides the answer's configuration
+   history from those contracts: no event they read names it, a revision that changed
+   only the answer is hidden, and a Behavior or Occurrence pointing at one reads as
+   pointing at the revision before it. Without this, a 0.1.14 to 0.1.17 export would
+   fail on the unknown changed field.
 4. **Model guesses are never stored.** A linked Mac reads the account's current guesses
    (`GET /api/behaviors/alongside`) and keeps the last answer in memory, so it still
    applies offline within the session. Guesses never reach SQLite, native backups,

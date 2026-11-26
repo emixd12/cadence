@@ -2088,7 +2088,7 @@ before Ticket 356: planners read the cached model guess, then false, the estimat
 asks the model about alongside for every Behavior, and no web code reads
 `behaviors.alongside`. Default: off. Server-only.
 
-Turn it on only after all nine alongside migrations are on the database:
+Turn it on only after all ten alongside migrations are on the database:
 
 1. `20261125140000_behavior_alongside.sql`
 2. `20261125150000_advisor_estimate_where_guess.sql`
@@ -2099,6 +2099,7 @@ Turn it on only after all nine alongside migrations are on the database:
 7. `20261126220000_account_sync_alongside.sql` (before the Ticket 363 code deploys)
 8. `20261126230000_where_guess_dismissal_without_labels.sql` (Ticket 383)
 9. `20261126250000_account_sync_where_guess_dismissals.sql` (Ticket 383, Cadence for Mac)
+10. `20261126260000_account_sync_alongside_history.sql` (Ticket 363, Cadence for Mac)
 
 The seventh differs: it must reach the database before the Ticket 363 code deploys,
 whatever the flag (below). With the flag on, the move-day read selects the column. The migration is
@@ -2116,6 +2117,16 @@ database before a contract-11 Mac build is used, since the server refuses an unk
 contract. It inserts one contract-registry row and changes the projection and apply
 functions for older contracts, so it needs the owner's yes before a hosted push.
 
+The tenth must reach the database before the flag turns on, and after the ninth, whose
+registry it uses. Only with the flag on can a configuration revision name the answer.
+Cadence for Mac on account sync contracts 8 and 9 (0.1.14 to 0.1.17) would then fail every
+export on that changed field. The tenth hides the answer's history from those contracts:
+no event they read names it, a revision that changed only the answer is hidden, and a
+Behavior or Occurrence pointing at one reads as pointing at the revision before it. It
+inserts one contract-registry row and changes the projection and apply functions for
+older contracts, so it needs the owner's yes before a hosted push. Push it with the
+seventh and ninth.
+
 One more alongside migration is not needed for the flag but orders a content change:
 `20261126240000_alongside_tip_link_target.sql` (Ticket 385) lets a tip link open a
 Behavior's alongside control. It must be on the database before the advice card
@@ -2125,7 +2136,11 @@ replaces a check constraint, so it is not additive and the standing approval doe
 cover its hosted push; the owner approves it.
 
 Since Ticket 363 the column syncs at account sync contract 10 and is part of
-configuration history, whatever the flag (schema is schema). Migration
+configuration history, whatever the flag (schema is schema). An unanswered Behavior's
+history names the answer nowhere: no changed field and no snapshot key, flag on or off
+(defect D1 of the 2026-11-26 local acceptance). With the flag off nothing writes an
+answer, so deploying this code with the flag off writes history byte for byte as
+before. Migration
 `20261126220000_account_sync_alongside.sql` must reach the database before a build of
 this code deploys: it replaces the `changed_fields` check constraint and inserts one
 contract-registry row, as the sub-behaviors contract did, so it needs the owner's yes
@@ -2138,9 +2153,12 @@ Mac then shows no alongside surface. The Mac's own switch is the build variable
 Since Ticket 364 the flag also selects the MCP contract edition and the export shape.
 With it on, the MCP endpoint, its errors and Cadence chat's tool list speak contract
 1.8.0 (`alongside` on Behaviors and Occurrences, optional on `create_behavior` and
-`update_behavior`), and Full JSON, JSONL, CSV and BehaviorLog exports carry the answer;
-BehaviorLog import and restore read it. With it off they serve contract 1.7.0 and the
-pre-364 export bytes. Turn it on only after migration
+`update_behavior`), and Full JSON, JSONL, CSV and BehaviorLog exports carry the answer,
+in configuration history too; BehaviorLog import and restore read it. With it off they
+serve contract 1.7.0 and the pre-364 export bytes for an account without an answer
+(pinned by `tests/export-import-restore-alongside.test.ts`). An answered account's
+flag-off export names the answer nowhere and leaves out revisions that changed only the
+answer (`docs/EXPORT_FORMATS.md`). Turn it on only after migration
 `20261125180000_alongside_mcp_and_portability.sql` is also on the database: it keeps
 the answer in MCP write receipts and lets import and restore store it. Without it, an
 MCP write would report the answer as null and an import or restore would drop it.
