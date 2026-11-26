@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 383 Mac part, 384, 385 and 386 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 385 complete in code on `feat/alongside-385`, card awaiting review (migration `20261126140000`); 383 Mac part, 384 and 386 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the owner reviews the card `do-it-during-something-else` and approves the hosted push of `20261126140000` (a constraint replacement, not additive), which must be on the database before the card is activated | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
@@ -101,6 +101,30 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 385 complete in code: an advice card for the alongside question — November 26, 2026
+
+Branch `feat/alongside-385`. Closes the advisor-tip gap Ticket 360 recorded: `setup_gaps`'s
+`alongside_unanswered` now has a card, awaiting the owner's review.
+
+- **Card:** `do-it-during-something-else` in `packages/core/src/data/advice-library.json`
+  (library version `2026-11-25.1`), resting on Milkman, Minson and Volpp (2014), kind
+  `randomized_trial`, strength limited. Behavior-scoped rule on `alongside_unanswered`
+  (coach-signals version 4, so only with `CADENCE_ALONGSIDE` on). Ships as `draft` with no
+  `reviewer` or `reviewed_at`: the matcher and the tip run skip it, and no tip shows.
+- **Link:** new tip link target `alongside` opens the Behavior form at "Can be done
+  alongside other things" (`?edit=<id>&field=alongside`); an account-wide tip picks the
+  first Behavior whose question is open.
+- **Migration:** `20261126140000_alongside_tip_link_target.sql` replaces the
+  `coach_tips.link_target` check to allow `alongside`. Not applied locally; not additive,
+  so the hosted push needs the owner's yes. It must be on the database before the card is
+  activated. Smoke: `tests/sql/alongside-tip-link-target-smoke.sql` (not run).
+- **To activate:** push the migration, then set the card's `status` to `active` and fill
+  `reviewer` and `reviewed_at` (owner only).
+
+Platform impact: web implemented; desktop not applicable (tips come from the hosted server;
+the Mac opens the same shared form field); marketing not applicable; future mobile inherits
+the resolvers. Messaging impact: P-103.
 
 ## Ticket 383 web complete: the guessed Where without Completion places — November 26, 2026
 

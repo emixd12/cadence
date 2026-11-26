@@ -3695,8 +3695,9 @@ shown to the person; Phase 4 matches the signals to advice cards.
   4: `setup_gaps` also reports an open alongside question (not answered while Cadence
   guesses yes, `alongsideQuestionOpen`). A Behavior's row adds boolean
   `alongside_unanswered` and appears when that alone is true; the account-wide row adds
-  the count `without_alongside_answer`. No advice card reads them yet (no reviewed
-  source fits). `signal_version`'s check is
+  the count `without_alongside_answer`. Ticket 385's card `do-it-during-something-else`
+  reads the Behavior row's `alongside_unanswered`; it ships as a draft and shows no tip
+  until the owner reviews it. `signal_version`'s check is
   a pattern, so no migration was needed. With the flag off the visit writes version 3,
   unchanged. At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
@@ -3861,7 +3862,9 @@ carries its question; other tips link to the editor field their card names.
   No also answers the tip that carries the question "not now".
 - `coach_tips` gains `proposal_id` (the question the tip carries, set null when the
   proposal is deleted), `link_target` (`time`, `length`, `where`, `description`,
-  `behavior`, `unmarked`, `behaviors`) and `link_behavior_id`. `coach_write_tips` takes
+  `behavior`, `unmarked`, `behaviors`; `20261126140000_alongside_tip_link_target.sql`,
+  Ticket 385, replaces the check to add `alongside`, the Behavior form's "Can be done
+  alongside other things") and `link_behavior_id`. `coach_write_tips` takes
   them and drops a proposal of another Behavior; `tip_json` returns them;
   `coach_tip_history` adds `proposal_declined`, so the tip run rests that card for that
   Behavior 30 days.
