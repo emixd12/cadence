@@ -109,3 +109,50 @@ export function attachTimelineDayNotes<T extends TimelineDates>(
   const shown = new Set([...view.daySections, ...view.needsDecision.daySections].map((section) => section.localDate));
   return { ...view, dayNotes: dayNotesByDate(records.filter((record) => shown.has(record.local_date))) };
 }
+
+/**
+ * Ticket 367 (D35): the day notes the Daily Brief's opening reads. Today and the two
+ * local days before it, each note cut to 280 characters. A model sentence may not
+ * repeat a whole note of three or more words, or six words in a row from a note.
+ */
+export const BRIEF_DAY_NOTE_LIMITS = { days: 3, characters: 280, wholeNoteWords: 3, sharedWords: 6 } as const;
+
+export const BRIEF_DAY_NOTE_DAYS = ["today", "yesterday", "2 days ago"] as const;
+export type BriefDayNote = Readonly<{ day: (typeof BRIEF_DAY_NOTE_DAYS)[number]; note: string }>;
+
+/** The inclusive local dates the Daily Brief reads day notes for; `localDate` is today in the account's timezone. */
+export function briefDayNoteRange(localDate: string): Readonly<{ from: string; to: string }> {
+  const to = parseDayNoteLocalDate(localDate);
+  return { from: Temporal.PlainDate.from(to).subtract({ days: BRIEF_DAY_NOTE_LIMITS.days - 1 }).toString(), to };
+}
+
+/** The brief's day notes, newest day first. Days with no note are left out; an empty list means the brief gets none. */
+export function resolveBriefDayNotes(input: Readonly<{
+  localDate: string;
+  records: readonly Pick<DayNoteRecord, "local_date" | "note">[];
+}>): BriefDayNote[] {
+  const today = Temporal.PlainDate.from(parseDayNoteLocalDate(input.localDate));
+  const saved = dayNotesByDate(input.records);
+  return BRIEF_DAY_NOTE_DAYS.flatMap((day, daysAgo) => {
+    const note = saved[today.subtract({ days: daysAgo }).toString()]?.trim();
+    return note ? [{ day, note: [...note].slice(0, BRIEF_DAY_NOTE_LIMITS.characters).join("").trimEnd() }] : [];
+  });
+}
+
+/**
+ * True when `text` repeats a day note: the whole note when it has three or more words, or
+ * any six words in a row from a longer one. Case, spacing and punctuation are ignored.
+ */
+export function textQuotesDayNote(text: string, notes: readonly string[]): boolean {
+  const words = (value: string) => value.normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}']+/u).filter(Boolean);
+  const haystack = ` ${words(text).join(" ")} `;
+  return notes.some((note) => {
+    const needle = words(note);
+    if (needle.length < BRIEF_DAY_NOTE_LIMITS.wholeNoteWords) return false;
+    const size = Math.min(BRIEF_DAY_NOTE_LIMITS.sharedWords, needle.length);
+    for (let index = 0; index + size <= needle.length; index += 1) {
+      if (haystack.includes(` ${needle.slice(index, index + size).join(" ")} `)) return true;
+    }
+    return false;
+  });
+}

@@ -90,11 +90,9 @@ Still deferred:
 Promote these separately only when their own scope is approved. Ticket 134
 capability research is recorded in `docs/qa/google-calendar-capabilities.md`.
 
-## Day notes in the Daily Brief
+## Day notes and Periods in the other brief paths
 
-The owner wants the Daily Brief to read day notes (Ticket 292) as part of a later
-Daily Brief upgrade. That upgrade must update the brief's model-input disclosure
-before any day note reaches a provider.
+The layered workbench recipes and the ChatGPT-plan device path do not read day notes or Periods yet; only the hosted brief's opening does (Ticket 367, D35).
 
 ## AI-friendly routing provider for prose-level travel reasoning
 
@@ -241,7 +239,10 @@ The owner approved the remote MCP server and Claude and ChatGPT plugins on
 2026-10-18 (Tickets 220–232; `docs/DECISIONS.md`, `docs/MCP_INTEGRATION.md`).
 These related items stay deferred until separately scoped:
 
-- MCP Apps interactive widgets inside Claude or ChatGPT.
+- MCP Apps views after the first one. The owner moved MCP Apps into scope on
+  November 25, 2026 (D36): Tickets 375–381 cover the "Cadence day" view, and Ticket 382
+  holds the later views (Needs decision, weekly adherence review, Behavior preview and
+  confirm, and more controls in the day view). Gemini Enterprise stays out.
 - A REST API and webhook adapter over the same operation contract.
 - Facets sync. Tickets 220–232 add only foundations: client attribution,
   retry-safe writes, external record links, and "changed since" reads.
@@ -250,7 +251,8 @@ These related items stay deferred until separately scoped:
 - Per-event client provenance in synced status history and BehaviorLog exports.
   In v1, hosted integration activity records which client made a write; synced
   tables do not change.
-- MCP prompts and resources. V1 exposes tools only.
+- MCP prompts, and MCP resources other than view HTML. V1 exposes tools only; D36 adds
+  resources for MCP Apps view HTML alone (Ticket 376).
 - An OpenAI-compatible profile tool. The optional `openai/profile` marker
   requires an identity-only output schema incompatible with `get_account_context`.
   V1 connects without it; account labels and duplicate detection may be less reliable.

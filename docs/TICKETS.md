@@ -15315,8 +15315,15 @@ Submit Google's sensitive-scope verification for `cadence-calendar-agent-prod`.
   in the Verification Center. Owner steps: `docs/qa/2026-10-12-agentic-calendar.md`.
 - Record the video link, submission time and Verification Center state in that QA
   file and `STATUS.md`. Then follow Google's review to a decision.
+- **Hold & return trigger (November 25, 2026):** `P-090` Privacy copy, `calendarmcp.googleapis.com`
+  production transport, Model Armor screening, and the Phase 0 live wire check passed on
+  November 25, 2026 (`docs/qa/2026-11-25-google-calendar-mcp-spike.md`), along with a full
+  8-shot dry-run video. Per owner instruction, hold uploading the final demo video and
+  submitting in Google Verification Center until the pre-beta marketing site overhaul
+  (`P-048` / Ticket 246) ships to `https://cadence-me.com`, then re-record against the
+  updated homepage and submit before February 1, 2027.
 
-Messaging impact: resolves P-010 and P-012. Platform impact: web Privacy and Settings
+Messaging impact: resolves P-010, P-012, and P-090 verification submission. Platform impact: web Privacy and Settings
 text only if the owner chooses text changes; desktop shares the hosted pages;
 marketing and future mobile not applicable.
 
@@ -15330,6 +15337,13 @@ Trust, in-app copy, the user guide, marketing and the README in one review. Upda
 tests that assert changed text. Include the README and marketing wording left by the
 2026-10-23 removal of "not a medical dosing app" from `AGENTS.md`. Mark each entry
 resolved with file, deployment and date.
+
+- **Required return-to-Ticket-245 reminder (logged November 25, 2026):** as soon as the
+  pre-beta marketing site overhaul (`P-048`, `apps/marketing`) deploys to
+  `https://cadence-me.com`, immediately return to **Ticket 245** to re-record the
+  single-take verification demo video (`docs/qa/2026-10-12-agentic-calendar.md`, shot list
+  1–8) against the updated homepage and submit `cadence-calendar-agent-prod` in Google Auth
+  Platform Verification Center (deadline: February 1, 2027).
 
 Messaging impact: resolves all open entries. Platform impact: web legal and copy,
 desktop in-app copy, marketing site; future mobile not applicable.
@@ -20356,3 +20370,673 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers. |
 
 Messaging impact: `P-094`.
+
+## Ticket 367: The Daily Brief reads day notes
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: `docs/plans/2026-11-25-periods.md`, section 6.
+
+Dependencies: none.
+
+Goal: Let the Daily Brief's words take the person's recent day notes into account.
+
+Requirements:
+
+- With the AI Notes source on, the production opening facts (`lib/services/brief-opening.ts`) gain `dayNotes` for today and the two days before it, each cut to 280 characters. The key is absent when there is none.
+- The day-note instructions are appended only when the key is present. A brief without day notes keeps today's pinned prompt revision and exact request bytes.
+- The revision recorded in the run log and the saved brief is derived from the instructions actually sent.
+- A quiet day still makes no model call. Day notes never reach the move planner, Re-check or Re-plan. A changed day note does not invalidate a saved brief.
+- The output check covers the opening and every reason: fall back when the text holds a whole note of three or more words, or shares six consecutive tokens with a note.
+- Day notes are never written to application logs. Run content follows the existing expiring store.
+- Offline eval fixture `day_notes` and rule `day_note_not_quoted`. New rows in `docs/RULES_REGISTER.md`.
+- No schema change.
+
+Out of scope: the layered recipes and the ChatGPT-plan device path (`docs/FUTURE_UPDATES.md`).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/brief-opening.ts`, `lib/services/daily-brief.service.ts`, `lib/services/advisor-eval/` |
+| Desktop | A linked Mac shows the hosted brief, so it gets the change with the web deploy. No Mac code. |
+| Marketing | Not applicable: no public claim lists the brief's inputs. |
+| Future mobile | Deferred (no mobile track active); inherits the hosted brief. |
+
+Messaging impact: `P-095`.
+
+## Ticket 368: Period foundation: table, resolver and services
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: sections 1 to 3.
+
+Dependencies: none.
+
+Goal: Store Periods and hold every Period rule in one resolver, with no entry point yet.
+
+Requirements:
+
+- Migration for `public.periods` with RLS, a select policy for the owner, direct writes revoked, and the functions `create_period`, `update_period` and `delete_period` (compare-and-set on `revision`).
+- A `before insert` trigger holds the cap of 500 Periods per account for every writer.
+- Core resolver `period.resolver.ts` with tests, registered and documented; core and web services; `lib/db/periods.repo.ts`; `PeriodDataStore`.
+- `docs/DATA_MODEL.md`, regenerated database types, RLS smoke lists, `tests/sql/periods.sql`, a `docs/RULES_REGISTER.md` row for the cap.
+- Hosted push under the standing approval for additive migrations.
+
+Out of scope: any UI, MCP tool, export or Mac code.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `supabase/migrations/`, `packages/core/src/resolvers/period.resolver.ts`, `packages/core/src/services/period.service.ts`, `lib/db/periods.repo.ts`, `lib/services/period.service.ts` |
+| Desktop | Follow-up Ticket 374. The resolver is shared. |
+| Marketing | Not applicable: nothing visible. |
+| Future mobile | Deferred (no mobile track active); inherits the resolver and the hosted functions. |
+
+Messaging impact: `P-096`.
+
+## Ticket 369: Periods on the web Timeline and Behaviors
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 4.
+
+Dependencies: Tickets 368 and 373.
+
+Goal: Let the person add, edit, end and remove a Period, and see which days one covers.
+
+Requirements:
+
+- Timeline day headers show a chip for each Period covering the day. Today's header has "Add period". A chip opens the editor: Label with past-label suggestions, First day, Last day, Note, End today and Remove.
+- `/behaviors` lists every Period, newest first, with the same editor, and shows "Outside periods" and "In periods" adherence when a Period overlaps the selected range.
+- One shared component, in the design-system manifest and bench. Notices from the notices library. Interaction registry, load-test map, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, user guide and `DESIGN.md` updated.
+- Mobile-responsive. `npm run desktop:build` still passes.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `components/periods/PeriodControl.tsx`, `components/timeline/`, `app/(app)/timeline/actions.ts`, `app/(app)/behaviors/` |
+| Desktop | Follow-up Ticket 374. Until then the shared controls render nothing on the Mac. |
+| Marketing | Not applicable until a claim is written (`P-096`). |
+| Future mobile | Deferred (no mobile track active); the shared component is the reference. |
+
+Messaging impact: `P-096`.
+
+## Ticket 370: Periods in the MCP contract and Chat
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 5.
+
+Dependencies: Tickets 368 and 373.
+
+Goal: Give agents a well-scoped view of Periods and the three writes the owner allowed.
+
+Requirements:
+
+- Contract 1.8.0 in the base registry: `list_periods`, `create_period`, `update_period`, `end_period`; `active_periods` on `get_account_context`; `periods` on each `get_timeline` day; `period_split` on `get_adherence_summary`; record kind `period` in `search` and `fetch`. No remove tool.
+- Every description states that a Period changes nothing else and is not a reason to mark an Occurrence.
+- Search matches the label only. Fetched text never holds the note. Embedded lists are summaries without notes, capped at 20. `list_periods` pages.
+- The alongside edition moves from 1.8.0 to 1.9.0 in every place the plan lists.
+- Migration: the three tools in `integration_lock_write` and `integration_apply_period_write` with receipts. Hosted push under the standing approval.
+- Chat: confirmation and outcome text for the three writes, no Undo, and Notes-off tests for `list_periods`, `search`, `fetch` and a confirmed write.
+- Plugin skills updated and copied. Generated contract docs regenerated. `npm run test:web-client`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/integration/`, `lib/integrations/operations/`, `lib/services/integration-*.service.ts`, `lib/services/chat/`, `supabase/migrations/` |
+| Desktop | Not applicable: the MCP server is hosted. Chat on the Mac follows advisor Phase 5C. |
+| Marketing | The generated developer reference changes (`apps/marketing/src/data/developer-reference.json`). |
+| Future mobile | Not applicable: no MCP client on mobile. |
+
+Messaging impact: `P-096`.
+
+## Ticket 371: The Daily Brief and advisor tips read Periods
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 7.
+
+Dependencies: Tickets 367 and 368.
+
+Goal: Let the brief and tips know that a Period covers today or the recent days.
+
+Requirements:
+
+- Opening facts gain `periods` (covering today, at most 5) and `recentPeriods` (ended in the last 7 days, at most 3): label and dates, no note. Not gated by the Notes source.
+- Period instructions are appended only when a key is present. Labels are untrusted text. The brief may name a label and never suggests marking anything because of a Period.
+- Pins, recorded revision, call budget and stored content follow Ticket 367.
+- Advisor tips: the tip prompt gains Periods for its window; `TIP_PROMPT_VERSION` becomes `coach-tips-4`.
+- Offline eval fixture `period_active` and rule `period_named_not_judged`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/brief-opening.ts`, `lib/services/daily-brief.service.ts`, `lib/services/advisor-tips-writer.ts`, `lib/services/advisor-tips-job.service.ts` |
+| Desktop | A linked Mac shows the hosted brief and tips. No Mac code. |
+| Marketing | Not applicable. |
+| Future mobile | Deferred (no mobile track active); inherits the hosted brief. |
+
+Messaging impact: `P-096`.
+
+## Ticket 372: Period days in coach signals
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 8.
+
+Dependencies: Ticket 368.
+
+Goal: Record how many days of a completion drop a Period covered, without changing which signals fire.
+
+Requirements:
+
+- The coach visit reads the local dates covered by Periods under RLS and passes them to the resolver.
+- `completion_drop` facts gain `recent_period_days` and `baseline_period_days`. No signal is suppressed. Facts hold counts only, never a label.
+- Signal versions move to `coach-signals-5` and, with the alongside flag, `coach-signals-6`.
+- Eval account `period_sick_week`; resolver tests.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/resolvers/coach-signals.resolver.ts`, `lib/services/coach-signals-job.service.ts`, `lib/db/coach-signals.repo.ts` |
+| Desktop | Not applicable: the coach runs on the hosted app. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable: hosted job. |
+
+Messaging impact: none.
+
+## Ticket 373: Periods in export, BehaviorLog import and restore
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 9.
+
+Dependencies: Ticket 368.
+
+Goal: Carry Periods out of and back into an account before anything can create one.
+
+Requirements:
+
+- Full JSON gains a `periods` array, emitted only when at least one Period overlaps the range, so existing export bytes do not change. The note follows the notes option.
+- BehaviorLog writes each Period as a `review` record with a Cadence extension. An ongoing Period's end is the later of the export's last date and its start, with `ongoing: true`.
+- Import and restore match by label, first day and last day. Import adds and never changes. Restore also sets the note when the file carries one. Neither removes a Period or passes the cap. Preview reports counts.
+- JSONL, CSV and Markdown carry no Periods. `docs/EXPORT_FORMATS.md` updated.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/resolvers/export.resolver.ts`, `packages/core/src/resolvers/behaviorlog-period.resolver.ts`, `packages/core/src/services/behaviorlog-period.service.ts`, `lib/services/export.service.ts`, `lib/services/behaviorlog-import.service.ts`, `lib/services/behaviorlog-restore.service.ts` |
+| Desktop | Follow-up Ticket 374 (local export, import and restore). |
+| Marketing | Not applicable. |
+| Future mobile | Deferred (no mobile track active); inherits the core resolvers. |
+
+Messaging impact: `P-096`.
+
+## Ticket 374: Periods on Cadence for Mac
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
+
+Dependencies: Tickets 368, 369 and 373; Ticket 363 on `main`.
+
+Goal: Show, change and synchronize Periods on the Mac, offline and linked.
+
+Requirements:
+
+- A SQLite migration for `periods`, the local store commands, the cap, tombstoned delete, and the local service and actions. Run `npm run ids:next` first.
+- Account sync entity kind `period` on the next contract, additive, with the hosted registry migration, the Rust kind and row struct, and the smokes. The writer floor does not move. Older contracts keep hosted Periods.
+- The Timeline and Behaviors screens pass Period data and actions to the shared component. Local export, import and restore carry Periods.
+- Two pull requests: store and sync, then screens. `npm run desktop:build`, `npm run desktop:contract:test` and the `Desktop native` workflow pass. A dev-signed installed check. A release needs the owner's instruction.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | The hosted sync registry migration only. |
+| Desktop | `apps/desktop/src-tauri/migrations/`, `apps/desktop/src-tauri/src/local_store/`, `apps/desktop/src/` |
+| Marketing | Not applicable. |
+| Future mobile | Deferred (no mobile track active). |
+
+Messaging impact: `P-096`.
+
+## Ticket 375: MCP Apps spike: resource handlers and a static view on real hosts
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: `docs/plans/2026-11-25-mcp-apps-expansion.md`, package B and section 7.
+
+Dependencies: none.
+
+Goal: Answer the plan's eight unknowns on real hosts and freeze the `show_day` schema and the view contract before Tickets 376 and 377 start.
+
+Scope:
+
+- A throwaway branch that never merges: resource handlers and one static view on the local stack.
+- Run the view in the `ext-apps` `basic-host` and in MCP Inspector, then in Claude and ChatGPT as test account A against a preview deployment.
+- Answer each unknown in the plan's section 7: approval prompts on view-initiated writes; `resources/read` on the 2026-07-28 and legacy paths with a fresh server per request; host behavior on a 403 step-up challenge; bundle size with React 19 inlined; view caching per host; the redirect URI VS Code uses; whether Gemini sends the `resource` parameter; whether a preview deployment can run the acceptance suites.
+
+Acceptance criteria:
+
+- A dated note under `docs/qa/` records each of the eight answers with the host, client version and connection method, or states why an answer could not be obtained.
+- The note holds the frozen `show_day` input and output schema and the view contract (messages, write preconditions, `_meta` fields).
+- The note says whether Ticket 381 is needed, and for which host.
+- No spike code reaches `main`. No production setting changes.
+
+Out of scope: production code, the flag, any listing or submission.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Throwaway branch and a `docs/qa/` note only. Follow-up Tickets 376 and 377. |
+| Desktop | Not applicable: the MCP server is hosted, and Cadence for Mac renders no MCP view. |
+| Marketing | Not applicable: nothing public changes. |
+| Future mobile | Deferred (no mobile track active). The Claude and ChatGPT mobile apps render the view; Ticket 378 tests Claude mobile. |
+
+Messaging impact: none.
+
+## Ticket 376: MCP Apps server: `show_day`, view resources and the flag
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.2 and 3.4, package C.
+
+Dependencies: Ticket 375 (frozen schema and view contract).
+
+Goal: Serve the day projection and the view HTML from the MCP endpoint behind a flag that is off in production.
+
+Scope:
+
+- Read tool `show_day` (name frozen by Ticket 375), scope `cadence.read`, optional `date`. It is a one-day adapter over the Timeline service in `lib/services/integration-read.service.ts` and returns the same JSON as text for hosts that show no view.
+- One server-computed field per Occurrence: whether a Completed status came from a connected service, and which one. `get_timeline` does not change.
+- Granted scopes travel in the result's `_meta`. `_meta.ui.resourceUri` is `ui://cadence/day/v1.html`.
+- `resources: {}` and the `io.modelcontextprotocol/ui` extension in capabilities. `resources/list` returns descriptors only. `resources/read` returns the HTML for an exact known URI with an explicit empty CSP.
+- Both resource methods need a valid grant with `cadence.read`, count against the per-grant read limit, log a fixed operation label and have a byte cap.
+- Flag `CADENCE_MCP_APPS` (working name), off in production. Off removes the tool and the resources.
+- During the trial `show_day` lives in `lib/mcp/`, outside the contract registry. No change to `editions.ts`.
+- `docs/MCP_CONTRACT.md`, `docs/MCP_INTEGRATION.md`, `docs/AGENT_RESOLVERS.md` and `docs/ROUTE_MAP.md` updated.
+
+Acceptance criteria:
+
+- Protocol tests pass on the 2026-07-28 and legacy paths with the flag on and off. `tests/mcp-server.test.ts` no longer asserts that `resources` is undefined when the flag is on.
+- A resource read without a valid grant fails. A resource read counts against the read limit and returns the rate-limit error past it.
+- Rollback tests cover a host that holds a stale tool descriptor after the flag goes off.
+- A test asserts that Cadence Chat neither lists nor executes `show_day`.
+- Calendar events, travel, leave times, Daily Brief text and location never appear in `show_day` output.
+- No log line holds a token, note text or view HTML.
+- The checks in `AGENTS.md`, "Testing rules", pass, and `npm run test:web-client` if a file it imports changes.
+
+Out of scope: the view itself (Ticket 377); joining the contract registry, which follows Ticket 365; the production flag.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/mcp/server.ts`, a new `lib/mcp/` module for `show_day` and the resource handlers, `lib/services/integration-read.service.ts`, `app/mcp/route.ts`. |
+| Desktop | Not applicable: the MCP server is hosted. A linked Mac receives view-made changes through existing account sync. |
+| Marketing | Follow-up: the generated developer reference and `/developers` text change at general release (`P-099`), after the marketing overhaul. |
+| Future mobile | Not applicable: no Cadence mobile client calls MCP. Host mobile apps render the view. |
+
+Messaging impact: `P-098`, `P-099`.
+
+## Ticket 377: MCP Apps view: "Cadence day"
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.3 and 3.4, package D.
+
+Dependencies: Ticket 375 (frozen schema and view contract). Runs in parallel with Ticket 376.
+
+Goal: Build the one bundled HTML view that shows today and lets the person mark Occurrences and save notes inside an AI client.
+
+Scope:
+
+- New workspace package (working name `packages/mcp-views`): Vite, `vite-plugin-singlefile`, React and `@modelcontextprotocol/ext-apps`. The dependency stays out of the Next.js root.
+- The build writes the single HTML file into a generated TypeScript string module. A check rebuilds it and fails on any byte difference.
+- The view shows today's Occurrences with Completed, Not Completed and Note; Needs decision as one count line; parent Behavior slots collapsed to their derived progress; the day note; labels for an opportunity row, an alongside row (only when `alongside` is `true`) and a connector completion.
+- Writes go through `set_occurrence_status`, `set_parent_occurrence_status` and `update_occurrence_note` with the displayed precondition and an `idempotency_key`. A click on a status button is the person's confirmation.
+- On a conflict the view refreshes and asks again. On 429 it honors `Retry-After`. Without a write scope it shows "Reconnect to allow changes".
+- After a successful write the view re-reads the day and sends one `ui/update-model-context` line with the Behavior and the new status. Note text is never sent there.
+- The view computes nothing: grouping, status rules and dates come from the resolvers.
+- Styling uses host CSS variables with Cadence token fallbacks. Text comes from the notices library. A `/design-system` bench page hosts the view against fixtures.
+- Use the impeccable and design-system-bench workflows. Update `interaction-registry.json`, `DESIGN.md` and `docs/UI_SPEC.md`, and run `npm run map:build`.
+
+Acceptance criteria:
+
+- DOM tests cover a status write, a note save, a conflict, a missing write scope, a rate limit, the Needs decision count and an empty day.
+- Fixtures cover `alongside` true, false, null and absent. The view shows "Alongside" only for `true`.
+- A test runs the shipped bundle in a sandboxed frame with no network allowlist and hostile note text. It makes no network request, loads no external asset and renders the note as text.
+- The view works at phone width with touch targets of at least 44 points, one inline note editor at a time, no modal and no nested scroll.
+- The bench page returns 404 in production.
+- The checks in `AGENTS.md`, "Testing rules", pass.
+
+Out of scope: an expanded Needs decision list, day-note editing, opportunity add and remove, move controls and tracked time (Ticket 382).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/mcp-views` (new), the generated HTML module read by `lib/mcp/`, a bench page under `app/design-system/`, `packages/core/src/notices/catalog/`. |
+| Desktop | Not applicable: Cadence for Mac renders no MCP view. `npm run desktop:build` must still pass. |
+| Marketing | Follow-up: screenshots and copy wait for the marketing overhaul (`P-097`). |
+| Future mobile | Deferred (no mobile track active). The view is built phone width first because host mobile apps render it. |
+
+Messaging impact: `P-097`, `P-098`.
+
+## Ticket 378: MCP Apps acceptance on the required hosts
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package E and section 6.
+
+Dependencies: Tickets 376 and 377. Ticket 381 for a host the spike shows cannot sign in.
+
+Goal: Show, with real hosts and Cadence's own records, that the day view reads and writes correctly on every host the owner requires before release.
+
+Scope:
+
+- `mcp-acceptance` suites on the local stack and a Vercel preview, as test accounts A and B.
+- Required hosts: Claude web, ChatGPT web, Claude Desktop, Claude mobile, VS Code Copilot and Gemini Apps Developer Mode. Claude web and ChatGPT web run in the QA Chrome profile. The other four need new harnesses.
+- Cases per host: a status write, a note save, a parent slot write, a denied approval, an expired grant, a read-only consent, and a reconnect that does not replay a pending write.
+- Each run records the host, client version, connection method and the text fallback.
+- Each step is checked against Cadence's records with `npm run mcp:watch`.
+- Acceptance ends on a preview deployment. The production flag is not part of this ticket.
+
+Acceptance criteria:
+
+- Every required host passes every case, or the run ledger names the failing case and its blocker.
+- A host that shows no view still receives the text result.
+- The run ledger under `.intent/acceptance/<run-id>/` holds tool names, outcomes and counts only.
+- `docs/qa/mcp-server.md` describes the new harnesses and how to resume a run.
+- `npm run test:web-client` passes after any change under `scripts/acceptance/`.
+
+Out of scope: the production flag, any listing or submission, Gemini Enterprise.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `scripts/acceptance/`, `.agentic/test-access.json`, `docs/qa/mcp-server.md`, the project skill `.claude/skills/mcp-acceptance`. |
+| Desktop | Not applicable to Cadence for Mac. Claude Desktop is a host under test, not a Cadence surface. |
+| Marketing | Not applicable: acceptance publishes nothing. Screenshot capture is Ticket 380. |
+| Future mobile | Deferred (no mobile track active). The Claude mobile run is the first evidence of the view on a phone. |
+
+Messaging impact: none.
+
+## Ticket 379: Consent Allow or Deny before hydration returns 500
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package F. Source of the finding: `STATUS.md`, "MCP acceptance tooling, Tickets 247–258" row.
+
+Dependencies: none. It can run at any time.
+
+Goal: A person who presses Allow or Deny on the OAuth consent page before the page hydrates gets the normal result, not a 500.
+
+Scope:
+
+- Reproduce the finding on the local stack with a submit before hydration.
+- Fix the consent page so Allow and Deny work before and after hydration.
+- Add a regression test at the layer the cause lives in.
+
+Acceptance criteria:
+
+- Allow before hydration grants the connection and redirects to the client. Deny before hydration returns the OAuth denial to the client. Neither returns 500.
+- The granted scopes equal the scopes shown on the page.
+- A double submit grants once.
+- The acceptance runner no longer needs a wait for hydration before it clicks.
+- The checks in `AGENTS.md`, "Testing rules", pass, and `npm run test:web-client`.
+
+Out of scope: consent copy (`P-013`, `P-014`), new scopes.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `app/oauth/` (the consent page and its action). |
+| Desktop | Not applicable: consent runs in the browser on the hosted web app. |
+| Marketing | Not applicable: no public text changes. |
+| Future mobile | Not applicable: no mobile client. A phone browser uses the same page and gets the fix. |
+
+Messaging impact: none.
+
+## Ticket 380: MCP Apps listing preparation, nothing published
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package G.
+
+Dependencies: Ticket 378 for screenshots. Drafts can start beside Ticket 378.
+
+Goal: Have every listing and submission input ready, so the owner can submit after the marketing site overhaul without new engineering.
+
+Scope:
+
+- Unpublished drafts in `docs/qa/mcp-directory-submission.md`, following that file's precedent: screenshot prompts, the CSP statement, reviewer test cases, and corrections to stale Ticket 231 text that still says Google-only sign-in.
+- A script that captures listing screenshots from acceptance runs: PNG, 1000 pixels or wider, with the paired prompt.
+- An unpublished update to the `daily-check-in` plugin skill that names `show_day`, with skill-rule tests. The published copies under `integrations/` do not change.
+- A checklist of the deferred owner steps: the Claude directory update and Verified listing, the ChatGPT plugin resubmission, Google's Connected Apps interest form and console, publishing the skill update, `/developers` and marketing copy, and Privacy, Terms and Trust text.
+
+Acceptance criteria:
+
+- Nothing is submitted, listed or published. No provider form is filled in.
+- No credential or reviewer account is in the repository.
+- No Privacy, Terms, Trust or marketing text changes, and no test that asserts that text.
+- The checklist names, for each deferred step, its input file and the messaging entry it waits on.
+
+Out of scope: every submission and listing step. Each waits for the marketing site overhaul (P-048, Ticket 246) and the owner's instruction.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `docs/qa/mcp-directory-submission.md`, a capture script under `scripts/acceptance/`, an unpublished skill draft. No app code. |
+| Desktop | Not applicable: no listing covers Cadence for Mac here. |
+| Marketing | Follow-up Ticket 246: public copy and listings wait for the overhaul (`P-097`, `P-099`, `P-100`, `P-101`). |
+| Future mobile | Not applicable: no mobile listing. |
+
+Messaging impact: `P-097`, `P-099`, `P-100`, `P-101`.
+
+## Ticket 381: Host sign-in compatibility for consumer Gemini and VS Code
+
+Status: not_started
+
+Conditional: it starts only if Ticket 375 shows that a required host cannot complete Cadence's OAuth flow as it is.
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package H and section 8, decision 4.
+
+Dependencies: Ticket 375.
+
+Goal: Let a required host that cannot sign in today connect to Cadence's OAuth server, with the smallest change and a security review.
+
+Scope:
+
+- Consumer Gemini: only if Google omits the RFC 8707 `resource` parameter that Cadence requires on authorization and token requests.
+- VS Code Copilot: only if its redirect URI fails Cadence's redirect rules, which reject custom schemes.
+- One change per host, each in its own pull request with a written security review.
+- The decision record states which D31 and MCP security rules change, and only as far as this ticket needs.
+
+Acceptance criteria:
+
+- The security review is recorded in `docs/qa/` before the change merges.
+- Tokens stay opaque, hashed at rest, bound to the MCP URL and revocable for every client.
+- Existing Claude and ChatGPT connections keep working without re-consent. The protocol suite passes.
+- A client that sends `resource` is still held to it.
+- If Ticket 375 finds no gap, this ticket closes as not needed, with that finding cited.
+
+Out of scope: Gemini Enterprise (a client secret and Cloud Run IAM); any new auth vendor; password sign-in.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `app/oauth/` and the OAuth services and private-schema functions the review names. |
+| Desktop | Not applicable: Cadence for Mac does not use the MCP OAuth server. |
+| Marketing | Follow-up: a Gemini listing waits for the overhaul (`P-101`). |
+| Future mobile | Not applicable: no mobile client. |
+
+Messaging impact: `P-101`.
+
+## Ticket 382: Later MCP Apps views
+
+Status: deferred, November 25, 2026. It holds the views after "Cadence day". Split it into one ticket per view before any work starts.
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package I.
+
+Dependencies: Tickets 376–378 complete, and the first view released.
+
+Goal: Record the later views so they are not built inside the first-view tickets.
+
+Scope, one future ticket each:
+
+- A Needs decision view.
+- A weekly adherence review.
+- A Behavior preview and confirm view.
+- In the day view: day-note editing, opportunity add and remove, move controls and tracked time.
+
+Acceptance criteria:
+
+- Each split ticket states its own scope, acceptance criteria, platform impact and messaging impact.
+- Each new view passes acceptance on every required host before release.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Deferred. Follow-up tickets split from this one. |
+| Desktop | Not applicable: Cadence for Mac renders no MCP view. |
+| Marketing | Deferred: each view logs its own listing entry when ticketed. |
+| Future mobile | Deferred (no mobile track active). Host mobile apps would render each view. |
+
+Messaging impact: none until a view is ticketed.
+
+## Ticket 383: The guessed Where shows without Completion places
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Tickets 357–359 and 363.
+
+Goal: Show a guessed or evidence-based Where in the Behavior form whether or not Completion places is on, and let the person dismiss it.
+
+Requirements:
+
+- With `CADENCE_ALONGSIDE` on, the Behavior form shows the guessed Where line ("Cadence guesses this happens at Home." and its variants) whenever the effective Where comes from a guess or from evidence, independent of `place_label_settings.enabled`.
+- Position markers, "I'm here" controls and completion place counts stay hidden unless Completion places is on. Evidence needs stored labels, so with Completion places off only the model guess can appear.
+- Dismissal works while Completion places is off. The trigger that requires the setting for `where_suggestion_dismissals` is relaxed for the guess suggestion keys only. The migration replaces a trigger; the owner approved its hosted push on November 25, 2026 (D37).
+- A dismissal stops the line and never changes planning (D33).
+- Mac parity through the shared components and `apps/desktop/src/local-place-labels.service.ts`; a linked Mac shows the hosted guess, local mode has none.
+- Resolver tests for the new state, DOM tests for both settings, SQL fixture for the trigger. Update `docs/UI_SPEC.md` (the line that documents the old gating), `docs/USER_FLOWS.md`, `DESIGN.md`, `docs/DATA_MODEL.md` and `interaction-registry.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `place-label.resolver.ts`, `place-labels.service.ts`, `components/travel/PlaceLabels.tsx`, migration. |
+| Desktop | Same components; `local-place-labels.service.ts`. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-103`.
+
+## Ticket 384: Calendar event places for the same-place rule
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Tickets 357, 361 and the Google Calendar MCP migration on `main`.
+
+Goal: Give each busy calendar event a coarse place for planning, so the same-place rule can refuse an alongside item during a meeting somewhere else.
+
+Requirements:
+
+- Each busy event that reaches the free-slot rule carries one coarse place: Home, a saved-place key, or unknown. It is computed from the event's location text with the existing place-key rule (`travelPlaceKey`) and compared with Home and the person's saved places.
+- Find every path that feeds calendar busy events to the free-slot rule today (the Daily Brief, Yes, Other time, Re-plan, Re-check, the Timeline's "Move for today", Chat) after the Calendar MCP migration, and compute the label where the location text already is: on the device for device-sent events, in the request for server-read events. Add no provider call and no geocoding.
+- The label lives for the request only. Nothing is stored, logged or sent to a model. Add a boundary test in the style of `tests/effective-where.boundary.test.ts`.
+- `alongsideMayOverlap` and `timeline-context.resolver.ts` use the label: an alongside item at Home is refused during an event at a saved place, allowed during an event at Home or with no known place. The Timeline shows its overlap cue again for refused overlaps.
+- An event with a location that matches neither Home nor a saved place is unknown, so behavior for such events does not change.
+- Calendar events stay out of pairing hosts (D33).
+- Behind `CADENCE_ALONGSIDE`; with the flag off request bodies and outputs are unchanged. Update `docs/DATETIME_STRATEGY.md` and `docs/DATA_MODEL.md` ("Effective Where").
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Brief and move request inputs, `alongside.resolver.ts` callers, Timeline overlap cues. |
+| Desktop | The Mac sends the same label with its brief requests; follow-up inside this ticket if the Mac path differs. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-103`.
+
+## Ticket 385: An advice card for the alongside question
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Ticket 360.
+
+Goal: Give the advisor tip surface a reviewed card so it can ask about an unanswered alongside guess.
+
+Requirements:
+
+- The existing card `stack-after-a-routine` does not fit: its study (Judah 2013) compared flossing after brushing with flossing before, and its own limitation says it did not compare pairing with not pairing.
+- Add one card, `do-it-during-something-else`, resting on Milkman, Minson and Volpp (2014), "Holding the Hunger Games Hostage at the Gym: An Evaluation of Temptation Bundling", Management Science 60(2), 283–299, doi:10.1287/mnsc.2013.1784. Kind: field experiment. Strength: limited.
+- Quote, from the abstract, verbatim: "Initially, full and intermediate treatment participants visited the gym 51% and 29% more frequently, respectively, than control participants, but treatment effects declined over time (particularly following Thanksgiving)."
+- Claim: people who could listen to tempting audiobooks only at the gym visited the gym more often than a control group at first, and the effect declined over time.
+- Limitation, stated on the card: one study of gym visits paired with audiobooks; the effect faded; applying it to a passive item such as a device is Cadence's reading, not what was tested.
+- Advice and action in the `PRODUCT.md` voice. Action: answer whether the Behavior can be done alongside other things, so Cadence can book it during another item. The offer opens the Behavior's alongside control.
+- Applies when `setup_gaps` reports `alongside_unanswered` (signal version `coach-signals-4`).
+- The card ships in the library's not-yet-reviewed state and shows no tip until the owner reviews it and the card records `reviewer` and `reviewed_at`. No agent sets those fields.
+- Library validation and advice-matcher tests cover the card. Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/data/advice-library.json`, advice matcher, tip offer link. |
+| Desktop | Not applicable: tips come from the hosted server. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-103`.
+
+## Ticket 386: The estimate hash leaves Where out
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Tickets 356 and 359, and the audit fixes.
+
+Goal: Stop a Where change from discarding a Behavior's cached length and alongside guess.
+
+Requirements:
+
+- `behaviorEstimateInputHash` hashes only what the model receives: title and description (plus the existing recipe markers). `where_kind` leaves the hash.
+- Setting Where still suppresses reading `where_guess` for that Behavior, as today.
+- This changes every stored hash once, with the flag on or off: each Behavior's estimate is asked again one time. Record the one-time cost in `docs/COSTS.md` and the change in `docs/DATETIME_STRATEGY.md` ("asked again only when its title or description changes").
+- Update the pinned-hash tests deliberately and add a test that changing Where keeps the cached length and guess.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/brief-move-day.service.ts` and every reader of a cached estimate. |
+| Desktop | Not applicable: estimates are hosted. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: none.

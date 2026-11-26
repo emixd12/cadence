@@ -47,7 +47,9 @@ briefing; since advisor Phase 3 (2026-11-18) it can move today's items when the 
 says Yes (`docs/DECISIONS.md`). Tickets 220–232 implement one remote MCP server, a
 Cadence-owned OAuth server, and Claude and ChatGPT plugins; the MCP server is
 live on production since October 29, 2026 (Ticket 232). See
-`docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 233–240 implement
+`docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 375–382 plan MCP Apps:
+views that the MCP server serves and an AI client renders (`docs/DECISIONS.md`,
+2026-11-25, D36); none has started. Tickets 233–240 implement
 read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
 web and linked desktop; the hosted connectors run on production since October 23,
 2026. Ticket 241 owns final disclosure/evidence review; connector release steps 6–7
@@ -366,6 +368,16 @@ In scope:
   Planning also uses a guessed Where, which never requests a route or a reminder. The
   Daily Brief and Chat may pair items for today; the coach may propose a schedule change
   the person confirms. Behind `CADENCE_ALONGSIDE`, off in production
+- Periods under Tickets 367–374 (`docs/DECISIONS.md`, 2026-11-25, D35): the person labels
+  a range of local dates for the whole account, such as "Sick". A Period is annotation
+  only. The Daily Brief, advisor tips, Chat and MCP clients read Periods; the Daily Brief
+  also reads day notes. MCP clients can create, edit and end a Period, not remove one
+- MCP Apps under Tickets 375–382 (`docs/DECISIONS.md`, 2026-11-25, D36): the MCP server
+  serves one "Cadence day" view that an AI client renders. It shows today only, with
+  Needs decision as a count line. A click in the view is the user's confirmation and
+  writes through the existing scoped tools. Behind a flag (working name
+  `CADENCE_MCP_APPS`), off in production until the marketing site overhaul (Ticket 246).
+  Submissions, listings and public copy wait for that overhaul
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -382,10 +394,11 @@ Out of scope for v1:
   same-day moves only when the person answers Yes. Outside AI clients may
   call scoped MCP tools at the user's direction (Tickets 220–232); Cadence itself
   runs no server-side AI agent or autonomous execution through MCP
-- MCP follow-ups: MCP Apps widgets, a REST/webhook adapter, Facets sync, a local
-  stdio MCP server for account-free desktop, MCP prompts/resources, per-event
-  client provenance in synced history and BehaviorLog, and a production reviewer
-  sign-in (see `docs/FUTURE_UPDATES.md`)
+- MCP follow-ups: a REST/webhook adapter, Facets sync, a local stdio MCP server for
+  account-free desktop, MCP prompts, MCP resources other than view HTML (D36),
+  per-event client provenance in synced history and BehaviorLog, and a production
+  reviewer sign-in (see `docs/FUTURE_UPDATES.md`). Also out: MCP Apps views after
+  "Cadence day" until ticketed (Ticket 382), and Gemini Enterprise
 - Calendar sync and event editing, except read-only Google Calendar context in
   Tickets 132–137 and read-only Outlook and iCloud Calendar context in
   Tickets 233–241
@@ -429,6 +442,8 @@ Use these terms consistently:
 - Effective Where: the place planning uses for a Behavior: the person's Where, else
   counted completion places, else a model guess (D33).
 - Pairing: a proposal to do an alongside item during another item, the host.
+- Period: a range of local dates the person labels for the whole account to say
+  something affected those days (D35). It is not a status and not a Behavior pause.
 
 Do not use “missed” as a stored status in v1.
 
@@ -499,6 +514,7 @@ Rules:
 - Notes can be added or edited.
 - Needs decision is derived from `status === "unresolved"` and `local_date` before the current local date.
 - Unresolved is shown separately and excluded from final adherence calculations.
+- A Period (D35) never changes a status, adherence, a reminder or a schedule.
 - Connector completion (D28) may mark an Unresolved occurrence Completed from a linked
   source. It never changes a status the user set and never marks Not Completed. After the
   user changes a connector completion, no activity completes that occurrence again.
@@ -808,6 +824,10 @@ Do not expand scope to solve speculative future requirements.
   revocable. Integration operations reach user data only through RLS as the
   grant's user; the service role is limited to OAuth token-endpoint functions.
   Never log tokens or note text.
+- MCP Apps views (D36) make no network request and load no external asset. No
+  credential or token reaches the iframe. Render user text as text, never as HTML. A
+  view resource read needs a valid grant with `cadence.read` and counts against the
+  per-grant read limit.
 - The leave reminder job (Ticket 276, decision D3) may act as one user with no session.
   It uses its own token channel, never an MCP grant. Tokens last 5 minutes or less, stay
   server-only and never reach logs. Selecting which accounts are due needs a cross-account

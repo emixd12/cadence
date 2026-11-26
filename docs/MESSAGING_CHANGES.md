@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-092` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-102` is next; `npm run ids:next` confirms). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -1554,7 +1554,13 @@ cite has not changed.
 - **Update needed:** rewrite these surfaces from `docs/NARRATIVE.md` under a marketing
   ticket. Publish only claims whose row in its "Claims" table is live. Use "Cadence is free
   during the beta. It will not stay free." Update `tests/public-content-contract.test.ts`
-  with the copy.
+  with the copy. **Reminder / follow-on trigger (owner hold, November 25, 2026):** as soon
+  as the pre-beta marketing site rewrite ships to `https://cadence-me.com`, immediately
+  return to **Ticket 245** (`P-090`; `docs/qa/2026-10-12-agentic-calendar.md` and
+  `docs/qa/2026-11-25-google-calendar-mcp-spike.md`) to re-record the single-take Google
+  OAuth verification demo video against the updated homepage and submit
+  `cadence-calendar-agent-prod` in Google Auth Platform Verification Center (must complete
+  before Google's February 1, 2027 Workspace AI Tools Addendum deadline).
 - **Status:** logged.
 
 ## P-049: Complete from Hevy at Behavior creation
@@ -2516,7 +2522,7 @@ cite has not changed.
      P-088, P-089, and this entry across Privacy, Terms, Settings, and the user guide.
 - **Related:** L-001, L-021, L-026, L-027, P-010, P-012, P-035, P-060, P-065, P-066, P-088,
   P-089.
-- **Status:** drafted (`components/settings/LegalContent.tsx` and `docs/qa/2026-10-12-agentic-calendar.md` updated for Ticket 245 verification; awaiting production deploy).
+- **Status:** live on web (`components/settings/LegalContent.tsx` and `docs/qa/2026-10-12-agentic-calendar.md` shipped in PR #398, production deployment `cadence-lo22vs16w`, November 25, 2026; live `calendarmcp.googleapis.com` Phase 0 wire check passed in `docs/qa/2026-11-25-google-calendar-mcp-spike.md`). **Ticket 245 verification video & Google Verification Center submission held by owner until the pre-beta marketing site overhaul (`P-048` / Ticket 246) ships** — re-record on the updated `https://cadence-me.com` homepage and submit before February 1, 2027.
 
 ## P-091: Geoapify place and Home autocomplete and auto-saved completion markers
 
@@ -2583,4 +2589,151 @@ cite has not changed.
 - **Update needed:** rename the section and field, state the 3-completion rule and the
   median, and note the rule beside `default_duration_minutes` in the MCP docs.
 - **Related:** none.
+- **Status:** logged.
+
+## P-095: Day notes in the Daily Brief model input (D35)
+
+- **Change:** planned under Ticket 367. With the Notes source on, the Daily Brief sends
+  the day notes for today and the two days before it, the first 280 characters of each,
+  to the model provider.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D35); Ticket 367.
+- **Surfaces:** Privacy, the AI features source text in Settings, user guide.
+- **Conflicting current text:** `components/settings/LegalContent.tsx` describes the Notes
+  the brief sends as Notes from Not Completed occurrences only. `docs/PRODUCT_SPEC.md`
+  said the Daily Brief does not read day notes.
+- **Update needed:** state that the brief reads recent day notes when Notes is on, with
+  the 3-day window and the 280-character limit.
+- **Related:** P-096.
+- **Status:** logged.
+
+## P-096: Periods (D35)
+
+- **Change:** planned under Tickets 368–374. A person can label a range of dates. The
+  Daily Brief and advisor tips send Period labels and dates to the model provider; they
+  do not send Period notes. MCP clients can read Periods and, with the existing
+  "Change Occurrence statuses and notes" permission, create, edit and end them. Exports
+  carry Periods.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D35); Tickets 368–374.
+- **Surfaces:** Privacy, OAuth consent and Connected apps permission text, the AI
+  features source text, user guide, MCP developer docs, Trust.
+- **Conflicting current text:** `lib/types/oauth-ui.ts` names the permission "Change
+  Occurrence statuses and notes", which does not mention day notes or Periods. Privacy
+  does not list Period labels among model input or stored data. A label can describe
+  health.
+- **Update needed:** name Periods in the permission text, in the model-input list and in
+  the stored-data list; add a user guide section; say that Period notes are not sent to
+  the model.
+- **Related:** P-028, P-095.
+- **Status:** logged.
+
+## P-097: Claude and ChatGPT listing copy and screenshots for the day view (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Tickets 377, 378 and 380.
+  Cadence's MCP server will serve an interactive "Cadence day" view that Claude and
+  ChatGPT render inside the conversation. The Claude directory listing needs 3 to 5 PNG
+  screenshots, 1000 pixels or wider, with paired prompts. The ChatGPT resubmission needs a
+  statement of the view's content security policy.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Tickets 377, 378, 380. Files:
+  `docs/qa/mcp-directory-submission.md`, `integrations/chatgpt-plugin/plugin.json`,
+  `integrations/claude-plugin/.claude-plugin/plugin.json`.
+- **Surfaces:** provider submissions (Claude directory and Verified listing, ChatGPT
+  plugin), plugin listings, marketing.
+- **Conflicting current text:** the submission drafts and both plugin listings describe
+  tools with text results only. `docs/qa/mcp-directory-submission.md` says "Cadence
+  requires a hosted account with Google sign-in"; email and Apple sign-in are live.
+- **Update needed:** listing copy that names the view, screenshots with prompts, the CSP
+  statement and reviewer test cases. Ticket 380 drafts them unpublished.
+- **Related:** P-048, P-098, P-100.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
+  instruction. Nothing is submitted or published before it.
+
+## P-098: Privacy, Terms and Trust text about views rendered inside AI clients (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Tickets 376 and 377. An AI
+  client can render a Cadence view in a sandboxed frame. The view shows today's
+  Occurrences, notes and the day note, and a count of earlier items that need a decision.
+  A click in the view marks an Occurrence or saves a note through the client, under the
+  permissions the user already granted. The click is the user's confirmation. The view
+  makes no network request and receives no credential.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Tickets 376, 377.
+- **Surfaces:** Privacy and Terms, Trust, OAuth consent and Connected apps text, user
+  guide.
+- **Conflicting current text:** `components/settings/LegalContent.tsx`, "Exports and
+  connected AI clients": "You direct and confirm changes in the AI client." It describes
+  requested records sent to the client and does not mention a view the client displays
+  or a change made by clicking in one.
+- **Update needed:** say that a connected client may display a Cadence view, that a click
+  in it changes the record under the granted permissions, what the view shows, and that
+  it sends nothing to any other party. Add a user guide section.
+- **Related:** P-013, P-014, P-061.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246).
+  The owner decided the production flag waits for the same overhaul.
+
+## P-099: Developer docs say Cadence implements no MCP Apps views or resources (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Ticket 376. With the flag on,
+  the MCP server lists one more read tool, declares the `io.modelcontextprotocol/ui`
+  extension and serves view HTML through `resources/list` and `resources/read`.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Ticket 376. Files:
+  `apps/marketing/src/data/developers.ts`, the generated developer reference.
+- **Surfaces:** marketing (developer docs).
+- **Conflicting current text:** `developers.ts`: "Cadence does not implement MCP Apps
+  widgets, prompts or resources." and "Cadence has no sessions, resumption, unsolicited
+  messages, resources".
+- **Update needed:** describe the view tool, the view resource, the empty CSP and the text
+  result for hosts that show no view. Prompts stay unimplemented.
+- **Related:** P-048.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and general release. The
+  current text stays accurate while the production flag is off.
+
+## P-100: Plugin skill update that names the day view (D36)
+
+- **Change:** decided November 25, 2026 (D36). Planned under Ticket 380. The published
+  `daily-check-in` skill tells the model to call `get_timeline` and to confirm before it
+  writes. With a view, the model should call `show_day`, and the person's click in the
+  view is the confirmation.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Ticket 380. Files:
+  `integrations/skills/daily-check-in/SKILL.md` and its copies in both plugins.
+- **Surfaces:** plugin listings (published skills), provider submissions.
+- **Conflicting current text:** `integrations/skills/daily-check-in/SKILL.md` names
+  `get_timeline` for the day and does not mention a view.
+- **Update needed:** an unpublished skill draft with skill-rule tests (Ticket 380).
+  Publishing it is listing work.
+- **Related:** P-097.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
+  instruction.
+
+## P-101: Gemini listing and Google's Connected Apps submission (D36)
+
+- **Change:** decided November 25, 2026 (D36). Gemini Apps Developer Mode is a required
+  acceptance host (Ticket 378). A public Gemini listing needs Google's Connected Apps
+  interest form and console. If consumer Gemini cannot sign in as-is, Ticket 381 may adapt
+  Cadence's OAuth server for it.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D36); Tickets 378, 380, 381.
+- **Surfaces:** provider submissions (Google), Privacy, marketing, developer docs.
+- **Conflicting current text:** Privacy, "Exports and connected AI clients", names
+  "Claude or ChatGPT" as examples. Marketing and the developer docs name Claude and
+  ChatGPT only. No Google listing text exists.
+- **Update needed:** Gemini listing copy and screenshots; name Google as a client
+  provider where the text lists them; record any OAuth change from Ticket 381 in the
+  developer docs.
+- **Related:** P-090, P-097.
+- **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
+  instruction. Developer Mode testing publishes nothing and does not wait.
+
+## P-103: Guessed Where shown without Completion places; calendar event places for planning (D37)
+
+- **Change:** planned November 25, 2026 (Tickets 383 and 384), behind `CADENCE_ALONGSIDE`.
+  The Behavior form shows Cadence's guess of a Behavior's kind of place whether or not
+  Completion places is on. Each busy calendar event gets a coarse place (Home, a saved
+  place or unknown) computed from its location text for one request, to decide whether an
+  alongside Behavior may overlap it.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D37); Tickets 383 and 384.
+- **Surfaces:** Privacy, in-app Calendar and Daily Brief disclosures, user guide.
+- **Conflicting current text:** disclosures describe calendar event locations as read for
+  routing only.
+- **Update needed:** say that an event's location is also compared with Home and saved
+  places to plan around it, that the result is not stored and not sent to a model, and
+  that a guessed place never requests a route or a reminder.
+- **Related:** P-093.
 - **Status:** logged.

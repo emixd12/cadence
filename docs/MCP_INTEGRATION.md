@@ -55,7 +55,9 @@ they do not describe the current implementation state.
   reminder delivery logs; push subscriptions; import-run internals; credentials
   and tokens; the email address. Also excluded: deletes, server-side AI or
   autonomous execution, natural-language recurrence parsing on the server,
-  medication doses, amounts, refills, or inventory, and MCP Apps widgets.
+  and medication doses, amounts, refills, or inventory. MCP Apps views are no longer
+  excluded: the owner moved them into scope on November 25, 2026 (D36, Tickets
+  375–382; section 17). Every data exclusion above also applies to a view.
 
 ## 2. Architecture
 
@@ -120,6 +122,11 @@ adapter over one contract. It is not a connector SDK or provider registry.
 | Desktop | No desktop code in v1. Linked desktop receives MCP-made changes through existing account sync, because writes reuse the web app's write paths and synced tables do not change. Account-free desktop data never reaches the server, so MCP cannot read it. A local stdio MCP server is a follow-up in `docs/FUTURE_UPDATES.md`. Ticket 227 records the desktop decision in `docs/DESKTOP_PARITY.md`. |
 | Marketing | Planned: `/developers` docs section in `apps/marketing` (Ticket 229), plugin listing links, and disclosures after owner approval (231). No public claim before deployed evidence. |
 | Future mobile | Not applicable. A future client can reuse `docs/MCP_CONTRACT.md`. |
+
+MCP Apps (D36, planned, section 17): web in Tickets 375–381; desktop not applicable,
+because Cadence for Mac renders no MCP view; marketing and listings wait for the
+marketing site overhaul (Ticket 246; Ticket 380 prepares unpublished drafts); future
+mobile has no Cadence code, and host mobile apps render the view.
 
 ## 4. Capability research (dated 2026-10-18)
 
@@ -611,3 +618,43 @@ it off. Write receipts carry the answer through `cadence_private.integration_wri
 `tests/integration-alongside-write.test.ts` and the protocol suite's
 `alongside-*` checks, which run when a server reports 1.8.0. Live client acceptance
 for the field is Ticket 365.
+
+## 17. MCP Apps (planned, D36, Tickets 375–382)
+
+Nothing in this section is implemented. The owner moved MCP Apps into scope on
+November 25, 2026 (`docs/DECISIONS.md`, D36). The plan is
+`docs/plans/2026-11-25-mcp-apps-expansion.md`. Ticket 375 is a spike that freezes the
+schema and the view contract, so the details below can change.
+
+- **Standard.** MCP Apps (extension `io.modelcontextprotocol/ui`). A tool links to a
+  view with `_meta.ui.resourceUri`. The host reads the HTML with `resources/read` and
+  runs it in a sandboxed iframe. A host without MCP Apps ignores the link and uses the
+  text result.
+- **First view.** "Cadence day" shows today only: each Occurrence with Completed, Not
+  Completed and Note, and Needs decision as one count line.
+- **Tool.** A new read tool, `show_day` (name tentative), scope `cadence.read`. It is a
+  one-day adapter over the Timeline service and adds one field per Occurrence: whether a
+  Completed status came from a connected service. `get_timeline` does not change.
+- **Writes.** The view calls the existing tools `set_occurrence_status`,
+  `set_parent_occurrence_status` and `update_occurrence_note` through the host, under the
+  user's existing grant, with the displayed precondition and an idempotency key. A click
+  is the user's confirmation. No new scope.
+- **Server.** `lib/mcp/server.ts` gains the resources capability for view HTML only.
+  Resource methods need a valid grant with `cadence.read`, count against the per-grant
+  read limit, log a fixed label and have a byte cap. The view resource declares an empty
+  CSP.
+- **Flag.** `CADENCE_MCP_APPS` (working name), off in production. Off removes the tool
+  and the resources. The production flag waits for the marketing site overhaul
+  (Ticket 246), the consent fix (Ticket 379) and the contract fold.
+- **Contract.** During the trial `show_day` lives in `lib/mcp/`, outside the contract
+  registry, so Cadence Chat never lists or runs it. For general release it joins the
+  registry as the next minor version after the alongside edition folds in (Ticket 365).
+- **Rules.** A view makes no network request, loads no external asset and receives no
+  credential. User text renders as text. The data exclusions in section 1 apply.
+- **Hosts required before release.** Claude web, ChatGPT web, Claude Desktop, Claude
+  mobile, VS Code Copilot and Gemini Apps Developer Mode (Ticket 378). Ticket 381 covers
+  an OAuth change only if the spike shows a required host cannot sign in. Gemini
+  Enterprise is out of scope.
+- **Listings.** Every submission, listing and public copy change waits for the marketing
+  site overhaul and the owner's instruction. Ticket 380 prepares unpublished drafts.
+  Messaging entries: P-097 to P-101.
