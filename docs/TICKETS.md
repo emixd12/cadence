@@ -20205,7 +20205,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 362: Pairing the schedule through the coach
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`. Migration `20261126110000_alongside_schedule_pairing.sql` (not pushed) drops and re-adds the proposals' evidence check to accept source `alongside_pairing`, following the Nov 20 precedent, so it needs the owner's yes before a hosted push. Readings: "four different days" counts accepted Daily Brief pairing lines (status `accepted`, so Other time and Undo do not count) for the same guest and host on 4 local dates in the 28 dates ending today; `done_together` counts in either direction, with the alongside side as guest. "The days both are scheduled" is the weekdays on which both have a time, for daily-every-day and weekly-every-week schedules only, with one set time each per shared day and the same pair on every shared day; other recurrences, ranges and mixed times are refused. A step that follows its routine's schedule is refused on either side, and a guest longer than its host when both lengths are set. At most one pairing proposal per coach run. The host is re-checked when the proposal is shown and before a Yes.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
