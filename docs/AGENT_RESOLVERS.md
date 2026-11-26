@@ -322,6 +322,19 @@ check and reads "today" from the profile timezone at the time of the write
 - Period labels and notes are the person's own words and can describe health. Never
   log them.
 
+`packages/core/src/resolvers/behaviorlog-period.resolver.ts` (Ticket 373) reads Cadence
+Period `review` records (extension `period: true`) from a BehaviorLog bundle and plans
+import and restore writes. It matches by `periodNaturalKey`, never by the file's id.
+Import only adds. Restore also sets the note of a matching Period when the file carries
+a note field. Neither removes a Period or plans past `PERIOD_LIMITS.perAccount`. Shared
+`services/behaviorlog-period.service.ts` saves the plan through the `PeriodDataStore`
+after the main import or restore commits and never throws; the web import and restore
+services call it, and the Mac follows in Ticket 374. `export.resolver.ts` writes the
+records and the Full JSON `periods` array. Paired checks live in
+`tests/behaviorlog-period.resolver.test.ts`, with `tests/behaviorlog-period.service.test.ts`
+and `tests/period-export.test.ts`; rules in `docs/EXPORT_FORMATS.md`, "Periods". Its
+messages give counts only.
+
 ## Connector completion matching (Tickets 313 and 321)
 
 `packages/core/src/resolvers/activity-match.resolver.ts` decides which recorded

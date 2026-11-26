@@ -129,6 +129,12 @@ const resolverRegistry = [
     source: "docs/EXPORT_FORMATS.md",
   },
   {
+    domain: "BehaviorLog Period import and restore",
+    resolver: "packages/core/src/resolvers/behaviorlog-period.resolver.ts",
+    test: "tests/behaviorlog-period.resolver.test.ts",
+    source: "docs/EXPORT_FORMATS.md",
+  },
+  {
     domain: "connector completion matching",
     resolver: "packages/core/src/resolvers/activity-match.resolver.ts",
     test: "tests/activity-match.resolver.test.ts",
