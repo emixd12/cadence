@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000`, `20261125190000` and the 360/361 follow-up `20261126100000` not pushed); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -98,6 +98,20 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Tickets 360 and 361 follow-up: own-channel pairing evidence and the brief "asked" record — November 26, 2026
+
+- **Pairing evidence (361):** new `advisor_read_pairing_evidence(date)`, Daily Brief and
+  Chat agent tokens only, returns `done_together` pairs and `crowded_hour` hours for the
+  caller's account (today, else yesterday). The brief reads it on its `daily_brief` agent
+  client, Chat on its `chat` context. `alongside-pairing.service.ts` no longer mints a coach
+  client.
+- **Brief asks (360):** new hosted-only `brief_alongside_asks` (ids and a date, owner-only
+  RLS, cascades on account and Behavior deletion), written after a saved brief includes the
+  question and read for `askedBehaviorIds`; earlier days only, so a same-day refresh may ask again.
+- **Migration:** `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`, additive,
+  not applied or pushed. Fixture: `tests/sql/alongside-pairing-evidence-and-brief-asks.sql`
+  (not yet run). Flag off: nothing new read or written.
+
 ## Ticket 361 complete: pairing for today in the Daily Brief and Chat — November 25, 2026
 
 - **Planner:** `packages/core/src/resolvers/alongside-pairing.resolver.ts` (`planAlongsidePairings`,
@@ -109,8 +123,9 @@ Check the cited entry before acting on a row.
   Re-plan re-pair or close; Yes is an ordinary move (source `daily_brief`). No migration.
 - **Chat (flag on):** tool `plan_alongside_pairings`; the move after the person's yes is
   `move_occurrence_for_day`. `CHAT_ALONGSIDE_INSTRUCTIONS` gains the pairing rule (still `chat-1.8`).
-- **Evidence:** the coach's `done_together` and `crowded_hour` signals, read through the coach
-  agent's read-only channel (no grant changed).
+- **Evidence:** the coach's `done_together` and `crowded_hour` signals. Since the November 26
+  follow-up, read on the brief's and Chat's own agent tokens through
+  `advisor_read_pairing_evidence`, not a coach client.
 - **Evals (offline):** brief fixture `alongside_pairing` and rule `pairing_off_host`; chat world
   `alongside_pairing` and scenario `alongside_pairing`. No live or paid eval run.
 - **Not done:** the Mac (Ticket 363), the schedule proposal (Ticket 362).
@@ -131,9 +146,8 @@ Check the cited entry before acting on a row.
 - **Gap, advice card:** no tip surface. No source in `advice-library.json` covers doing a
   Behavior alongside other things (`give-it-a-length` rests on Buehler 1994, task-length
   estimates), so the fact ships without a card. A card needs a reviewed source.
-- **Gap, brief "once per Behavior":** the stored answer closes the question for good and
-  the saved brief keeps one question per day. An ignored question can return in a later
-  brief; a durable "asked" record would need a migration.
+- **Brief "once per Behavior":** closed by the November 26 follow-up (`brief_alongside_asks`,
+  migration `20261126100000`).
 - **Flag off:** no reads, no new line, prompts, signals and brief output unchanged. The web
   client sends `alongside_question_v1`; the server ignores it while off.
 
