@@ -199,6 +199,8 @@ export type ExportBehaviorConfigurationSnapshot = {
   pause?: { fromOn: string; fromTime: string | null; backOn: string } | null;
   parentBehaviorId?: string | null;
   inheritParentSchedule?: boolean;
+  /** D33: present only on an event where either side has an alongside answer. */
+  alongside?: boolean | null;
 };
 
 export type ExportBehaviorConfigurationEventInput = {
@@ -471,6 +473,8 @@ export type ExportJsonBehaviorConfigurationSnapshot = {
   pause?: { from_on: string; from_time: string | null; back_on: string } | null;
   parent_behavior_id?: string | null;
   inherit_parent_schedule?: boolean;
+  /** D33: only in an export that includes alongside, on an event that carries the answer. */
+  alongside?: boolean | null;
 };
 
 export type ExportJsonBehaviorConfigurationEvent = {

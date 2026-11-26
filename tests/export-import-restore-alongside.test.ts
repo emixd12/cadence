@@ -15,6 +15,7 @@ import { sha256 } from "@cadence/core/hash";
 import type { BehaviorLogExistingRecords } from "@cadence/core/types/behaviorlog-import";
 import { USER_ID, storedBehavior, storedConfigurationEvent, storedExportOccurrence } from "./helpers/export-row-fixture";
 import { portabilityApplyRun, PORTABILITY_NOW } from "./helpers/portability-fixture";
+import { alongsideHistoryRows } from "./helpers/alongside-history-fixture";
 
 /**
  * Ticket 364 (D33): Full JSON, JSONL, CSV and BehaviorLog carry the person's alongside
@@ -190,5 +191,107 @@ describe("alongside restore (Ticket 364)", () => {
     const off = restore(true, false, false);
     expect(off.action).toBe("keep");
     for (const row of [...legacy.payload, ...off.payload]) expect(row).not.toHaveProperty("alongside");
+  });
+});
+
+// sha256 of the unanswered history fixture's export (Full JSON, JSONL, CSV, BehaviorLog
+// files), computed with origin/main's packages/core before Ticket 363's history change.
+const PRE_363_HISTORY_EXPORT_SHA256 = "7c9dc6fccb66a1a8b1b9991ceeb88c89034baf6ac1b0bf1e6429997e0b739913";
+
+function historyInput(answered: boolean, includeAlongside: boolean): ExportAssemblyInput {
+  const rows = alongsideHistoryRows(answered);
+  return input(undefined, {
+    behaviors: [rows.behavior], behaviorConfigurationEvents: rows.configurationEvents, occurrences: rows.occurrences,
+    ...(includeAlongside ? { includeAlongside: true } : {}),
+  } as Partial<ExportAssemblyInput>);
+}
+
+type HistoryEvent = { id: string; changed_fields: string[]; previous_configuration: Row | null; next_configuration: Row };
+
+describe("alongside configuration history in exports (Ticket 363, defect D1)", () => {
+  it("exports an unanswered account's history with the bytes it had before Ticket 363", () => {
+    const off = bytes(assembleExportBundle(historyInput(false, false)));
+    expect(createHash("sha256").update(off).digest("hex")).toBe(PRE_363_HISTORY_EXPORT_SHA256);
+    expect(off).not.toContain("alongside");
+  });
+
+  it("with alongside off, names the answer nowhere and leaves out the answer-only revision", () => {
+    const bundle = assembleExportBundle(historyInput(true, false));
+    // Byte for byte the export of the same account had it never answered.
+    expect(bytes(bundle)).toBe(bytes(assembleExportBundle(historyInput(false, false))));
+    expect(bytes(bundle)).not.toContain("alongside");
+    const events = bundle.jsonBackup.behavior_configuration_events as HistoryEvent[];
+    expect(events.map((event) => event.id)).toEqual(["configuration-1", "configuration-2"]);
+    // The answer-only revision's Occurrence belongs to the revision before it, and the chain holds.
+    expect(bundle.jsonBackup.occurrences.map((row) => row.behavior_configuration_event_id))
+      .toEqual(["configuration-1", "configuration-1", "configuration-2"]);
+    expect(events[1]!.previous_configuration).toEqual(events[0]!.next_configuration);
+  });
+
+  it("with alongside on, carries the answer in every snapshot of an event that names it", () => {
+    const bundle = assembleExportBundle(historyInput(true, true));
+    const events = bundle.jsonBackup.behavior_configuration_events as HistoryEvent[];
+    expect(events.map((event) => [event.id, event.changed_fields])).toEqual([
+      ["configuration-1", expect.not.arrayContaining(["alongside"])],
+      ["configuration-a", ["alongside"]],
+      ["configuration-2", ["reminder_offset_minutes"]],
+    ]);
+    expect(events[0]!.next_configuration).not.toHaveProperty("alongside");
+    expect([events[1]!.previous_configuration!.alongside, events[1]!.next_configuration.alongside]).toEqual([null, true]);
+    expect(events[1]!.previous_configuration).not.toEqual(events[1]!.next_configuration);
+    expect([events[2]!.previous_configuration!.alongside, events[2]!.next_configuration.alongside]).toEqual([true, true]);
+    expect(bundle.jsonBackup.occurrences.map((row) => row.behavior_configuration_event_id))
+      .toEqual(["configuration-1", "configuration-a", "configuration-2"]);
+    // BehaviorLog: the raw Cadence history keeps the answer, and the portable history keeps
+    // it in the snapshot extension the transformation note points to.
+    const raw = jsonl(bundle.behaviorLog.files, "raw/cadence/behavior_configuration_events.jsonl");
+    const answer = raw.find((row) => row.id === "configuration-a")!;
+    expect([(answer.previous_configuration as Row).alongside, (answer.next_configuration as Row).alongside]).toEqual([null, true]);
+    const portable = jsonl(bundle.behaviorLog.files, "data/behavior_configuration_events.jsonl")
+      .find((row) => row.event_id === "configuration-a")!;
+    expect(portable.changed_fields).toEqual([]);
+    expect([cadence(portable.previous as Row).alongside, cadence(portable.next as Row).alongside]).toEqual([null, true]);
+  });
+
+  it("stays a valid BehaviorLog bundle with alongside on and off", async () => {
+    for (const includeAlongside of [true, false]) {
+      const files = assembleExportBundle(historyInput(true, includeAlongside)).behaviorLog.files;
+      const root = await mkdtemp(path.join(tmpdir(), "cadence-alongside-history-"));
+      const bundlePath = path.join(root, "cadence.behaviorlog");
+      try {
+        for (const file of files) {
+          await mkdir(path.dirname(path.join(bundlePath, file.path)), { recursive: true });
+          await writeFile(path.join(bundlePath, file.path), file.content, "utf8");
+        }
+        const result = spawnSync(process.execPath, ["scripts/behaviorlog-conformance.mjs", bundlePath], { cwd: process.cwd(), encoding: "utf8" });
+        expect(result.status, result.stderr || result.stdout).toBe(0);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("imports and restores the answered account's bundle with alongside on and off", () => {
+    for (const read of [true, false]) {
+      const files = assembleExportBundle(historyInput(true, read)).behaviorLog.files;
+      const importPreview = resolveBehaviorLogImportPreview({ files, ...(read ? { readAlongside: true } : {}) });
+      expect(importPreview.valid, JSON.stringify(importPreview.errors)).toBe(true);
+      if (read) expect(importPreview.plan.behaviors[0]).toHaveProperty("cadenceAlongside", true);
+      else expect(importPreview.plan.behaviors[0]).not.toHaveProperty("cadenceAlongside");
+      expect(resolveBehaviorLogImportMergePreview({ files, ...(read ? { readAlongside: true } : {}) }).errors).toEqual([]);
+      const rows = alongsideHistoryRows(true);
+      const records = assembleBehaviorLogExistingRecords({
+        behaviors: [{ ...rows.behavior, category: null } as never], occurrences: rows.occurrences as never[],
+        statusEvents: [], definitionEvents: [], timeSessions: [], mappings: [], importedNotes: [],
+        importedInterventions: [], configurationEvents: rows.configurationEvents as never[], includeAlongside: read,
+      });
+      const preview = resolveBehaviorLogRestorePreview({ importPreview, existing: records });
+      expect(preview.errors ?? [], JSON.stringify(preview.errors)).toEqual([]);
+      // Restoring the account's own bundle changes no Behavior, flag on or off.
+      expect(preview.actions.behaviors.map((action) => action.action)).toEqual(["keep"]);
+      const { payload } = buildRestorePayload({ userId: USER_ID, importRunId: portabilityApplyRun().id, now: PORTABILITY_NOW,
+        importPreview, preview, existing: records });
+      expect(JSON.stringify(payload.behavior_configuration_events)).not.toContain("configuration-a");
+    }
   });
 });

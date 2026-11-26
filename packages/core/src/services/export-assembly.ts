@@ -266,6 +266,10 @@ function parseConfigurationSnapshot(
         ? false
         : requireBoolean(snapshot.inherit_parent_schedule, "configuration inherit_parent_schedule"),
     }),
+    // D33: an event where either side has an answer carries it on both sides.
+    ...(snapshot.alongside === undefined ? {} : {
+      alongside: snapshot.alongside === null ? null : requireBoolean(snapshot.alongside, "configuration alongside"),
+    }),
   };
 }
 
