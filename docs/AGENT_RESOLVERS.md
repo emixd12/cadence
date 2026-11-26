@@ -389,6 +389,17 @@ setup facts the advice matcher uses, and `repeated_move` gains per-weekday move 
 Fact names follow `ADVICE_SIGNAL_FACTS` in `packages/core/src/types/advice-cards.ts`.
 Paired test: `tests/coach-signals-v2.resolver.test.ts`.
 
+Versions 5 and 6 (`coach-signals-5`, and `coach-signals-6` while `CADENCE_ALONGSIDE` is
+on; Ticket 372, D35) replace versions 3 and 4. The resolver takes an optional
+`periodDates`: the local dates covered by any Period in the read window, which
+`lib/services/coach-signals-job.service.ts` computes with `periodCoveredDates` from the
+dates `lib/db/coach-signals.repo.ts` reads under RLS. `completion_drop` facts gain the
+counts `recent_period_days` and `baseline_period_days`, 0 without a Period. The input is
+dates only, so a Period's label or note cannot reach a fact. A Period is annotation
+only: the resolver must not read `periodDates` to suppress, delay or re-threshold a
+signal, and `tests/coach-signals.resolver.test.ts` proves the emitted signals and every
+other fact are identical with and without it.
+
 ## Advice matcher (advisor plan Phase 4, workstream 4A)
 
 `packages/core/src/resolvers/advice-matcher.resolver.ts` ranks advice cards for one
@@ -996,6 +1007,28 @@ Forbidden bypasses: no recurrence, Needs decision, adherence, or status logic in
 that skips the scope check. This is one transport adapter over one contract, not a
 connector SDK or provider registry. `npm run resolvers:check` still applies to every
 new module. Required tests are named in Tickets 221–228 in `docs/TICKETS.md`.
+
+### MCP Apps transport reads (Ticket 376, D36)
+
+The trial tool `show_day` and the view resources are outside the contract registry, so
+they cannot run through `lib/integrations/operations/`. They keep the same layers:
+
+| Layer | Location | May call | Must not |
+|---|---|---|---|
+| Wire shape | `lib/mcp/apps/` (`show-day.ts`, `view-resources.ts`, `config.ts`, `day-view-html.ts`) | `getIntegrationDay`, `lib/integrations/transport-read.ts`, the contract's schema builders and validator | Decide a day's rows, grouping, Needs decision or a connector label; query a table; read another service |
+| Admission and activity | `lib/integrations/transport-read.ts` | The per-grant rate limit and `recordIntegrationActivity`, as `operations/execute.ts` does | Return data when the limit or the activity write fails |
+| Day projection | `lib/services/integration-day.service.ts` | `getIntegrationTimeline` and `readTimelineSourceEvidence` | Add a rule of its own; copy a Timeline field it does not name |
+| Connector label reader | `lib/services/timeline-source-evidence.service.ts` | `resolveTimelineSourceEvidence` (core), the source-match and status-event repositories | Decide "from a connected service" outside the core resolver |
+
+`lib/mcp/apps/` is the one place in the MCP transport that calls a service directly,
+and it calls only `getIntegrationDay`. `show_day` adds no recurrence, Needs decision,
+status or adherence logic: the day comes from the `get_timeline` read, and
+`connector_completion` is the core resolver's `fromConnector`, the rule the web
+Timeline uses. The web Timeline service and `show_day` share
+`readTimelineSourceEvidence`. Cadence Chat builds its tools from the registry and never
+calls these modules. Tests: `tests/mcp-apps-server.test.ts`,
+`tests/mcp-apps-show-day.test.ts`, `tests/integration-day.service.test.ts`,
+`tests/mcp-apps-chat.test.ts`.
 
 ### OAuth expiry maintenance (Ticket 232)
 

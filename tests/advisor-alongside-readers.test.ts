@@ -182,7 +182,8 @@ describe("coach signals version 4", () => {
 
   it("versions only with the flag", () => {
     expect([coachSignalVersion(false), coachSignalVersion(true)]).toEqual([COACH_SIGNAL_VERSION, COACH_SIGNAL_VERSION_ALONGSIDE]);
-    expect(COACH_SIGNAL_VERSION_ALONGSIDE).toBe("coach-signals-4");
+    // Ticket 372 moved the pair from 3 and 4 to 5 and 6 (Period day counts).
+    expect([COACH_SIGNAL_VERSION, COACH_SIGNAL_VERSION_ALONGSIDE]).toEqual(["coach-signals-5", "coach-signals-6"]);
     expect(ADVICE_SIGNAL_FACTS.done_together).toEqual(expect.arrayContaining(["alongside", "other_alongside"]));
   });
 

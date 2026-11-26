@@ -295,7 +295,7 @@ sub-behavior is a real Behavior row with `parent_behavior_id`.
 11. **Cadence Agent.** Chat (`chat-1.6`) creates routines, adds, moves and detaches
     steps and marks a whole routine with one Undo. The Daily Brief moves a routine's
     following steps together, on web and Mac; a routine line has no "set length",
-    because its length is the steps' sum. Coach signals (`coach-signals-3`) add
+    because its length is the steps' sum. Coach signals (since `coach-signals-3`) add
     `sub_behavior_dropoff` and count a routine's steps at one time as one item for
     `crowded_hour`. Tips (`coach-tips-3`) name a step "Retinol in Skin routine".
 12. **Outside AI clients.** MCP contract 1.7.0 reads and writes the hierarchy and adds
