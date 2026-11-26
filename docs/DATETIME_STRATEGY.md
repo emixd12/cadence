@@ -240,8 +240,9 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   blocks like any other item, with the 10-minute gaps. Each item's place is its effective
   Where (`effective-where.resolver.ts`): the person's Where, else counted completion place
   labels, else the cached model guess, else unknown. Calendar events carry no place on
-  the free-slot inputs, so their place is unknown. The brief still never moves an
-  alongside item; when one at another place collides with an item, that item moves. A
+  the free-slot inputs, so their place is unknown. The brief's move lines never move an
+  alongside item; when one at another place collides with an item, that item moves. Only a
+  pairing line (below) moves an alongside item. A
   moved alongside item (the Timeline's "Move for today") is checked the same way, and
   calendar events do not block it. With the flag off, an alongside item blocks nothing
   and a moved one is blocked like any other item, as before. The effective Where is for
@@ -284,6 +285,44 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   Refresh, the earlier brief's lines (answered or not) are not shown again.
 - **Calendar text for one day.** A line may name the calendar event it avoids. When
   the day ends, the server replaces that title with a generic reason.
+- **Pairing (Ticket 361, D33).** With `CADENCE_ALONGSIDE` on, the brief may also offer
+  to do an alongside item during another of today's items, its host ("Do Red light
+  helmet during Reading at 8:00 PM."). The planner is
+  `packages/core/src/resolvers/alongside-pairing.resolver.ts`; the model only writes the
+  sentence, and the notice `brief-moves.pairing` is the stock text.
+  - Guest: an Unresolved, exact-time alongside item today with a known or guessed Where.
+    Host: an Unresolved, exact-time Cadence item today that is not alongside, at least as
+    long as the guest, starting now or later and by the latest start hour, with a known or
+    guessed Where that `alongsideMayOverlap` allows. Calendar events never host. A step that
+    follows its routine's time is neither on its own; a routine slot of two or more steps
+    may host as one item and is never a guest.
+  - Only when it helps: the guest's local hour holds 3 or more items (the coach's
+    `crowded_hour` threshold, alongside items not counted) or the coach's stored
+    `crowded_hour` signal names that hour; the guest runs into travel or an item somewhere
+    else; or the coach's `done_together` signal names the guest with one of today's hosts.
+    A guest already inside a compatible host's time is left alone.
+  - The host the `done_together` signal names comes first, then the nearest host. At most
+    one pairing per guest and per host. The new time is the host's start for the guest's
+    length, and it passes the same slot check Yes runs on the guest's side of the
+    same-place rule, so a pairing is not refused at Yes on the same data.
+  - Pairing lines come after the move lines, count toward `BRIEF_MOVE_MAX_LINES`, hold the
+    times the move lines offer, skip items a move line moves, and are not offered on a stale
+    calendar. No, Undo and "Don't suggest moving this" on the guest stop them as for any line.
+  - Yes · No · Other time behave as on every line: Yes is an ordinary move of the guest with
+    source `daily_brief` and reason `alongside_pairing`. Re-check on open keeps a line
+    whose time still fits and whose host is still Unresolved at the same start; otherwise
+    the planner pairs the guest again (the same host at its new time, or another host) with
+    the stock sentence, or the line closes as `withdrawn`. Re-plan pairs the guest with
+    another host, or offers nothing.
+  - No link between guest and host is stored. The proposal's `line.pairing` records which
+    host was offered, as history only. A later move of the host does not move the guest.
+  - Chat: the `plan_alongside_pairings` tool (flag on only) runs the same planner on today
+    with today's calendar; Chat offers what it returns and, after the person's yes, applies
+    that move with `move_occurrence_for_day` (source `chat`). When the person asks about one
+    item, the "helps" rule is skipped for it.
+  - The coach's signals are read through the coach agent's read-only channel
+    (`coach_read_signals`), today's or else yesterday's, ids and hours only. Without them
+    only a crowded hour or a conflict makes a pairing help.
 
 ### Brief opportunity lines
 
