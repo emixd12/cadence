@@ -842,8 +842,11 @@ the flag is on and Details and Settings is open, the Behavior record's one Where
 suggestion line moves below Where in the form; it returns to the record when Details
 and Settings closes. The same line also states a guessed Where for a Behavior with
 Where Not set (`alongside.where-guess`, for example "Cadence guesses this happens at
-Home. Planning uses the guess until Where is set.") with Review Where and Dismiss. It
-rides the Completion places state, so it shows only while labels are on. Bench:
+Home. Planning uses the guess until Where is set.") with Review Where and Dismiss.
+Ticket 383 (D37): on the web the guessed line shows whether or not Completion places is
+on, and Dismiss works in both states. With labels off the line is the only part of the
+Completion places state that shows: no marker line, I'm here, marker prompt or label
+count. Cadence for Mac still shows the guessed line only while labels are on. Bench:
 `composite.behavior-form` and `composite.behavior-place-assist`.
 
 Timezone is managed in Settings and should not be shown as a separate panel in

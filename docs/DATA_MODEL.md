@@ -511,10 +511,19 @@ Triggers keep every writer consistent, including MCP and account sync:
 - Markers, labels and dismissals require `place_label_settings.enabled`, read
   under a share lock held until the write commits. A concurrent opt-out either
   deletes the admitted write or completes first and makes the write fail.
+  Exception (Ticket 383, migration `20261126130000`): a dismissal whose suggestion is
+  one a model guess can produce (`home`, `anywhere`, `add_place`) is admitted while
+  labels are off. A `saved_place:` dismissal still needs labels on. The web service
+  accepts one while off only for the guess the Behavior's line shows, and only while
+  `CADENCE_ALONGSIDE` is on.
 - A label requires a Completed occurrence of the same Behavior and local date,
   read under a share lock.
 - A status change away from Completed deletes that occurrence's label.
-- Turning labels off deletes the owner's labels, markers and dismissals.
+- Turning labels off deletes the owner's labels, markers and dismissals, guess
+  dismissals included. Ticket 383 keeps that rule: the Settings confirmation promises
+  it, and a stored `home` or `anywhere` key does not say whether labels or a guess
+  produced it. A guess dismissal stored while labels are off stays until the next
+  turn-off or the Behavior's deletion.
 
 Check constraints accept only known rule versions, so a new rule value needs a
 migration. `public.save_place_label_settings(...)` is the web settings save: a
@@ -528,7 +537,11 @@ Account sync adds four entity kinds: `place_label_settings` (ID `place_labels`),
 `where_suggestion_dismissal`. Conflicts on these kinds resolve without review: a
 deletion wins over an edit, and otherwise the later record wins. The planner drops
 labels whose merged occurrence is not Completed and every row while labels are
-off, matching the triggers, so the post-apply fingerprint matches. Exports omit
+off, matching the triggers, so the post-apply fingerprint matches. Ticket 383 does
+not change the planner or the Mac's SQLite triggers (migration 0020): both still drop
+or refuse a dismissal while labels are off, so a linked Mac does not keep a guess
+dismissal stored on the web while labels are off. That needs its own desktop change
+before `CADENCE_ALONGSIDE` is on for accounts with a linked Mac. Exports omit
 all four tables (export inclusion is a backlog decision, not Ticket 216).
 
 ### Leave reminders (Ticket 275)

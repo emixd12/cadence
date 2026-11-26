@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026; all `not_started` | 386 and 383 first, then 384; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026. 383 web complete November 26 on branch `feat/alongside-383` (migration `20261126130000` not applied or pushed; Mac deferred); 384–386 `not_started` | 386 next, then 384; push `20261126130000` (approved, D37) before the 383 web dismissal runs on Production; the Mac part of 383 needs a desktop SQLite migration and a sync planner change; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
@@ -101,6 +101,28 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 383 web complete: the guessed Where without Completion places — November 26, 2026
+
+- **Web:** with `CADENCE_ALONGSIDE` on, the Behavior form and record show the guessed Where
+  line whether or not Completion places is on. With labels off, markers, I'm here, prompts
+  and counts stay hidden. Rule: `resolvePlaceLabelState`, `shownWhereGuessKey` and
+  `whereSuggestionDismissible` in `place-label.resolver.ts`. The guesses read takes no label
+  or position. Flag off: same reads, writes and DOM as before.
+- **Dismissal while off:** only the guess the line shows. Migration
+  `20261126130000_where_guess_dismissal_without_labels.sql` replaces
+  `cadence_private.require_place_labels_enabled()` so a dismissal row with `home`, `anywhere`
+  or `add_place` is admitted while labels are off. Not applied or pushed. Fixture:
+  `tests/sql/ticket-383-where-guess-dismissal-smoke.sql`.
+- **Retention:** Turn off still deletes every dismissal, as the Settings confirmation says.
+- **Mac deferred:** the Mac keeps the guessed line behind Completion places. Its SQLite
+  triggers (migration 0020) refuse a dismissal while labels are off, and the shared sync
+  planner drops dismissals while labels are off. A linked Mac would therefore delete or fail
+  to apply a web guess dismissal stored while labels are off. That needs a desktop SQLite
+  migration and a planner change before the flag is on for accounts with a linked Mac.
+
+Platform impact: web implemented; desktop deferred (above); marketing not applicable; future
+mobile inherits the resolver. Messaging impact: P-103.
 
 ## MCP Apps moved into scope; Tickets 375–382 filed (D36) — November 25, 2026
 
