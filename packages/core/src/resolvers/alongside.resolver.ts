@@ -14,6 +14,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import type { EffectiveWhere } from "./effective-where.resolver";
+import type { AlongsidePairingGuesses } from "../types/brief-moves";
 
 export const ALONGSIDE_SOURCES = ["person", "guess", "default"] as const;
 export type AlongsideSource = (typeof ALONGSIDE_SOURCES)[number];
@@ -167,4 +168,23 @@ export function pickBriefAlongsideQuestion(input: Readonly<{
   const [first] = [...open].sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.startAt), Temporal.Instant.from(right.startAt))
     || left.title.localeCompare(right.title) || left.behaviorId.localeCompare(right.behaviorId));
   return { behaviorId: first!.behaviorId, title: first!.title };
+}
+
+/**
+ * Audit fix 11 (D33): which inputs of a pairing are Cadence's model guesses: the guest's
+ * alongside value (`source: "guess"`) and either side's effective Where (`source:
+ * "guess"`). Counted completion places are the person's own record, not a guess. Null
+ * when none is, so a pairing with no guess carries nothing new.
+ */
+export function alongsidePairingGuesses(guest: Readonly<{ alongsideSource?: AlongsideSource; where?: Pick<EffectiveWhere, "source"> | null }>,
+  host: Readonly<{ where?: Pick<EffectiveWhere, "source"> | null }>): AlongsidePairingGuesses | null {
+  const guesses = { alongside: guest.alongsideSource === "guess", guestWhere: guest.where?.source === "guess", hostWhere: host.where?.source === "guess" };
+  return guesses.alongside || guesses.guestWhere || guesses.hostWhere ? guesses : null;
+}
+
+/** What the one quiet guess note says: `alongside`, `where`, `both`, or null for no note. */
+export function alongsidePairingGuessNote(guesses: AlongsidePairingGuesses | null | undefined): "alongside" | "where" | "both" | null {
+  if (!guesses) return null;
+  const where = guesses.guestWhere || guesses.hostWhere;
+  return guesses.alongside && where ? "both" : guesses.alongside ? "alongside" : where ? "where" : null;
 }

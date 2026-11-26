@@ -244,7 +244,9 @@ describe("alongside pairing: brief lines", () => {
     expect(line).toMatchObject({
       key: "helmet", occurrenceId: "helmet", reasonCode: "alongside_pairing", anchor: { kind: "item", title: "Reading" },
       to: { startAt: local("20:00").toString(), endAt: local("20:10").toString() }, travel: "not_needed", late: false, calendarDerived: false,
-      pairing: { hostOccurrenceId: "reading", hostBehaviorId: "b-reading", hostTitle: "Reading", hostStartAt: local("20:00").toString(), needs: ["crowded_hour"] },
+      pairing: { hostOccurrenceId: "reading", hostBehaviorId: "b-reading", hostTitle: "Reading", hostStartAt: local("20:00").toString(), needs: ["crowded_hour"],
+        // Audit fix 11: the helmet's alongside value and Where are guesses; Reading's Where is the person's.
+        guesses: { alongside: true, guestWhere: true, hostWhere: false } },
     });
     expect(line!.reason).toBe(stockAlongsidePairingReason("Red light helmet", "Reading", local("20:00"), TZ));
     expect(line!.reason.replace(/\s/gu, " ")).toBe("Do Red light helmet during Reading at 8:00 PM.");

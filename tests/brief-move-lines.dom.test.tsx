@@ -10,7 +10,7 @@ import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { FIRST_MOVE_LINE, OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
 import { DailyBriefRequestError } from "@/lib/ui/daily-brief";
 import type { BriefMoveClient } from "@/lib/ui/daily-brief-moves";
-import { BRIEF_MOVE_FIXTURE, BRIEF_MOVE_FIXTURE_BRIEFING, BRIEF_MOVE_FIXTURE_LINES, fixtureBriefMoveClient } from "@/app/design-system/brief-move-fixtures";
+import { BRIEF_MOVE_FIXTURE, BRIEF_MOVE_FIXTURE_BRIEFING, BRIEF_MOVE_FIXTURE_LINES, BRIEF_MOVE_PAIRING_LINE, fixtureBriefMoveClient } from "@/app/design-system/brief-move-fixtures";
 
 // Advisor plan Phase 3B: the brief's move lines on the web.
 
@@ -85,6 +85,29 @@ async function click(target: HTMLButtonElement) {
   await act(async () => { target.click(); });
   await settle();
 }
+
+describe("pairing lines and guesses (audit fix 11)", () => {
+  const pairingMoves = (pairing: NonNullable<typeof BRIEF_MOVE_PAIRING_LINE.pairing>): BriefMoves => ({
+    ...structuredClone(BRIEF_MOVE_FIXTURE), lines: [{ ...structuredClone(BRIEF_MOVE_PAIRING_LINE), pairing }], conflicts: [], acceptAll: false,
+  });
+  const { guesses: _guesses, ...stored } = BRIEF_MOVE_PAIRING_LINE.pairing!;
+
+  it.each([
+    [{ alongside: true, guestWhere: false, hostWhere: false }, "Alongside is a guess"],
+    [{ alongside: false, guestWhere: true, hostWhere: false }, "Where is a guess"],
+    [{ alongside: false, guestWhere: false, hostWhere: true }, "Where is a guess"],
+    [{ alongside: true, guestWhere: false, hostWhere: true }, "Alongside and Where are guesses"],
+  ])("labels a pairing that rests on %o", async (guesses, text) => {
+    await render(fixtureBriefMoveClient({ lines: [] }), pairingMoves({ ...stored, guesses }));
+    expect(line("helmet").querySelector("[data-brief-pairing-guess]")?.textContent).toBe(text);
+  });
+
+  it("a stored line without the new field renders as before", async () => {
+    await render(fixtureBriefMoveClient({ lines: [] }), pairingMoves(stored));
+    expect(line("helmet").querySelector("[data-brief-pairing-guess]")).toBeNull();
+    expect(line("helmet").querySelector("[data-brief-move-actions]")!.textContent).toBe("Yes · No · Other time");
+  });
+});
 
 describe("move lines", () => {
   it("reads like text: title, times, reason, then Yes · No · Other time, with late and assumed-length extras", async () => {

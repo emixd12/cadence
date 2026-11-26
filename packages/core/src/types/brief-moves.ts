@@ -108,7 +108,16 @@ export type BriefMovePairing = Readonly<{
   /** The host's start when the line was written (UTC instant): the line's own `to.startAt`. */
   hostStartAt: string;
   needs: readonly BriefMovePairingNeed[];
+  /**
+   * Audit fix 11 (D33, "Where a guess drives a result, the UI labels it as a guess"): which
+   * of the pairing's inputs came from Cadence's model guess. Present only when one did;
+   * absent from lines stored before the fix, which render as before.
+   */
+  guesses?: AlongsidePairingGuesses;
 }>;
+
+/** Which pairing inputs are model guesses: the guest's alongside value, and each side's Where. */
+export type AlongsidePairingGuesses = Readonly<{ alongside: boolean; guestWhere: boolean; hostWhere: boolean }>;
 
 export type BriefMoveLine = Readonly<{
   proposalId: string;

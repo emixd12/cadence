@@ -36,6 +36,13 @@
       "platforms": ["web"],
       "interactions": ["INT-TIMELINE-028", "INT-BRIEF-011"]
     },
+    "alongside.pairing-guess": {
+      "meaning": "A quiet note on a Daily Brief pairing line or an advisor schedule pairing proposal when the guest's alongside value or either side's Where is Cadence's guess, not the person's setting.",
+      "text": "{kind, select, alongside {Alongside is a guess} where {Where is a guess} other {Alongside and Where are guesses}}",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-BRIEF-006", "INT-ADVISOR-004"]
+    },
     "alongside.answer-not-found": {
       "meaning": "An alongside answer was refused because the Behavior is no longer in the person's account.",
       "text": "This Behavior is not in your account anymore.",

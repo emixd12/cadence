@@ -663,6 +663,17 @@ line writes nothing and reads `alongside.answer-already` with the stored answer.
 gets the line; the Mac follows in Ticket 363. Advisor tips carry no alongside card (no
 reviewed source fits; `STATUS.md`).
 
+Guess note on pairings (audit fix 11, D33: "Where a guess drives a result, the UI labels
+it as a guess"; behind `CADENCE_ALONGSIDE`): a Daily Brief pairing line and an advisor
+schedule pairing proposal show one quiet `text-xs` Readable Ash note, like the length
+note, when the guest's alongside value or either side's Where comes from Cadence's model
+guess: `alongside.pairing-guess` ("Alongside is a guess", "Where is a guess" or
+"Alongside and Where are guesses"). It has no action; the Behavior form changes either
+setting. Counted completion places are the person's record, not a guess. A pairing with
+no guess, and a line stored before the note existed, show no note. The brief line hides
+it once answered, as the length note does. Benches: `module.daily-brief-moves` (pairing
+state) and `/design-system?preview=advisor&state=pairing`.
+
 ### Routine rows and Semantic Zoom (Ticket 349)
 
 - A routine slot renders as one `ParentOccurrenceRow`: disclosure triangle, routine

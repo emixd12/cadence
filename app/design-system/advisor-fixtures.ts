@@ -53,6 +53,24 @@ export const ADVISOR_FIXTURE_PROPOSAL: Extract<ScheduleProposalView, { kind: "pr
   answers: ["try", "for_good", "no"],
 };
 
+/**
+ * Ticket 362 with audit fix 11: a schedule pairing proposal whose guest's alongside value
+ * is Cadence's guess, so it carries the quiet guess note.
+ */
+export const ADVISOR_FIXTURE_PAIRING_PROPOSAL: Extract<ScheduleProposalView, { kind: "proposal" }> = {
+  kind: "proposal",
+  proposalId: "77777777-7777-4777-8777-777777777777",
+  behaviorId: "behavior-helmet",
+  line: "Change your schedule: Red light helmet at 8:00 PM every day, starting today (now 7:00 PM).",
+  reason: "You said Yes to doing it during Reading on 4 days in the last 4 weeks.",
+  before: ["Every day at 7:00 PM"],
+  after: ["Every day at 8:00 PM"],
+  firstAffectedDate: "2026-11-19",
+  answers: ["try", "for_good", "no"],
+  changeKind: "time",
+  pairing: { hostBehaviorId: "behavior-reading", hostTitle: "Reading", guesses: { alongside: true, guestWhere: false, hostWhere: false } },
+};
+
 /** A question that came from a tip (one-tap changes): the tip's sentence, then Cadence's question. */
 export const ADVISOR_FIXTURE_TIP_QUESTION: Extract<ScheduleProposalView, { kind: "proposal" }> = {
   kind: "proposal",

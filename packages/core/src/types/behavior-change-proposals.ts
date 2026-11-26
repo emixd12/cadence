@@ -6,6 +6,7 @@
  */
 
 import type { AdvisorTipResearch } from "./advisor-tips";
+import type { AlongsidePairingGuesses } from "./brief-moves";
 
 export const SCHEDULE_PROPOSAL_ROUTE = "/api/advisor/coach/schedule-proposal";
 
@@ -23,8 +24,11 @@ export type ScheduleProposalTip = Readonly<{
   research: AdvisorTipResearch | null;
 }>;
 
-/** Ticket 362: the host of a pairing proposal. */
-export type ScheduleProposalPairing = Readonly<{ hostBehaviorId: string; hostTitle: string }>;
+/**
+ * Ticket 362: the host of a pairing proposal. `guesses` (audit fix 11): which inputs are
+ * model guesses today; present only when one is.
+ */
+export type ScheduleProposalPairing = Readonly<{ hostBehaviorId: string; hostTitle: string; guesses?: AlongsidePairingGuesses }>;
 
 export type ScheduleProposalView =
   /** Nothing to show. */

@@ -7,7 +7,7 @@ import {
   type BriefMovePairingNeed,
   type BriefMoveTravel,
 } from "../types/brief-moves";
-import { alongsideMayOverlap } from "./alongside.resolver";
+import { alongsideMayOverlap, alongsidePairingGuesses } from "./alongside.resolver";
 import {
   BRIEF_MOVE_MAX_LINES,
   BRIEF_MOVE_OTHER_TIMES,
@@ -221,6 +221,7 @@ export function briefPairingCandidate(pairing: AlongsidePairing, input: Pick<Bri
   const stop = input.travel?.stops.get(guest.occurrenceId) ?? null;
   const atPlace = input.placeBehaviorIds?.has(guest.behaviorId) ?? false;
   const travel: BriefMoveTravel = unknownLeg ? "not_checked" : stop ? "checked" : atPlace ? "not_checked" : "not_needed";
+  const guesses = alongsidePairingGuesses(guest, host);
   return {
     key: guest.occurrenceId,
     occurrenceId: guest.occurrenceId,
@@ -244,6 +245,7 @@ export function briefPairingCandidate(pairing: AlongsidePairing, input: Pick<Bri
     pairing: {
       hostOccurrenceId: host.occurrenceId, hostBehaviorId: host.behaviorId, hostTitle: host.title,
       hostStartAt: host.start.toString(), needs: pairing.needs,
+      ...(guesses ? { guesses } : {}),
     },
   };
 }

@@ -3,6 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ADVISOR_RECENT_TIPS, type AdvisorTip, type AdvisorTipReaction, type AdvisorTipResearch } from "@cadence/core/types/advisor-tips";
 import type { ScheduleProposalAnswer, ScheduleProposalView } from "@cadence/core/types/behavior-change-proposals";
+import type { AlongsidePairingGuesses } from "@cadence/core/types/brief-moves";
+import { alongsidePairingGuessNote } from "@cadence/core/resolvers/alongside.resolver";
+import { noticeText } from "@cadence/core/notices";
 
 import {
   TIP_REACTION_OUTCOME,
@@ -108,6 +111,12 @@ function Dot() {
 
 function Outcome({ children }: Readonly<{ children: ReactNode }>) {
   return <p className="italic text-foreground" role="status">{children}</p>;
+}
+
+/** Audit fix 11 (D33): a schedule pairing that rests on Cadence's guesses says so, quietly. */
+function PairingGuessNote({ guesses }: Readonly<{ guesses: AlongsidePairingGuesses | undefined }>) {
+  const kind = alongsidePairingGuessNote(guesses);
+  return kind ? <p className="text-xs leading-5 text-muted-readable" data-advisor-pairing-guess>{noticeText("alongside.pairing-guess", { kind })}</p> : null;
 }
 
 function ErrorLine({ text }: Readonly<{ text: string | null }>) {
@@ -345,6 +354,7 @@ function AdvisorPanelContent() {
                   <>
                     <p>{view.line}</p>
                     {view.reason ? <p className="text-xs leading-5 text-muted-readable">{view.reason}</p> : null}
+                    <PairingGuessNote guesses={view.pairing?.guesses} />
                     {proposal?.outcome ? <ProposalOutcome /> : <ProposalAnswers answers={PROPOSAL_ANSWERS} />}
                   </>
                 ) : view.kind === "check_in" ? (

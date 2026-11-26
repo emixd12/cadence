@@ -10,7 +10,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | --- | ---: |
 | outcome | 34 |
 | error | 90 |
-| note | 28 |
+| note | 29 |
 | question | 5 |
 
 ## Alongside Behaviors
@@ -24,6 +24,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `alongside.answer-unavailable` An alongside answer could not be saved, because the setting is unavailable or the save failed. | error | Cadence could not save that. Try again. | web | INT-BRIEF-011, INT-TIMELINE-028, `components/briefing/BriefAlongsideQuestion.tsx`, `lib/services/alongside-answer.service.ts` |
 | `alongside.brief-question` The Daily Brief's one question line about a Behavior whose alongside question is open, answered with Yes or No. | question | Can {title} be done alongside other things? | web | INT-BRIEF-011, `components/briefing/BriefAlongsideQuestion.tsx` |
 | `alongside.form-guess` Shows Cadence's guess beside the unanswered alongside setting in the Behavior form, which planning uses until the person answers. | note | Cadence guesses {guess, select, yes {Yes} other {No}}. Planning uses the guess until you choose. | web | INT-BEHAVIOR-047, `components/behaviors/BehaviorForm.tsx` |
+| `alongside.pairing-guess` A quiet note on a Daily Brief pairing line or an advisor schedule pairing proposal when the guest's alongside value or either side's Where is Cadence's guess, not the person's setting. | note | {kind, select, alongside {Alongside is a guess} where {Where is a guess} other {Alongside and Where are guesses}} | web | INT-ADVISOR-004, INT-BRIEF-006, `components/advisor/AdvisorParts.tsx`, `components/briefing/BriefMoveLines.tsx` |
 | `alongside.row-label` Marks a Timeline row whose Behavior can be done alongside other things, and says when that comes from Cadence's guess rather than the person's answer. | note | {source, select, guess {Alongside · a guess} other {Alongside}} | web | INT-BEHAVIOR-046, INT-BEHAVIOR-047, `components/timeline/OccurrenceRow.tsx` |
 | `alongside.where-guess` The Where suggestion line for a Behavior with Where not set, when planning uses Cadence's guess of where it happens. | note | {kind, select, home {Cadence guesses this happens at Home.} anywhere {Cadence guesses this can happen anywhere.} other {Cadence guesses this happens away from home.}} Planning uses the guess until Where is set. | web | INT-PLACE-008, INT-PLACE-009, `components/travel/PlaceLabels.tsx` |
 
