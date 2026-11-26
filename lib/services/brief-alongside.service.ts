@@ -1,6 +1,7 @@
 import { pickBriefAlongsideQuestion } from "@cadence/core/resolvers/alongside.resolver";
 import type { BriefAlongsideAnswerRequest, BriefAlongsideAnswerResponse, BriefAlongsideQuestion } from "@cadence/core/types/brief-alongside";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
+import { readBriefAlongsideAskedBefore, recordBriefAlongsideAsk } from "@/lib/db/brief-alongside-asks.repo";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { AlongsideAnswerError, recordBehaviorAlongsideAnswer } from "@/lib/services/alongside-answer.service";
 import { readAlongsideBehaviorFacts } from "@/lib/services/alongside-view.service";
@@ -14,7 +15,10 @@ import { BriefMoveError } from "@/lib/services/brief-moves.service";
  * At most one question per brief: the new brief stores its pick with the saved brief,
  * and a reopen shows that same question while it is still open, or nothing. Once per
  * Behavior: the answer is the Behavior's own setting, so an answered Behavior's
- * question is closed for good. Nothing else is stored; no new table.
+ * question is closed for good, and `brief_alongside_asks` records the first saved brief
+ * that asked, so an ignored question is not asked again on a later day. A refresh on
+ * the same local day may ask it again. The record holds ids and a date only; the other
+ * surfaces (Timeline row, form, Chat) do not read it.
  *
  * While `CADENCE_ALONGSIDE` is off every function here reads nothing and returns null.
  */
@@ -36,10 +40,25 @@ export async function planBriefAlongsideQuestion(supabase: AppSupabaseClient, us
     behaviorIds: today.map((item) => item.behaviorId), localDate: input.localDate, ...(input.env ? { env: input.env } : {}),
   });
   if (!facts) return null;
-  return pickBriefAlongsideQuestion({
-    items: today.map((item) => ({ behaviorId: item.behaviorId, title: item.title, startAt: item.start.toString(),
-      questionOpen: facts.get(item.behaviorId)?.questionOpen === true })),
+  const open = today.filter((item) => facts.get(item.behaviorId)?.questionOpen === true);
+  if (!open.length) return null;
+  const askedBehaviorIds = await readBriefAlongsideAskedBefore(supabase, {
+    userId, behaviorIds: open.map((item) => item.behaviorId), localDate: input.localDate,
   });
+  return pickBriefAlongsideQuestion({
+    items: open.map((item) => ({ behaviorId: item.behaviorId, title: item.title, startAt: item.start.toString(), questionOpen: true })),
+    askedBehaviorIds,
+  });
+}
+
+/** After the brief that includes `question` is saved: records that it asked. */
+export async function recordBriefAlongsideQuestionAsked(supabase: AppSupabaseClient, userId: string, input: Readonly<{
+  localDate: string;
+  question: BriefAlongsideQuestion | null | undefined;
+  env?: Env;
+}>): Promise<void> {
+  if (!input.question || !alongsideEnabled(input.env)) return;
+  await recordBriefAlongsideAsk(supabase, { userId, behaviorId: input.question.behaviorId, localDate: input.localDate });
 }
 
 /** The saved brief's question when it reopens: shown again only while it is still open. */
