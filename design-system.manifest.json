@@ -567,6 +567,22 @@
       "notes": "Behaviors of Opportunity. Under today's date, an underlined Opportunity (n) opens a non-modal ledger of today's pool: an inline square panel on wide screens, a bottom sheet on phones (max min(24rem, 55dvh), internal scroll, Escape closes and returns focus). Each item: Add to today (Exact time or Time window) and Done now. Rows added from the pool show a muted Added line; a clean added row offers Remove."
     },
     {
+      "id": "module.period-control",
+      "name": "PeriodControl",
+      "kind": "module",
+      "source": "components/periods/PeriodControl.tsx",
+      "exportName": "PeriodDayControls",
+      "usageNames": [
+        "PeriodDayControls",
+        "PeriodList",
+        "PeriodEditor"
+      ],
+      "benchAnchor": "design-system#ds-module-period-control",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 369 (D35). Periods: labeled ranges of local dates for the whole account, annotation only. PeriodDayControls draws one square chip per Period under a Timeline date and, on today only, an Add period disclosure beside Add day note. A chip opens the editor in place (PeriodEditor: Label with past labels, First day, Last day, Note; End today when the Period resolver allows it; Remove with an inline second tap). PeriodList lists every Period, newest first, on Behaviors with the same editor. Without actions the controls draw nothing, so Cadence for Mac is unchanged until Ticket 374."
+    },
+    {
       "id": "module.trust-and-legal-panel",
       "name": "TrustAndLegalPanel",
       "kind": "module",
