@@ -127,7 +127,11 @@ export function briefMoveRoutineMembers(items: readonly BriefMoveDayItem[], occu
 
 /**
  * Each routine slot as one item: the lead's id, the routine's title, and the summed
- * length of its steps (alongside steps add nothing). Other items pass through.
+ * length of its steps, done one after another from the lead's start. Alongside steps
+ * run during the other steps and add nothing. When every step is alongside, no step
+ * carries the time, so the block lasts the sum of all its steps (audit fix 3): the
+ * routine is still running for that long, and travel or an item elsewhere is refused
+ * across it. Other items pass through.
  */
 export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): BriefMoveDayItem[] {
   const blocks = briefMoveRoutineBlocks(items);
@@ -136,7 +140,8 @@ export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): B
     const block = blocks.get(item.occurrenceId);
     if (!block) { out.push(item); continue; }
     if (block.members[0]!.occurrenceId !== item.occurrenceId) continue;
-    const timed = block.members.filter((member) => !member.alongside);
+    const notAlongside = block.members.filter((member) => !member.alongside);
+    const timed = notAlongside.length > 0 ? notAlongside : block.members;
     const alongside = resolveRoutineBlockAlongside(block.members);
     const minutes = Math.min(1440, Math.max(1, timed.reduce((sum, member) => sum + member.length.minutes, 0)));
     const end = item.start.add({ minutes });

@@ -130,6 +130,21 @@ describe("the free-slot rule with the same-place rule", () => {
     expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, GYM)])[0]!.where).toEqual(UNKNOWN);
   });
 
+  it("an all-alongside routine block lasts the sum of its steps (audit fix 3)", () => {
+    const step = (id: string, order: number, minutes: number, alongside: boolean) => item(id, "07:00", minutes, { alongside, where: HOME,
+      routine: { parentBehaviorId: "skin", parentTitle: "Skin routine", inheritParentSchedule: true, stepOrder: order } });
+    const [all] = collapseBriefMoveRoutines([step("serum", 0, 10, true), step("helmet", 1, 15, true)]);
+    expect(all).toMatchObject({ alongside: true, length: { minutes: 25 }, end: local("07:25") });
+    // Mixed: alongside steps still add nothing.
+    const [mixed] = collapseBriefMoveRoutines([step("serum", 0, 10, false), step("helmet", 1, 15, true)]);
+    expect(mixed).toMatchObject({ alongside: false, length: { minutes: 10 }, end: local("07:10") });
+    // Travel 15 minutes after the start is inside the running routine.
+    const subject = briefMoveOverlapSubject([step("serum", 0, 10, true), step("helmet", 1, 15, true)], "serum");
+    const blocks = briefMoveBlocksForSubject([{ kind: "travel", ref: "trip", start: local("07:15"), end: local("07:40") }], subject);
+    expect(checkBriefMoveSlot({ interval: { start: all!.start, end: all!.end }, blocks, travelBeforeSeconds: 0, travelAfterSeconds: 0 }))
+      .toMatchObject({ ok: false, ref: "trip" });
+  });
+
   it("the brief moves the item that collides with an alongside item somewhere else", () => {
     const base: BriefMovePlanInputs = {
       localDate: DAY, timezone: TZ, now: local("08:00"), items: [], calendarBusy: [], calendar: "current", travel: null,
