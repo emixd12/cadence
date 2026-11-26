@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import { placeLabelRetentionCutoff } from "@cadence/core/resolvers/place-label.resolver";
+import { placeLabelRetentionCutoff, shownWhereGuessKey } from "@cadence/core/resolvers/place-label.resolver";
 import {
   buildPlaceLabelState,
   placeLabelSettingsFromRecord,
@@ -77,11 +77,11 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
     const behaviors = [...graphs].sort((left, right) => left.behavior.created_at.localeCompare(right.behavior.created_at) || left.behavior.id.localeCompare(right.behavior.id))
       .map(({ behavior }) => ({ id: behavior.id, active: behavior.active, where_kind: behavior.where_kind ?? null, location_text: behavior.location_text ?? null }));
     // Only a Behavior whose Where is Not set here gets a guessed Where.
-    // Ticket 383: the Mac keeps the guessed Where behind Completion places. Its SQLite
-    // triggers (migration 0020) refuse a dismissal while labels are off, and the shared
-    // sync planner drops dismissals while labels are off; both need their own change.
-    const guesses = settings.enabled ? new Map([...(whereGuesses() ?? [])]
-      .filter(([id]) => behaviors.some((behavior) => behavior.id === id && behavior.where_kind === null))) : null;
+    // Ticket 383 (D37): whether or not Completion places is on, as on the web. SQLite
+    // migration 0030 admits a guess dismissal while labels are off, and account sync
+    // contract 11 keeps it.
+    const guesses = new Map([...(whereGuesses() ?? [])]
+      .filter(([id]) => behaviors.some((behavior) => behavior.id === id && behavior.where_kind === null)));
     return buildPlaceLabelState({ settings: stored.settings, homeText: travel.baseLocationText, markers: stored.markers, labels,
       dismissals: stored.dismissals, behaviors, today: today(owner.timezone), ...(guesses?.size ? { whereGuesses: guesses } : {}) });
   };
@@ -148,7 +148,10 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
     async dismissSuggestion(dismissal) {
       const owner = await profile();
       const settings = placeLabelSettingsFromRecord((await rows(owner.id)).settings);
-      const row = planWhereSuggestionDismissal({ settings, dismissal, dismissedAt: now() });
+      // Ticket 383 (D37): with labels off, only the guess the line shows can be dismissed.
+      // Guesses exist only on a linked Mac whose alongside surfaces are on.
+      const shownGuess = !settings.enabled && whereGuesses()?.size ? shownWhereGuessKey(await load(), dismissal.behaviorId) : null;
+      const row = planWhereSuggestionDismissal({ settings, dismissal, dismissedAt: now(), shownGuess });
       await commit(owner.id, { kind: "upsertDismissal", dismissal: { ...row, user_id: owner.id } });
       return load();
     },
