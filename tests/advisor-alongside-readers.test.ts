@@ -12,7 +12,7 @@ import { ADVICE_SIGNAL_FACTS } from "@cadence/core/types/advice-cards";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { generateDailyBrief } from "@/lib/services/daily-brief-consumer";
 import {
-  CHAT_ALONGSIDE_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_STATIC_INSTRUCTIONS, buildChatSystemPrompt, chatPromptVersion,
+  CHAT_ALONGSIDE_INSTRUCTIONS, CHAT_ALONGSIDE_PAIRING_RULE, CHAT_PROMPT_VERSION, CHAT_STATIC_INSTRUCTIONS, buildChatSystemPrompt, chatPromptVersion,
 } from "@/lib/services/chat/chat-prompt";
 import { chatPlanningBehaviorIds, withChatPlanning } from "@/lib/services/chat/chat-planning";
 import { withPlanningFacts } from "@/lib/services/chat/chat-executor";
@@ -104,8 +104,10 @@ describe("Chat", () => {
     expect(chatPromptVersion(true)).toBe("chat-1.8");
     const prompt = buildChatSystemPrompt({ ...promptContext, alongside: true });
     expect(prompt.startsWith(`${CHAT_STATIC_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_INSTRUCTIONS}\n\nThe person's timezone:`)).toBe(true);
-    // No asking (Ticket 360) and no pairing (Ticket 361) here.
-    expect(CHAT_ALONGSIDE_INSTRUCTIONS).not.toMatch(/\bask\b|pair/i);
+    // No asking (Ticket 360) here. Ticket 361 adds the pairing rule, and only it names the pairing tool.
+    expect(CHAT_ALONGSIDE_INSTRUCTIONS).not.toMatch(/\bask\b/i);
+    expect(CHAT_ALONGSIDE_INSTRUCTIONS.endsWith(` ${CHAT_ALONGSIDE_PAIRING_RULE}`)).toBe(true);
+    expect(CHAT_ALONGSIDE_INSTRUCTIONS.match(/plan_alongside_pairings/g)).toHaveLength(1);
   });
 
   const timeline = {
