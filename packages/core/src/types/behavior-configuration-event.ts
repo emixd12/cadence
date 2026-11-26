@@ -16,6 +16,7 @@ export const BEHAVIOR_CONFIGURATION_CHANGED_FIELDS = [
   "is_opportunity",
   "parent_behavior_id",
   "inherit_parent_schedule",
+  "alongside",
 ] as const;
 
 export type BehaviorConfigurationChangedField =
@@ -60,6 +61,11 @@ export type BehaviorConfigurationSnapshot = {
   parentBehaviorId?: string | null;
   /** Absent in older snapshots. Normalized to false without a parent. */
   inheritParentSchedule?: boolean;
+  /**
+   * D33 (Ticket 363): the person's alongside answer. Null is unanswered. Absent in
+   * snapshots written before configuration history carried it; read as unanswered.
+   */
+  alongside?: boolean | null;
 };
 
 export type BehaviorConfigurationEnd = { on: string; time: string | null };

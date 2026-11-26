@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { alongsideOption, readAlongsideOption } from "./alongside";
 import { resolveBehaviorLogImportPreview } from "@cadence/core/resolvers/behaviorlog-import.resolver";
 import { resolveBehaviorLogRestorePreview } from "@cadence/core/resolvers/behaviorlog-restore.resolver";
 import { existingRecords, planBehaviorLogRestoreWrite } from "@cadence/core/services/behaviorlog-write-plan";
@@ -22,8 +23,8 @@ export async function previewLocalBehaviorLogRestore(profile: Profile, form: For
   try {
     const bundle = await readLocalBundle(form, "restore_behaviorlog_file"); const now = portabilityNow(clock);
     const snapshot = await localCommand("readImportSnapshot", { profileId: profile.id });
-    const importPreview = resolveBehaviorLogImportPreview({ files: bundle.files, reminderChannel: "other" });
-    const preview = resolveBehaviorLogRestorePreview({ importPreview, existing: existingRecords(snapshot) });
+    const importPreview = resolveBehaviorLogImportPreview({ files: bundle.files, reminderChannel: "other", ...readAlongsideOption() });
+    const preview = resolveBehaviorLogRestorePreview({ importPreview, existing: existingRecords(snapshot, alongsideOption()) });
     const run = previewRun(profile.id, bundle, preview, now);
     await localCommand("prepareBehaviorLogImport", { ...localMutation(profile.id, now), expectedRevision: snapshot.revision, previewRun: run, plan: null });
     const dayNotes = preview.valid ? await previewBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore") : null;
@@ -44,10 +45,10 @@ export async function applyLocalBehaviorLogRestore(profile: Profile, form: FormD
     try { result = await applyStoredPlan(profile.id, accepted, now, "restore_apply"); }
     catch (error) {
       if (!(error instanceof Error) || error.message !== "The preview has no applicable write plan.") throw error;
-      const importPreview = resolveBehaviorLogImportPreview({ files: bundle.files, reminderChannel: "other" });
-      const preview = resolveBehaviorLogRestorePreview({ importPreview, existing: existingRecords(snapshot) }); assertFreshPreview(accepted, preview);
+      const importPreview = resolveBehaviorLogImportPreview({ files: bundle.files, reminderChannel: "other", ...readAlongsideOption() });
+      const preview = resolveBehaviorLogRestorePreview({ importPreview, existing: existingRecords(snapshot, alongsideOption()) }); assertFreshPreview(accepted, preview);
       reviewedPreview = preview;
-      const plan = planBehaviorLogRestoreWrite({ snapshot, applyRun: applyRun(accepted, "restore_apply", now), now, newId: () => crypto.randomUUID(), importPreview, preview });
+      const plan = planBehaviorLogRestoreWrite({ snapshot, applyRun: applyRun(accepted, "restore_apply", now), now, newId: () => crypto.randomUUID(), importPreview, preview, ...alongsideOption() });
       await localCommand("prepareBehaviorLogImport", { ...localMutation(profile.id, now), expectedRevision: snapshot.revision, previewRun: accepted, plan });
       result = await applyStoredPlan(profile.id, accepted, now, "restore_apply");
     }

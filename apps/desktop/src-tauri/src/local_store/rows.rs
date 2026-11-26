@@ -55,6 +55,9 @@ pub struct BehaviorArchiveNote {
 #[serde(deny_unknown_fields)]
 pub struct Behavior {
     pub active: bool,
+    /// D33 (migration 0029): the person's alongside answer; None is unanswered.
+    #[serde(default)]
+    pub alongside: Option<bool>,
     #[serde(default)]
     pub archive_notes: Vec<BehaviorArchiveNote>,
     pub archived_at: Option<String>,
@@ -99,6 +102,7 @@ impl StoredRow for Behavior {
     const JSON_COLUMNS: &'static [&'static str] = &["archive_notes", "recurrence_rule"];
     const BOOL_COLUMNS: &'static [&'static str] = &[
         "active",
+        "alongside",
         "browser_reminder_enabled",
         "email_reminder_enabled",
         "is_opportunity",

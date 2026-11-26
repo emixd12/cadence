@@ -12,6 +12,7 @@ import {
   alongsideRowViews,
   alongsideWhereGuesses,
   readAlongsideBehaviorFacts,
+  readAlongsideGuesses,
 } from "@/lib/services/alongside-view.service";
 import { behaviorEstimateInputHash } from "@/lib/services/brief-move-day.service";
 
@@ -85,5 +86,34 @@ describe("readAlongsideBehaviorFacts", () => {
     });
     // A set Where is never replaced by a guess; a stale estimate offers nothing.
     expect([...alongsideWhereGuesses(facts)]).toEqual([["helmet", "home"]]);
+  });
+});
+
+// Ticket 363: the guesses a linked Cadence for Mac reads (GET /api/behaviors/alongside).
+describe("readAlongsideGuesses", () => {
+  it("answers enabled: false with no reads while the flag is off", async () => {
+    const fake = fakeClient({ behaviors: [{ id: "helmet", title: "Red light helmet", alongside: null }], estimates: [] });
+    expect(await readAlongsideGuesses(fake.client, "user-1", {})).toEqual({ enabled: false, guesses: [] });
+    expect(fake.tablesRead).toEqual([]);
+  });
+
+  it("lists current guesses only, never place labels, and no Where guess once Where is set", async () => {
+    const fake = fakeClient({
+      behaviors: [
+        { id: "helmet", title: "Red light helmet", alongside: null },
+        { id: "reading", title: "Reading", alongside: null, where_kind: "home" },
+        { id: "stale", title: "Stretch", alongside: null },
+      ],
+      estimates: [
+        { behavior_id: "helmet", input_hash: hash("Red light helmet"), duration_minutes: 10, alongside: true, where_guess: "home" },
+        { behavior_id: "reading", input_hash: hash("Reading", "home"), duration_minutes: 30, alongside: false, where_guess: null },
+        { behavior_id: "stale", input_hash: "old", duration_minutes: 10, alongside: true, where_guess: "home" },
+      ],
+    });
+    expect(await readAlongsideGuesses(fake.client, "user-1", ON)).toEqual({ enabled: true, guesses: [
+      { behaviorId: "helmet", alongside: true, whereGuess: "home" },
+      { behaviorId: "reading", alongside: false, whereGuess: null },
+    ] });
+    expect(fake.tablesRead).not.toContain("completion_place_labels");
   });
 });

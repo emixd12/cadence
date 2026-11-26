@@ -8,6 +8,7 @@ import type { DailyBriefClient, DailyBriefPlanControls, DailyBriefRequestInput, 
 import { DAILY_BRIEF_CLIENT_DEADLINES, DailyBriefRequestError, dailyBriefFetch, withDailyBriefDeadline } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_MOVE_DEADLINE_MS, createBriefMoveClient, type BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { createBriefOpportunityClient, type BriefOpportunityClient } from "@/lib/ui/daily-brief-opportunities";
+import { createBriefAlongsideClient, type BriefAlongsideClient } from "@/lib/ui/daily-brief-alongside";
 import { ADVISOR_REQUEST_DEADLINE_MS, createAdvisorClient, type AdvisorClient } from "@/lib/ui/advisor";
 import { ChatGPTPlanError, chooseChatGPTPlanModel, generateChatGPTPlanDailyBrief } from "@/lib/services/daily-brief-chatgpt-plan";
 import { readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
@@ -47,8 +48,10 @@ export function createDesktopDailyBriefClient(
   origin = readDesktopCalendarBrokerOrigin(),
   plan: DesktopDailyBriefPlan | null = null,
   onAccountWrite: () => void = () => undefined,
+  /** Ticket 363: render the brief's alongside question (the Mac's alongside build switch). */
+  options: Readonly<{ alongside?: boolean }> = {},
 ): DailyBriefClient | null {
-  return origin ? new DesktopDailyBriefClient(origin, async () => (await client.auth.getSession()).data.session?.access_token ?? null, plan, undefined, onAccountWrite) : null;
+  return origin ? new DesktopDailyBriefClient(origin, async () => (await client.auth.getSession()).data.session?.access_token ?? null, plan, undefined, onAccountWrite, options) : null;
 }
 
 export class DesktopDailyBriefClient implements DailyBriefClient {
@@ -59,6 +62,13 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
   readonly opportunities: BriefOpportunityClient;
   /** Advisor Phase 4 (4E): tips and schedule questions from the hosted API with this Mac's bearer session. */
   readonly advisor: AdvisorClient;
+  /**
+   * Ticket 363 (D33): the brief's alongside question, answered on the hosted route. Set only
+   * with the Mac's alongside build switch on, so only then does the brief ask for the line;
+   * the server sends it only while `CADENCE_ALONGSIDE` is on. The answer reaches this Mac by
+   * account sync. Pairing lines are move lines and need nothing here.
+   */
+  readonly alongside?: BriefAlongsideClient;
   /** The latest settings read; `deviceModelAvailable` decides whether the plan path can run. */
   private settings: DailyBriefSettings | null = null;
   private readonly planBriefs = new WeakSet<DailyBriefing>();
@@ -70,7 +80,11 @@ export class DesktopDailyBriefClient implements DailyBriefClient {
     private readonly planPath: DesktopDailyBriefPlan | null = null,
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
     onAccountWrite: () => void = () => undefined,
+    options: Readonly<{ alongside?: boolean }> = {},
   ) {
+    if (options.alongside) {
+      this.alongside = createBriefAlongsideClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
+    }
     this.moves = createBriefMoveClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
     this.opportunities = createBriefOpportunityClient((path, init, signal) => this.request(path, init, DAILY_BRIEF_MOVE_DEADLINE_MS, signal), onAccountWrite);
     // A schedule answer changes a hosted Behavior; the Mac pulls it through account sync.

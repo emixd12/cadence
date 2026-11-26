@@ -56,6 +56,8 @@ export function BehaviorsScreen({
               sourceLinkCoordinator={sourceLinkCoordinator}
               parentOptions={parentChoices(null, [...listProps.activeBehaviors, ...listProps.archivedBehaviors]).options}
               savedPlaces={collectSavedBehaviorPlaces([...listProps.activeBehaviors, ...listProps.archivedBehaviors])}
+              // Ticket 363: the alongside field shows exactly when the list shows it (unanswered on create).
+              alongside={listProps.alongsideViews ? { answer: "unanswered", guess: null } : undefined}
             />
             <BehaviorList {...listProps} reminderRuntime="desktop" sourceLinkCoordinator={sourceLinkCoordinator}
               createAction={createAction} subBehaviorsEnabled />
