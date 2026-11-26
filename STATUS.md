@@ -48,6 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026; all `not_started` | 386 and 383 first, then 384; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
