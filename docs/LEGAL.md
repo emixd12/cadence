@@ -597,6 +597,10 @@ part of L-002.
 - **Status:** open.
 - **Next action:** read each provider's brand terms before public launch and record the
   clause. Replace a mark with plain text if its terms do not allow this use.
+- **Update 2026-11-26:** a draft listing screenshot of the "Cadence day" view shows the
+  words "From Hevy" (Ticket 380; `docs/qa/mcp-directory-submission.md`, shot
+  `connected-service`). It is text, not a mark, and nothing is published. A public
+  directory image is a new place for this question. Hevy's terms were not read.
 
 ## L-021: One Daily Brief choice for every connected source
 

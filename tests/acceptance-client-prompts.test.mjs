@@ -1,9 +1,10 @@
 // Ticket 291: skill scenarios for the headless client acceptance. Prompt
 // construction only; no client, provider or Cadence server is contacted.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CLIENT_SCENARIOS, SKILL_NAMES, behaviorTitle, skillPrompt, skillText } from '../scripts/acceptance/client-prompts.mjs';
-import { OPERATION_ACCESS } from '../scripts/acceptance/watch.mjs';
+import { CLIENT_SCENARIOS, DRAFT_SKILL_NAMES, SKILL_NAMES, behaviorTitle, skillPrompt, skillText } from '../scripts/acceptance/client-prompts.mjs';
+import { REGISTRY_TOOLS, TRANSPORT_TOOLS } from '../scripts/acceptance/protocol.mjs';
+import { OPERATION_ACCESS, TRANSPORT_OPERATION_ACCESS } from '../scripts/acceptance/watch.mjs';
 
 const SKILL_FILE = (name) => readFileSync(new URL(`../integrations/skills/${name}/SKILL.md`, import.meta.url), 'utf8').trim();
 const SKILL_SCENARIOS = ['skill-check-in-unconfirmed', 'skill-routine-unconfirmed', 'skill-routine-confirmed'];
@@ -85,5 +86,65 @@ describe('skill scenarios', () => {
 
   it('skillPrompt builds the same layout for any message', () => {
     expect(skillPrompt('daily-check-in', 'hello').endsWith('</skill>\nUser message:\nhello')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ticket 380: the unpublished daily-check-in draft that names `show_day`
+// ---------------------------------------------------------------------------
+
+describe('draft skill scenario (Ticket 380)', () => {
+  const DRAFT_FILE = (name) => readFileSync(new URL(`../integrations/drafts/skills/${name}/SKILL.md`, import.meta.url), 'utf8').trim();
+  const NAME = 'skill-check-in-view-unconfirmed';
+  const toolsNamed = (text) => [...text.matchAll(/`([a-z][a-z0-9_]*)\(\)`/g)].map((match) => match[1]);
+
+  it('reads the draft only when asked, and the published file otherwise', () => {
+    expect(DRAFT_SKILL_NAMES).toEqual(['daily-check-in']);
+    // Every draft folder is one the runner can read, and nothing else is there.
+    expect(readdirSync(new URL('../integrations/drafts/skills/', import.meta.url)).sort()).toEqual([...DRAFT_SKILL_NAMES].sort());
+    expect(TRANSPORT_TOOLS).toEqual(['show_day']);
+    expect(skillText('daily-check-in', { draft: true })).toBe(DRAFT_FILE('daily-check-in'));
+    expect(skillText('daily-check-in')).toBe(SKILL_FILE('daily-check-in'));
+    expect(skillText('daily-check-in', { draft: true })).not.toBe(skillText('daily-check-in'));
+    const reads = [];
+    skillText('daily-check-in', { draft: true, read: (url) => { reads.push(url.pathname); return '---\nname: daily-check-in\n---\n'; } });
+    expect(reads).toEqual([expect.stringMatching(/\/integrations\/drafts\/skills\/daily-check-in\/SKILL\.md$/)]);
+    // No draft exists for routine-setup, and a path can never be passed as a name.
+    expect(() => skillText('routine-setup', { draft: true })).toThrow('skill-unknown');
+    expect(() => skillText('../skills/daily-check-in', { draft: true })).toThrow('skill-unknown');
+  });
+
+  it('prompts with the whole draft and a message that confirms nothing', () => {
+    const s = CLIENT_SCENARIOS[NAME];
+    expect(s).toMatchObject({ name: NAME, grant: 'full', needsModel: true, draftSkill: true });
+    expect(s.inspector(LABEL)).toEqual([]);
+    const prompt = s.prompt(LABEL);
+    expect(prompt.startsWith('[Cadence QA] ')).toBe(true);
+    expect(prompt).toContain(`<skill name="daily-check-in">\n${DRAFT_FILE('daily-check-in')}\n</skill>\nUser message:\n`);
+    expect(prompt).not.toMatch(/Do not ask me to confirm|I confirm every change/i);
+    // The same user message as the published skill's scenario, so the two runs compare like for like.
+    expect(userMessage(prompt)).toBe(userMessage(CLIENT_SCENARIOS['skill-check-in-unconfirmed'].prompt(LABEL)));
+    expect(userMessage(prompt)).not.toMatch(/confirm|go ahead|yes,/i);
+    // Only this scenario carries a draft.
+    expect(Object.values(CLIENT_SCENARIOS).filter((x) => x.draftSkill).map((x) => x.name)).toEqual([NAME]);
+  });
+
+  it('expects a read and no write, with show_day counted as a read', () => {
+    const s = CLIENT_SCENARIOS[NAME];
+    expect(s.expect).toEqual(CLIENT_SCENARIOS['skill-check-in-unconfirmed'].expect);
+    expect(s.expect).toMatchObject({ readOk: true, writesOk: [], noWrites: true, createdBehaviors: 0 });
+    expect(s.watcherSteps.map((step) => [step.id, step.access, step.where.outcome])).toEqual([['read-succeeded', 'read', 'success']]);
+    expect(TRANSPORT_OPERATION_ACCESS.show_day).toBe('read');
+  });
+
+  it('names only tools that exist: registry tools and the transport tool show_day', () => {
+    const tools = toolsNamed(DRAFT_FILE('daily-check-in'));
+    expect(tools).toContain('show_day');
+    expect(tools).toContain('get_timeline');
+    for (const tool of tools) expect([...REGISTRY_TOOLS, ...TRANSPORT_TOOLS], tool).toContain(tool);
+    // Every tool it names has a known access, so the runner can tell a read from a write.
+    for (const tool of tools) expect(OPERATION_ACCESS[tool] ?? TRANSPORT_OPERATION_ACCESS[tool], tool).toMatch(/^(read|write)$/);
+    // The published skill still names no transport tool.
+    for (const tool of toolsNamed(SKILL_FILE('daily-check-in'))) expect(REGISTRY_TOOLS, tool).toContain(tool);
   });
 });

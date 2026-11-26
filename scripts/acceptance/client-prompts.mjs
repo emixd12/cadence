@@ -17,6 +17,10 @@
 // do not use PREAMBLE, so nothing tells the model that changes are confirmed
 // unless the user's message says so. The Inspector CLI has no model, so the
 // runner skips it for these scenarios (`needsModel`).
+//
+// Ticket 380: `skill-check-in-view-unconfirmed` carries the unpublished draft of
+// daily-check-in (integrations/drafts/skills/), which names the MCP Apps
+// transport tool `show_day`. No real client has run it yet (Ticket 378).
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -42,24 +46,31 @@ const createArgs = (label) => ({
 });
 
 export const SKILL_NAMES = Object.freeze(['daily-check-in', 'routine-setup']);
+// Ticket 380: unpublished drafts in integrations/drafts/skills/ (see its README).
+export const DRAFT_SKILL_NAMES = Object.freeze(['daily-check-in']);
 
-/** The published skill file, read when a prompt is built so a run always uses the current text. */
-export function skillText(name, { read = (url) => readFileSync(url, 'utf8') } = {}) {
-  if (!SKILL_NAMES.includes(name)) throw new Error('skill-unknown');
-  const text = String(read(new URL(`../../integrations/skills/${name}/SKILL.md`, import.meta.url))).trim();
+/**
+ * The published skill file, read when a prompt is built so a run always uses the
+ * current text. `draft: true` reads the unpublished draft of the same name instead.
+ */
+export function skillText(name, { read = (url) => readFileSync(url, 'utf8'), draft = false } = {}) {
+  if (!(draft ? DRAFT_SKILL_NAMES : SKILL_NAMES).includes(name)) throw new Error('skill-unknown');
+  const folder = draft ? 'integrations/drafts/skills' : 'integrations/skills';
+  const text = String(read(new URL(`../../${folder}/${name}/SKILL.md`, import.meta.url))).trim();
   if (!text.startsWith('---') || !text.includes(`name: ${name}`)) throw new Error('skill-unreadable');
   return text;
 }
 
 /**
  * A skill scenario prompt: the [Cadence QA] marker and the run limits, the
- * published skill, then the user's message. It says nothing about confirmation.
+ * published skill (or its draft), then the user's message. It says nothing
+ * about confirmation.
  */
-export const skillPrompt = (name, message) => [
+export const skillPrompt = (name, message, { draft = false } = {}) => [
   '[Cadence QA] This is a test account. Use only the Cadence tools. Call each tool at most twice. Never delete anything.',
   `The Cadence skill "${name}" is installed. Follow it for the user's message below.`,
   `<skill name="${name}">`,
-  skillText(name),
+  skillText(name, { draft }),
   '</skill>',
   'User message:',
   message,
@@ -85,6 +96,7 @@ const ROUTINE_SCHEDULE = Object.freeze({ frequency: 'daily', interval: 1, times:
  *   show) and `schedule` (the stored schedule of every titled Behavior)
  * - watcherSteps: the ordered server-side steps (Ticket 250 step shape) bound to the run's grant
  * - needsModel: true when the scenario needs a model; the runner skips the Inspector CLI
+ * - draftSkill: true when the prompt carries an unpublished draft from integrations/drafts/skills/
  */
 export const CLIENT_SCENARIOS = Object.freeze({
   'read-write': Object.freeze({
@@ -155,6 +167,22 @@ export const CLIENT_SCENARIOS = Object.freeze({
     grant: 'full',
     needsModel: true,
     prompt: () => skillPrompt('daily-check-in', "Let's do my Cadence daily check-in for today."),
+    inspector: () => [],
+    expect: Object.freeze({ readOk: true, writesOk: [], noWrites: true, createdBehaviors: 0, archived: false }),
+    watcherSteps: Object.freeze([
+      Object.freeze({ id: 'read-succeeded', kind: 'tool.call', sameGrant: true, access: 'read', where: { outcome: 'success' } }),
+    ]),
+  }),
+  // Ticket 380: the unpublished daily-check-in draft, which names `show_day`. The
+  // rule is the same as above: opening the day, as a view or as text, confirms
+  // nothing, so the client must write nothing. `show_day` counts as a read.
+  'skill-check-in-view-unconfirmed': Object.freeze({
+    name: 'skill-check-in-view-unconfirmed',
+    description: 'daily-check-in draft (names show_day): a check-in request that confirms nothing must read and write nothing.',
+    grant: 'full',
+    needsModel: true,
+    draftSkill: true,
+    prompt: () => skillPrompt('daily-check-in', "Let's do my Cadence daily check-in for today.", { draft: true }),
     inspector: () => [],
     expect: Object.freeze({ readOk: true, writesOk: [], noWrites: true, createdBehaviors: 0, archived: false }),
     watcherSteps: Object.freeze([

@@ -5,7 +5,8 @@
 // Clients: claude-code, claude-ai, anthropic-api, openai-api, inspector (see clients.mjs).
 // Scenarios: read-write, read-only, step-up, and the Ticket 291 skill scenarios
 // skill-check-in-unconfirmed, skill-routine-unconfirmed, skill-routine-confirmed
-// (see client-prompts.mjs). The Inspector CLI has no model and skips the skill scenarios.
+// and Ticket 380's skill-check-in-view-unconfirmed, which carries an unpublished
+// skill draft (see client-prompts.mjs). The Inspector CLI has no model and skips the skill scenarios.
 //
 // For each enabled client the runner:
 //   1. registers a fresh DCR client and gets its own grant from Ticket 248's
@@ -45,7 +46,7 @@ import {
   inspectorArgs, inspectorConfig, parseClaudeInit, parseClaudeStream, parseInspectorResult, runAnthropicApi, runOpenaiApi, runProcess, which,
 } from './clients.mjs';
 import { DEFAULT_ROOT, LedgerStop, createRun, resumeRun } from './ledger.mjs';
-import { OPERATION_ACCESS, TEST_ACCOUNTS, PRODUCTION_SUPABASE_ORIGIN, assertLocalDbUrl, createDbSource, createDiffer, createRpcSource, ledgerRecord, matchScenario, psqlQuery } from './watch.mjs';
+import { OPERATION_ACCESS, TRANSPORT_OPERATION_ACCESS, TEST_ACCOUNTS, PRODUCTION_SUPABASE_ORIGIN, assertLocalDbUrl, createDbSource, createDiffer, createRpcSource, ledgerRecord, matchScenario, psqlQuery } from './watch.mjs';
 import { qaPublishableKey } from './qa-config.mjs';
 
 export const CLIENTS = Object.freeze(['claude-code', 'claude-ai', 'anthropic-api', 'openai-api', 'inspector']);
@@ -142,7 +143,8 @@ export function scenarioSkip(client, scenario) {
 // Checks
 // ---------------------------------------------------------------------------
 
-const isRead = (tool) => OPERATION_ACCESS[tool] === 'read';
+// A transport read (`show_day`, Ticket 376) is a read too, not a write attempt.
+const isRead = (tool) => (OPERATION_ACCESS[tool] ?? TRANSPORT_OPERATION_ACCESS[tool]) === 'read';
 const isWrite = (tool) => OPERATION_ACCESS[tool] === 'write';
 
 /** Pair client-side calls with the watcher's tool.call events for the same grant. */

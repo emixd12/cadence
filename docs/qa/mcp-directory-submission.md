@@ -4,13 +4,20 @@ Prepared October 18, 2026. **Unpublished draft for owner review.** This packet
 does not authorize submission, legal publication, deployment, provider changes,
 or a production reviewer login. Ticket 232 owns hosted and live-client acceptance.
 
+Updated November 26, 2026 (Ticket 380, D36), still unpublished: the text that said
+Cadence signs in with Google only is corrected in place, each change marked
+"Corrected November 26, 2026". Three sections were added at the end:
+"Unpublished MCP Apps listing drafts", "Sign-in corrections to the Ticket 231
+text" and "Deferred owner steps for MCP Apps". Nothing was submitted, listed or
+published, and no provider form was opened.
+
 ## Readiness and approval record
 
 | Gate | Current state | Owner action before submission |
 |---|---|---|
 | Legal text | Complete owner-approved Privacy/Terms, separate Daily Brief disclosure, and matching marketing copy implemented locally under Ticket 232 | Independently review the local candidate; authorize publication separately and set the actual publication date in America/New_York |
 | Personal health data | Possible in user-authored Behaviors and notes | Confirm classification, lawful disclosure, and directory eligibility |
-| Reviewer sign-in | Google only; unattended reviewer access unverified | Choose and verify the reviewer-account plan below |
+| Reviewer sign-in | Google, email (a link or a 6-digit code, no password) and Apple, live since November 13, 2026 (D31). Corrected November 26, 2026; this row said "Google only". Unattended reviewer access unverified | Choose and verify the reviewer-account plan below |
 | Retention | Local SQL implements expiry/purge; hosted maintenance unverified | Schedule and verify purge before publishing retention claims |
 | Deployment | Local implementation only | Complete Ticket 232 for web, marketing, and live clients |
 | Review evidence | Cases and recording script prepared, not executed in live clients | Run cases, record results, supply accessible video URL |
@@ -54,10 +61,15 @@ Ask what is scheduled today, review older Unresolved Occurrences under Needs dec
 
 Choose read access alone or add separate permissions to mark Occurrences and edit notes, or create, edit, archive, and restore Behaviors. Ask for each change and review it before confirming. The integration provides no delete tool.
 
-Cadence requires a hosted account with Google sign-in. Linked desktop records become available after synchronization. Account-free desktop records are unavailable. Disconnect a client in Settings > Connected apps to stop future access; copies already received remain subject to that client's policies.
+Cadence requires a hosted account. Sign in with Google, Apple, or a link or code sent by email. Linked desktop records become available after synchronization. Account-free desktop records are unavailable. Disconnect a client in Settings > Connected apps to stop future access; copies already received remain subject to that client's policies.
 
 Google Calendar data, travel routes and device location, Daily Brief content, account email, and credentials are excluded. User-authored Behaviors and notes can contain sensitive personal information. Cadence is a personal record, not medical advice, medication dosing, or an emergency service.
 ```
+
+Corrected November 26, 2026 (Ticket 380): the fourth paragraph of the description
+said "a hosted account with Google sign-in". The description is 1,273 characters
+after the change. The view is not named in this copy yet: see "Unpublished MCP
+Apps listing drafts".
 
 Proposed category: **Productivity**. Use that title if available in each portal;
 otherwise select its closest personal-recordkeeping category. Avoid medical or
@@ -113,6 +125,10 @@ packages the assets; confirm its final paths before upload. The official pages
 require an icon but do not specify a universal raster size for this connector.
 Use the portal's current asset validator if it requests another size.
 Cadence has no MCP App widget, so Claude's MCP App carousel requirement does not apply.
+Corrected November 26, 2026 (Ticket 380): that sentence holds only while
+`CADENCE_MCP_APPS` is off in production. Once the "Cadence day" view is released
+(D36), the listing is an MCP App and needs the carousel screenshots drafted under
+"Unpublished MCP Apps listing drafts".
 
 ## Unpublished Privacy draft
 
@@ -284,7 +300,11 @@ test every tool in Inspector and Claude before attesting. See
 Both submissions should provide a populated synthetic account that reviewers can
 access without an owner present, MFA approval, or email/SMS codes. OpenAI states
 this explicitly; Claude requires usable credentials and complete test instructions.
-Cadence currently supports Google sign-in only. `/auth/test-login` is local-only
+Cadence signs in with Google, with email (a link or a 6-digit code, no password)
+and with Apple, all live on web since November 13, 2026 (D31). Corrected
+November 26, 2026 (Ticket 380): this paragraph said "Google sign-in only". No
+method is a password, so none gives a reviewer unattended access by itself; see
+"Sign-in corrections to the Ticket 231 text". `/auth/test-login` is local-only
 and must remain disabled in production. No reviewer credentials belong in this
 file, Git, plugin ZIPs, demo footage, or chat.
 
@@ -293,6 +313,7 @@ file, Git, plugin ZIPs, demo footage, or chat.
 | Dedicated synthetic Google account | Uses existing sign-in. Google may still demand device, recovery, or risk challenges even without configured MFA; unattended access cannot be guaranteed. | Try only after owner approval; prove a fresh-browser flow and seek directory acceptance. Never weaken the owner's account. |
 | Dedicated reviewer sign-in implementation | Can provide predictable access, but adds a production authentication path and requires security design, expiry, isolation, audit, tests, and owner approval. | Separate future ticket; do not ship a bypass or promote local test-login. |
 | Portal-approved review arrangement | Ask each review team whether its process can accommodate the existing Google flow. No auth code change, but acceptance and timing are unknown. | Recommended first step, alongside a synthetic Google account trial. Hold submission if unattended access cannot be verified. |
+| Email sign-in for a reviewer mailbox (added November 26, 2026) | Uses the email method that is live since D31: the reviewer types an address and receives a link or a 6-digit code. It needs a mailbox the reviewer can read. OpenAI's guide excludes "email or SMS codes" and "magic links" for reviewer accounts, so this does not meet OpenAI's rule. Anthropic asks for test access by email only if a listing goes to Verified review, and does not say which sign-in methods it accepts. | Not verified with either review team. Ask before relying on it. |
 
 The owner should choose the least intrusive accepted option. Do not submit a
 known challenge-prone account or invent a username/password flow that Cadence
@@ -349,8 +370,10 @@ prove what a user clicked in an external client.
 Paste these instructions into the private reviewer field with the separately
 approved account credentials. Do not put those credentials in plugin metadata.
 
-1. Open the supplied sign-in URL in a fresh browser. Follow the approved Google
-   instructions. Stop and report any MFA/email/device challenge; no bypass exists.
+1. Open the supplied sign-in URL in a fresh browser. Follow the approved sign-in
+   instructions for the method the owner chose (Google, email or Apple; corrected
+   November 26, 2026, this step named Google only). Stop and report any
+   MFA/email/device challenge; no bypass exists.
 2. Add the HTTPS MCP endpoint as a custom connector, then connect. Sign into the
    synthetic account and review Cadence consent. Read is required; allow both
    write scopes for the positive cases. Complete consent and return to Claude.
@@ -537,3 +560,251 @@ removal, and independence from the MCP kill switch. Required repository gates:
 `agents:check`, `interactions:check`, `resolvers:check`, `lint`, `typecheck`,
 `test`, and `build`. Exact run results and SHAs are recorded in the Ticket 231
 task note and shared PR Context. Hosted route verification remains Ticket 232.
+
+## Unpublished MCP Apps listing drafts — Ticket 380
+
+Prepared November 26, 2026 (D36). **Unpublished draft for owner review.** Every
+item below waits on the marketing site overhaul (`P-048`, Ticket 246) and the
+owner's instruction. Nothing here was submitted, listed or published, and no
+provider form or console was opened.
+
+State on November 26, 2026:
+
+- `CADENCE_MCP_APPS` is off in production. No public tool list names `show_day`.
+- No AI client has rendered the view. Host acceptance is Ticket 378, which has
+  not started; Ticket 375's real-host part waits on owner sign-ins.
+- The only screenshots that exist are bench captures from fixtures. They are not
+  listing screenshots.
+- No credential, reviewer account or token is in this file or anywhere in the
+  repository. Reviewer access follows "Reviewer-account plan" above.
+
+### Requirements read on November 26, 2026
+
+These are the provider pages as they read on that date. Recheck each before use.
+
+| Source | What it asks for | Cadence's input |
+|---|---|---|
+| [Claude: Submit a connector](https://claude.com/docs/connectors/building/submission.md) | An MCP App adds carousel screenshots: PNG; at least 1000px wide; 3–5 images; cropped "to the app response only, without the prompt in the image"; any aspect ratio; the prompt text supplied separately for each; no separate mobile assets; no video or GIF. Allowed link URIs are optional and apply only to a connector that calls `ui/open-link`; every origin listed must belong to the submitter. "Don't put credentials in the portal"; a Verified reviewer asks for test access by email. | "Screenshot prompts" and "Screenshot capture" below. The view calls no `ui/open-link`, so Cadence declares no link URIs. |
+| [Claude: Connector pre-submission checklist](https://claude.com/docs/connectors/building/review-criteria.md) | Every tool has a `title` and `readOnlyHint` or `destructiveHint`; tool names are 64 characters or fewer. A submission is listed as a Community connector by default; Anthropic may escalate it to Verified review, where reviewers test each tool. "An MCP App's embedded websites and entry points are available only under a Verified listing." | `show_day` has a title and `readOnlyHint: true` (`docs/MCP_CONTRACT.md`, "MCP Apps trial"). "Reviewer test cases for the view" below. |
+| [Claude: entry points](https://claude.com/docs/connectors/building/mcp-apps/entry-points.md) | A tool marked with `_meta["openai/ui"].entrypoints` of type `global` can be listed on Claude's Artifacts page. Verified directory connectors and custom connectors can have entry points; a Community listing cannot. Every input must be optional. | Not built. `show_day` carries no entry-point mark. Its one input, `date`, is optional. Adding the mark is a server change and needs a ticket. |
+| [OpenAI: Upload and submit your plugin](https://developers.openai.com/plugins/deploy/submission.md) | Changes to metadata or skills need a new ZIP. Hosted tool changes are scanned on the server; a new tool stays unavailable until approved. Five positive and three negative test cases, a video walkthrough and release notes. Reviewer credentials must work "without MFA approval, email or SMS codes, magic links, or private-network access". "If your plugin uses iframes, explain what each embedded page does, why it is needed, and who controls its domain." | "CSP statement" and "Reviewer test cases for the view" below; "ChatGPT test cases" above. |
+| [OpenAI: Add UI to your MCP server](https://developers.openai.com/apps-sdk/mcp-apps-in-chatgpt.md) | Link the tool with `_meta.ui.resourceUri`; serve `text/html;profile=mcp-app`. Declare `connectDomains` for API requests, `resourceDomains` for assets and `frameDomains` only for embedded origins. "Nested frames are blocked by default." "The plugin review process checks the declared policy against the UI behavior." The resource URI is a cache key. Keep tools useful without UI. | "CSP statement" below. `show_day` returns the day as text for a host that shows no view. A breaking view change gets a new URI. |
+| [Google: Connected Apps Platform MCP server guide](https://developers.google.com/connected-apps/mcp) | Four phases: build, validate with MCP Inspector, deploy and test in Gemini Developer Mode, then register. Access to registration is requested through an interest form. The Google Connected Console takes app details, authentication, endpoints and tool discovery, manages testers and submits for review. UI binding uses `meta={"ui": {"resourceUri": "ui://..."}}`. | "Google Connected Apps: what the forms will ask" below. |
+| [Google: OAuth 2.1 implementation guide](https://developers.google.com/connected-apps/mcp/oauth) | Authorization code with PKCE. Metadata is read first from `/.well-known/oauth-authorization-server`, and the first URL that answers is used, even an error. The metadata must hold `authorization_endpoint`, `token_endpoint`, `response_types_supported` with `code`, and a `registration_endpoint` (or a client ID and secret typed into the console). Six Google redirect patterns must be allowed. Google recommends returning the same refresh token on refresh ("Persistent Linking"). A square SVG logo of at least 500 by 500 pixels. | Same section below. |
+
+### Screenshot prompts
+
+Five shots, one prompt each. The prompt is supplied as text beside its image and
+never appears in the image. `scripts/acceptance/listing-capture.mjs` holds the
+same list (`LISTING_SHOTS`); `tests/acceptance-web-client/listing-capture.test.mjs`
+fails when a prompt here differs from the script.
+
+| ID | Prompt | What the image shows | Bench fixture |
+|---|---|---|---|
+| `today` | Show my Cadence day. | Today with a day note, the Needs decision count line and rows with Completed, Not Completed and Note. | `normal`, light |
+| `mark-completed` | I just finished my morning walk. Open today in Cadence so I can mark it. | The same day after the person clicked Completed on Morning walk. | `normal`, light, one click |
+| `routine-steps` | Show today in Cadence. I want to see the steps of my skin routine. | A routine opened to its steps, with the progress the server derived. | `parent`, light, one click |
+| `note` | Open my Cadence day. I want to add a note to Stretch. | The note editor open on one row, before Save note. | `normal`, light, one click and typed text |
+| `connected-service` | Show today in Cadence, with anything a connected service marked. | Dark theme. A row a connected service marked reads "Completed · From Hevy"; the person can still change it. | `connector`, dark |
+
+Notes for the owner:
+
+- No prompt was tried in a real client. Ticket 378 learns whether each one makes
+  the client call `show_day`. Change the wording here and in the script together.
+- In a test run, send each prompt with the `[Cadence QA]` marker in front, as
+  every acceptance prompt is. The paired prompt text for the listing has no marker.
+- Host captures come from test accounts A and B only, with invented Behaviors.
+  The fixture names above (Morning walk, Vitamins, Stretch, Read, Skin routine, Gym)
+  are a starting list for that test data.
+- `connected-service` shows the name "Hevy" as text. `docs/LEGAL.md`, `L-020`,
+  holds the open question about provider marks. A public listing image is a new
+  place for that question; the owner decides whether this shot is used.
+- The Claude directory takes 3 to 5 images. Dropping `connected-service` or `note`
+  leaves a valid set.
+
+### Screenshot capture
+
+`scripts/acceptance/listing-capture.mjs` writes one PNG and one JSON sidecar per
+shot. The sidecar holds the paired prompt, the source, the size and the time. It
+refuses an image narrower than 1000px and an output directory inside the
+repository that git does not ignore. The default directory is
+`.local/listing-captures/`, which `.gitignore` covers. Files are mode 0600.
+
+```sh
+# Today: bench captures from fixtures. Start the app first: npm run dev
+node scripts/acceptance/listing-capture.mjs bench
+node scripts/acceptance/listing-capture.mjs bench --base-url http://127.0.0.1:3000 --shot note
+
+# After Ticket 378 has a host run: the view frame in the open QA Chrome tab
+node scripts/acceptance/listing-capture.mjs host --client claude-web --shot today --selector '<the view frame>'
+
+node scripts/acceptance/listing-capture.mjs list
+```
+
+| Mode | Files | Sidecar says | Use |
+|---|---|---|---|
+| `bench` | `.local/listing-captures/bench/bench-<id>.png` and `.json` | `source: "bench"`, `listing_candidate: false`, and a label that it is not a listing screenshot | Layout and wording review only. No AI client rendered these. |
+| `host` | `.local/listing-captures/host/<client>/host-<id>.png` and `.json` | `source: "host"`, `listing_candidate: true`, the client | Listing candidates, after the owner looks at each one. |
+
+- Bench mode loads `/design-system?preview=mcp-day-view` from a loopback address
+  only, with Claude's published style variables and the 720px frame at twice the
+  pixel density (1436px wide in the November 26 run). Its browser context refuses
+  every request that is not loopback. The bench is a 404 in production.
+- Host mode attaches to the Cadence QA Chrome profile that a Ticket 378 run left
+  open. It captures the one frame the selector names and refuses anything that is
+  not an `iframe`, so no prompt, sidebar or chat title is in the image. It never
+  navigates, types or clicks. `--scale` multiplies the pixel density for a frame
+  narrower than 1000px.
+- The command line knows Claude web and ChatGPT web. The harnesses that Ticket 378
+  adds for Claude Desktop, Claude mobile, VS Code and Gemini call
+  `captureHostView()` with their own page.
+- Not done: no host capture exists. The frame selector for each client is unknown
+  until Ticket 378 sees the view in that client. Host mode is tested against a
+  stub page only.
+- Run on November 26, 2026 against `next dev` on loopback: five bench captures,
+  1436px wide, 0 refused requests. Tests: `npm run test:web-client`.
+
+### CSP statement
+
+For the ChatGPT resubmission's review information, and for any reviewer who asks.
+Copy only the fenced text.
+
+```text
+Cadence serves one UI resource, ui://cadence/day/v1.html ("Cadence day"), as one self-contained HTML file with the MIME type text/html;profile=mcp-app. Its declared policy is _meta.ui.csp = { connectDomains: [], resourceDomains: [] }. Both lists are empty on purpose. No frameDomains are declared and _meta.ui.domain is not set.
+
+The view makes no network request. It loads no external script, style sheet, image or font: all code and styles are inline in the one file. It embeds no nested frame and opens no link. It uses no cookie, localStorage, sessionStorage or IndexedDB. No credential or token reaches the view.
+
+The view talks only to its host, through the MCP Apps bridge (JSON-RPC over postMessage). It reads the result of the show_day tool. When the person clicks Completed, Not Completed or Save note, it asks the host to call one of three existing Cadence tools (set_occurrence_status, set_parent_occurrence_status, update_occurrence_note) under the permissions the person granted when connecting. Text the person wrote is shown as text, never as HTML.
+
+Iframes: the plugin embeds no page. The only frame is the one the host creates to run this view. Its content is the HTML that Cadence's MCP server at app.cadence-me.com returns from resources/read. Identity Scaffolding LLC controls that domain.
+```
+
+How each claim is tested:
+
+| Claim | Test or check |
+|---|---|
+| The server declares the empty policy on `resources/list` and `resources/read` | `tests/mcp-apps-server.test.ts`, `tests/mcp-apps-show-day.test.ts` |
+| The shipped bundle makes no network attempt across reads, writes, refusals and a theme change | `tests/mcp-day-view.dom.test.ts`: `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `Worker`, `Image` and `sendBeacon` are recorders that must stay empty |
+| The file holds no external script, style, image, font, frame, link, storage or network API | `tests/mcp-day-view.dom.test.ts`, "Inert and offline" (`docs/qa/2026-11-25-mcp-day-view.md`) |
+| Titles, notes and the day note render as text | Same file, hostile-text cases |
+| The served file is the tested file | `tests/mcp-day-view-build.test.ts` rebuilds the view and compares bytes |
+| A sandboxed frame with scripts only made 0 requests | Hand checks in `docs/qa/2026-11-25-mcp-day-view.md` (bench and `basic-host`); the bench capture run above refused 0 requests |
+
+Not tested: the policy as a real host enforces it. OpenAI's review compares the
+declared policy with what the view does; Ticket 378 is the first run in ChatGPT.
+
+### Reviewer test cases for the view
+
+Five cases, written in the form of "ChatGPT test cases" above. **None has run in a
+real client.** Ticket 378 runs them; record results there before any submission.
+The view opens when the client calls `show_day`. A client that shows no view still
+gets the day as text, and P1 above then applies.
+
+Seed additions to "Reviewer-account plan": a routine **Review routine** with three
+steps scheduled today, and today's **Review walk** and **Review reading** left
+Unresolved before the run.
+
+| ID / scenario | Setup and prompt | In the view | Expected tools | Expected result |
+|---|---|---|---|---|
+| V1 — Mark | Full grant. "Show my Cadence day." | Click Completed on Review walk. | `show_day`, then `set_occurrence_status`, then `show_day` | The row reads Completed in the view and on the web Timeline. One write. The assistant does not ask to confirm again and calls no write tool itself. |
+| V2 — Parent slot | Full grant. "Show today in Cadence. I want to see the steps of Review routine." | Open the routine, then click Completed on the routine's own row. | `show_day`, then `set_parent_occurrence_status`, then `show_day` | The routine reads Completed in the view and every step is Completed on the web. One write for the slot, none per step. |
+| V3 — Note | Full grant. "Open my Cadence day. I want to add a note to Review walk." | Click Note on Review walk, type **Review view note**, click Save note. | `show_day`, then `update_occurrence_note`, then `show_day` | The note shows under the row and on the web. Connected apps activity shows the operation and outcome, never the note text. |
+| V4 — Read-only grant | Connect with read permission only. "Show my Cadence day." | Look for controls. | `show_day` only | The view shows "Reconnect to allow changes" and no Completed, Not Completed or Note control. No write is attempted. Asking the assistant to mark an item gets the reconnect explanation (N2 above). |
+| V5 — Conflict | Full grant. "Show my Cadence day." Then, in the web app in another tab, mark today's Review reading Completed. | Without reloading, click Not Completed on Review reading. | `show_day`, then `set_occurrence_status` (refused with `conflict`), then `show_day` | The view says "Not changed. This changed somewhere else. Check it and try again." and now shows Completed. The web Timeline still shows Completed. Nothing is written until the person clicks again. |
+
+- Each write is followed by one `show_day` read, so a case costs two calls against
+  the per-grant limits.
+- In Settings > Connected apps the reads appear as "show day" and "read view
+  resource".
+- OpenAI asks for exactly five positive and three negative cases. V1 to V3 are
+  positive. V4 and V5 are safe-fallback cases. The owner chooses which of P1 to P5
+  and N1 to N3 they replace at resubmission.
+- Unknown until Ticket 378: whether a client shows its own approval prompt before
+  a write the view starts. If it does, the reviewer approves it, and the case text
+  must say so.
+
+### Facts for listing copy
+
+Listing copy that names the view is written in the messaging track (Ticket 246)
+from `docs/NARRATIVE.md`. These are facts it may state, not copy:
+
+- One view, "Cadence day". It shows today only.
+- Each Occurrence has Completed, Not Completed and Note. A routine shows its steps.
+- Earlier Unresolved items appear as one count line, never a list.
+- A click in the view is the person's confirmation. It writes through the existing
+  permissions; there is no new permission.
+- A client that shows no view gets the same day as text.
+- The view shows no Calendar event, travel, leave time, Daily Brief text, location
+  or Period.
+
+### Google Connected Apps: what the forms will ask
+
+Nothing was sent to Google. No Gemini client has connected to Cadence.
+
+| Google asks for | Cadence today | Open |
+|---|---|---|
+| Metadata at `/.well-known/oauth-authorization-server` | `https://app.cadence-me.com/.well-known/oauth-authorization-server` ("URLs and assets" above) | None known. |
+| `registration_endpoint` in the metadata | Cadence's metadata has one (`lib/services/oauth/server.ts`) | Not tried with Google's client. |
+| Google's six redirect patterns allowed | Cadence matches a web redirect exactly, per registered client | Not tested: whether the URIs Google registers pass Cadence's redirect rules. |
+| PKCE | S256 is required on every request | None known. |
+| The RFC 8707 `resource` parameter | Cadence requires it | Unknown whether Gemini sends it (Ticket 375, unknown 7). A change is Ticket 381. |
+| The same refresh token returned on refresh ("Persistent Linking") | Cadence rotates the refresh token on every refresh and revokes the token family on reuse (`docs/MCP_INTEGRATION.md`, section 6) | Possible gap. Not tested. Any change is an OAuth security change and belongs to Ticket 381. |
+| A square SVG logo, at least 500 by 500 pixels | PNG logos only (`apps/marketing/public/brand/`) | An SVG is needed. Design work, not engineering. |
+| Tool annotations on every tool | Present on every registry tool and on `show_day` | None known. |
+
+## Sign-in corrections to the Ticket 231 text
+
+Ticket 231 wrote this packet on October 18, 2026, when Cadence signed in with
+Google only. Email and Apple sign-in went live on web on November 13, 2026 (D31).
+Corrected in place on November 26, 2026, each marked with that date:
+
+1. "Readiness and approval record", the Reviewer sign-in row.
+2. "Listing copy", the description's fourth paragraph.
+3. "URLs and assets", the sentence that says the carousel requirement does not
+   apply.
+4. "Reviewer-account plan", its first paragraph, and one new row in its table.
+5. "Claude reviewer instructions", step 1.
+
+What the correction does not change: no sign-in method is a password. OpenAI's
+guide excludes email codes and magic links for reviewer accounts, so unattended
+reviewer access is still unverified, as the plan says.
+
+Other Ticket 231 text that is out of date and was left as written, because Ticket
+380 covers sign-in text only. Fix each before a submission:
+
+- "Ten reads and six scoped writes" and "all 16 tools". The registry holds 30 tools
+  on November 26, 2026 (`REGISTRY_TOOLS` in `scripts/acceptance/protocol.mjs`).
+- The expected-tools lists in P1 to P5 and the draft release notes describe
+  contract 1.0.0.
+- "Paste these instructions into the private reviewer field with the separately
+  approved account credentials." Anthropic's page now says not to put credentials
+  in the portal.
+- Statements that hosted launch and live-client acceptance are pending. The MCP
+  server is live since October 29, 2026 (Ticket 232).
+
+## Deferred owner steps for MCP Apps
+
+Each step is the owner's, waits on the marketing site overhaul (`P-048`, Ticket
+246) and needs the owner's instruction at the time. None is authorized by this
+file. An agent may prepare an input; an agent does not open a provider form.
+
+Before any of them: Ticket 378 passes on the required hosts; the owner turns
+`CADENCE_MCP_APPS` on in production (D36); and `show_day` joins the contract
+registry after the alongside edition folds in (Ticket 365).
+
+| # | Owner step | Input in the repository | Waits on |
+|---|---|---|---|
+| 1 | Claude directory update: the listing becomes an MCP App with carousel screenshots and their prompts | This file: "Listing copy", "Screenshot prompts", "Screenshot capture". `scripts/acceptance/listing-capture.mjs` in `host` mode makes the images; they are not in the repository | `P-097`, `P-048` |
+| 2 | Claude Verified listing, and the Artifacts entry point that needs it | This file: "Reviewer test cases for the view", "Reviewer-account plan", "Claude reviewer instructions". The entry point itself is not built: marking `show_day` in `lib/mcp/apps/show-day.ts` needs a ticket | `P-097`, `P-048` |
+| 3 | ChatGPT plugin resubmission: new ZIP, tool rescan, review information | `integrations/chatgpt-plugin/` (`plugin.json`, `mcp.json`), `node scripts/package-plugins.mjs`; this file: "CSP statement", "Reviewer test cases for the view", "ChatGPT test cases" | `P-097`, `P-048`; `P-100` if the ZIP carries the skill update |
+| 4 | Google's Connected Apps interest form and the Google Connected Console | This file: "Google Connected Apps: what the forms will ask", "URLs and assets". Ticket 378's Gemini Developer Mode result; Ticket 381 if it finds a sign-in gap | `P-101`, `P-048` |
+| 5 | Publish the `daily-check-in` skill update in both plugins | `integrations/drafts/skills/daily-check-in/SKILL.md`; steps in `integrations/drafts/README.md` | `P-100`, `P-048` |
+| 6 | `/developers` and marketing copy that describe the view | `apps/marketing/src/data/developers.ts` and the generated developer reference; facts in `docs/MCP_CONTRACT.md`, "MCP Apps trial", `docs/MCP_INTEGRATION.md`, section 17, and "Facts for listing copy" above | `P-099` for the developer docs; `P-097` and `P-048` for marketing |
+| 7 | Privacy, Terms and Trust text about views shown inside AI clients | `components/settings/LegalContent.tsx`; the facts to state are in `P-098` | `P-098`, `P-048` |
+
+The plan sets no order among these steps. Three dependencies are fixed:
+
+- Step 7 comes before any listing that links to Privacy or Terms. "URLs and
+  assets" above says not to list an unpublished legal draft as the current policy.
+- The entry point in step 2 needs a Verified listing, so it follows step 1.
+- A skill change needs a new ChatGPT ZIP, so step 5 goes with step 3 or before it.
