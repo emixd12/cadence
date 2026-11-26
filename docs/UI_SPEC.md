@@ -1630,6 +1630,76 @@ A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
 
+## Cadence day view in an AI client (Ticket 377)
+
+The "Cadence day" view is one HTML file that Cadence's MCP server serves at
+`ui://cadence/day/v1.html` and an AI client draws in a sandboxed frame (MCP Apps, D36).
+Source: `packages/mcp-views`. The server reads the built file from the generated module
+`lib/mcp/apps/day-view-html.ts`. It is behind `CADENCE_MCP_APPS`, off in production.
+Contract: `docs/qa/2026-11-26-mcp-apps-spike.md`, "Frozen `show_day` contract".
+
+What it shows, top to bottom:
+
+- "Today" with the date under it, or the date alone for another day. The date comes from
+  the server's `local_date`.
+- The day note, read-only, under the label "Day note". Absent when there is none.
+- Needs decision as one line of text: "4 earlier items need a decision", "1 earlier item
+  needs a decision", or "More than 100 earlier items need a decision" when the server says
+  more exist. No line at zero. It never expands and has no control.
+- "Reconnect to allow changes" when the grant has no write scope.
+- One alert line when a change was refused.
+- The day's rows in the server's order, or "Nothing is scheduled for this day."
+
+A row shows the time, the Behavior title and, below them in small grey text, what applies
+of: the status when the row is Completed or Not Completed; "From Hevy" for a connector
+completion; "Added", "Added from Daily Brief", "Added in Chat" or "Added by a connected app"
+for a row whose origin is opportunity; and "Alongside" only when `alongside` is `true`.
+A moved item shows the time it sits at today. A saved note shows as text under the row.
+
+Each row has Completed, Not Completed and Note. The current status is a filled button with
+`aria-pressed`. Clicking it again returns the row to Unresolved. A connector completion
+uses the same buttons; the view never presents it as the person's mark.
+
+A parent Behavior slot is one row: a disclosure triangle, the time, the title and the
+server's progress ("1/3"), or the status once every step shares it. It starts closed.
+Completed and Not Completed mark the whole slot. Open, it lists each step once as an
+ordinary row, indented. A step never appears outside its slot.
+
+Note opens one inline editor under the row. Opening another closes the first. The field
+grows with its text. Save note and Cancel sit below it. There is no modal and nothing
+scrolls inside the view.
+
+Rules the view keeps:
+
+- It computes nothing. Order, grouping, progress, statuses and the count come from
+  `show_day`. Times are formatted from the server's values in the server's timezone.
+- A click is the person's confirmation. Each write carries the displayed precondition and
+  an idempotency key. After a write the view reads the day again.
+- Conflict: the view reads the day again and shows "Not changed. This changed somewhere
+  else. Check it and try again." It sends nothing again without a new click. After a
+  refused note save the draft stays open and the note saved now shows above it.
+- A note save sends the revision read when the editor opened. If the day was re-read since
+  and the saved note still reads the same, it sends the newer revision. If the saved note
+  changed, the save is refused as a conflict. The field is read-only while a save is sent.
+- Rate limit: "Not changed. Too many changes for now. Try again in 8 seconds." The controls
+  stay off for that time.
+- No write scope, or a write refused for scope: the reconnect line replaces every write
+  control. Reading and opening slots still work.
+- After a successful write the AI client's model receives one line, such as "Morning walk:
+  Completed (set by the person in the Cadence day view)". A note save sends "note saved"
+  and never the note's text.
+- Titles, notes and the day note are drawn as text. The view makes no network request,
+  loads no file and stores nothing in the browser.
+- No Periods, tracked time, move controls, Calendar or travel data, and no day-note
+  editing (Ticket 382).
+
+Layout: phone width first. Controls sit under the row's text. From 36rem of container
+width they sit beside it. Every control is at least 44px high and wide. Colors, type and
+radius follow the AI client's style variables and its light or dark theme, with Cadence's
+tokens as fallbacks (`DESIGN.md`, "Cadence day view").
+
+Bench: `/design-system?preview=mcp-day-view&state=normal|empty|read-only|conflict|rate-limit|rejected|connector|parent|opportunity|alongside|hostile|many-earlier|loading|unavailable&theme=light|dark&host=cadence|claude&layout=phone|desktop`.
+
 ## Daily Brief source choice (Ticket 306)
 
 `DailyBriefSettingsPanel` shows, in order:

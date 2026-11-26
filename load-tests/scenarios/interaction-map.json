@@ -1967,6 +1967,26 @@
       "id": "INT-PERIOD-004",
       "classification": "destructive_serial_only",
       "reason": "Remove deletes a seeded Period for good; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-DAYVIEW-001",
+      "classification": "not_load_bearing",
+      "reason": "Sent from an AI client's frame through MCP tools, outside the web app's routes; the existing MCP write tools carry the load. Host acceptance is Ticket 378."
+    },
+    {
+      "id": "INT-DAYVIEW-002",
+      "classification": "not_load_bearing",
+      "reason": "Sent from an AI client's frame through MCP tools, outside the web app's routes; the existing MCP write tools carry the load. Host acceptance is Ticket 378."
+    },
+    {
+      "id": "INT-DAYVIEW-003",
+      "classification": "not_load_bearing",
+      "reason": "Sent from an AI client's frame through MCP tools, outside the web app's routes; the existing MCP write tools carry the load. Host acceptance is Ticket 378."
+    },
+    {
+      "id": "INT-DAYVIEW-004",
+      "classification": "browser_only",
+      "reason": "The reconnect line is drawn from scopes already in the show_day result; it sends no request."
     }
   ]
 }

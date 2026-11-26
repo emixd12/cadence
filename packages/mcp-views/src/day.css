@@ -1,0 +1,331 @@
+/*
+ * "Cadence day" view styles (Ticket 377).
+ *
+ * Colors, type and radius come from the host's style variables (MCP Apps spec,
+ * `--color-*`, `--font-*`, `--border-radius-*`). Each one falls back to a Cadence token
+ * with the name and value it has in packages/ui/tokens.css. Cadence has no dark theme,
+ * so the dark fallbacks below exist only for a host that sends a dark theme and no
+ * variables: Cadence's ink and paper swapped, with Monolith Blue lightened to keep
+ * contrast. The view never hard-codes a color outside these fallbacks.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Cadence theme-level base tokens (packages/ui/tokens.css). */
+  --theme-background: oklch(99.16% 0.0017 67.8);
+  --theme-surface: oklch(96.97% 0.0017 247.8);
+  --theme-foreground: oklch(14.89% 0.0027 248.1);
+  --theme-muted-readable: oklch(52.59% 0.0187 245.3);
+  --theme-line: oklch(83% 0.006 248);
+  --theme-primary: #3572b3;
+  --theme-primary-foreground: oklch(99.16% 0.0017 67.8);
+  --theme-accent: oklch(57.69% 0.1656 33.1);
+
+  --day-safe-top: 0px;
+  --day-safe-right: 0px;
+  --day-safe-bottom: 0px;
+  --day-safe-left: 0px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --theme-background: oklch(14.89% 0.0027 248.1);
+    --theme-surface: oklch(22% 0.004 248);
+    --theme-foreground: oklch(96.97% 0.0017 247.8);
+    --theme-muted-readable: oklch(74% 0.012 245.3);
+    --theme-line: oklch(40% 0.006 248);
+    --theme-primary: oklch(72% 0.1 250);
+    --theme-primary-foreground: oklch(14.89% 0.0027 248.1);
+    --theme-accent: oklch(74% 0.13 33.1);
+  }
+}
+
+:root[data-theme="dark"] {
+  --theme-background: oklch(14.89% 0.0027 248.1);
+  --theme-surface: oklch(22% 0.004 248);
+  --theme-foreground: oklch(96.97% 0.0017 247.8);
+  --theme-muted-readable: oklch(74% 0.012 245.3);
+  --theme-line: oklch(40% 0.006 248);
+  --theme-primary: oklch(72% 0.1 250);
+  --theme-primary-foreground: oklch(14.89% 0.0027 248.1);
+  --theme-accent: oklch(74% 0.13 33.1);
+}
+
+:root {
+  /* Surface-scoped semantic tokens: the host's variable first, Cadence's token after. */
+  --foreground: var(--color-text-primary, var(--theme-foreground));
+  --muted-readable: var(--color-text-secondary, var(--theme-muted-readable));
+  --line: var(--color-border-secondary, var(--theme-line));
+  --alert-signal: var(--color-text-danger, var(--theme-accent));
+  --focus: var(--color-ring-primary, var(--theme-foreground));
+  --surface: var(--color-background-secondary, var(--theme-surface));
+  --selected: var(--color-background-inverse, var(--theme-primary));
+  --selected-foreground: var(--color-text-inverse, var(--theme-primary-foreground));
+  --control-line: var(--color-border-primary, var(--theme-line));
+  --radius: var(--border-radius-md, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* The host's background when it sends one; Cadence's otherwise, so text and ground always pair. */
+  background: var(--color-background-primary, var(--theme-background));
+}
+
+body {
+  margin: 0;
+  padding: calc(12px + var(--day-safe-top)) calc(12px + var(--day-safe-right)) calc(12px + var(--day-safe-bottom)) calc(12px + var(--day-safe-left));
+  color: var(--foreground);
+  font-family: var(--font-sans, "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif);
+  font-size: var(--font-text-sm-size, 14px);
+  line-height: var(--font-text-sm-line-height, 1.45);
+  font-weight: var(--font-weight-normal, 400);
+  -webkit-text-size-adjust: 100%;
+  container-type: inline-size;
+}
+
+h1,
+h2,
+p,
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+.day {
+  display: grid;
+  gap: 8px;
+}
+
+h1 {
+  font-size: var(--font-heading-md-size, 18px);
+  line-height: var(--font-heading-md-line-height, 1.25);
+  font-weight: var(--font-weight-semibold, 400);
+}
+
+.muted,
+.time,
+.facts,
+.label {
+  color: var(--muted-readable);
+}
+
+.label {
+  font-size: var(--font-text-xs-size, 12px);
+  font-weight: var(--font-weight-normal, 400);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The person's text: shown as written, wrapped, never interpreted. */
+.user-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.day-note {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.alert {
+  color: var(--alert-signal);
+}
+
+.rows {
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.steps {
+  margin-left: 16px;
+  border-top: 0;
+}
+
+.steps .row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.row-main {
+  display: grid;
+  gap: 4px;
+}
+
+.row-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  min-width: 0;
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.title {
+  font-size: var(--font-text-md-size, 16px);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.facts {
+  flex-basis: 100%;
+  font-size: var(--font-text-xs-size, 12px);
+  overflow-wrap: anywhere;
+}
+
+.facts.inline {
+  flex-basis: auto;
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.action {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--control-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* The selected status is filled and also said in words on the row, so it never rests on color alone. */
+.action[aria-pressed="true"] {
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--selected-foreground);
+}
+
+.action:disabled {
+  cursor: default;
+}
+
+.action:disabled:not([aria-pressed="true"]) {
+  color: var(--color-text-disabled, var(--muted-readable));
+  border-color: var(--line);
+}
+
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.triangle {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor;
+  transition: transform 180ms ease-out;
+}
+
+.disclosure[aria-expanded="true"] .triangle {
+  transform: rotate(90deg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.editor {
+  display: grid;
+  gap: 8px;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--control-line);
+  border-radius: var(--radius);
+  /* DayView sizes the field to its text, so it never scrolls inside the view. */
+  resize: none;
+  overflow: hidden;
+  /* 16px keeps iOS from zooming the page when the field takes focus. */
+  font-size: max(16px, var(--font-text-md-size, 16px));
+}
+
+.skeleton span {
+  display: block;
+  height: 14px;
+  width: 60%;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.skeleton span:first-child {
+  width: 30%;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Wider containers put a row's controls beside its text. Phone width is the base layout. */
+@container (min-width: 36rem) {
+  .row-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 16px;
+  }
+
+  .actions {
+    flex-wrap: nowrap;
+  }
+
+  .editor .actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .triangle {
+    transition: none;
+  }
+}
