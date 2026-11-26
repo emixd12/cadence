@@ -2097,6 +2097,7 @@ Turn it on only after all seven alongside migrations are on the database:
 5. `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`
 6. `20261126110000_alongside_schedule_pairing.sql`
 7. `20261126120000_account_sync_alongside.sql`
+8. `20261126130000_where_guess_dismissal_without_labels.sql` (Ticket 383)
 
 The seventh differs: it must reach the database before the Ticket 363 code deploys,
 whatever the flag (below). With the flag on, the move-day read selects the column. The migration is

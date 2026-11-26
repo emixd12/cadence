@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const root = path.resolve(__dirname, "..");
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
-const ALONGSIDE_MIGRATIONS = ["20261125140000", "20261125150000", "20261125180000", "20261125190000", "20261126100000", "20261126110000", "20261126120000"];
+const ALONGSIDE_MIGRATIONS = ["20261125140000", "20261125150000", "20261125180000", "20261125190000", "20261126100000", "20261126110000", "20261126120000", "20261126130000"];
 
 describe("alongside flag migrations", () => {
   const migrations = fs.readdirSync(path.join(root, "supabase/migrations"));
@@ -18,7 +18,7 @@ describe("alongside flag migrations", () => {
     for (const version of ALONGSIDE_MIGRATIONS) expect(migrations.some((file) => file.startsWith(`${version}_`))).toBe(true);
   });
 
-  it.each(["lib/services/alongside-flag.ts", "docs/OPERATIONS.md", ".env.example"])("%s names all seven and the deploy order", (file) => {
+  it.each(["lib/services/alongside-flag.ts", "docs/OPERATIONS.md", ".env.example"])("%s names every migration and the deploy order", (file) => {
     const text = read(file);
     for (const version of ALONGSIDE_MIGRATIONS) expect(text).toContain(version);
     expect(text).toMatch(/20261126120000[\s\S]{0,200}before the Ticket 363 code deploys/);

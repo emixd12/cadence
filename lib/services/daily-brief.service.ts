@@ -397,7 +397,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           readOpenBriefConflicts(caller.client, { userId: caller.user.id, localDate: context.localDate }),
         ]);
         const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id,
-          agentClient: agentRun?.client ?? agentClient });
+          // The run starts after planning (its revision depends on the plan), so evidence reads use the agent client.
+          agentClient });
         return [planned, open] as const;
       });
       signal.throwIfAborted();
