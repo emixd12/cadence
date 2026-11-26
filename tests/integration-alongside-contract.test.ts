@@ -31,7 +31,7 @@ import { integrationContractOptions } from "@/lib/services/integration-contract-
 
 // sha256 of JSON.stringify(mcpTools()) with CADENCE_ALONGSIDE off: the published contract
 // 1.8.0, which added Periods (Ticket 370). Recompute it when the published registry changes.
-const PUBLISHED_TOOLS_SHA256 = "2af18dc90f9b71fc645d14eaa21d1d32304deb8b19a3d0c7365bf1590750a7cd";
+const PUBLISHED_TOOLS_SHA256 = "693fd4257b1aa436e0b3edb76a170a2c94fbf4b4697e4b2d29ce645d3c268425";
 const ON = { alongside: true } as const;
 const fixtureDir = path.resolve(__dirname, "fixtures/integration/operations");
 const fixture = (name: string) => JSON.parse(fs.readFileSync(path.join(fixtureDir, `${name}.json`), "utf8")) as {

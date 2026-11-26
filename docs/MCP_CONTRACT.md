@@ -75,8 +75,7 @@ the transport (Ticket 228), and OAuth (Ticket 226) consume this contract.
   or hard-to-reverse outcomes. It also asks for the standard `search` and
   `fetch` input shapes, absolute user-openable URLs, and internal ids in `id`.
 - Cadence applies the stricter rule. Every write that modifies an existing
-  record sets `destructiveHint: true`, with one exception: `end_period` sets one
-  date that `update_period` can change back, and sets `false` (D35 plan).
+  record sets `destructiveHint: true`, `end_period` included.
   `create_behavior`, `add_opportunity_occurrence` and `create_period` only add a
   record, so they set `false`. No tool reaches the open internet, so every tool sets
   `openWorldHint: false`. Each tool's rationale is listed in the tool reference
@@ -123,7 +122,7 @@ Contract version: `1.8.0`. Generated from `packages/core/src/integration/`.
 | `update_day_note` | Update day note | `cadence.occurrences.write` | no | yes | yes |
 | `create_period` | Create Period | `cadence.occurrences.write` | no | no | no |
 | `update_period` | Update Period | `cadence.occurrences.write` | no | yes | yes |
-| `end_period` | End Period today | `cadence.occurrences.write` | no | no | yes |
+| `end_period` | End Period today | `cadence.occurrences.write` | no | yes | yes |
 | `add_opportunity_occurrence` | Add opportunity to today | `cadence.occurrences.write` | no | no | no |
 | `remove_opportunity_occurrence` | Remove added opportunity | `cadence.occurrences.write` | no | yes | yes |
 | `create_behavior` | Create Behavior | `cadence.behaviors.write` | no | no | no |
@@ -192,7 +191,8 @@ Every tool sets `openWorldHint: false`.
 | Period note length | 2000 |
 | `list_periods` maximum date range (days, inclusive) | 366 |
 | Periods per `list_periods` page | 40 |
-| Period summaries per embedded list (`active_periods`, a Timeline day's `periods`, `period_split.periods`) | 20 |
+| Period summaries per embedded list (`active_periods`, `period_split.periods`) | 20 |
+| Period summaries per `get_timeline` day (`periods`) | 10 |
 | Periods per account | 500 |
 | Cursor length | 512 |
 | Revision length | 128 |
@@ -798,8 +798,8 @@ Output:
 **End Period today.** Ends a Period today: its last day becomes today in the account timezone. It takes no date. A Period that has not started, or has already ended, fails with invalid_state; update_period changes its dates. A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it. No tool removes a Period: the user removes one in the Cadence app.
 
 - Scope: `cadence.occurrences.write`
-- Annotations: readOnlyHint false, destructiveHint false, idempotentHint true, openWorldHint false
-- Annotation rationale: Sets one field, the Period's last day, to today, and only when the Period has started and has not ended. update_period sets any other last day or makes the Period ongoing again, so the change is easy to reverse and destructiveHint is false, as OpenAI's guidance reads it; Claude's stricter reading would set it, and readOnlyHint false still marks the tool as a write. Repeating it leaves the same Period, ended today, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.
+- Annotations: readOnlyHint false, destructiveHint true, idempotentHint true, openWorldHint false
+- Annotation rationale: Changes an existing Period: it sets the last day to today and overwrites a later last day, so destructiveHint is true under Claude's review criteria, which ask for it on tools that modify data. update_period can set the day back, so the hint is conservative for ChatGPT. Repeating it leaves the same Period, ended today, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.
 - Errors: `invalid_input`, `authentication_required`, `rate_limited`, `service_unavailable`, `internal_error`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reused`, `invalid_state`
 - Since: 1.8.0
 
@@ -1106,7 +1106,8 @@ only: it never changes a status, adherence, a reminder or a schedule.
   `revision` and `updated_at`.
 - **Embedded lists.** `get_account_context.active_periods` (Periods that cover today),
   `periods` on each `get_timeline` day, and `get_adherence_summary.period_split.periods`
-  hold at most 20 summaries, earliest first. `more_active_periods` and `more_periods` say
+  hold summaries, earliest first: at most 20, and at most 10 on a `get_timeline` day, so
+  a 14-day read of the longest labels fits. `more_active_periods` and `more_periods` say
   when more exist. With the 500 Periods an account can hold, every result stays under the
   100,000-byte cap.
 - **`list_periods`.** A range of at most 366 days and an optional `cursor`. It returns the
@@ -1126,9 +1127,8 @@ only: it never changes a status, adherence, a reminder or a schedule.
   note. `end_period` takes no date. It sets the last day to today in the account timezone
   and returns `invalid_state` when the Period has not started or has already ended.
   `create_period` returns `limit_exceeded` when the account already holds 500 Periods.
-- **Annotations.** `create_period` only adds a record. `update_period` overwrites fields
-  and sets `destructiveHint: true`. `end_period` sets one date that `update_period` can
-  change back, and sets `destructiveHint: false` (D35 plan).
+- **Annotations.** `create_period` only adds a record. `update_period` and `end_period`
+  change an existing one and set `destructiveHint: true`.
 
 ## Alongside (contract 1.9.0, available when `CADENCE_ALONGSIDE` is on)
 

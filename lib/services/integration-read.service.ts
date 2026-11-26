@@ -247,7 +247,7 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
       parent_groups: needsDays.flatMap((day) => day.parentGroups).map(serializeIntegrationParentGroup),
     } : null,
     days: timeline.daySections.map((day) => {
-      const covering = embeddedPeriods(dayPeriods[day.localDate] ?? []);
+      const covering = embeddedPeriods(dayPeriods[day.localDate] ?? [], L.maxTimelineDayPeriods);
       return {
         local_date: day.localDate, is_today: day.localDate === account.today,
         day_note: dayNotes[day.localDate] ?? null,
@@ -285,9 +285,9 @@ function serializePeriod(row: PeriodRecord) {
     revision: integrationInstant(row.updated_at), updated_at: integrationInstant(row.updated_at) };
 }
 
-/** At most 20 summaries from Periods already in display order, and whether more exist. */
-function embeddedPeriods(rows: readonly PeriodRecord[]) {
-  return { periods: rows.slice(0, L.maxEmbeddedPeriods).map(serializePeriodSummary), more: rows.length > L.maxEmbeddedPeriods };
+/** The first summaries (20, or 10 on a Timeline day) from Periods already in display order, and whether more exist. */
+function embeddedPeriods(rows: readonly PeriodRecord[], limit: number = L.maxEmbeddedPeriods) {
+  return { periods: rows.slice(0, limit).map(serializePeriodSummary), more: rows.length > limit };
 }
 
 /** Display order as one sortable key: first day, last day with ongoing last, creation time, id. */

@@ -370,7 +370,7 @@ describe("integration read handlers", () => {
       expect(timeline.ok, JSON.stringify(timeline).slice(0, 200)).toBe(true);
       if (timeline.ok) {
         expect(timeline.value.days).toHaveLength(14);
-        for (const day of timeline.value.days) { expect(day.periods).toHaveLength(20); expect(day.more_periods).toBe(true); }
+        for (const day of timeline.value.days) { expect(day.periods).toHaveLength(10); expect(day.more_periods).toBe(true); }
         expect(bytes(timeline.value)).toBeLessThan(100_000);
       }
 
@@ -394,6 +394,26 @@ describe("integration read handlers", () => {
       } while (cursor && pages < 600);
       expect(seen.size).toBe(500);
       for (const result of [contextResult, adherence]) if (result.ok) expect(bytes(result.value)).toBeLessThan(100_000);
+    });
+
+    it("keeps a 14-day Timeline under the result cap with 500 overlapping Periods whose labels are 60 four-byte characters", async () => {
+      const label = (index: number) => String.fromCodePoint(0x1f600 + (index % 60)) + "\u{1F9E0}".repeat(59);
+      periods = Array.from({ length: 500 }, (_, index) => period(3000 + index, { label: label(index), start_on: "2026-01-01", end_on: index % 2 ? null : "2026-12-31" }));
+      expect([...periods[0].label]).toHaveLength(60);
+      expect(Buffer.byteLength(periods[0].label, "utf8")).toBe(240);
+      const timeline = await readOperationHandlers.get_timeline(context, { start_local_date: "2026-03-01", days: 14, include_needs_decision: false });
+      expect(timeline.ok, JSON.stringify(timeline).slice(0, 200)).toBe(true);
+      if (!timeline.ok) return;
+      expect(validateOperationOutput("get_timeline", timeline.value).ok).toBe(true);
+      expect(timeline.value.days).toHaveLength(14);
+      for (const day of timeline.value.days) { expect(day.periods).toHaveLength(10); expect(day.more_periods).toBe(true); }
+      expect(Buffer.byteLength(JSON.stringify(timeline.value), "utf8")).toBeLessThan(100_000);
+      // The other embedded lists keep 20 and stay under the cap with the same labels.
+      for (const result of [await readOperationHandlers.get_account_context(context, {}),
+        await readOperationHandlers.get_adherence_summary(context, { start_local_date: "2026-01-01", end_local_date: "2026-12-31" })]) {
+        expect(result.ok).toBe(true);
+        if (result.ok) expect(Buffer.byteLength(JSON.stringify(result.value), "utf8")).toBeLessThan(100_000);
+      }
     });
 
     it("searches Period labels only and never returns a Period note from search or fetch", async () => {

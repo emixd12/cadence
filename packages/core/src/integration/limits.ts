@@ -38,14 +38,16 @@ export const INTEGRATION_LIMITS = Object.freeze({
   /**
    * Periods (Ticket 370): label and note length, the longest inclusive `list_periods`
    * range, Periods per `list_periods` page, Period summaries in one embedded list
-   * (`active_periods`, a Timeline day's `periods`, `period_split.periods`), and Periods
-   * one account can hold. They match `PERIOD_LIMITS` in the Period resolver.
+   * (`active_periods`, `period_split.periods`), Period summaries on one `get_timeline`
+   * day (lower, so 14 days of the longest labels stay under the result cap), and Periods
+   * one account can hold. The lengths, range and cap match `PERIOD_LIMITS`.
    */
   maxPeriodLabelLength: 60,
   maxPeriodNoteLength: 2000,
   maxPeriodRangeDays: 366,
   maxPeriodsPerPage: 40,
   maxEmbeddedPeriods: 20,
+  maxTimelineDayPeriods: 10,
   maxPeriodsPerAccount: 500,
   /** Opaque token sizes. */
   maxCursorLength: 512,

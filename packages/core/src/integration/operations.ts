@@ -190,7 +190,7 @@ export const PERIOD_MEANING =
 const PERIOD_NO_REMOVE = "No tool removes a Period: the user removes one in the Cadence app.";
 
 const periodIdInput = () => uuid("Period id from list_periods, get_account_context `active_periods`, or a get_timeline day.");
-const periodSummaries = (description: string) => array(periodSummaryOutput, { maxItems: L.maxEmbeddedPeriods, description });
+const periodSummaries = (description: string, maxItems: number = L.maxEmbeddedPeriods) => array(periodSummaryOutput, { maxItems, description });
 
 // ------------------------------------------------------------------ reads
 
@@ -288,7 +288,7 @@ const timelineDay = object({
   day_note: optional(nullable(string({ description: "The user's day note for this date, or null. Separate from Occurrence notes and statuses." }))),
   occurrences: array(occurrenceOutput, { description: "Every Occurrence of the day, sub-behavior Occurrences included." }),
   parent_groups: optional(array(parentGroupOutput, { description: "The day's parent Behavior slots in time order. Their Occurrences also appear in `occurrences` (contract 1.7.0)." })),
-  periods: periodSummaries(`Periods that cover this date, earliest first, at most ${L.maxEmbeddedPeriods}. Empty when none does (contract 1.8.0).`),
+  periods: periodSummaries(`Periods that cover this date, earliest first, at most ${L.maxTimelineDayPeriods}. Empty when none does (contract 1.8.0).`, L.maxTimelineDayPeriods),
   more_periods: boolean({ description: "True when more Periods cover this date than `periods` returns. list_periods returns them all." }),
 });
 
@@ -702,10 +702,10 @@ const endPeriod = writeOperation({
     changed: boolean({ description: "True when the last day was set to today." }),
   }),
   errors: ["not_found", "conflict", "idempotency_key_reused", "invalid_state"],
-  destructiveHint: false,
+  destructiveHint: true,
   idempotentHint: true,
   annotationRationale:
-    "Sets one field, the Period's last day, to today, and only when the Period has started and has not ended. update_period sets any other last day or makes the Period ongoing again, so the change is easy to reverse and destructiveHint is false, as OpenAI's guidance reads it; Claude's stricter reading would set it, and readOnlyHint false still marks the tool as a write. Repeating it leaves the same Period, ended today, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.",
+    "Changes an existing Period: it sets the last day to today and overwrites a later last day, so destructiveHint is true under Claude's review criteria, which ask for it on tools that modify data. update_period can set the day back, so the hint is conservative for ChatGPT. Repeating it leaves the same Period, ended today, so idempotentHint is true. openWorldHint is false: only the user's own Cadence account is touched.",
 });
 
 const REFUSED_DESCRIPTION = "Set when nothing changed because a rule refused the request. Null when the change was made.";

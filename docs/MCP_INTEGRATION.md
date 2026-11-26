@@ -754,7 +754,8 @@ What keeps an outside agent from misusing a Period:
 - A Period note leaves Cadence only in the structured `note` field of `list_periods` and
   the three write results. Search matches the label only, and fetched text holds the
   label, dates and revision. The embedded lists return summaries without the note, at
-  most 20, so every result stays under the 100,000-byte cap with 500 overlapping Periods.
+  most 20, and at most 10 on a Timeline day, so every result stays under the 100,000-byte
+  cap with 500 overlapping Periods, even with the longest labels over 14 days.
 - `period_split` adds counts and changes none: the adherence definition and every
   existing number stay as they were.
 - `end_period` takes no date, and the database refuses an end that would extend a Period.

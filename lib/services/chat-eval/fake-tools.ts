@@ -192,7 +192,7 @@ function dayNoteOutput(world: ChatWorld, localDate: string) {
   return row ? { id: row.id, local_date: localDate, note: row.note, revision: `r${row.revision}`, updated_at: toInstant(world, localDate, "12:00") } : null;
 }
 
-// Periods (Ticket 370). The embedded lists carry summaries without the note, at most 20.
+// Periods (Ticket 370). The embedded lists carry summaries without the note: at most 20, or 10 on a Timeline day.
 function periodsOf(world: ChatWorld): WorldPeriod[] {
   return (world.periods ??= []);
 }
@@ -217,8 +217,8 @@ function periodOutput(world: ChatWorld, row: WorldPeriod) {
   return { ...periodSummary(row), note: row.note, revision: `r${row.revision}`, updated_at: nowInstant(world) };
 }
 
-function embeddedPeriods(rows: readonly WorldPeriod[]) {
-  return { periods: rows.slice(0, 20).map(periodSummary), more: rows.length > 20 };
+function embeddedPeriods(rows: readonly WorldPeriod[], limit = 20) {
+  return { periods: rows.slice(0, limit).map(periodSummary), more: rows.length > limit };
 }
 
 function periodTitle(row: WorldPeriod): string {
@@ -288,7 +288,7 @@ const HANDLERS: Record<IntegrationOperationName, Handler> = {
       needs_decision: input.include_needs_decision === false ? null : { occurrences: needs.map((item) => occurrenceOutput(world, item)), total_count: needs.length,
         truncated: false, lookback_start_local_date: Temporal.PlainDate.from(world.today).subtract({ days: 90 }).toString() },
       days: dates.map((date) => {
-        const covering = embeddedPeriods(periodsOverlapping(world, date, date));
+        const covering = embeddedPeriods(periodsOverlapping(world, date, date), 10);
         return { local_date: date, is_today: date === world.today, day_note: world.dayNotes.get(date)?.note ?? null,
           occurrences: sortedOccurrences(world.occurrences.filter((item) => item.localDate === date)).map((item) => occurrenceOutput(world, item)),
           periods: covering.periods, more_periods: covering.more };

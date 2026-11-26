@@ -194,7 +194,7 @@ describe("integration operation registry", () => {
     const destructive = operations.filter(([, operation]) => operation.annotations.destructiveHint).map(([name]) => name);
     expect(destructive).toEqual([
       "set_occurrence_status", "set_parent_occurrence_status", "update_occurrence_note", "move_occurrence_for_day",
-      "revert_occurrence_move", "update_day_note", "update_period", "remove_opportunity_occurrence", "update_behavior", "archive_behavior",
+      "revert_occurrence_move", "update_day_note", "update_period", "end_period", "remove_opportunity_occurrence", "update_behavior", "archive_behavior",
       "restore_behavior",
       "end_behavior", "pause_behavior", "resume_behavior",
     ]);
@@ -275,14 +275,14 @@ describe("Periods in the contract (Ticket 370)", () => {
     expect(checkOperationScope("create_period", ["cadence.read", "cadence.behaviors.write"])?.required_scopes).toEqual(["cadence.occurrences.write"]);
   });
 
-  it("annotates the writes as the plan's table says", () => {
+  it("marks every Period write that changes an existing record destructive", () => {
     const hints = (name: (typeof periodTools)[number]) => {
       const { destructiveHint, idempotentHint } = INTEGRATION_OPERATIONS[name].annotations;
       return { destructiveHint, idempotentHint };
     };
     expect(hints("create_period")).toEqual({ destructiveHint: false, idempotentHint: false });
     expect(hints("update_period")).toEqual({ destructiveHint: true, idempotentHint: true });
-    expect(hints("end_period")).toEqual({ destructiveHint: false, idempotentHint: true });
+    expect(hints("end_period")).toEqual({ destructiveHint: true, idempotentHint: true });
     expect(INTEGRATION_OPERATIONS.create_period.errors).toContain("limit_exceeded");
     expect(INTEGRATION_OPERATIONS.end_period.errors).toContain("invalid_state");
   });
@@ -298,8 +298,8 @@ describe("Periods in the contract (Ticket 370)", () => {
     const split = (INTEGRATION_OPERATIONS.get_adherence_summary.output.schema.properties as Record<string, JsonSchemaObject>).period_split;
     const [splitObject, splitNull] = split.anyOf as JsonSchemaObject[];
     const splitProperties = splitObject.properties as Record<string, JsonSchemaObject>;
-    for (const [label, list] of [["active_periods", context.active_periods], ["days[].periods", day.periods], ["period_split.periods", splitProperties.periods]] as const) {
-      expect(list.maxItems, label).toBe(20);
+    for (const [label, list, cap] of [["active_periods", context.active_periods, 20], ["days[].periods", day.periods, 10], ["period_split.periods", splitProperties.periods, 20]] as const) {
+      expect(list.maxItems, label).toBe(cap);
       expect(propertiesOf(list.items as JsonSchemaObject), label).toEqual(summaryKeys);
     }
     expect(context.more_active_periods.type).toBe("boolean");
@@ -328,7 +328,7 @@ describe("Periods in the contract (Ticket 370)", () => {
   it("keeps the contract limits equal to the Period resolver's", () => {
     expect([INTEGRATION_LIMITS.maxPeriodLabelLength, INTEGRATION_LIMITS.maxPeriodNoteLength, INTEGRATION_LIMITS.maxPeriodRangeDays, INTEGRATION_LIMITS.maxPeriodsPerAccount])
       .toEqual([PERIOD_LIMITS.labelCharacters, PERIOD_LIMITS.noteCharacters, PERIOD_LIMITS.rangeDays, PERIOD_LIMITS.perAccount]);
-    expect([INTEGRATION_LIMITS.maxEmbeddedPeriods, INTEGRATION_LIMITS.maxPeriodsPerPage]).toEqual([20, 40]);
+    expect([INTEGRATION_LIMITS.maxEmbeddedPeriods, INTEGRATION_LIMITS.maxTimelineDayPeriods, INTEGRATION_LIMITS.maxPeriodsPerPage]).toEqual([20, 10, 40]);
   });
 
   it("extends search and fetch with the period record kind", () => {
