@@ -348,7 +348,10 @@ and validate every redirect target. No metadata-driven user-data request exists.
 secret. The HttpOnly cookie carries the secret; the consent URL carries only a
 request UUID. Ticket 227 uses `getOAuthConsent(request, id, userClient)` for
 display and `completeOAuthConsent(request, id, scopesOrNull, userClient)` on an
-explicit same-origin Allow/Deny POST. The database atomically consumes the
+explicit same-origin Allow/Deny POST. The consent page's referrer policy is
+`same-origin`, never `no-referrer`: under `no-referrer` a browser sends
+`Origin: null` on the plain form post that Allow or Deny sends before the page
+hydrates, and the origin check refuses it (Ticket 379). The database atomically consumes the
 request and creates its grant/code under the authenticated user. The user may
 approve any valid advertised scope set, whatever the client requested; the grant
 holds exactly what the user left on (Ticket 259). Render client text as text, identify unverified clients, and show

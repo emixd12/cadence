@@ -102,15 +102,7 @@ export function consentRecord({ view, requestedScopes, decision, grantScopes = [
 /** Set the write-scope checkboxes for the grant, then click Allow or Deny. */
 export async function submitConsent(page, { decision, grantScopes = [] }) {
   if (!['allow', 'deny'].includes(decision)) throw new AcceptanceError('decision-invalid');
-  // A click before React hydrates sends a native form POST. The page's
-  // no-referrer policy makes its Origin "null", which Next's Server Action
-  // CSRF check rejects. Wait until React owns the button.
-  try {
-    await page.waitForFunction(() => {
-      const button = document.querySelector('button[name="decision"][value="allow"]');
-      return Boolean(button && Object.keys(button).some((key) => key.startsWith('__reactProps')));
-    }, undefined, { timeout: 30_000 });
-  } catch { throw new AcceptanceError('consent-not-interactive'); }
+  // No wait for hydration: since Ticket 379 the form also works as a plain form post.
   for (const scope of WRITE_SCOPES) {
     const box = page.locator(`input[type="checkbox"][name="scope"][value="${scope}"]`);
     if (await box.count() === 0) {

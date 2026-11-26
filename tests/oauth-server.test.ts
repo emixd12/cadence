@@ -222,4 +222,31 @@ describe("consent handoff", () => {
     overrides.oauth_finish_pending = null;
     await expect(completeOAuthConsent(request(), requestId, null, { rpc } as never)).rejects.toThrow();
   });
+  // Ticket 379. The fix changed the page's referrer policy; the same-origin check stays.
+  it("Ticket 379: still refuses a post with Origin null, no Origin or another site's Origin before reading the request", async () => {
+    const noOrigin = new Request(`${issuer}/oauth/consent`, { method: "POST", headers: { Cookie: `cadence_oauth_${requestId}=${"a".repeat(43)}` } });
+    for (const refused of [request("POST", "null"), noOrigin, request("POST", "https://evil.example"), request("POST", `${issuer}.evil.example`)]) {
+      await expect(completeOAuthConsent(refused, requestId, ["cadence.read"], { rpc } as never)).rejects.toMatchObject({ code: "invalid_request", status: 403 });
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("Ticket 379: a double submit finishes the request once; the second post gets no code", async () => {
+    // The database function consumes the pending request atomically: the second caller gets null.
+    let consumed = false;
+    const once = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name: string, input: Record<string, unknown>) => {
+      if (name !== "oauth_finish_pending") return once(name, input);
+      if (consumed) return { data: null, error: null };
+      consumed = true;
+      return { data: { approved: true, redirect_uri: "http://localhost/callback", state: "state" }, error: null };
+    });
+    const results = await Promise.allSettled([
+      completeOAuthConsent(request(), requestId, ["cadence.read"], { rpc } as never),
+      completeOAuthConsent(request(), requestId, ["cadence.read"], { rpc } as never),
+    ]);
+    const granted = results.filter((result) => result.status === "fulfilled");
+    expect(granted).toHaveLength(1);
+    expect(new URL(granted[0].value.headers.get("location")!).searchParams.get("code")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({ reason: { code: "invalid_request" } });
+  });
 });

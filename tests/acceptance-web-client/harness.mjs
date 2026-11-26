@@ -397,9 +397,8 @@ const consentPage = (rid, client, scopes) => html('Cadence consent', `
   ${scopes.filter((s) => s !== 'cadence.read').map((s) => `<label><input type="checkbox" name="scope" value="${escapeHtml(s)}"${state.writesStartOff ? '' : ' checked'}> ${escapeHtml(s)}</label>`).join('')}
   <button name="decision" value="allow">Allow</button>
   <button name="decision" value="deny">Deny</button>
-</form>`, `
+</form>`, state.consentNotHydrated ? '' : `
 for (const b of document.querySelectorAll('button[name="decision"]')) {
-  b.__reactProps$stub = {};
   b.addEventListener('click', async (e) => {
     e.preventDefault();
     const scopes = [...document.querySelectorAll('input[name="scope"]')].filter((i) => i.type === 'hidden' || i.checked).map((i) => i.value);
@@ -430,7 +429,10 @@ function issuerServer() {
       return res.end(consentPage(r.rid, r.client, shown));
     }
     if (url.pathname === '/oauth/decide') {
-      const input = JSON.parse(body);
+      // Ticket 379: a page that has not hydrated sends the plain form post instead.
+      const native = (req.headers['content-type'] ?? '').startsWith('application/x-www-form-urlencoded');
+      const fields = native ? new URLSearchParams(body) : null;
+      const input = native ? { rid: fields.get('request_id'), decision: fields.get('decision'), scopes: fields.getAll('scope') } : JSON.parse(body);
       const r = requests.get(input.rid);
       // A faulty server that ignores the switches the user cleared.
       if (state.grantAllOnDecide) input.scopes = ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'];
@@ -442,6 +444,11 @@ function issuerServer() {
           state.grants.push({ grant_id: randomUUID(), client_id: `client-${r.client.toLowerCase()}`, client_name: r.client, scopes: input.scopes, created_at: iso() });
         }
         redirect = `${r.ret}?connected=1`;
+      }
+      if (native) {
+        // The stub chat sites listen on loopback; redirect nowhere else.
+        if (new URL(redirect).hostname !== '127.0.0.1') { res.writeHead(400, { 'content-type': 'text/plain' }); return res.end('bad return'); }
+        res.writeHead(303, { location: redirect }); return res.end();
       }
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ redirect }));
