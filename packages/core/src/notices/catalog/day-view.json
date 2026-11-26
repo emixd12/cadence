@@ -1,0 +1,109 @@
+{
+  "feature": "cadence-day-view",
+  "notices": {
+    "day-view.loading": {
+      "meaning": "Says, to a screen reader, that the Cadence day view in an AI client is waiting for the day. Sighted people see placeholder rows.",
+      "text": "Loading the day…",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.unavailable": {
+      "meaning": "Says the Cadence day view could not reach the AI client that opened it, or got no day from Cadence.",
+      "text": "This view could not load the day. Ask for the day again.",
+      "style": "error",
+      "alert": "data_stale",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.empty": {
+      "meaning": "Says in the Cadence day view that the day has no Occurrences.",
+      "text": "Nothing is scheduled for this day.",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.needs-decision": {
+      "meaning": "Counts, in the Cadence day view, the earlier Unresolved items in Needs decision. It is a count only; the view lists none of them.",
+      "text": "{truncated, select, yes {More than {count} earlier items need a decision} other {{count, plural, one {# earlier item needs a decision} other {# earlier items need a decision}}}}",
+      "style": "note",
+      "feature": "needs-decision",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.reconnect": {
+      "meaning": "Stands in place of the Completed, Not Completed and Note controls in the Cadence day view when the AI client's access does not include changes.",
+      "text": "Reconnect to allow changes",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-004"]
+    },
+    "day-view.from-source": {
+      "meaning": "Marks, in the Cadence day view, a Completed row that a connected service marked, so it does not read as the person's own mark.",
+      "text": "From {source}",
+      "style": "note",
+      "feature": "hevy-connector",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.added": {
+      "meaning": "Marks, in the Cadence day view, a row that was added to the day from the person's opportunities, and who added it.",
+      "text": "{source, select, daily_brief {Added from Daily Brief} chat {Added in Chat} mcp {Added by a connected app} other {Added}}",
+      "style": "note",
+      "feature": "behaviors-of-opportunity",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.alongside": {
+      "meaning": "Marks, in the Cadence day view, a row whose Behavior the person set as alongside. A guess is never shown.",
+      "text": "Alongside",
+      "style": "note",
+      "feature": "alongside-behaviors",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001"]
+    },
+    "day-view.conflict": {
+      "meaning": "Refuses a change from the Cadence day view because the item changed somewhere else first. The view has reloaded the day.",
+      "text": "This changed somewhere else. Check it and try again.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001", "INT-DAYVIEW-002", "INT-DAYVIEW-003"]
+    },
+    "day-view.note-current": {
+      "meaning": "Introduces the saved note above the open note editor in the Cadence day view after a refused note save, so the person can compare before saving again.",
+      "text": "The saved note now reads:",
+      "style": "note",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-003"]
+    },
+    "day-view.rate-limited": {
+      "meaning": "Refuses a change from the Cadence day view because the AI client made too many changes, and says how long to wait.",
+      "text": "Too many changes for now. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001", "INT-DAYVIEW-002", "INT-DAYVIEW-003"]
+    },
+    "day-view.not-saved": {
+      "meaning": "Says a change from the Cadence day view did not reach Cadence, or the AI client declined to send it.",
+      "text": "Cadence could not save that. Try again.",
+      "style": "error",
+      "alert": "write_refused",
+      "label": "Not changed",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001", "INT-DAYVIEW-002", "INT-DAYVIEW-003"]
+    },
+    "day-view.reload-failed": {
+      "meaning": "Says a change from the Cadence day view was saved but the view could not read the day again, so its rows may be old.",
+      "text": "Saved. The day did not reload, so this view may be out of date.",
+      "style": "error",
+      "alert": "data_stale",
+      "label": "Out of date",
+      "platforms": ["web"],
+      "interactions": ["INT-DAYVIEW-001", "INT-DAYVIEW-002", "INT-DAYVIEW-003"]
+    }
+  }
+}

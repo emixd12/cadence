@@ -712,8 +712,10 @@ Code: `lib/mcp/apps/` (`config.ts`, `show-day.ts`, `view-resources.ts`,
 - **Log line.** The existing `cadence_mcp` line, with the same labels as `operation`.
   Never the URI, the HTML, a token, arguments or note text.
 - **View HTML seam.** `lib/mcp/apps/day-view-html.ts` exports
-  `DAY_VIEW_HTML: string`. It holds a static placeholder page with no script and no
-  request. Ticket 377 replaces that file with its generated module and keeps the export.
+  `DAY_VIEW_HTML: string`. Since Ticket 377 it is generated: `npm run mcp-views:build`
+  builds `packages/mcp-views` to one HTML file and writes it there, and
+  `tests/mcp-day-view-build.test.ts` fails when the file differs from a fresh build. The
+  view makes no request; `docs/UI_SPEC.md`, "Cadence day view in an AI client".
 - **Rollback.** Set the flag to anything but `true`. No migration and no stored state
   belong to the trial. Clients may hold `tools/list` for five minutes; a call to
   `show_day` in that window gets the stable tool error above.

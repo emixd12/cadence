@@ -9,8 +9,8 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | Style | Notices |
 | --- | ---: |
 | outcome | 37 |
-| error | 91 |
-| note | 27 |
+| error | 96 |
+| note | 35 |
 | question | 5 |
 
 ## Alongside Behaviors
@@ -25,6 +25,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `alongside.form-guess` Shows Cadence's guess beside the unanswered alongside setting in the Behavior form, which planning uses until the person answers. | note | Cadence guesses {guess, select, yes {Yes} other {No}}. Planning uses the guess until you choose. | web | INT-BEHAVIOR-047, `components/behaviors/BehaviorForm.tsx` |
 | `alongside.row-label` Marks a Timeline row whose Behavior can be done alongside other things, and says when that comes from Cadence's guess rather than the person's answer. | note | {source, select, guess {Alongside · a guess} other {Alongside}} | web | INT-BEHAVIOR-046, INT-BEHAVIOR-047, `components/timeline/OccurrenceRow.tsx` |
 | `alongside.where-guess` The Where suggestion line for a Behavior with Where not set, when planning uses Cadence's guess of where it happens. | note | {kind, select, home {Cadence guesses this happens at Home.} anywhere {Cadence guesses this can happen anywhere.} other {Cadence guesses this happens away from home.}} Planning uses the guess until Where is set. | web | INT-PLACE-008, INT-PLACE-009, `components/travel/PlaceLabels.tsx` |
+| `day-view.alongside` Marks, in the Cadence day view, a row whose Behavior the person set as alongside. A guess is never shown. | note | Alongside | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
 
 ## Behavior editor
 
@@ -51,6 +52,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `brief-opportunity.refused.taken` Refuses a brief's Add for today answer because the time is no longer free under the free-slot rule. | error | Not added. {time} is not free now. | web, Mac | INT-BRIEF-010, `lib/services/brief-opportunities.service.ts` |
 | `brief-opportunity.travel-not-checked` Says on a brief's Add for today line that the Behavior happens at a place and travel to it was not checked. | note | Travel not checked. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
 | `brief-opportunity.undone` Says on a brief's Add for today line that Undo removed the added item from today. | outcome | Removed from today. | web, Mac | INT-BRIEF-010, `components/briefing/BriefOpportunityLines.tsx` |
+| `day-view.added` Marks, in the Cadence day view, a row that was added to the day from the person's opportunities, and who added it. | note | {source, select, daily_brief {Added from Daily Brief} chat {Added in Chat} mcp {Added by a connected app} other {Added}} | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
 | `opportunity.added` Confirms that the person added an opportunity Behavior to today at a time or in a time range. | outcome | {title} added to today: {time}. | web, Mac | INT-TIMELINE-022, `app/design-system/OpportunityBasketBench.tsx`, `apps/desktop/src/local-opportunity.service.ts`, `lib/services/opportunity.service.ts` |
 | `opportunity.added-from` Marks a Timeline row that was added from the opportunity basket, and who added it. | note | {source, select, daily_brief {Added from Daily Brief} chat {Added in Chat} mcp {Added by a connected app} other {Added}} | web, Mac | INT-TIMELINE-022, INT-TIMELINE-024, `components/timeline/OccurrenceRow.tsx` |
 | `opportunity.failed` Says an add, Done now or Remove did not reach Cadence, so nothing changed. | error | Cadence could not change today's items. Try again. | web, Mac | INT-TIMELINE-022, INT-TIMELINE-023, INT-TIMELINE-024, `app/(app)/timeline/opportunity-actions.ts`, `packages/core/src/types/timeline.ts`, `lib/services/opportunity-placement.ts` |
@@ -66,6 +68,20 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `opportunity.remove-refused.not-found` Refuses Remove because the item is not an added opportunity in the person's account, for example after another device removed it. | error | Not removed. This item is no longer on today's Timeline. | web, Mac | INT-TIMELINE-024, `app/(app)/timeline/opportunity-actions.ts`, `app/design-system/OpportunityBasketBench.tsx`, `lib/services/opportunity-placement.ts` |
 | `opportunity.remove-refused.scheduled` Refuses Remove from Chat or a connected app because the item comes from the Behavior's schedule, not from the opportunity basket. | error | Not removed. {title} is on its schedule. Only an added item can be removed. | web, Mac | INT-TIMELINE-024, `lib/services/opportunity-integration.service.ts` |
 | `opportunity.removed` Confirms that the person removed an added item from today, or from Needs decision, back to the opportunity basket. | outcome | {title} removed. It stays in your opportunities. | web, Mac | INT-TIMELINE-024, `app/design-system/OpportunityBasketBench.tsx`, `apps/desktop/src/local-opportunity.service.ts`, `lib/services/opportunity.service.ts` |
+
+## Cadence day view
+
+| Notice | Style | Words | Where | Shown in |
+| --- | --- | --- | --- | --- |
+| `day-view.conflict` Refuses a change from the Cadence day view because the item changed somewhere else first. The view has reloaded the day. | error | Not changed. This changed somewhere else. Check it and try again. | web | INT-DAYVIEW-001, INT-DAYVIEW-002, INT-DAYVIEW-003, `packages/mcp-views/src/model.ts` |
+| `day-view.empty` Says in the Cadence day view that the day has no Occurrences. | note | Nothing is scheduled for this day. | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
+| `day-view.loading` Says, to a screen reader, that the Cadence day view in an AI client is waiting for the day. Sighted people see placeholder rows. | note | Loading the day… | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
+| `day-view.not-saved` Says a change from the Cadence day view did not reach Cadence, or the AI client declined to send it. | error | Not changed. Cadence could not save that. Try again. | web | INT-DAYVIEW-001, INT-DAYVIEW-002, INT-DAYVIEW-003, `packages/mcp-views/src/model.ts` |
+| `day-view.note-current` Introduces the saved note above the open note editor in the Cadence day view after a refused note save, so the person can compare before saving again. | note | The saved note now reads: | web | INT-DAYVIEW-003, `packages/mcp-views/src/DayView.tsx` |
+| `day-view.rate-limited` Refuses a change from the Cadence day view because the AI client made too many changes, and says how long to wait. | error | Not changed. Too many changes for now. Try again in {seconds, plural, one {# second} other {# seconds}}. | web | INT-DAYVIEW-001, INT-DAYVIEW-002, INT-DAYVIEW-003, `packages/mcp-views/src/DayView.tsx`, `packages/mcp-views/src/model.ts` |
+| `day-view.reconnect` Stands in place of the Completed, Not Completed and Note controls in the Cadence day view when the AI client's access does not include changes. | note | Reconnect to allow changes | web | INT-DAYVIEW-004, `packages/mcp-views/src/DayView.tsx` |
+| `day-view.reload-failed` Says a change from the Cadence day view was saved but the view could not read the day again, so its rows may be old. | error | Out of date. Saved. The day did not reload, so this view may be out of date. | web | INT-DAYVIEW-001, INT-DAYVIEW-002, INT-DAYVIEW-003, `packages/mcp-views/src/model.ts` |
+| `day-view.unavailable` Says the Cadence day view could not reach the AI client that opened it, or got no day from Cadence. | error | This view could not load the day. Ask for the day again. | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
 
 ## Daily Brief
 
@@ -153,6 +169,12 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `run.pause-back-on` Refuses a pause whose back-on day is not after its first paused day and after today. | error | Pick a back-on day after the first paused day and after today. | web, Mac | INT-BEHAVIOR-031, `packages/core/src/services/behavior-values.ts` |
 | `run.paused` Says on the Timeline, on the first paused day, that a Behavior is paused and when it comes back, with Resume now and Close. | outcome | {back, select, none {{title} is paused.} other {{title} is paused, back {back}.}} | web, Mac | INT-TIMELINE-020, `components/timeline/BehaviorRunNotices.tsx` |
 
+## Hevy connector
+
+| Notice | Style | Words | Where | Shown in |
+| --- | --- | --- | --- | --- |
+| `day-view.from-source` Marks, in the Cadence day view, a Completed row that a connected service marked, so it does not read as the person's own mark. | note | From {source} | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
+
 ## Move for today
 
 | Notice | Style | Words | Where | Shown in |
@@ -187,6 +209,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
+| `day-view.needs-decision` Counts, in the Cadence day view, the earlier Unresolved items in Needs decision. It is a count only; the view lists none of them. | note | {truncated, select, yes {More than {count} earlier items need a decision} other {{count, plural, one {# earlier item needs a decision} other {# earlier items need a decision}}}} | web | INT-DAYVIEW-001, `packages/mcp-views/src/DayView.tsx` |
 | `timeline.left-to-decide` Counts the earlier items in Needs decision that still wait for Completed or Not Completed. | note | {count, plural, =0 {None left to decide} other {# left to decide}} | web, Mac | INT-TIMELINE-002, `components/timeline/TimelineGroup.tsx` |
 
 ## Periods

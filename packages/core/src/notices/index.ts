@@ -1,6 +1,7 @@
 import alongside from "./catalog/alongside.json";
 import dailyBrief from "./catalog/daily-brief.json";
 import dailyBriefMoves from "./catalog/daily-brief-moves.json";
+import dayView from "./catalog/day-view.json";
 import endingPausingArchiving from "./catalog/ending-pausing-archiving.json";
 import moveForToday from "./catalog/move-for-today.json";
 import opportunity from "./catalog/opportunity.json";
@@ -62,7 +63,7 @@ export type NoticeEntry = Readonly<{
 type Catalog = Readonly<{ feature: string; notices: Readonly<Record<string, NoticeEntry>> }>;
 
 // JSON types widen `style` to string; the notices test and `npm run map:check` validate every entry.
-const CATALOGS = [alongside, dailyBrief, dailyBriefMoves, endingPausingArchiving, moveForToday, opportunity, periods, placeSearch, subBehaviors, timeline] as const;
+const CATALOGS = [alongside, dailyBrief, dailyBriefMoves, dayView, endingPausingArchiving, moveForToday, opportunity, periods, placeSearch, subBehaviors, timeline] as const;
 
 type CatalogIds<C> = C extends { notices: infer N } ? keyof N & string : never;
 export type NoticeId = CatalogIds<(typeof CATALOGS)[number]>;

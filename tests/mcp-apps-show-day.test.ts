@@ -300,11 +300,15 @@ describe("view resources", () => {
     expect(dayViewHtml()).toEqual({ ok: true, html: DAY_VIEW_HTML });
   });
 
-  it("ships a placeholder view that runs nothing and requests nothing", () => {
+  it("ships the built view (Ticket 377) as one self-contained file under the byte cap", () => {
+    // What the view does and requests is tested on the bundle itself in tests/mcp-day-view.dom.test.ts.
     expect(DAY_VIEW_HTML.startsWith("<!doctype html>")).toBe(true);
-    expect(DAY_VIEW_HTML).toContain("Cadence day view is not built yet.");
-    for (const forbidden of [/<script/i, /<link/i, /<img/i, /<iframe/i, /<form/i, /<style/i, /\bsrc=/i, /\bhref=/i, /url\(/i, /https?:/i, /\bon[a-z]+=/i]) {
-      expect(DAY_VIEW_HTML).not.toMatch(forbidden);
+    expect(DAY_VIEW_HTML.includes("<title>Cadence day</title>")).toBe(true);
+    expect(DAY_VIEW_HTML.includes('<script type="module"')).toBe(true);
+    // Booleans, so a failure does not print the bundle. Inline code only: no tag loads a file.
+    const markup = DAY_VIEW_HTML.replace(/<script[^>]*>[\s\S]*?<\/script>/g, "").replace(/<style[^>]*>[\s\S]*?<\/style>/g, "");
+    for (const forbidden of [/<link/i, /<img/i, /<iframe/i, /<form/i, /\bsrc=/i, /\bhref=/i, /https?:/i, /\bon[a-z]+=/i]) {
+      expect(forbidden.test(markup), String(forbidden)).toBe(false);
     }
     expect(Buffer.byteLength(DAY_VIEW_HTML, "utf8")).toBeLessThan(MCP_APP_RESOURCE_BYTE_CAP);
   });

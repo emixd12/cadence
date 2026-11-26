@@ -900,6 +900,45 @@ timezone dates, app-named Disconnect buttons, and a closed native Recent activit
 disclosure. Loading failures, empty grants, pending actions, and action results
 have separate text. Controls preserve 44px targets and semantic live feedback.
 
+## Cadence day view (MCP Apps, Ticket 377)
+
+`packages/mcp-views/src/day.css` and `DayView.tsx`. The view runs inside an AI client's
+frame, so it takes the client's look first and Cadence's second.
+
+- **Tokens:** the view defines Cadence's surface-scoped names (`--foreground`,
+  `--muted-readable`, `--line`, `--alert-signal`, `--focus`) from the client's MCP Apps
+  style variables, each falling back to the matching `--theme-*` value copied from
+  `packages/ui/tokens.css`: `--color-text-primary`, `--color-text-secondary`,
+  `--color-border-secondary`, `--color-text-danger`, `--color-ring-primary`. Controls use
+  `--color-border-primary`; the day note block uses `--color-background-secondary` (Cold
+  Surface); a selected status uses `--color-background-inverse` with `--color-text-inverse`
+  (Monolith Blue with its foreground). The page ground is `--color-background-primary`
+  (Bleached Newsprint).
+- **Dark:** Cadence has no dark theme. The view has dark fallbacks for a client that sends
+  a dark theme and no variables: ink and paper swapped, Monolith Blue lightened. They live
+  only in `day.css`. The client's theme arrives as `data-theme` on the root.
+- **Type:** the client's `--font-sans` and size variables, else IBM Plex Sans if installed,
+  then system fonts. No font file loads. Three sizes: 18px heading, 16px Behavior title,
+  14px body, with 12px for the grey facts line. Fallback weight is 400 everywhere, as in the
+  product; a client's semibold applies to the heading only.
+- **Rows:** unboxed, divided by one `--line` rule, as on the Timeline. Time in grey with
+  tabular figures, then the title. Facts ("Completed · From Hevy", "Alongside") are one grey
+  line under them, never chips.
+- **Buttons:** unlike the Timeline's text links, row actions are outlined buttons at least
+  44px high and wide, because the view is touched on phones inside another app. The current
+  status is filled and also written on the facts line, so it does not rest on color. Radius
+  is the client's `--border-radius-md`, else square.
+- **Alert:** one line in `--alert-signal`, label first ("Not changed."), no box or icon,
+  `role="alert"`. Notes and the reconnect line are grey.
+- **Loading:** three grey placeholder rows and a screen-reader status. No spinner.
+- **Motion:** the disclosure triangle turns in 180ms; reduced motion turns that off.
+- **Words:** `packages/core/src/notices/catalog/day-view.json`. The bundle carries that one
+  catalog file and the catalog's formatter.
+
+Bench: `/design-system?preview=mcp-day-view`. It frames the shipped bundle in a sandbox and
+can send no variables (Cadence fallbacks) or Claude's published ones, light or dark, at 375px
+or 720px.
+
 ## Developer documentation (Ticket 229)
 
 The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.

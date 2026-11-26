@@ -1147,6 +1147,25 @@ old consent form. Expired, consumed, or invalid requests require a new client
 connection. A failed Disconnect remains visible with a reload/retry instruction.
 No hosted actions or live Google-provider acceptance follow from local tests.
 
+## Mark the day from an AI client (Ticket 377)
+
+Behind `CADENCE_MCP_APPS`, off in production (D36).
+
+1. In a connected AI client that draws MCP Apps views, ask to see today in Cadence.
+2. The client calls `show_day` and draws the Cadence day view in the conversation.
+3. Click Completed or Not Completed on a row. The row changes after Cadence confirms it.
+   Click the same status again to return the row to Unresolved.
+4. For a routine, click Completed or Not Completed on its row to mark every step, or open
+   it and mark one step.
+5. Click Note, write, and click Save note.
+6. If the row changed somewhere else, the view reloads the day and says so. Check the row
+   and click again.
+7. If the view says "Reconnect to allow changes", reconnect Cadence in the AI client with
+   the permission to change Occurrences, then ask for the day again.
+
+Earlier Unresolved items appear only as a count. Ask the AI client about them, or open
+Needs decision in Cadence.
+
 ## Calendar for Daily Brief (Tickets 187, 306 and 307)
 
 Daily Brief has no Google Calendar connection of its own since Ticket 307. Connect Google
