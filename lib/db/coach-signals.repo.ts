@@ -9,6 +9,7 @@ import type {
   CoachSignalOccurrence,
   ResolveCoachSignalsInput,
 } from "@cadence/core/resolvers/coach-signals.resolver";
+import type { PeriodDates } from "@cadence/core/resolvers/period.resolver";
 
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import type { Json } from "@/lib/db/database.types";
@@ -62,6 +63,12 @@ export type CoachSignalReads = Readonly<{
   reminders(since: string, before: string): Promise<CoachSignalReminder[]>;
   /** Stopped timed sessions for Occurrences dated in [since, before). */
   sessions(since: string, before: string): Promise<CoachSignalSession[]>;
+  /**
+   * Ticket 372: the first and last day of every Period with a day in [from, to], both
+   * inclusive. Dates only: the label and the note are never selected. Optional so a
+   * port written before Periods still satisfies the type; the visit then counts none.
+   */
+  periods?(from: string, to: string): Promise<PeriodDates[]>;
 }>;
 
 const PROPOSAL_STATUS_ANSWERS: Readonly<Record<string, CoachBriefAnswerKind>> = {
@@ -149,6 +156,15 @@ export function createCoachSignalReads(client: AppSupabaseClient, userId: string
         .order("id").range(from, to));
       return rows.flatMap((row) => row.stopped_at
         ? [{ occurrenceId: row.occurrence_id, behaviorId: row.behavior_id, startedAt: row.started_at, stoppedAt: row.stopped_at }] : []);
+    },
+    async periods(from, to) {
+      // Owner-only select under RLS (migration 20261126130000). Until that migration is
+      // on the database the table is missing: the visit then counts no Period days
+      // instead of failing, as the answers read does.
+      const rows = await pages("read_periods_failed", (start, end) => client.from("periods")
+        .select("id,start_on,end_on").eq("user_id", userId)
+        .lte("start_on", to).or(`end_on.is.null,end_on.gte.${from}`).order("id").range(start, end), isMissingRelation);
+      return (rows ?? []).map((row) => ({ start_on: row.start_on, end_on: row.end_on }));
     },
     async answers(since) {
       // Workstream 3A1 records every answer in move_proposal_answers. Until that table

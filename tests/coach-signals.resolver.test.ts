@@ -55,6 +55,7 @@ describe("completion_drop", () => {
         recent_days: 14, recent_completed: 3, recent_resolved: 6, recent_unresolved: 1, recent_rate: 0.5,
         baseline_days: 28, baseline_completed: 10, baseline_resolved: 12, baseline_unresolved: 0, baseline_rate: 0.83,
         drop: 0.33,
+        recent_period_days: 0, baseline_period_days: 0,
       },
     }]);
   });
@@ -72,6 +73,77 @@ describe("completion_drop", () => {
     const recent = occurrences(READING.id, -14, [n, n, n, n, n, n]);
     const archived = { ...READING, active: false };
     expect(resolveV1(input({ behaviors: [archived], occurrences: [...baseline, ...recent] }))).toEqual([]);
+  });
+});
+
+describe("Period days in completion_drop (Ticket 372)", () => {
+  // Baseline: days -42..-15. Recent: days -14..-1. Reading drops; Gym drops by less than the bar.
+  const reading = [
+    ...occurrences(READING.id, -42, [...Array(10).fill(c), ...Array(2).fill(n)]), // 10/12 = 0.83
+    ...occurrences(READING.id, -14, [c, c, c, n, n, n, u]), // 3/6 = 0.5
+  ];
+  const gym = [
+    ...occurrences(GYM.id, -42, [...Array(10).fill(c), ...Array(2).fill(n)]), // 0.83
+    ...occurrences(GYM.id, -14, [c, c, c, c, n, n]), // 0.67, drop 0.17: no signal
+  ];
+  const dates = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => day(from + index));
+  const drops = (periodDates?: readonly string[]) => resolveCoachSignals(input({ occurrences: [...reading, ...gym], ...(periodDates ? { periodDates } : {}) }))
+    .filter((signal) => signal.kind === "completion_drop");
+
+  it("counts the Period days in each counting period, and reports 0 when no Period was read", () => {
+    // Days -20..-10: six fall in the baseline (-20..-15), five in the recent 14 (-14..-10).
+    expect(drops(dates(-20, -10))[0]!.facts).toMatchObject({ recent_period_days: 5, baseline_period_days: 6 });
+    expect(drops()[0]!.facts).toMatchObject({ recent_period_days: 0, baseline_period_days: 0 });
+    expect(drops([])[0]!.facts).toMatchObject({ recent_period_days: 0, baseline_period_days: 0 });
+  });
+
+  it("leaves out today, later days and days before the baseline, and counts a repeated date once", () => {
+    const facts = drops([day(-43), day(-42), day(-15), day(-14), day(-14), day(-1), day(0), day(3)])[0]!.facts;
+    expect(facts).toMatchObject({ recent_period_days: 2, baseline_period_days: 2 });
+  });
+
+  it("puts the same counts on every completion_drop of the visit: a Period covers the whole account", () => {
+    const both = [...reading, ...occurrences(GYM.id, -42, [...Array(10).fill(c), ...Array(2).fill(n)]), ...occurrences(GYM.id, -14, [c, n, n, n, n, n])];
+    const signals = resolveCoachSignals(input({ occurrences: both, periodDates: dates(-7, -1) })).filter((signal) => signal.kind === "completion_drop");
+    expect(signals.map((signal) => [signal.behaviorId, signal.facts.recent_period_days, signal.facts.baseline_period_days]))
+      .toEqual([[READING.id, 7, 0], [GYM.id, 7, 0]]);
+  });
+
+  it("suppresses, delays and re-thresholds nothing: the emitted signals and every other fact are identical with and without periodDates", () => {
+    const base = input({
+      occurrences: [...reading, ...gym],
+      decisions: Array.from({ length: 6 }, (_, index) => ({ occurrenceId: `d${index}`, behaviorId: READING.id, localDate: day(-10 + index),
+        recordedAt: `${day(-8 + index)}T15:00:00Z`, timezone: ZONE })),
+      answers: [{ behaviorId: GYM.id, localDate: day(-3), kind: "no" }],
+    });
+    const without = resolveCoachSignals(base);
+    expect(without.some((signal) => signal.kind === "completion_drop")).toBe(true);
+    // Every day of both counting periods covered, a Period over only the recent 14 days, and one over only the baseline.
+    for (const periodDates of [dates(-42, -1), dates(-14, -1), dates(-42, -15), dates(-60, 5)]) {
+      const withPeriods = resolveCoachSignals({ ...base, periodDates });
+      const strip = (signals: typeof without) => signals.map((signal) => ({ ...signal,
+        facts: Object.fromEntries(Object.entries(signal.facts).filter(([name]) => name !== "recent_period_days" && name !== "baseline_period_days")) }));
+      expect(strip(withPeriods)).toEqual(strip(without));
+      // Only completion_drop carries the counts; every other kind is the same object for object.
+      expect(withPeriods.filter((signal) => signal.kind !== "completion_drop")).toEqual(without.filter((signal) => signal.kind !== "completion_drop"));
+      expect(withPeriods.filter((signal) => signal.kind !== "completion_drop").some((signal) => "recent_period_days" in signal.facts)).toBe(false);
+    }
+  });
+
+  it("cannot put a Period label in facts: the resolver's input type takes local dates only, so no label or note reaches it", () => {
+    // `periodDates` is `readonly string[]` of local dates. A Period record does not fit the type.
+    const withLabel = { label: "Sick", note: "Flu, stayed in bed", start_on: day(-7), end_on: day(-1) };
+    // @ts-expect-error A Period record is not a local date.
+    const rejected: NonNullable<ResolveCoachSignalsInput["periodDates"]> = [withLabel];
+    expect(rejected).toHaveLength(1);
+    const signals = resolveCoachSignals(input({ occurrences: [...reading, ...gym], periodDates: dates(-7, -1) }));
+    const drop = signals.find((signal) => signal.kind === "completion_drop")!;
+    expect([typeof drop.facts.recent_period_days, typeof drop.facts.baseline_period_days]).toEqual(["number", "number"]);
+    const text = JSON.stringify(signals);
+    expect(text).not.toContain("Sick");
+    expect(text).not.toContain("Flu");
+    // No fact holds a covered date either: the two new facts are the only trace of a Period.
+    for (const date of dates(-7, -1)) expect(JSON.stringify(drop.facts)).not.toContain(date);
   });
 });
 

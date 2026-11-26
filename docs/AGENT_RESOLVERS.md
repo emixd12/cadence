@@ -393,6 +393,17 @@ setup facts the advice matcher uses, and `repeated_move` gains per-weekday move 
 Fact names follow `ADVICE_SIGNAL_FACTS` in `packages/core/src/types/advice-cards.ts`.
 Paired test: `tests/coach-signals-v2.resolver.test.ts`.
 
+Versions 5 and 6 (`coach-signals-5`, and `coach-signals-6` while `CADENCE_ALONGSIDE` is
+on; Ticket 372, D35) replace versions 3 and 4. The resolver takes an optional
+`periodDates`: the local dates covered by any Period in the read window, which
+`lib/services/coach-signals-job.service.ts` computes with `periodCoveredDates` from the
+dates `lib/db/coach-signals.repo.ts` reads under RLS. `completion_drop` facts gain the
+counts `recent_period_days` and `baseline_period_days`, 0 without a Period. The input is
+dates only, so a Period's label or note cannot reach a fact. A Period is annotation
+only: the resolver must not read `periodDates` to suppress, delay or re-threshold a
+signal, and `tests/coach-signals.resolver.test.ts` proves the emitted signals and every
+other fact are identical with and without it.
+
 ## Advice matcher (advisor plan Phase 4, workstream 4A)
 
 `packages/core/src/resolvers/advice-matcher.resolver.ts` ranks advice cards for one

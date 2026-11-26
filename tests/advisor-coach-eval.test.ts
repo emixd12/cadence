@@ -10,9 +10,23 @@ import { resolveCoachSignals } from "@cadence/core/resolvers/coach-signals.resol
 const seedsOnly = { label: "seeds", model: "openai/gpt-5.6-luna", generate: async () => null };
 
 describe("coach eval accounts", () => {
-  it("has the 14 brief-eval accounts plus the five the review added and the alongside account", () => {
-    expect(COACH_EVAL_FIXTURE_IDS).toHaveLength(20);
-    expect(COACH_EVAL_FIXTURE_IDS).toEqual(expect.arrayContaining(["brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions", "alongside_evening"]));
+  it("has the 14 brief-eval accounts plus the five the review added, the alongside account and the Period account", () => {
+    expect(COACH_EVAL_FIXTURE_IDS).toHaveLength(21);
+    expect(COACH_EVAL_FIXTURE_IDS).toEqual(expect.arrayContaining(["brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions", "alongside_evening", "period_sick_week"]));
+  });
+
+  it("Ticket 372: period_sick_week reports a completion drop with its Period days, and the Period suppresses nothing", () => {
+    const input = coachEvalFixture("period_sick_week").inputFor("2026-11-19");
+    // "Sick", November 10 to 16: all seven days fall in the recent 14 (November 5 to 18).
+    expect(input.periodDates).toEqual(["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15", "2026-11-16"]);
+    const signals = resolveCoachSignals(input);
+    const drop = signals.find((signal) => signal.kind === "completion_drop" && signal.behaviorId === "gym");
+    expect(drop?.facts).toMatchObject({ recent_period_days: 7, baseline_period_days: 0 });
+    // The same account with no Period read: the same signals, with both counts at 0.
+    expect(resolveCoachSignals({ ...input, periodDates: undefined })).toEqual(signals.map((signal) => signal.kind === "completion_drop"
+      ? { ...signal, facts: { ...signal.facts, recent_period_days: 0, baseline_period_days: 0 } } : signal));
+    // The input and the facts carry dates and counts, never the label.
+    expect(JSON.stringify([input, signals]).toLowerCase()).not.toContain("sick");
   });
 
   it("Ticket 359: alongside items (the helmet and the pill) do not crowd the evening hour", () => {
@@ -40,7 +54,7 @@ describe("coach eval accounts", () => {
 });
 
 describe("coach eval with the cards' own wording", () => {
-  // One test per account. As a single test the 19 accounts (20 since Ticket 359) took 2.7 to 4.4 s on GitHub's
+  // One test per account. As a single test the 19 accounts (21 since Ticket 372) took 2.7 to 4.4 s on GitHub's
   // runners and passed the 5 s limit on 3 of 11 runs on November 20, 2026.
   const tipsByFixture = new Map<string, number>();
 
