@@ -8,6 +8,7 @@ import type {
   CoachSignalSession,
   ResolveCoachSignalsInput,
 } from "@cadence/core/resolvers/coach-signals.resolver";
+import { periodCoveredDates } from "@cadence/core/resolvers/period.resolver";
 
 import type { DayNote } from "../advisor-tips-writer";
 
@@ -18,6 +19,7 @@ import type { DayNote } from "../advisor-tips-writer";
  * notes) expanded by code into 8 weeks of history with a fixed random seed, so a run is
  * repeatable. The 14 names of the brief eval come first, then the five accounts the review
  * added: brand new, steady, a month of moves, lapsed, and notes with hidden instructions.
+ * Ticket 359 added the alongside account and Ticket 372 the account with a Period.
  * No account or provider data is read.
  */
 export const COACH_EVAL_FIXTURE_VERSION = "coach-eval-2026-11-19.1";
@@ -25,7 +27,7 @@ export const COACH_EVAL_FIXTURE_VERSION = "coach-eval-2026-11-19.1";
 export const COACH_EVAL_FIXTURE_IDS = ["busy_professional", "irregular_schedule", "new_user", "heavy_mover", "daylight_saving",
   "near_midnight", "timezone_change", "mac_linked", "stale_calendar", "hidden_instructions",
   "quiet_day", "declined_and_undone", "alongside_and_never_move", "late_evening",
-  "brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions", "alongside_evening"] as const;
+  "brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions", "alongside_evening", "period_sick_week"] as const;
 export type CoachEvalFixtureId = typeof COACH_EVAL_FIXTURE_IDS[number];
 
 /** The first simulated day. Later days follow. */
@@ -75,9 +77,14 @@ type Profile = Readonly<{
   forbiddenText?: readonly string[];
   /**
    * Ticket 359: the visit read each Behavior's effective alongside value, as it does with
-   * CADENCE_ALONGSIDE on (signal version 4). Other profiles leave it unread (version 3).
+   * CADENCE_ALONGSIDE on (signal versions 4 and 6). Other profiles leave it unread.
    */
   alongsideRead?: true;
+  /**
+   * Ticket 372: the account's Periods, as local dates (both inclusive; a null end is
+   * ongoing). The label stays here: the signal input carries the covered dates only.
+   */
+  periods?: readonly Readonly<{ label: string; start_on: string; end_on: string | null }>[];
 }>;
 
 export type CoachEvalFixture = Readonly<{
@@ -184,6 +191,13 @@ const PROFILES: Readonly<Record<CoachEvalFixtureId, Profile>> = {
       { id: "read", title: "Read", start: "20:10", rate: 0.3, length: 30 }, { id: "journal", title: "Journal", start: "20:20", rate: 0.3, length: 10 },
       { id: "gym", title: "Gym session", start: "07:00", rate: 0.85, length: 60 }, { id: "walk", title: "Lunch walk", start: "12:00", rate: 0.85, length: 20 },
     ] },
+  // Ticket 372: "Sick", November 10 to 16, covers 7 of the 14 recent days on the first
+  // morning. Gym drops over those two weeks; the Period is context and suppresses nothing.
+  period_sick_week: { description: "A week marked Sick; Gym drops over the same two weeks.", timezone: NY, ageDays: 130,
+    forbiddenText: ["sick"], periods: [{ label: "Sick", start_on: "2026-11-10", end_on: "2026-11-16" }], behaviors: [
+      { id: "gym", title: "Gym", start: "07:00", rate: 0.9, recentRate: 0.15, length: 60 },
+      { id: "read", title: "Read", start: "21:00", rate: 0.8, length: 20 }, { id: "vit", title: "Vitamins", start: "08:00", rate: 0.95 },
+    ] },
 };
 
 export function coachEvalFixtures(ids: readonly CoachEvalFixtureId[] = COACH_EVAL_FIXTURE_IDS): CoachEvalFixture[] {
@@ -263,6 +277,8 @@ export function coachEvalFixture(id: CoachEvalFixtureId): CoachEvalFixture {
         answers: [],
         reminders: reminders.filter((row) => known(row.sentAt)),
         sessions: sessions.filter((row) => known(row.stoppedAt)),
+        // Covered dates through today, as the visit computes them. Never a label.
+        ...(profile.periods ? { periodDates: [...periodCoveredDates(profile.periods, firstDay.toString(), localDate)].sort() } : {}),
       };
     },
   };
