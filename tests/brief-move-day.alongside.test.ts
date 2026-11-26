@@ -8,6 +8,7 @@ import type { Occurrence } from "@/lib/types/database";
 
 const mocks = vi.hoisted(() => ({ occurrences: [] as Occurrence[] }));
 vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: async () => mocks.occurrences }));
+vi.mock("@/lib/services/behavior-length.service", async () => ({ readBehaviorLengths: (await import("./helpers/no-tracked-history")).readBehaviorLengthsWithoutHistory }));
 
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { behaviorEstimateInputHash, readBriefMoveDay } from "@/lib/services/brief-move-day.service";
