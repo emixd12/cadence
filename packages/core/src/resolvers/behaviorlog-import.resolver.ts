@@ -291,6 +291,12 @@ type ParsedJsonlRecord = {
 export type ResolveBehaviorLogImportPreviewInput = {
   reminderChannel?: "browser_push" | "other";
   convertNativeRemindersToBrowser?: boolean;
+  /**
+   * Ticket 364 (D33): read `extensions.app.cadence.alongside` into `cadenceAlongside`.
+   * The hosted app sets it while CADENCE_ALONGSIDE is on; off, the key is ignored and the
+   * plan is unchanged. The Mac reads it from Ticket 363.
+   */
+  readAlongside?: boolean;
   files: BehaviorLogImportFile[];
   existing?: BehaviorLogExistingRecords;
   supportedSchemaVersions?: readonly string[];
@@ -415,7 +421,7 @@ export function resolveBehaviorLogImportPreview(
     : [];
   const plan: BehaviorLogImportPlan = {
     behaviors: behaviorRows
-      .map((row) => toBehaviorPlan(row, errors, warnings))
+      .map((row) => toBehaviorPlan(row, errors, warnings, input.readAlongside === true))
       .filter((record): record is BehaviorLogImportBehaviorPlan =>
         Boolean(record),
       ),
@@ -505,6 +511,7 @@ export function resolveBehaviorLogImportMergePreview(
     supportedSchemaVersions: input.supportedSchemaVersions,
     reminderChannel: input.reminderChannel,
     convertNativeRemindersToBrowser: input.convertNativeRemindersToBrowser,
+    ...(input.readAlongside ? { readAlongside: true } : {}),
   });
   const mergePreview = buildMergePreview({
     plan: preview.plan,
@@ -1032,6 +1039,7 @@ function toBehaviorPlan(
   row: ParsedJsonlRecord,
   errors: BehaviorLogImportIssue[],
   warnings: BehaviorLogImportIssue[],
+  readAlongside = false,
 ): BehaviorLogImportBehaviorPlan | null {
   const id = readRequiredString(row, "behavior_id", errors);
   const title = readRequiredString(row, "title", errors);
@@ -1056,6 +1064,7 @@ function toBehaviorPlan(
     errors,
   );
   const subBehaviorLink = readExtensionSubBehaviorLink(cadence, row, errors);
+  const cadenceAlongside = readAlongside ? readExtensionAlongside(cadence, row, errors) : undefined;
 
   if (
     expectedDurationMinutes !== null &&
@@ -1112,6 +1121,7 @@ function toBehaviorPlan(
     ...(cadenceRun === undefined ? {} : { cadenceRun }),
     ...(cadenceAutoArchivedAt === undefined ? {} : { cadenceAutoArchivedAt }),
     ...(cadenceIsOpportunity === null ? {} : { cadenceIsOpportunity }),
+    ...(cadenceAlongside === undefined ? {} : { cadenceAlongside }),
     ...(subBehaviorLink ?? {}),
     active: archivedAtUtc === null,
     cadenceActive,
@@ -5721,6 +5731,24 @@ function readExtensionInstant(
   errors.push({ severity: "error", code: `cadence_${field}_invalid`,
     message: `${row.file} row ${row.row}: extensions.app.cadence.${field} must be a UTC instant or null.`,
     file: row.file, row: row.row, path: `extensions.app.cadence.${field}` });
+  return undefined;
+}
+
+/**
+ * The person's alongside answer (Ticket 364): true, false or null (unanswered); undefined
+ * when the key is absent. Any other value is an error. BehaviorLog has no field for it.
+ */
+function readExtensionAlongside(
+  extension: JsonRecord | null,
+  row: ParsedJsonlRecord,
+  errors: BehaviorLogImportIssue[],
+): boolean | null | undefined {
+  if (!extension || !Object.hasOwn(extension, "alongside")) return undefined;
+  const value = extension.alongside;
+  if (value === null || typeof value === "boolean") return value;
+  errors.push({ severity: "error", code: "cadence_alongside_invalid",
+    message: `${row.file} row ${row.row}: extensions.app.cadence.alongside must be true, false or null.`,
+    file: row.file, row: row.row, path: "extensions.app.cadence.alongside" });
   return undefined;
 }
 

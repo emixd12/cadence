@@ -15,7 +15,7 @@
       "benchAnchor": "design-system#ds-composite-behavior-form",
       "trackUsages": "optional",
       "status": "active",
-      "notes": "Ticket 215 adds optional Where (Not set, Anywhere, Home, A place) with a Place field for A place and one travel hint."
+      "notes": "Ticket 215 adds optional Where (Not set, Anywhere, Home, A place) with a Place field for A place and one travel hint. Ticket 358: with alongside data (hosted web, CADENCE_ALONGSIDE on) it shows Can be done alongside other things (Not answered, Yes, No) with a Use the guess line while unanswered, and takes the Where suggestion line below Where."
     },
     {
       "id": "composite.occurrence-note-form",
@@ -71,7 +71,7 @@
       "benchAnchor": "design-system#ds-composite-occurrence-row",
       "trackUsages": "optional",
       "status": "active",
-      "notes": "One Timeline occurrence row: the behavior and time, Completed and Not Completed actions, and an expandable area for the note and Move for today."
+      "notes": "One Timeline occurrence row: the behavior and time, Completed and Not Completed actions, and an expandable area for the note and Move for today. Ticket 358: a small Alongside label (Alongside \u00b7 a guess when guessed) when the view carries alongside."
     },
     {
       "id": "flow.sign-in-methods",
@@ -971,7 +971,7 @@
       "benchAnchor": "design-system#ds-composite-behavior-place-assist",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 216: one sparse line on a Behavior record, either a Where suggestion (Review Where, Dismiss; carries its rule version) or the first missing-marker prompt (I'm here, Not now). A suggestion only fills the form."
+      "notes": "Ticket 216: one sparse line on a Behavior record, either a Where suggestion (Review Where, Dismiss; carries its rule version) or the first missing-marker prompt (I'm here, Not now). A suggestion only fills the form. Ticket 358: the same line also states a guessed Where for a Behavior with Where Not set (basis guess), with the same Review Where and Dismiss."
     },
     {
       "id": "flow.consent-form",

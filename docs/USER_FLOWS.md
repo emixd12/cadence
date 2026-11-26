@@ -601,6 +601,22 @@ The Behaviors screen distinguishes two edit modes:
 Web and Cadence for Mac use the same shared components. Mac data and sync:
 `docs/DESKTOP_DATA_MODEL.md`.
 
+## Alongside Behaviors (Ticket 358, D33)
+
+Hosted web, behind `CADENCE_ALONGSIDE`; the Mac follows in Ticket 363.
+
+1. **Answer.** In Create behavior or a Behavior's Details and Settings, choose Yes, No or
+   Not answered under "Can be done alongside other things" and select Save behavior.
+2. **Use the guess.** While it is Not answered and Cadence has a guess, the form says
+   so. Use the guess fills the field; Save behavior stores it. Until then planning uses
+   the guess.
+3. **Guessed Where.** With Completion places on and Where Not set, the Where suggestion
+   line may state Cadence's guess of where the Behavior happens. Review Where fills
+   Where; Dismiss hides that guess and stores the existing dismissal. Planning keeps
+   using the guess.
+4. **Timeline.** An alongside row shows "Alongside", or "Alongside · a guess". It stops
+   warning about Calendar overlaps; travel overlaps still show.
+
 ## Reminder flow
 
 Browser notifications are enabled by default for every behavior.

@@ -3,6 +3,7 @@ import type { BehaviorWhereKind } from "./behavior";
 import type { BehaviorDurationEstimate } from "./day-progress";
 import type { NoticeId } from "../notices";
 import type { ParentSlotRollup } from "./sub-behavior";
+import type { AlongsideRowView } from "../resolvers/alongside.resolver";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
 
@@ -144,6 +145,13 @@ export type TimelineOccurrenceView = {
    * share the parent's time on a day form one group.
    */
   parentSlotKey?: string;
+  /**
+   * Ticket 358 (D33): set only while `CADENCE_ALONGSIDE` is on and the Behavior's
+   * effective value is alongside. The row shows a small label, naming a guess as a guess,
+   * and overlap cues skip what `alongsideMayOverlap` allows. Absent otherwise, so views
+   * built without it (the Mac until Ticket 363) render as before.
+   */
+  alongside?: AlongsideRowView;
 };
 
 export type TimelineSourceEvidence = Readonly<{

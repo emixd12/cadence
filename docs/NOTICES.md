@@ -10,8 +10,16 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | --- | ---: |
 | outcome | 33 |
 | error | 87 |
-| note | 24 |
+| note | 27 |
 | question | 3 |
+
+## Alongside Behaviors
+
+| Notice | Style | Words | Where | Shown in |
+| --- | --- | --- | --- | --- |
+| `alongside.form-guess` Shows Cadence's guess beside the unanswered alongside setting in the Behavior form, which planning uses until the person answers. | note | Cadence guesses {guess, select, yes {Yes} other {No}}. Planning uses the guess until you choose. | web | INT-BEHAVIOR-047, `components/behaviors/BehaviorForm.tsx` |
+| `alongside.row-label` Marks a Timeline row whose Behavior can be done alongside other things, and says when that comes from Cadence's guess rather than the person's answer. | note | {source, select, guess {Alongside · a guess} other {Alongside}} | web | INT-BEHAVIOR-046, INT-BEHAVIOR-047, `components/timeline/OccurrenceRow.tsx` |
+| `alongside.where-guess` The Where suggestion line for a Behavior with Where not set, when planning uses Cadence's guess of where it happens. | note | {kind, select, home {Cadence guesses this happens at Home.} anywhere {Cadence guesses this can happen anywhere.} other {Cadence guesses this happens away from home.}} Planning uses the guess until Where is set. | web | INT-PLACE-008, INT-PLACE-009, `components/travel/PlaceLabels.tsx` |
 
 ## Behavior editor
 

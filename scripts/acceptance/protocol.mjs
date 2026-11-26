@@ -34,6 +34,8 @@ import { qaPublishableKey } from './qa-config.mjs';
 
 // Mirrors INTEGRATION_OPERATIONS in packages/core/src/integration/operations.ts
 // (tools/list order); tests/acceptance-protocol.test.mjs keeps them equal.
+/** The contract that adds the person's alongside setting (Ticket 364). */
+export const ALONGSIDE_CONTRACT_VERSION = '1.8.0';
 export const REGISTRY_TOOLS = Object.freeze([
   'get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences',
   'get_occurrence', 'list_day_notes', 'get_adherence_summary', 'search', 'fetch',
@@ -275,6 +277,18 @@ export async function runProtocolSuite({
       behavior_id: created.id, expected_revision: created.revision, title: `${behaviorTitle} updated`, idempotency_key: key('update'),
     });
     check('update-applied', updated?.changed === true && updated?.behavior?.title === `${behaviorTitle} updated`);
+    // Contract 1.8.0 (Ticket 364) is served only while CADENCE_ALONGSIDE is on; 1.7.0 never names the field.
+    if (context?.contract_version === ALONGSIDE_CONTRACT_VERSION) {
+      check('alongside-unanswered-on-create', created.alongside === null, String(created.alongside));
+      const answered = await expectOk(session, check, 'update_behavior', {
+        behavior_id: created.id, expected_revision: updated?.behavior?.revision, alongside: true, idempotency_key: key('alongside'),
+      }, 'update-alongside');
+      check('alongside-saved', answered?.changed === true && answered?.behavior?.alongside === true);
+      const read = await expectOk(session, check, 'get_behavior', { behavior_id: created.id }, 'get-alongside');
+      check('alongside-read-back', read?.behavior?.alongside === true);
+    } else {
+      check('alongside-absent-before-1.8.0', created && !Object.hasOwn(created, 'alongside'));
+    }
     const archived = await expectOk(session, check, 'archive_behavior', { behavior_id: created.id, idempotency_key: key('archive-1') });
     check('archive-applied', archived?.behavior?.state === 'archived');
     const restored = await expectOk(session, check, 'restore_behavior', { behavior_id: created.id, idempotency_key: key('restore-1') });

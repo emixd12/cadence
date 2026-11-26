@@ -19,8 +19,9 @@ import { authenticateCalendarRequest } from "@/lib/services/google-calendar-requ
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import { systemClock } from "@/lib/services/clock";
 import { runChatConfirm, runChatUndo } from "./chat-confirm";
-import { createLiveChatExecutor, liveChatConnectorReads } from "./chat-executor";
-import { CHAT_PROMPT_VERSION, buildChatSystemPrompt } from "./chat-prompt";
+import { createLiveChatExecutor, liveChatConnectorReads, withPlanningFacts } from "./chat-executor";
+import { buildChatSystemPrompt, chatPromptVersion } from "./chat-prompt";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { chatEnabled, chatSources, chatSourcesOff, readChatAiSettings, type ChatAiSettings } from "./chat-settings";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { buildChatToolDefinitions, trimToolResult, withoutNotes } from "./chat-tools";
@@ -224,16 +225,19 @@ async function runAndStore(input: Readonly<{
   const settings = input.session.settings ?? await readChatAiSettings(caller.client);
   const sources = chatSources(settings);
   // Everything before the first model call runs at once: each is a separate database round trip.
+  // Ticket 359: chat-1.8 with the alongside rule while CADENCE_ALONGSIDE is on; chat-1.7 otherwise.
+  const alongside = alongsideEnabled();
+  const promptVersion = chatPromptVersion(alongside);
   const [timezone, run, history, timelineJson] = await Promise.all([
     profileTimezone(caller),
-    startAgentRun(client, { trigger: "chat_turn", model: setting.model, promptVersion: CHAT_PROMPT_VERSION }, signal)
+    startAgentRun(client, { trigger: "chat_turn", model: setting.model, promptVersion }, signal)
       .then((value) => value.runId, () => undefined),
     readChatHistory(client, input.conversationId, input.replyId),
     input.firstTurn ? firstTurnTimeline(context, sources.notes) : Promise.resolve(null),
   ]);
   const now = localNow(timezone);
   const tools = buildChatToolDefinitions(sources);
-  const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources) });
+  const instructions = buildChatSystemPrompt({ timezone, today: now.today, localTime: now.localTime, weekday: now.weekday, sourcesOff: chatSourcesOff(sources), alongside });
   const onGoogleCalendarRead = async (grantGeneration: number | null) => {
     await markChatConversationGoogleCalendarTouched(client, {
       conversationId: input.conversationId,
@@ -342,7 +346,7 @@ async function runAndStore(input: Readonly<{
     summaryGoogleCalendarExpiresAt,
   }).catch(() => undefined);
   await finishAgentRun(client, {
-    runId, outcome, errorCode, errorReason, inputHash: createHash("sha256").update(`${CHAT_PROMPT_VERSION}\n${input.message}`).digest("hex"),
+    runId, outcome, errorCode, errorReason, inputHash: createHash("sha256").update(`${promptVersion}\n${input.message}`).digest("hex"),
     modelCalls, inputTokens: total((item) => item.inputTokens), cachedInputTokens: total((item) => item.cachedInputTokens),
     outputTokens: total((item) => item.outputTokens), reasoningTokens: total((item) => item.reasoningTokens), toolCalls,
   }).catch(() => undefined);
@@ -358,7 +362,10 @@ async function firstTurnTimeline(context: IntegrationContext, notes: boolean): P
   try {
     const result = await executeMcpOperation("get_timeline", context, { days: 1, include_needs_decision: true });
     if (!result.ok) return null;
-    return trimToolResult(compactTimeline(notes ? result.value : withoutNotes(result.value)));
+    // Ticket 359: with CADENCE_ALONGSIDE on, each item carries its planning facts, as the tool's own result does.
+    const today = typeof result.value === "object" && result.value && "today_local_date" in result.value ? String((result.value as { today_local_date: unknown }).today_local_date) : null;
+    const value = today ? await withPlanningFacts("get_timeline", result.value, context, today) : result.value;
+    return trimToolResult(compactTimeline(notes ? value : withoutNotes(value)));
   } catch { return null; }
 }
 
@@ -367,7 +374,8 @@ export function compactTimeline(value: unknown): unknown {
   const out = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const item = (raw: unknown) => {
     const occurrence = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
-    const keep = ["id", "behavior_title", "local_date", "effective_start_at", "status", "revision", "note"];
+    // `planning` is present only while CADENCE_ALONGSIDE is on (Ticket 359).
+    const keep = ["id", "behavior_title", "local_date", "effective_start_at", "status", "revision", "note", "planning"];
     const schedule = occurrence.schedule && typeof occurrence.schedule === "object" ? occurrence.schedule as Record<string, unknown> : null;
     return { ...Object.fromEntries(keep.filter((key) => key in occurrence).map((key) => [key, occurrence[key]])),
       ...(occurrence.move ? { moved_today: true } : {}), ...(schedule ? { schedule: schedule.label } : {}) };

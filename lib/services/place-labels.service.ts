@@ -40,6 +40,7 @@ import { readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
 import { reportMonitoringEvent } from "@/lib/monitoring/privacy-safe-events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type { CalendarCaller } from "./google-calendar.service";
+import { alongsideWhereGuesses, readAlongsideBehaviorFacts } from "./alongside-view.service";
 
 export { PlaceLabelError };
 
@@ -55,8 +56,13 @@ export async function getPlaceLabelState(caller: CalendarCaller, now = Temporal.
     readPlaceLabelBehaviorRows(client, user.id),
     readProfileTimezone(client, user.id),
   ]);
+  const today = now.toZonedDateTimeISO(timezone ?? DEFAULT_TIMEZONE).toPlainDate();
+  // Ticket 358: while CADENCE_ALONGSIDE is on and labels are on, a guessed Where shares the suggestion line.
+  const whereGuesses = settings?.enabled
+    ? alongsideWhereGuesses(await readAlongsideBehaviorFacts(client, user.id, { localDate: today.toString() }))
+    : null;
   return buildPlaceLabelState({ settings, homeText: travel?.base_location_text ?? null, markers, labels, dismissals, behaviors,
-    today: now.toZonedDateTimeISO(timezone ?? DEFAULT_TIMEZONE).toPlainDate() });
+    today, ...(whereGuesses?.size ? { whereGuesses } : {}) });
 }
 
 export async function savePlaceLabelSettings(caller: CalendarCaller, value: unknown, now = Temporal.Now.instant()): Promise<PlaceLabelState> {

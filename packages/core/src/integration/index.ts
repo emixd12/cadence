@@ -2,6 +2,7 @@ export * from "./contract";
 export * from "./data-policy";
 export * from "./docs";
 export * from "./domain";
+export * from "./editions";
 export * from "./errors";
 export * from "./limits";
 export * from "./operations";

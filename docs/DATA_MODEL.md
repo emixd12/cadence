@@ -363,6 +363,7 @@ create table behaviors (
   scheduled_time time,
   timezone text not null default 'America/New_York',
   is_opportunity boolean not null default false,
+  alongside boolean,
 
   browser_reminder_enabled boolean not null default true,
   email_reminder_enabled boolean not null default false,
@@ -391,6 +392,9 @@ routing destination that only `place` keeps. Both columns are part of the
 Behavior configuration revision and account-sync row. Neither is a provider
 geocode; they never store coordinates or place identifiers. A Where suggestion
 never changes these columns on its own.
+
+`alongside` is the person's answer to whether the Behavior can be done alongside other
+things. Null means unanswered. See "Alongside setting" below.
 
 ### `travel_settings`
 
@@ -2515,6 +2519,95 @@ check (see "Coach signals in shadow").
 Hosted state (2026-11-21): the three migrations are not pushed to the hosted database.
 They are additive; push them before this code reaches production.
 
+## Alongside setting (Ticket 356, D33)
+
+`behaviors.alongside boolean` (nullable, no default) is the person's answer to "Can this
+be done alongside other things?". Null means unanswered. Migration:
+`20261125140000_behavior_alongside.sql` (additive).
+
+- **Effective value.** Readers never use the column alone. `resolveAlongside` in
+  `packages/core/src/resolvers/alongside.resolver.ts` returns `{ value, source }`: the
+  person's answer (`person`), else the cached model guess (`guess`), else false
+  (`default`). A routine block is alongside only when every step that follows it is.
+- **The cached guess.** `behavior_advisor_estimates.alongside` holds the model's guess
+  from the Daily Brief estimate call, read only while its `input_hash` matches the
+  Behavior's title, description and Where. With `CADENCE_ALONGSIDE` on, a Behavior the
+  person answered is asked for its length only. That row is stored with a distinct
+  length-only hash and `alongside = false`, so it never reads as a guess; clearing the
+  answer makes the estimate stale and the next brief asks about alongside again.
+- **Writers.** `create_behavior_with_schedule_graph` stores the payload's `alongside`
+  (absent: null). `update_behavior_with_schedule_graph` changes it only when the payload
+  carries the key; JSON null clears it. A change through the RPC is a revision: the RPC
+  sets every column the `updated_at` trigger watches. The trigger itself is unchanged.
+- **Flag.** While `CADENCE_ALONGSIDE` is not `on`, no web code reads the column and
+  planners read the cached guess, then false, as before Ticket 356.
+- **Hosted-only until Ticket 363.** Account sync contract 9 does not carry the column:
+  `account_sync_snapshot()` leaves it out of each Behavior row, `apply_account_sync_plan`
+  compares a device's expected row without it, and a synced Behavior write neither
+  inserts nor updates it, so a Mac write keeps the stored answer and a Behavior created
+  on the Mac starts unanswered. The configuration snapshot and `changed_fields` do not
+  include it yet either, because configuration history is synced; changing the answer
+  writes no configuration event. Ticket 363 adds the column to the Mac's SQLite, the
+  sync contract and configuration history together.
+- **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
+  and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
+  import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
+  `20261125180000_alongside_mcp_and_portability.sql` (additive function patches) keeps
+  it in MCP write receipts, `cadence_private.apply_behaviorlog_import` (from the plan
+  row's `cadenceAlongside`) and `apply_behaviorlog_restore_product_writes` (changed only
+  when the restored record carries the key). The cached guess is never exported or
+  returned. See `docs/EXPORT_FORMATS.md` and `docs/MCP_CONTRACT.md`, "Alongside".
+
+## Effective Where (Ticket 357, D33)
+
+Migration `20261125150000_advisor_estimate_where_guess.sql` (additive) adds
+`behavior_advisor_estimates.where_guess text`, checked to `home`, `anywhere`,
+`elsewhere` or `unknown`. Null means no guess. It never holds a place name, coordinate
+or place key. Ticket 357 added the column and its read path.
+
+- **Writer (Ticket 359).** Migration `20261125190000_advisor_estimate_where_guess_writer.sql`
+  (`create or replace`, same signature) makes `upsert_behavior_advisor_estimates` write
+  `where_guess` from each item: one of the four values, otherwise null. Its `ON CONFLICT`
+  update always sets it, so a guess made under an earlier `input_hash` never survives a
+  new estimate. With `CADENCE_ALONGSIDE` on, the estimate call is recipe 1.3: both its
+  requests (the alongside one and the length-only one) also return `whereGuess`, and
+  `cacheBehaviorEstimates` stores it, or null for a Behavior whose `where_kind` the person
+  set. Recipe 1.3 rows hash with `whereAsked` (`behaviorEstimateInputHash`), so turning
+  the flag on asks each Behavior once more and the flag-on reader accepts only recipe 1.3
+  rows. With the flag off the request is recipe 1.2, the rows carry no `where_guess` key
+  and the function stores null. The model input stays the title and description under a
+  local ref; no Where, place key, place label, coordinate or `location_text` is sent
+  (`tests/advisor-where-guess.test.ts`). Smoke: `tests/sql/advisor-estimate-where-guess-writer-smoke.sql`.
+
+- **Effective Where.** `resolveEffectiveWhere` in
+  `packages/core/src/resolvers/effective-where.resolver.ts` returns
+  `{ kind: home | anywhere | elsewhere | place | unknown, placeKey?, source }`. Order:
+  the Behavior's `where_kind` (`person`; a place carries the one-way key of its
+  `location_text`); else `completion_place_labels` in the 60 days ending on the planned
+  day, when at least 6 exist and one label holds at least 80% of them (`evidence`; the
+  same thresholds as the Where suggestion rules); else the cached `where_guess` while the
+  estimate's `input_hash` is current, `unknown` counting as no guess (`guess`); else
+  `unknown` (`none`).
+- **Readers.** Only `lib/services/brief-move-day.service.ts`, while `CADENCE_ALONGSIDE` is
+  on: `readBriefMoveDay` and, since Ticket 359, `readBehaviorPlanningFacts`, which gives
+  every other advisor reader the same effective alongside value and Where. It then also
+  reads `behaviors.location_text` and the Behaviors' labels (label and local date only).
+  With the flag off none of these is read.
+- **Advisor readers (Ticket 359).** With the flag on: the advisor day context gives each
+  occurrence `planning: { alongside, alongsideSource, where: { kind, source, placeKey? } }`
+  (`placeKey` only for a saved place; the brief's model facts never carry `planning`);
+  the Daily Brief consumer reads it for the same-place rule and lets the person's answer
+  outrank the run's own estimate; Chat's timeline and Behavior reads (`get_timeline`,
+  `list_occurrences`, `get_occurrence`, `list_behaviors`, `get_behavior`) and the first
+  turn's Timeline carry `planning: { alongside, alongside_source, where, where_source }`
+  (the Where kind only, never a key); an exact-time opportunity add checks the added
+  Behavior's side of the same-place rule; the coach reads the effective alongside value
+  (see "Coach signals in shadow", version 4).
+- **Planning only.** The free-slot rule uses it for the same-place overlap rule
+  (`docs/DATETIME_STRATEGY.md`, "Brief moves"). Travel, departure and leave-reminder code
+  reads `where_kind` alone, and `tests/effective-where.boundary.test.ts` pins that. A
+  dismissed Where suggestion does not change it.
+
 ## Note shortcut state (Tickets 126–128)
 
 `note_shortcut_states` stores records separately from historical Notes. Its
@@ -3523,7 +3616,13 @@ shown to the person; Phase 4 matches the signals to advice cards.
   (`coach-signals-3`, migration `20261122030000`), `sub_behavior_dropoff`: one step of a
   routine is done much less often than its sibling steps over 28 days. Its facts are
   `parent_behavior_id`, `step_rate`, `step_completed`, `step_resolved`,
-  `sibling_rate`, `sibling_resolved`, `other_steps` and `gap`. At most
+  `sibling_rate`, `sibling_resolved`, `other_steps` and `gap`. Version 4
+  (`coach-signals-4`, Ticket 359) is written only while `CADENCE_ALONGSIDE` is on and adds
+  no kind: each Behavior carries its effective alongside value, `crowded_hour` leaves
+  alongside items out of the hour, and `done_together` facts add booleans `alongside` and
+  `other_alongside` (the signal's Behavior and the other one). `signal_version`'s check is
+  a pattern, so no migration was needed. With the flag off the visit writes version 3,
+  unchanged. At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
   local times of day only, never titles, notes or calendar data; `signal_version`

@@ -79,6 +79,7 @@ export type Database = {
           model: string | null
           updated_at: string
           user_id: string
+          where_guess: string | null
         }
         Insert: {
           alongside?: boolean
@@ -88,6 +89,7 @@ export type Database = {
           model?: string | null
           updated_at?: string
           user_id: string
+          where_guess?: string | null
         }
         Update: {
           alongside?: boolean
@@ -97,6 +99,7 @@ export type Database = {
           model?: string | null
           updated_at?: string
           user_id?: string
+          where_guess?: string | null
         }
         Relationships: [
           {
@@ -536,6 +539,7 @@ export type Database = {
       behaviors: {
         Row: {
           active: boolean
+          alongside: boolean | null
           archive_notes: Json
           archived_at: string | null
           auto_archived_at: string | null
@@ -568,6 +572,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          alongside?: boolean | null
           archive_notes?: Json
           archived_at?: string | null
           auto_archived_at?: string | null
@@ -600,6 +605,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          alongside?: boolean | null
           archive_notes?: Json
           archived_at?: string | null
           auto_archived_at?: string | null

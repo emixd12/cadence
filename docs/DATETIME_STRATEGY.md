@@ -230,8 +230,26 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   default length.
 - **Gaps.** Items and calendar events keep 10 minutes on each side. An exact-time
   item blocks its own length. A range item blocks its own length at the earliest
-  free point in its range. An item done alongside others (a pill, a device) blocks
-  nothing. Travel spans already carry their margins.
+  free point in its range. Whether an item is alongside (a pill, a device) comes from
+  `alongside.resolver.ts` (Ticket 356): the person's setting (behind `CADENCE_ALONGSIDE`),
+  then the cached model guess, then false. Travel spans already carry their margins.
+- **Same-place overlap (Ticket 357, D33).** With `CADENCE_ALONGSIDE` on, an alongside
+  item blocks only what `alongsideMayOverlap` refuses. It may share time with a Cadence
+  item or a calendar event at the same place, or where either place is unknown or
+  Anywhere. It may not share time with travel or with an item somewhere else; there it
+  blocks like any other item, with the 10-minute gaps. Each item's place is its effective
+  Where (`effective-where.resolver.ts`): the person's Where, else counted completion place
+  labels, else the cached model guess, else unknown. Calendar events carry no place on
+  the free-slot inputs, so their place is unknown. The brief still never moves an
+  alongside item; when one at another place collides with an item, that item moves. A
+  moved alongside item (the Timeline's "Move for today") is checked the same way, and
+  calendar events do not block it. With the flag off, an alongside item blocks nothing
+  and a moved one is blocked like any other item, as before. The effective Where is for
+  planning only: routes, departure lines and leave reminders read `where_kind` alone.
+  Since Ticket 359 the same rule covers the Daily Brief consumer's overlap and tight-fit
+  findings with places from the day context's `planning` field, where the person's
+  alongside answer outranks the run's own estimate, and an exact-time opportunity add
+  (Chat and MCP), which checks the added Behavior's own side. Chat's moves already used it.
 - **Calendar and travel on each request.** The device sends today's busy calendar
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it

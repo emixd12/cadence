@@ -1962,7 +1962,10 @@ const previewFactories: Record<
   "composite.occurrence-row": () => (
       <ProductPreview>
         <div className="grid gap-3">
-          {[needsDecisionOccurrence, completedOccurrence, notCompletedOccurrence].map(
+          {[needsDecisionOccurrence, completedOccurrence, notCompletedOccurrence,
+            // Ticket 358: the Alongside label, from the person's answer and from a guess.
+            { ...needsDecisionOccurrence, id: "bench-occurrence-alongside", title: "Vitamins", alongside: { source: "person" as const } },
+            { ...needsDecisionOccurrence, id: "bench-occurrence-alongside-guess", title: "Red light helmet", alongside: { source: "guess" as const } }].map(
             (occurrence) => (
               <OccurrenceRow
                 key={occurrence.id}
@@ -2121,11 +2124,20 @@ const previewFactories: Record<
     ),
   "composite.behavior-form": () => (
       <ProductPreview maxHeight="48rem">
-        <BehaviorForm
-          mode="create"
-          action={behaviorAction}
-          categories={categoryOptions}
-        />
+        <div className="grid gap-8">
+          <BehaviorForm
+            mode="create"
+            action={behaviorAction}
+            categories={categoryOptions}
+          />
+          {/* Ticket 358: the alongside field, unanswered with a guess (CADENCE_ALONGSIDE on). */}
+          <BehaviorForm
+            mode="create"
+            action={behaviorAction}
+            categories={categoryOptions}
+            alongside={{ answer: "unanswered", guess: true }}
+          />
+        </div>
       </ProductPreview>
     ),
   "module.behavior-list": () => (

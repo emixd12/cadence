@@ -32,6 +32,7 @@ import {
   parseBehaviorRunActionFormData,
 } from "@/lib/services/behavior-form";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 export { behaviorErrorToActionState };
 
 /** Ids for sub-behavior writes: new group members and the archive notes of archived children. */
@@ -61,7 +62,7 @@ export async function createBehaviorFromFormData(formData: FormData): Promise<Be
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
   return toBehaviorView(await createBehaviorForUser(supabase, userId,
-    parseBehaviorFormData(formData, { mode: "create" })));
+    parseBehaviorFormData(formData, { mode: "create", readAlongside: alongsideEnabled() })));
 }
 
 export async function createBehaviorForUser(
@@ -119,7 +120,7 @@ export async function reorderSubBehaviorsFromFormData(formData: FormData): Promi
 export async function updateBehaviorFromFormData(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  const values = parseBehaviorFormData(formData, { mode: "update" });
+  const values = parseBehaviorFormData(formData, { mode: "update", readAlongside: alongsideEnabled() });
   await updateBehaviorForUser(supabase, userId, {
     behaviorId: values.behaviorId, values,
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),

@@ -2,7 +2,7 @@ import { behaviorRunState, runFieldsFromStored } from "@cadence/core/resolvers/b
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  ADHERENCE_DEFINITION, INTEGRATION_CONTRACT_VERSION, isIntegrationScope, INTEGRATION_LIMITS as L,
+  ADHERENCE_DEFINITION, integrationContractVersion, isIntegrationScope, INTEGRATION_LIMITS as L,
   createIntegrationError, type IntegrationError, type IntegrationErrorCode,
   type IntegrationOperationInput, type IntegrationOperationOutput,
   type OccurrenceDetailOutput,
@@ -29,6 +29,7 @@ import {
   serializeIntegrationParentGroup, subBehaviorsOf,
 } from "./integration-read-serialization";
 import type { Occurrence } from "@/lib/types/database";
+import { integrationContractOptions } from "./integration-contract-options";
 import { listAllDayNotes, listDayNotesInRange } from "@/lib/db/dayNotes.repo";
 import { listDayNotes } from "@cadence/core/services/day-note.service";
 import { dayNotesByDate } from "@cadence/core/resolvers/day-note.resolver";
@@ -152,7 +153,9 @@ export async function getIntegrationAccountContext(context: IntegrationContext):
     account_ref: digest(["cadence-account-v1", context.actor.clientId, context.userId]),
     timezone: account.timezone, today_local_date: account.today, local_time: account.localTime,
     now: account.now.toString(), granted_scopes: context.actor.grantedScopes.filter(isIntegrationScope),
-    contract_version: INTEGRATION_CONTRACT_VERSION, freshness: account.freshness,
+    // 1.8.0 while CADENCE_ALONGSIDE is on (Ticket 364); the output schema follows the same edition.
+    contract_version: integrationContractVersion(integrationContractOptions()) as IntegrationOperationOutput<"get_account_context">["contract_version"],
+    freshness: account.freshness,
   };
 }
 

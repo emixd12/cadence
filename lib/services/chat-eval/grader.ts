@@ -65,6 +65,8 @@ export function scenarioFacts(scenario: ChatScenario): string {
       `Calendar events (calendar name, location): ${world.events.map((item) => `${item.localDate} ${clockLabel(item.start)}-${clockLabel(item.end)} ${JSON.stringify(item.title)} (${item.calendar}${item.location ? `, ${item.location}` : ""})`).join("; ") || "none connected"}.`,
     `Hevy workouts: ${world.id === "new_user" ? "Hevy not connected" : world.workouts.map((item) => `${item.localDate} at ${clockLabel(item.start)}, ${item.minutes} min`).join("; ") || "none"} (chat sees only times and lengths, not workout names or exercises).`,
     "Research: chat has no advice library yet, so it has no research cards. The right answer to a research question says it has no research to cite and may still help from the person's own records. Stating research findings would be unsupported.",
+    ...(world.alongside ? [`Planning (CADENCE_ALONGSIDE on; chat reads these on each item): ${world.behaviors.filter((item) => item.planning).map((item) =>
+      `${JSON.stringify(item.title)} ${item.planning!.alongside ? "alongside" : "not alongside"} (${item.planning!.alongsideSource === "guess" ? "Cadence's guess" : item.planning!.alongsideSource === "person" ? "the person's setting" : "default"}), Where ${item.planning!.where} (${item.planning!.whereSource === "guess" ? "Cadence's guess" : item.planning!.whereSource})`).join("; ")}. An alongside item may overlap an item or event at the same place, or where either place is anywhere or unknown, without a clash; it still clashes with travel and with an item somewhere else. A guess must not be presented as the person's setting.`] : []),
     `Scenario: ${scenario.description}`,
   ];
   return lines.join("\n");

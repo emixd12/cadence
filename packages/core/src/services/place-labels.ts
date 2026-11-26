@@ -147,6 +147,8 @@ export function buildPlaceLabelState(input: Readonly<{
   dismissals: readonly WhereSuggestionDismissalRecord[];
   behaviors: readonly PlaceLabelBehaviorRecord[];
   today: Temporal.PlainDate;
+  /** Ticket 358: current Where guesses, only while `CADENCE_ALONGSIDE` is on. */
+  whereGuesses?: ReadonlyMap<string, string>;
 }>): PlaceLabelState {
   return resolvePlaceLabelState({
     settings: placeLabelSettingsFromRecord(input.settings),
@@ -164,6 +166,7 @@ export function buildPlaceLabelState(input: Readonly<{
       return { id: row.id, active: row.active, whereKind: where.where_kind, locationText: where.location_text };
     }),
     today: input.today,
+    ...(input.whereGuesses ? { whereGuesses: input.whereGuesses } : {}),
   });
 }
 

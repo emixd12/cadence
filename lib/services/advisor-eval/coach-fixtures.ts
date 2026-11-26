@@ -25,7 +25,7 @@ export const COACH_EVAL_FIXTURE_VERSION = "coach-eval-2026-11-19.1";
 export const COACH_EVAL_FIXTURE_IDS = ["busy_professional", "irregular_schedule", "new_user", "heavy_mover", "daylight_saving",
   "near_midnight", "timezone_change", "mac_linked", "stale_calendar", "hidden_instructions",
   "quiet_day", "declined_and_undone", "alongside_and_never_move", "late_evening",
-  "brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions"] as const;
+  "brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions", "alongside_evening"] as const;
 export type CoachEvalFixtureId = typeof COACH_EVAL_FIXTURE_IDS[number];
 
 /** The first simulated day. Later days follow. */
@@ -56,6 +56,8 @@ type BehaviorProfile = Readonly<{
   moved?: Readonly<{ weekdays: readonly number[]; minutes: number; share: number }>;
   /** Marked done this many minutes after the start, on average. */
   markDelay?: number;
+  /** Ticket 359: the effective alongside value, for a profile that reads it (`alongsideRead`). */
+  alongside?: true;
 }>;
 
 type Profile = Readonly<{
@@ -71,6 +73,11 @@ type Profile = Readonly<{
   silentDays?: number;
   /** Text that must never appear in a tip (case-insensitive). */
   forbiddenText?: readonly string[];
+  /**
+   * Ticket 359: the visit read each Behavior's effective alongside value, as it does with
+   * CADENCE_ALONGSIDE on (signal version 4). Other profiles leave it unread (version 3).
+   */
+  alongsideRead?: true;
 }>;
 
 export type CoachEvalFixture = Readonly<{
@@ -169,6 +176,14 @@ const PROFILES: Readonly<Record<CoachEvalFixtureId, Profile>> = {
       { id: "gym", title: "Gym", start: "18:00", rate: 0.55, weekdays: { 5: 0.1 }, length: 60 }, { id: "run", title: "Long run", start: "08:00", rate: 0.6, on: [6], length: 90 },
       { id: "floss", title: "Floss", start: "22:30", rate: 0.65 },
     ] },
+  alongside_evening: { description: "Evening hour with a red-light helmet and a pill alongside reading and journaling; gym elsewhere.", timezone: NY, ageDays: 120,
+    alongsideRead: true, behaviors: [
+      // Ticket 359: the helmet (at home) and the pill (anywhere) happen during other things, so they never crowd 8 PM.
+      { id: "helmet", title: "Red light helmet", start: "20:00", rate: 0.95, length: 10, alongside: true },
+      { id: "pill", title: "Magnesium", start: "20:05", rate: 0.95, alongside: true },
+      { id: "read", title: "Read", start: "20:10", rate: 0.3, length: 30 }, { id: "journal", title: "Journal", start: "20:20", rate: 0.3, length: 10 },
+      { id: "gym", title: "Gym session", start: "07:00", rate: 0.85, length: 60 }, { id: "walk", title: "Lunch walk", start: "12:00", rate: 0.85, length: 20 },
+    ] },
 };
 
 export function coachEvalFixtures(ids: readonly CoachEvalFixtureId[] = COACH_EVAL_FIXTURE_IDS): CoachEvalFixture[] {
@@ -193,6 +208,7 @@ export function coachEvalFixture(id: CoachEvalFixtureId): CoachEvalFixture {
     behaviors.push({
       id: item.id, createdAt: instant(created, "09:00", profile.timezone), timezone: profile.timezone, active: true,
       hasLength: item.length !== undefined, lengthMinutes: item.length ?? null, hasPlace: false,
+      ...(profile.alongsideRead ? { alongside: item.alongside === true } : {}),
     });
     for (let date = later(firstDay, created); Temporal.PlainDate.compare(date, lastDay) <= 0; date = date.add({ days: 1 })) {
       if (item.on && !item.on.includes(date.dayOfWeek)) continue;

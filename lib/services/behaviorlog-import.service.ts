@@ -61,6 +61,7 @@ import {
 import type {
   BehaviorLogImportRun,
 } from "@/lib/types/database";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 
 export type BehaviorLogZipInput = Buffer | Uint8Array | ArrayBuffer;
 
@@ -113,13 +114,14 @@ export function previewBehaviorLogImportFromZip(input: {
     existing: input.existing,
     supportedSchemaVersions: input.supportedSchemaVersions,
     convertNativeRemindersToBrowser: input.convertNativeRemindersToBrowser,
+    ...alongsideReadOption(),
   });
 }
 
 export function previewBehaviorLogMergeImportFromFiles(
   input: ResolveBehaviorLogImportMergePreviewInput,
 ): BehaviorLogImportMergePreviewResult {
-  return resolveBehaviorLogImportMergePreview(input);
+  return resolveBehaviorLogImportMergePreview({ ...input, ...alongsideReadOption() });
 }
 
 export async function listCurrentUserBehaviorLogImportRuns(
@@ -641,7 +643,16 @@ export async function listBehaviorLogExistingRecords(
       occurrenceIds,
     }),
   ]);
-  return assembleBehaviorLogExistingRecords({ behaviors, occurrences, definitionEvents, configurationEvents, mappings, importedNotes, importedInterventions, statusEvents, timeSessions, importRuns });
+  return assembleBehaviorLogExistingRecords({ behaviors, occurrences, definitionEvents, configurationEvents, mappings, importedNotes, importedInterventions, statusEvents, timeSessions, importRuns,
+    ...(alongsideEnabled() ? { includeAlongside: true } : {}) });
+}
+
+/**
+ * Ticket 364: read and compare the person's alongside answer only while CADENCE_ALONGSIDE
+ * is on. Off, previews, fingerprints and apply payloads are unchanged.
+ */
+export function alongsideReadOption(): { readAlongside?: true } {
+  return alongsideEnabled() ? { readAlongside: true } : {};
 }
 
 function errorMessage(error: unknown): string {

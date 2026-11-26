@@ -3,6 +3,7 @@ import {
   type IntegrationError, type IntegrationOperationInput, type IntegrationOperationOutput,
 } from "@cadence/core/integration";
 import type { IntegrationContext } from "@/lib/integrations/request-context";
+import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 import {
   IntegrationReadError, getIntegrationAccountContext, listIntegrationBehaviors, getIntegrationBehavior,
   listIntegrationCategories, getIntegrationTimeline, listIntegrationOccurrences, getIntegrationOccurrence,
@@ -21,10 +22,11 @@ function handler<N extends ReadOperationName>(name: N,
   return async (context: IntegrationContext, input: unknown): Promise<ReadOperationResult<N>> => {
     const scopeError = checkOperationScope(name, context.actor.grantedScopes);
     if (scopeError) return { ok: false, error: scopeError };
-    const validated = validateOperationInput(name, input);
+    const contract = integrationContractOptions();
+    const validated = validateOperationInput(name, input, contract);
     if (!validated.ok) return { ok: false, error: validated.error };
     try {
-      const result = validateOperationOutput(name, await read(context, validated.value));
+      const result = validateOperationOutput(name, await read(context, validated.value), contract);
       return result.ok ? { ok: true, value: result.value } : { ok: false, error: result.error };
     } catch (error) {
       if (error instanceof IntegrationReadError) return { ok: false, error: error.error };

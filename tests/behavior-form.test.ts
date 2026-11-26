@@ -492,3 +492,28 @@ describe("parseBehaviorFormData for Behaviors of Opportunity", () => {
     expect(result).not.toHaveProperty("isOpportunity");
   });
 });
+
+// Ticket 358 (D33): "Can be done alongside other things" is read only when the caller asks.
+describe("parseBehaviorFormData alongside", () => {
+  const base: Array<[string, string]> = [
+    ["title", "Red light helmet"], ["scheduled_time", "20:00"], ["recurrence_kind", "daily"],
+    ["daily_interval", "1"], ["reminder_offset", "0"],
+  ];
+  const parse = (value: string | null, readAlongside: boolean) =>
+    parseBehaviorFormData(formData(value === null ? base : [...base, ["alongside", value]]), { mode: "create", readAlongside });
+
+  it("maps Yes, No and Not answered to the stored answer", () => {
+    expect(parse("yes", true).alongside).toBe(true);
+    expect(parse("no", true).alongside).toBe(false);
+    expect(parse("", true).alongside).toBeNull();
+  });
+
+  it("keeps the stored answer when the field is absent or the flag is off", () => {
+    expect("alongside" in parse(null, true)).toBe(false);
+    expect("alongside" in parse("yes", false)).toBe(false);
+  });
+
+  it("refuses any other value", () => {
+    expect(() => parse("maybe", true)).toThrow(BehaviorValidationError);
+  });
+});

@@ -105,6 +105,7 @@ export const BEHAVIOR_FORM_FIELDS = [
   "recurrence",
   "reminders",
   "active",
+  "alongside",
 ] as const;
 
 export type BehaviorFormField = (typeof BEHAVIOR_FORM_FIELDS)[number];

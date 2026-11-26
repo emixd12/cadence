@@ -8,6 +8,12 @@
  */
 
 export const CHAT_PROMPT_VERSION = "chat-1.7";
+/** Ticket 359: the version while `CADENCE_ALONGSIDE` is on, with the alongside planning rule. */
+export const CHAT_PROMPT_VERSION_ALONGSIDE = "chat-1.8";
+
+export function chatPromptVersion(alongside: boolean): string {
+  return alongside ? CHAT_PROMPT_VERSION_ALONGSIDE : CHAT_PROMPT_VERSION;
+}
 
 export const CHAT_STATIC_INSTRUCTIONS = `You are Cadence's chat. Cadence is a personal behavior tracker: the person sets up recurring Behaviors (habits, routines, tasks), and each scheduled instance on a day is an item they mark Completed or Not Completed. Unmarked items stay Unresolved; earlier days' Unresolved items are "Needs decision".
 
@@ -28,6 +34,13 @@ Times: use the person's timezone and the date given below. Say times the way the
 
 Voice: calm, plain and brief, like a thoughtful friend. Answer first, then only the detail that helps. Use the person's own Behavior titles and keep their own words when restating their question. Say "not marked yet", not "Unresolved". For a research question, call search_advice and state only what its cards say, naming the source in plain words; never state a study or finding from memory. If it returns no cards, say Cadence has no research on that, then offer help from the person's own records. No Markdown, no lists unless the person asks for a list, no emoji. Never mention tools, operations, revisions, ids, scopes or other internal words. Never guilt or moralize; Unresolved never means failure.`;
 
+/**
+ * Ticket 359 (D33): appended to the static part while `CADENCE_ALONGSIDE` is on, when reads
+ * carry `planning`. It explains planning only; asking about alongside (Ticket 360) and
+ * pairing (Ticket 361) are not here.
+ */
+export const CHAT_ALONGSIDE_INSTRUCTIONS = `Alongside: items and Behaviors may carry planning. planning.alongside true means the item can be done during other things at the same place, such as taking a pill or wearing a device at home; planning.where is where Cadence assumes it happens. An alongside item may share time with another item or a calendar event at the same place, or when either place is anywhere or unknown, so that overlap is not a clash: do not raise it and do not suggest a move for it. It still clashes with travel and with an item somewhere else. When alongside_source or where_source is guess, that is Cadence's guess, not the person's setting: if it matters to your answer, say Cadence guessed it. Never name a source or a planning field.`;
+
 export type ChatPromptContext = Readonly<{
   timezone: string;
   /** Local date, YYYY-MM-DD. */
@@ -36,6 +49,8 @@ export type ChatPromptContext = Readonly<{
   localTime: string;
   weekday: string;
   sourcesOff: readonly string[];
+  /** Ticket 359: `CADENCE_ALONGSIDE` is on. Omitted or false: the chat-1.7 text, unchanged. */
+  alongside?: boolean;
 }>;
 
 /** The full instructions: the cached static part, then this person's facts. */
@@ -43,7 +58,8 @@ export function buildChatSystemPrompt(context: ChatPromptContext): string {
   const off = context.sourcesOff.length
     ? `\nTurned off in Settings, so you cannot read them: ${context.sourcesOff.join(", ")}. If asked, say they are off in Settings.`
     : "";
-  return `${CHAT_STATIC_INSTRUCTIONS}\n\nThe person's timezone: ${context.timezone}. Today is ${context.weekday} ${context.today}; the local time is ${context.localTime}.${off}`;
+  const fixed = context.alongside ? `${CHAT_STATIC_INSTRUCTIONS}\n\n${CHAT_ALONGSIDE_INSTRUCTIONS}` : CHAT_STATIC_INSTRUCTIONS;
+  return `${fixed}\n\nThe person's timezone: ${context.timezone}. Today is ${context.weekday} ${context.today}; the local time is ${context.localTime}.${off}`;
 }
 
 /** First turn of a conversation only: today's Timeline as data. */

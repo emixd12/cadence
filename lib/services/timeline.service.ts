@@ -8,6 +8,8 @@ import type { TimelineSourceEvidence } from "@cadence/core/types/timeline";
 import { listOccurrenceStatusEventsByOccurrenceIds } from "@/lib/db/occurrenceStatusEvents.repo";
 import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
 import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
+import { attachTimelineAlongside } from "@cadence/core/services/timeline-alongside";
+import { alongsideRowViews, readAlongsideBehaviorFacts } from "@/lib/services/alongside-view.service";
 
 import {
   listBehaviorAdvisorEstimates,
@@ -256,11 +258,35 @@ async function getTimelineViewForUser(input: {
   });
   const dayNoteRange = timelineDayNoteRange(view);
   const withNotes = attachTimelineDayNotes(view, dayNoteRange ? await listDayNotesInRange(supabase, userId, dayNoteRange) : []);
-  const [evidence, countable] = await Promise.all([
+  const [evidence, countable, alongside] = await Promise.all([
     readTimelineSourceEvidence(supabase, userId, occurrenceRows, timezone),
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
+    readTimelineAlongside(supabase, userId, occurrenceRows, now, timezone),
   ]);
-  return attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable);
+  return attachTimelineAlongside(attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable), alongside);
+}
+
+/**
+ * Ticket 358 (D33): each alongside Behavior's row label and effective Where. Read only
+ * while `CADENCE_ALONGSIDE` is on, so the Timeline's reads are unchanged while it is
+ * off. A failed read shows no labels and keeps every overlap cue.
+ */
+async function readTimelineAlongside(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrences: readonly Occurrence[],
+  now: Temporal.Instant,
+  timezone: string,
+): Promise<ReturnType<typeof alongsideRowViews>> {
+  if (occurrences.length === 0) return {};
+  try {
+    return alongsideRowViews(await readAlongsideBehaviorFacts(supabase, userId, {
+      behaviorIds: occurrences.map((occurrence) => occurrence.behavior_id),
+      localDate: now.toZonedDateTimeISO(timezone).toPlainDate().toString(),
+    }));
+  } catch {
+    return {};
+  }
 }
 
 /**

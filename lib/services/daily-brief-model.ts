@@ -37,6 +37,8 @@ export async function generateBriefOpeningWithModel(input: Parameters<DailyBrief
 
 /** Ticket 188 estimate step: same transport and limits, its own strict schema, always the production setting. */
 export async function generateDurationEstimatesWithModel(input: Parameters<DailyBriefGenerator>[0], options: Omit<AdapterOptions, "model" | "effort"> = {}): Promise<unknown> {
+  if (input.estimateVariant === "alongside_where") return call(input, options, "cadence_duration_estimates_v1_3", DURATION_ESTIMATE_ALONGSIDE_WHERE_SCHEMA, dailyBriefModelSetting());
+  if (input.estimateVariant === "where") return call(input, options, "cadence_duration_estimates_v1_3_length", DURATION_ESTIMATE_WHERE_SCHEMA, dailyBriefModelSetting());
   return input.estimateVariant === "alongside"
     ? call(input, options, "cadence_duration_estimates_v1_2", DURATION_ESTIMATE_ALONGSIDE_SCHEMA, dailyBriefModelSetting())
     : call(input, options, "cadence_duration_estimates", DURATION_ESTIMATE_SCHEMA, dailyBriefModelSetting());
@@ -52,6 +54,24 @@ const DURATION_ESTIMATE_SCHEMA = { type: "object", additionalProperties: false, 
 const DURATION_ESTIMATE_ALONGSIDE_SCHEMA = { type: "object", additionalProperties: false, required: ["estimates"], properties: {
   estimates: { type: "array", items: { type: "object", additionalProperties: false, required: ["behaviorRef", "minutes", "basis", "alongside"], properties: {
     behaviorRef: { type: "string" }, minutes: { type: ["integer", "null"] }, basis: { type: "string", enum: ["stated", "inferred"] }, alongside: { type: "boolean" },
+  } } },
+} } as const;
+
+/** Estimate recipe 1.3 (Ticket 359, `CADENCE_ALONGSIDE` on): one coarse Where guess per Behavior, never a place name. */
+const WHERE_GUESS_PROPERTY = { type: "string", enum: ["home", "anywhere", "elsewhere", "unknown"] } as const;
+
+const DURATION_ESTIMATE_ALONGSIDE_WHERE_SCHEMA = { type: "object", additionalProperties: false, required: ["estimates"], properties: {
+  estimates: { type: "array", items: { type: "object", additionalProperties: false, required: ["behaviorRef", "minutes", "basis", "alongside", "whereGuess"], properties: {
+    behaviorRef: { type: "string" }, minutes: { type: ["integer", "null"] }, basis: { type: "string", enum: ["stated", "inferred"] }, alongside: { type: "boolean" },
+    whereGuess: WHERE_GUESS_PROPERTY,
+  } } },
+} } as const;
+
+/** Recipe 1.3 for Behaviors the person already answered alongside: length and Where, no alongside. */
+const DURATION_ESTIMATE_WHERE_SCHEMA = { type: "object", additionalProperties: false, required: ["estimates"], properties: {
+  estimates: { type: "array", items: { type: "object", additionalProperties: false, required: ["behaviorRef", "minutes", "basis", "whereGuess"], properties: {
+    behaviorRef: { type: "string" }, minutes: { type: ["integer", "null"] }, basis: { type: "string", enum: ["stated", "inferred"] },
+    whereGuess: WHERE_GUESS_PROPERTY,
   } } },
 } } as const;
 

@@ -412,6 +412,9 @@ function toBehaviorPayload(
     ...("is_opportunity" in behavior && behavior.is_opportunity !== undefined
       ? { is_opportunity: behavior.is_opportunity }
       : {}),
+    // D33 (Ticket 364): sent only when the caller set it, so the update RPC keeps the stored
+    // answer otherwise and payloads without it are unchanged.
+    ...("alongside" in behavior && behavior.alongside !== undefined ? { alongside: behavior.alongside } : {}),
     // Sub-behaviors: each link column changes only when the payload carries it.
     ...("parent_behavior_id" in behavior ? { parent_behavior_id: behavior.parent_behavior_id ?? null } : {}),
     ...("sub_behavior_sort_order" in behavior ? { sub_behavior_sort_order: behavior.sub_behavior_sort_order ?? 0 } : {}),

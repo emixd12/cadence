@@ -16,6 +16,7 @@ import {
 } from "@/lib/resolvers/behaviorlog-import.resolver";
 import { resolveBehaviorLogRestorePreview } from "@/lib/resolvers/behaviorlog-restore.resolver";
 import {
+  alongsideReadOption,
   listBehaviorLogExistingRecords,
   parseBehaviorLogZipFiles,
   type BehaviorLogZipInput,
@@ -118,6 +119,7 @@ export function previewBehaviorLogRestoreFromFiles(input: {
   const importPreview = resolveBehaviorLogImportPreview({
     files: input.files,
     convertNativeRemindersToBrowser: input.convertNativeRemindersToBrowser,
+    ...alongsideReadOption(),
   });
 
   return resolveBehaviorLogRestorePreview({
@@ -310,6 +312,7 @@ export async function applyBehaviorLogRestoreUploadFromFormData(
   const importPreview = resolveBehaviorLogImportPreview({
     files: bundle.files,
     convertNativeRemindersToBrowser: formData.get("convert_native_reminders") === "yes",
+    ...alongsideReadOption(),
   });
   const preview = resolveBehaviorLogRestorePreview({
     importPreview,

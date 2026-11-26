@@ -325,6 +325,9 @@ begin
     -- Server-only derived columns that the snapshot leaves out (advisor Phase 2A):
     -- effective time is derived on each device from the synced occurrence_move rows.
     and not (c.table_name = 'occurrences' and c.column_name in ('effective_start_at', 'effective_end_at'))
+    -- Hosted-only until Ticket 363 (D33): the snapshot leaves the alongside answer out and
+    -- a synced Behavior write keeps it (tests/sql/behavior-alongside-smoke.sql).
+    and not (c.table_name = 'behaviors' and c.column_name = 'alongside')
     and not exists (
       select 1 from cadence_private.account_sync_contract_additions addition
       where addition.kind = kinds ->> c.table_name and addition.field = c.column_name and addition.contract > 3

@@ -481,3 +481,38 @@ it("treats Outlook and iCloud scheduled events exactly like Google events with d
   expect(merged.overlapAssessment).toBe("possible");
   expect(resolveTimelineOccurrenceContext({ ...input, events: [outlook] }).overlappingEventIds).toEqual([outlook.id]);
 });
+
+// Ticket 358 (D33): an alongside item's overlap cues skip what alongsideMayOverlap allows.
+describe("resolveTimelineOccurrenceContext with an alongside item", () => {
+  const known: BehaviorDurationEstimate = { kind: "known", seconds: 1800, durationLabel: "30m", sampleCount: 0, lookbackDays: null, provenance: "behavior_default" };
+  const base = {
+    occurrenceId: "occurrence-1", scheduledFor: "2026-09-16T16:00:00Z", runningStartedAt: null,
+    estimate: known, now: NOW, freshness: CURRENT,
+    events: [timedEvent("meeting", "2026-09-16T16:10:00Z", "2026-09-16T17:00:00Z")],
+  };
+
+  it("keeps the Calendar overlap for an item that is not alongside", () => {
+    const context = resolveTimelineOccurrenceContext({ ...base, alongside: null });
+    expect(context.overlappingEventIds).toEqual(["meeting"]);
+    expect(context.overlapAssessment).toBe("possible");
+  });
+
+  it("drops a Calendar overlap the rule allows, whatever the item's Where", () => {
+    for (const where of [undefined, { kind: "home" as const }, { kind: "place" as const, placeKey: "k".repeat(43) }]) {
+      const context = resolveTimelineOccurrenceContext({ ...base, alongside: { where } });
+      expect(context.overlappingEventIds).toEqual([]);
+      expect(context.overlapAssessment).toBe("none");
+      expect(context.overlapLabel).not.toContain("Possible overlap");
+    }
+  });
+
+  it("still cues travel, which an alongside item never overlaps", () => {
+    const travel = {
+      segments: [{ id: "route:leg-1", kind: "route" as const, startAt: "2026-09-16T16:05:00Z", endAt: "2026-09-16T16:20:00Z", sourceRefs: ["dentist"], legId: "leg-1" }],
+      completeTrip: true,
+    } as unknown as NonNullable<Parameters<typeof resolveTimelineOccurrenceContext>[0]["travel"]>;
+    const context = resolveTimelineOccurrenceContext({ ...base, events: [], travel, alongside: { where: { kind: "home" } } });
+    expect(context.overlapAssessment).toBe("possible");
+    expect(context.travelOverlapLegIds).toEqual(["leg-1"]);
+  });
+});

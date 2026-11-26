@@ -4,6 +4,7 @@ import type { DepartureTrip } from "../types/departure";
 import type { TravelEvidenceResult } from "../types/travel";
 import { resolveTravelCollisions, travelUnreliableSegments } from "./travel.resolver";
 import { RETURN_TIME_UNKNOWN, departureOverlapPhrase, departurePhraseContext } from "../services/departure-phrases";
+import { alongsideMayOverlap, type OverlapPlace } from "./alongside.resolver";
 
 import type {
   BehaviorDurationEstimate,
@@ -234,6 +235,11 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
   travelLabels?: ReadonlyMap<string, string>;
   /** The account timezone for the trip's times. Defaults to America/New_York. */
   timezone?: string;
+  /**
+   * Ticket 358 (D33): set only for an alongside item, with its effective Where. A Calendar
+   * event `alongsideMayOverlap` allows is not an overlap; travel still is.
+   */
+  alongside?: Readonly<{ where?: OverlapPlace }> | null;
   now: Temporal.Instant;
 }>): TimelineOccurrenceContext {
   const scheduledFor = parseInstant(input.scheduledFor, "Occurrence scheduled_for");
@@ -276,6 +282,8 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     eventIds.add(event.id);
     const interval = "interval" in event ? event.interval : event;
     if (interval.kind === "all_day" || event.state === "cancelled" || event.availability === "free" || event.currentUserResponse === "declined") continue;
+    // Calendar events carry no place yet, so the rule reads their place as unknown.
+    if (input.alongside && alongsideMayOverlap(input.alongside, { kind: "calendar" })) continue;
 
     const eventStart = parseInstant(interval.startAt, "External event start");
     const eventEnd = parseInstant(interval.endAt, "External event end");

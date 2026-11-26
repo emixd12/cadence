@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
+import type { AlongsideFormView } from "@cadence/core/resolvers/alongside.resolver";
 import { createLinkMessage, SourceLinkCreateChoice, type SourceLinkChoice } from "@/components/behaviors/SourceLinkSettings";
 import { webSourceLinkCoordinator, type SourceLinkCoordinator } from "@/lib/ui/source-links";
 import { dispatchBehaviorCreated } from "@/components/behaviors/behavior-events";
@@ -34,6 +35,8 @@ type BehaviorCreateSectionProps = Readonly<{
   parentOptions?: readonly ParentOption[];
   /** Unique saved places from existing Behaviors for instant local autocomplete. */
   savedPlaces?: readonly string[];
+  /** Ticket 358: show the alongside field (unanswered). Passed only while `CADENCE_ALONGSIDE` is on. */
+  alongside?: AlongsideFormView;
 }>;
 
 export function BehaviorCreateSection({
@@ -46,6 +49,7 @@ export function BehaviorCreateSection({
   allowOpportunity = true,
   parentOptions,
   savedPlaces,
+  alongside,
 }: BehaviorCreateSectionProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -118,6 +122,7 @@ export function BehaviorCreateSection({
             parentOptions={parentOptions}
             allowSubBehaviorDrafts={parentOptions !== undefined}
             savedPlaces={savedPlaces}
+            alongside={alongside}
             extraFields={linkCoordinator
               ? <SourceLinkCreateChoice onChange={handleLinkChoice} coordinator={linkCoordinator} />
               : null}

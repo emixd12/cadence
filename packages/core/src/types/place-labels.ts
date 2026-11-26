@@ -69,6 +69,11 @@ export type WhereSuggestion = Readonly<{
   placeKey: string | null;
   labelCount: number;
   supportingCount: number;
+  /**
+   * Ticket 358 (D33): `guess` when the line shows Cadence's guessed Where for a Behavior
+   * with Where Not set (counts are then 0). Absent: counted completion labels.
+   */
+  basis?: "guess";
 }>;
 
 export type PlaceLabelBehaviorInput = Readonly<{
