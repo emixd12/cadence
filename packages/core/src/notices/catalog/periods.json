@@ -1,0 +1,29 @@
+{
+  "feature": "periods",
+  "notices": {
+    "period.saved": {
+      "meaning": "Confirms that a Period was added or its label, days or note were changed.",
+      "text": "Period saved.",
+      "style": "outcome",
+      "interactions": ["INT-PERIOD-001", "INT-PERIOD-002"]
+    },
+    "period.ended": {
+      "meaning": "Confirms that End today set a Period's last day to today.",
+      "text": "Period ended today.",
+      "style": "outcome",
+      "interactions": ["INT-PERIOD-003"]
+    },
+    "period.removed": {
+      "meaning": "Confirms that a Period was removed.",
+      "text": "Period removed.",
+      "style": "outcome",
+      "interactions": ["INT-PERIOD-004"]
+    },
+    "period.conflict": {
+      "meaning": "Says a Period was not saved, ended or removed because it changed somewhere else first; the editor then shows the latest version.",
+      "text": "This period changed elsewhere. Review the latest version before saving again.",
+      "style": "error",
+      "interactions": ["INT-PERIOD-002", "INT-PERIOD-003", "INT-PERIOD-004"]
+    }
+  }
+}
