@@ -48,6 +48,10 @@ const RESOLVER_IMPORTERS = new Set([
   // Ticket 359: the advisor day context's planning field (server-side; never in model facts).
   "packages/core/src/types/advisor-day-context.ts",
   "packages/core/src/services/advisor-day-context.ts",
+  // Ticket 363: the shared alongside facts builder (web and Mac) and the Mac's Timeline
+  // read of local completion labels inside the evidence period. Neither requests a route.
+  "packages/core/src/services/alongside-facts.ts",
+  "apps/desktop/src/local-timeline.service.ts",
 ]);
 /** The only sources that name the stored guess column. */
 const GUESS_READERS = new Set([

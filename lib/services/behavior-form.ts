@@ -32,9 +32,10 @@ export type ParseBehaviorFormOptions = {
   mode: "create" | "update";
   categories?: CategoryOption[];
   /**
-   * Ticket 358 (D33): read the `alongside` field. Only hosted callers with
-   * `CADENCE_ALONGSIDE` on pass true; otherwise the field is ignored and the stored
-   * answer is kept, so no write reaches `behaviors.alongside`.
+   * Ticket 358 (D33): read the `alongside` field. Hosted callers pass true with
+   * `CADENCE_ALONGSIDE` on, and Cadence for Mac with its alongside build switch on
+   * (Ticket 363); otherwise the field is ignored. A form without the field keeps the
+   * stored answer either way.
    */
   readAlongside?: boolean;
 };

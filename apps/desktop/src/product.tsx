@@ -20,6 +20,7 @@ import { PlaceSearchProvider } from "@/components/travel/PlaceAutocomplete";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
+import { notifyPlaceLabelsChanged } from "@/lib/ui/place-labels";
 import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPermission } from "./foreground-location";
 import { DESKTOP_CALENDAR_NOT_LOADED_LABEL, useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
@@ -33,6 +34,7 @@ import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { CHAT_CONVERSATIONS_CHANGED_EVENT, type ChatConversationsChangedDetail } from "@/lib/ui/chat";
 import { createDesktopDailyBriefClient, type DesktopDailyBriefPlan } from "./daily-brief";
+import { alongsideSwitchOn, alongsideWhereGuessMap, createDesktopAlongsideGuessClient, desktopAlongsideContext, type AlongsideHostedRead, type DesktopAlongsideContext } from "./alongside";
 import { chatGptPlanSwitchOn } from "./chatgpt/plan-switch";
 import { createChatGptAccountScope, createChatGptConnection } from "./chatgpt/connection";
 import { ChatGptPlanSettings } from "./chatgpt/chatgpt-plan-settings";
@@ -73,6 +75,8 @@ import { scheduleLocalDayRefresh } from "./desktop-lifecycle";
 import type { AnalyticsSelection } from "@cadence/core/services/analytics";
 import "./timeline.css";
 
+// Ticket 363 (D33): the alongside setting exists only when the build turns its switch on; a linked Mac also follows the server.
+const alongsideSwitch = alongsideSwitchOn();
 // Ticket 299: the ChatGPT plan feature exists only when the build turns its switch on (owner decision, November 12, 2026).
 const chatGptPlan = chatGptPlanSwitchOn() && isTauri() ? createChatGptConnection() : null;
 const openChatGptUsage = () => { void openCalendarSourceUrl(CHATGPT_USAGE_URL).catch(() => undefined); };
@@ -150,6 +154,8 @@ export function Product() {
   const refreshWaiters = useRef<Array<(success: boolean) => void>>([]);
   const syncAfterRefresh = useRef(false);
   const mounted = useRef(true);
+  // Ticket 363: what this refresh's alongside surfaces use; guesses stay in memory only.
+  const alongsideContext = useRef<DesktopAlongsideContext | null>(desktopAlongsideContext({ switchOn: alongsideSwitch, accountId: null, read: null }));
   useEffect(() => {
     if (navigationRequest) return scrollAfterDesktopNavigation(navigationRequest.anchor);
   }, [navigationRequest]);
@@ -187,7 +193,7 @@ export function Product() {
         const requestedActivation = activation.current;
         const now = Temporal.Now.instant();
         try {
-          const timeline = await loadLocalTimeline(parameters.current.days, now);
+          const timeline = await loadLocalTimeline(parameters.current.days, now, alongsideContext.current);
           if (!mounted.current || current !== revision.current) continue;
           const [behaviors, imports, day, accepted, behaviorViews] = await Promise.all([
             getLocalBehaviorsPageData(timeline.profile, { ...parameters.current.analytics, now }),
@@ -371,8 +377,32 @@ export function Product() {
     ? { connection: accountChatGpt, connect: async () => { await accountChatGpt.connect(); }, openUsage: openChatGptUsage } : null, [accountChatGpt]);
   // Advisor Phase 3 (3C): a brief answer writes on the hosted server; account sync brings the move to this Mac.
   const dailyBriefClient = useMemo(() => calendarClient && accountUserId
-    ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan, () => setSyncRequest((previous) => previous + 1)) : null,
+    ? createDesktopDailyBriefClient(calendarClient, undefined, dailyBriefPlan, () => setSyncRequest((previous) => previous + 1), { alongside: alongsideSwitch }) : null,
   [calendarClient, accountUserId, dailyBriefPlan]);
+  // Ticket 363 (D33): a linked Mac reads the account's model guesses from the hosted server
+  // and keeps the last answer in memory, so it still applies offline.
+  const alongsideGuessClient = useMemo(() => alongsideSwitch && calendarClient && accountUserId
+    ? createDesktopAlongsideGuessClient(calendarClient) : null, [calendarClient, accountUserId]);
+  const [alongsideRead, setAlongsideRead] = useState<AlongsideHostedRead | null>(null);
+  const alongsideReadAt = useRef(0);
+  const syncCompletedAt = syncStatus.state === "current" ? syncStatus.completedAt : null;
+  useEffect(() => {
+    if (!alongsideGuessClient || !accountUserId) return;
+    // At most one read a minute: after the account changes and after a synchronization.
+    if (Date.now() - alongsideReadAt.current < 60_000 && alongsideRead?.accountId === accountUserId) return;
+    let active = true;
+    alongsideReadAt.current = Date.now();
+    void alongsideGuessClient.read(accountUserId).then((read) => { if (active && read) setAlongsideRead(read); });
+    return () => { active = false; };
+  }, [accountUserId, alongsideGuessClient, alongsideRead?.accountId, syncCompletedAt]);
+  useEffect(() => {
+    const next = desktopAlongsideContext({ switchOn: alongsideSwitch, accountId: accountUserId, read: alongsideRead });
+    if (alongsideContextKey(next) === alongsideContextKey(alongsideContext.current)) return;
+    alongsideContext.current = next;
+    void refreshScreen();
+    // The Where suggestion line reads the guesses when Place labels load again.
+    notifyPlaceLabelsChanged();
+  }, [accountUserId, alongsideRead, refreshScreen]);
   const [loadedDesktopAiEnabled, setLoadedDesktopAiEnabled] = useState(false);
   const desktopAiEnabled = Boolean(dailyBriefClient && loadedDesktopAiEnabled);
   useEffect(() => {
@@ -454,7 +484,10 @@ export function Product() {
   const nativePermission = reminders?.permission ?? "checking";
   const readLeaveReminderNotifications = useCallback(async () => nativeLeaveReminderNotifications(nativePermission), [nativePermission]);
   // Ticket 216: place labels live in SQLite; each change asks account sync to run.
-  const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1)), []);
+  /* eslint-disable react-hooks/refs -- the Where guesses are read from the ref when the client loads, never during render. */
+  const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1),
+    () => alongsideWhereGuessMap(alongsideContext.current)), []);
+  /* eslint-enable react-hooks/refs */
   // Ticket 319: a hosted connector completion reaches this Mac through account sync.
   const requestConnectorSync = useCallback(() => setSyncRequest((previous) => previous + 1), []);
   const calendarRange = {
@@ -613,8 +646,8 @@ export function Product() {
     if (profile?.timezone) return scheduleLocalDayRefresh(profile.timezone, refresh);
   }, [profile?.timezone, refresh]);
   /* eslint-disable react-hooks/refs -- These factories only capture refresh; event callbacks read its refs after render. */
-  const occurrenceActions = useMemo(() => profile ? createLocalOccurrenceActions(profile.id, () => refresh()) : null, [profile, refresh]);
-  const behaviorActions = useMemo(() => profile ? createLocalBehaviorActions(profile, () => refresh()) : null, [profile, refresh]);
+  const occurrenceActions = useMemo(() => profile ? createLocalOccurrenceActions(profile.id, () => refresh(), { alongside: alongsideSwitch }) : null, [profile, refresh]);
+  const behaviorActions = useMemo(() => profile ? createLocalBehaviorActions(profile, () => refresh(), { alongside: alongsideSwitch }) : null, [profile, refresh]);
   const categoryAction = useMemo(() => createLocalCategoryAction(() => refresh()), [refresh]);
   const timezoneAction = useMemo(() => createLocalTimezoneAction(() => refresh()), [refresh]);
   const noteShortcutAction: NoteShortcutAction = async (behaviorId, command, expectedRevision) => {
@@ -746,6 +779,7 @@ export function Product() {
       {activeScreen === "behaviors" ? <NoteShortcutDismissProvider onDismiss={dismissShortcut}><BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
         {...occurrenceActions} {...behaviorActions} onRefresh={refresh}
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
+        alongsideViews={bundle.timeline.alongsideViews}
         sourceLinkCoordinator={sourceLinkCoordinator}
         editTarget={behaviorEditTarget}
         onNavigateReview={(selection) => { parameters.current.analytics = selection; refreshScreen(); }} /></NoteShortcutDismissProvider> : null}
@@ -790,6 +824,12 @@ export function Product() {
     </DesktopErrorBoundary>
     </PlaceLabelProvider></PlaceSearchProvider>
   </DesktopApp></DevelopmentBuildProvider>;
+}
+
+/** Equal keys: the same alongside surfaces and guesses, so no refresh is needed. */
+function alongsideContextKey(context: DesktopAlongsideContext | null): string {
+  if (!context) return "off";
+  return JSON.stringify([...context.guesses].sort(([left], [right]) => left.localeCompare(right)));
 }
 
 function noteShortcutMessage(operation: string, view: NoteShortcutView): string {
