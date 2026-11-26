@@ -529,6 +529,13 @@ such as `get_account_context()`, so tests can check every named tool against
 `INTEGRATION_OPERATION_NAMES`. The structured routine example also validates
 against the live contract schema.
 
+`integrations/drafts/` holds unpublished skill drafts (Ticket 380). It is outside
+both packages: `packageFiles` in `scripts/check-plugins.mjs` lists files inside a
+plugin folder only, and `tests/plugin-skill-drafts.test.ts` fails if a draft
+reaches a package. A draft may name the transport tool `show_day`; the published
+skills may not until it joins the registry. `integrations/drafts/README.md` has
+the publishing steps.
+
 Daily check-in reads today and Needs decision, then marks only confirmed
 changes using current status checks and retry keys. Weekly review makes no
 writes and excludes Unresolved from adherence. Routine setup previews a
@@ -656,7 +663,11 @@ are not done.
   an OAuth change only if a required host cannot sign in. Gemini Enterprise is out of
   scope.
 - **Listings.** Every submission, listing and public copy change waits for the marketing
-  site overhaul and the owner's instruction. Ticket 380 prepares unpublished drafts.
+  site overhaul and the owner's instruction. Ticket 380 prepared unpublished drafts
+  on November 26, 2026: `docs/qa/mcp-directory-submission.md` ("Unpublished MCP
+  Apps listing drafts" and "Deferred owner steps for MCP Apps"), the screenshot
+  script `scripts/acceptance/listing-capture.mjs`, and a skill draft in
+  `integrations/drafts/`.
   Messaging entries: P-097 to P-101.
 
 ### Server implementation (Ticket 376)

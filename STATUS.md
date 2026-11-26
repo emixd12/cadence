@@ -49,7 +49,7 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026; all `not_started` | 386 and 383 first, then 384; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
-| Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. 377 (view) complete November 26: the real view replaces the placeholder. 378–381 not started; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 378 tests hosts (notes for it: `docs/qa/2026-11-25-mcp-day-view.md`); 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
+| Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. 377 (view) complete November 26: the real view replaces the placeholder. 380 (listing preparation) `in_progress`: drafts, capture script, skill draft and owner checklist done November 26, host screenshots wait for 378. 378 and 381 not started; 379 complete; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 378 tests hosts (notes for it: `docs/qa/2026-11-25-mcp-day-view.md`); 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) blocked | Owner: say yes or no to draft PR #423 (Chat writes Periods; its migration drops and re-adds a check constraint). 374 starts when Ticket 363 (PR #407) is on `main`. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
@@ -101,6 +101,33 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 380: MCP Apps listing preparation, nothing published — November 26, 2026
+
+- **In progress.** Nothing was submitted, listed or published. No provider form was
+  opened. No credential or reviewer account is in the repository. No Privacy, Terms,
+  Trust or marketing text changed.
+- **Drafts, unpublished:** `docs/qa/mcp-directory-submission.md` gains five screenshot
+  prompts, the CSP statement, reviewer cases V1 to V5, Google's form facts, and the
+  checklist "Deferred owner steps for MCP Apps" (input file and messaging entry per
+  step). Its Google-only sign-in text is corrected in five places.
+- **Capture script:** `scripts/acceptance/listing-capture.mjs`. Bench mode ran: five
+  PNGs, 1436 pixels wide, each with a prompt sidecar, in the git-ignored
+  `.local/listing-captures/`. They are labelled bench captures, not listing screenshots.
+  Host mode is tested against a stub page only.
+- **Skill draft:** `integrations/drafts/skills/daily-check-in/SKILL.md` names `show_day`.
+  The published copies are unchanged. New acceptance scenario
+  `skill-check-in-view-unconfirmed`; the runner now counts `show_day` as a read.
+- **Remaining, after Ticket 378:** host captures of the five shots, a prompt change if a
+  client does not call `show_day` for it, and the owner's look at each image.
+- **Found, not tested:** Google recommends an unchanged refresh token on refresh and
+  Cadence rotates it; Google asks for an SVG logo and the repository has PNG only.
+- **Verification:** `dagger check --cadence` passed 11 of 11; `npm run test:web-client`
+  passed (84 tests); `node scripts/check-plugins.mjs` passed. Not run: any real client.
+
+Platform impact: web (docs, acceptance tooling, an unpackaged draft); desktop and future
+mobile not applicable; marketing waits for Ticket 246. Messaging: `P-097`, `P-099`,
+`P-100`, `P-101`; statuses of `P-097` and `P-100` updated.
 
 ## Ticket 377 complete: the "Cadence day" MCP Apps view — November 26, 2026
 
