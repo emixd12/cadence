@@ -117,6 +117,20 @@ export type BehaviorChangeEvidence =
       signalIds: readonly number[];
       cardId: string;
       counts: Readonly<Record<string, number>>;
+    }>
+  /**
+   * Ticket 362 (D33, "Pairing the schedule"): the guest Behavior moves to its host's set
+   * time. `basis` says what backs it: the coach's done_together signal names the pair, or
+   * the person said Yes to the same pairing in the Daily Brief on `yesDays` different days
+   * in the last `windowDays`. The rule lives in alongside-schedule-pairing.resolver.ts.
+   */
+  | Readonly<{
+      source: "alongside_pairing";
+      basis: "done_together" | "brief_yes";
+      hostBehaviorId: string;
+      signalIds: readonly number[];
+      yesDays: number;
+      windowDays: number;
     }>;
 
 // ------------------------------------------------------------- weekday move patterns
@@ -475,6 +489,11 @@ function evidenceMatchesChange(evidence: BehaviorChangeEvidence, change: Behavio
   if (evidence.signalIds.some((id) => !Number.isSafeInteger(id) || id < 1)) return false;
   if (evidence.source === "card") return evidence.cardId.length > 0;
   if (evidence.source === "tip") return evidence.cardId.length > 0 && evidence.signalKind === "repeated_move" && evidence.tipText.length > 0;
+  // The pairing rule itself is checked by the pairing resolver; here only the shape.
+  if (evidence.source === "alongside_pairing") {
+    return evidence.hostBehaviorId.length > 0 && Number.isInteger(evidence.yesDays) && evidence.yesDays >= 0
+      && (evidence.basis === "done_together" || evidence.yesDays > 0);
+  }
   return evidence.movedDays >= R.minSameDirectionMoves && evidence.targetSpreadMinutes <= R.maxTargetSpreadMinutes
     && evidence.movedWeekdays.every((day) => change.weekdays.includes(day))
     && evidence.direction === directionOf(change);
@@ -581,6 +600,7 @@ export function codeReason(evidence: BehaviorChangeEvidence, change: BehaviorCha
     return `You moved it to about ${formatClockTimeLabel(change.toTime)} on ${evidence.movedDays} of the last ${evidence.windowDays} days.`;
   }
   if (evidence.source === "tip") return acceptReason(evidence.tipText) ?? `You moved it to about ${formatClockTimeLabel(change.toTime)} often lately.`;
+  if (evidence.source === "alongside_pairing") return `It can be done during another item at ${formatClockTimeLabel(change.toTime)}.`;
   return evidence.signalKind === "never_done"
     ? `It rarely gets done at ${formatClockTimeLabel(change.fromTime)}.`
     : `Items at this time of day get done less often for you.`;
@@ -652,6 +672,15 @@ export const PROPOSE_BEHAVIOR_CHANGE_OPERATION = Object.freeze({
           value: integer({ minimum: 0, maximum: 100000 }),
         }), { maxItems: 20 }),
       }),
+      // Ticket 362: ids and counts only, never titles.
+      object({
+        source: literal("alongside_pairing"),
+        basis: enumOf(["done_together", "brief_yes"] as const),
+        host_behavior_id: uuid("The host Behavior whose set time the guest moves to."),
+        signal_ids: array(integer({ minimum: 1 }), { maxItems: 20 }),
+        yes_days: integer({ minimum: 0, maximum: 60 }),
+        window_days: integer({ minimum: 1, maximum: 60 }),
+      }),
     ]),
     run_id: optional(nullable(uuid())),
   }),
@@ -690,6 +719,12 @@ function evidenceInput(evidence: BehaviorChangeEvidence): ProposeBehaviorChangeI
       source: "repeated_move", signal_ids: [...evidence.signalIds], moved_weekdays: [...evidence.movedWeekdays],
       window_days: evidence.windowDays, moved_days: evidence.movedDays, direction: evidence.direction,
       median_target_time: evidence.medianTargetTime, target_spread_minutes: evidence.targetSpreadMinutes,
+    };
+  }
+  if (evidence.source === "alongside_pairing") {
+    return {
+      source: "alongside_pairing", basis: evidence.basis, host_behavior_id: evidence.hostBehaviorId,
+      signal_ids: [...evidence.signalIds], yes_days: evidence.yesDays, window_days: evidence.windowDays,
     };
   }
   const counts = Object.entries(evidence.counts).filter(([, value]) => Number.isInteger(value) && value >= 0)
@@ -733,7 +768,11 @@ function entryStart(entry: Entry): string | null {
   return "start_time" in entry ? entry.start_time : null;
 }
 
-function scheduleWeekdays(schedule: ProposalSchedule): Weekday[] | null {
+/**
+ * The weekdays a daily-every-day or weekly-every-week schedule lands on; null for every N
+ * days, every N weeks and monthly, which do not land on fixed weekdays.
+ */
+export function scheduleWeekdays(schedule: ProposalSchedule): Weekday[] | null {
   const rule = schedule.recurrence;
   if (rule.frequency === "daily" && rule.interval === 1) return [...WEEKDAYS];
   if (rule.frequency === "weekly" && rule.interval === 1) return WEEKDAYS.filter((day) => rule.days_of_week.includes(day));
