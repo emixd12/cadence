@@ -118,7 +118,7 @@ export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly str
   // `alongside` and `other_alongside` (booleans) appear from coach-signals-4 (Ticket 359, CADENCE_ALONGSIDE on).
   done_together: ["other_behavior_id", "pattern", "together_days", "either_days", "alongside", "other_alongside"],
   crowded_hour: ["hour", "items_in_hour", "hour_rate", "other_rate", "hour_resolved"],
-  setup_gaps: ["missing_length", "missing_place", "without_length", "without_place", "active_behaviors"],
+  setup_gaps: ["missing_length", "missing_place", "without_length", "without_place", "active_behaviors", "alongside_unanswered", "without_alongside_answer"],
   reminder_response: ["reminded_marked", "within_30_min", "later", "quick_share", "median_minutes_after"],
   session_length: ["sessions", "planned_minutes", "median_minutes", "shorter", "longer", "on_target", "pattern"],
   moved_vs_unmoved: ["moved_rate", "moved_resolved", "unmoved_rate", "unmoved_resolved", "gap", "pattern"],

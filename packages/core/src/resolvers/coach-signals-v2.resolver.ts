@@ -30,7 +30,9 @@ import type {
  * - Alongside (version 4, Ticket 359): when Behaviors carry `alongside`, an alongside
  *   item never makes an hour look crowded (it happens during other things), and a
  *   done-together pair says which side is alongside (`alongside`, `other_alongside`).
- *   Without the field (flag off) both signals are exactly version 3.
+ *   Ticket 360: `setup_gaps` also reports an open alongside question
+ *   (`alongside_unanswered`, `without_alongside_answer`).
+ *   Without the fields (flag off) these signals are exactly version 3.
  */
 
 export const COACH_SIGNAL_V2_THRESHOLDS = Object.freeze({
@@ -602,25 +604,33 @@ function itemKey(ctx: Ctx, row: CoachSignalOccurrence, index: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Setup gaps: active Behaviors without a length or a place.
+// Setup gaps: active Behaviors without a length or a place. Version 4 (Ticket 360) also
+// reports an open alongside question: unanswered while Cadence guesses yes.
 
 function setupGaps(ctx: Ctx): CoachSignal[] {
   const behaviors = [...ctx.active.values()].filter((b) => b.hasLength !== undefined || b.hasPlace !== undefined);
+  // Only when the visit read the question (version 4); otherwise the facts stay version 3.
+  const asksAlongside = [...ctx.active.values()].some((b) => b.alongsideQuestionOpen !== undefined);
   const signals: CoachSignal[] = [];
   for (const behavior of behaviors) {
     const missingLength = behavior.hasLength === false;
     const missingPlace = behavior.hasPlace === false;
-    if (missingLength || missingPlace) {
-      signals.push({ kind: "setup_gaps", behaviorId: behavior.id, facts: { missing_length: missingLength, missing_place: missingPlace } });
+    const unanswered = behavior.alongsideQuestionOpen === true;
+    if (missingLength || missingPlace || unanswered) {
+      signals.push({ kind: "setup_gaps", behaviorId: behavior.id, facts: {
+        missing_length: missingLength, missing_place: missingPlace, ...(asksAlongside ? { alongside_unanswered: unanswered } : {}),
+      } });
     }
   }
   const withoutLength = behaviors.filter((b) => b.hasLength === false).length;
   const withoutPlace = behaviors.filter((b) => b.hasPlace === false).length;
-  if (withoutLength + withoutPlace > 0) {
+  const withoutAlongside = behaviors.filter((b) => b.alongsideQuestionOpen === true).length;
+  if (withoutLength + withoutPlace + withoutAlongside > 0) {
     signals.push({
       kind: "setup_gaps",
       behaviorId: null,
-      facts: { active_behaviors: behaviors.length, without_length: withoutLength, without_place: withoutPlace },
+      facts: { active_behaviors: behaviors.length, without_length: withoutLength, without_place: withoutPlace,
+        ...(asksAlongside ? { without_alongside_answer: withoutAlongside } : {}) },
     });
   }
   return signals;
