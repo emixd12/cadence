@@ -1,9 +1,12 @@
--- Alongside setting (migrations 20261125140000, Ticket 356, and 20261126220000, Ticket 363).
--- Local-only rollback fixture. Covers: create with and without the answer, update with,
--- without and clearing it, the answer as a configuration revision with the changed field
--- 'alongside', a plan without the key keeping the stored answer, RLS isolation, and
--- account sync: contract 10 carries the answer, a contract-9 write keeps it, a contract-10
--- write changes it with its history and a contract-10 write without it is refused.
+-- Alongside setting (migrations 20261125140000, Ticket 356, 20261126220000 and
+-- 20261126260000, Ticket 363). Local-only rollback fixture. Covers: create with and
+-- without the answer, update with, without and clearing it, the answer as a configuration
+-- revision with the changed field 'alongside', an unanswered Behavior's history without
+-- any trace of the answer, a plan without the key keeping the stored answer, RLS
+-- isolation, and account sync: contract 10 carries the answer and its history; contract 9
+-- sees neither, reads an alongside-only revision as the one before it, and its writes
+-- keep the answer and the stored pointers; a contract-10 write changes the answer with its
+-- history and a contract-10 write without it is refused.
 begin;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data)
@@ -121,10 +124,14 @@ begin
     raise exception 'A Behavior created without an answer is not unanswered.';
   end if;
   if (select next_configuration -> 'alongside' from public.behavior_configuration_events where behavior_id = helmet and event_kind = 'baseline')
-      is distinct from 'true'::jsonb
-    or not (select next_configuration ? 'alongside' and next_configuration -> 'alongside' = 'null'::jsonb
-      from public.behavior_configuration_events where behavior_id = reading and event_kind = 'baseline') then
+      is distinct from 'true'::jsonb then
     raise exception 'The configuration baseline does not carry the answer.';
+  end if;
+  -- D1: an unanswered Behavior's baseline carries no trace of the answer. (This fixture's
+  -- plans list no answer field; the database computes and checks the stored fields.)
+  if (select next_configuration ? 'alongside' or 'alongside' = any(changed_fields)
+      from public.behavior_configuration_events where behavior_id = reading and event_kind = 'baseline') then
+    raise exception 'An unanswered Behavior''s baseline names the answer.';
   end if;
 
   select * into before from public.behaviors where id = helmet;
@@ -168,6 +175,19 @@ begin
   perform pg_temp.update_behavior(helmet, '{}');
   if (select alongside from public.behaviors where id = helmet) is distinct from false then
     raise exception 'An update without the key changed the answer.';
+  end if;
+
+  -- An edit of an unanswered Behavior that changes another field names no answer either.
+  perform public.update_behavior_with_schedule_graph(reading,
+    (pg_temp.behavior_payload('Reading', 15) - 'created_at'),
+    jsonb_build_object('stored_title', 'Reading', 'stored_description', null),
+    '[]'::jsonb, (select updated_at from public.behaviors where id = reading), null,
+    pg_temp.plan('revision', pg_temp.configuration(0), pg_temp.configuration(15),
+      array['reminder_offset_minutes'], 'behavior_edited'), '[]'::jsonb);
+  if not exists (select 1 from public.behavior_configuration_events
+      where behavior_id = reading and event_kind = 'revision' and changed_fields = array['reminder_offset_minutes']
+        and not previous_configuration ? 'alongside' and not next_configuration ? 'alongside') then
+    raise exception 'An unanswered Behavior''s edit names the answer.';
   end if;
 
   perform pg_temp.update_behavior(helmet, '{"alongside": null}');
@@ -247,6 +267,15 @@ returns jsonb language sql immutable as $$
   ) rows
 $$;
 
+-- One Occurrence of Helmet's that points at its current revision, an answer-only one.
+reset role;
+insert into public.occurrences (user_id, behavior_id, behavior_configuration_event_id, scheduled_for, local_date,
+  schedule_kind, schedule_start_time, status, origin, added_by)
+select user_id, id, current_configuration_event_id, '2026-11-25T14:00:00Z', '2026-11-25', 'exact', '09:00', 'unresolved',
+  'opportunity', 'user'
+from public.behaviors where title = 'Red light helmet';
+set local role authenticated;
+
 grant execute on function pg_temp.sync_payload(integer, jsonb, jsonb, jsonb, text) to authenticated;
 grant execute on function pg_temp.merged(jsonb, jsonb) to authenticated;
 
@@ -260,6 +289,7 @@ declare
   stored_configuration jsonb;
   event_id uuid := gen_random_uuid();
   event jsonb;
+  hidden_pointer uuid := (select current_configuration_event_id from public.behaviors where title = 'Red light helmet');
 begin
   -- Contract 10 carries the answer; contract 9 never sees it.
   select entity -> 'value' into stored from jsonb_array_elements(current_snapshot -> 'entities') entity
@@ -271,10 +301,41 @@ begin
     where entity ->> 'kind' = 'behavior' and (entity -> 'value') ? 'alongside') then
     raise exception 'Account sync contract 9 sees the alongside answer.';
   end if;
+  -- Contract 10 reads the answer's history; contract 9 reads none of it (20261126260000).
+  if not exists (select 1 from jsonb_array_elements(current_snapshot -> 'entities') entity
+    where entity ->> 'kind' = 'configuration_event' and entity -> 'value' -> 'changed_fields' ? 'alongside') then
+    raise exception 'Account sync contract 10 lost the answer''s configuration events.';
+  end if;
   if exists (select 1 from jsonb_array_elements(legacy_snapshot -> 'entities') entity
-    where entity ->> 'kind' = 'configuration_event' and entity -> 'value' -> 'changed_fields' ? 'alongside') is not true then
-    -- Configuration history is synced as rows; older contracts receive the events unchanged.
-    raise exception 'Account sync contract 9 lost the answer''s configuration events.';
+    where entity ->> 'kind' = 'configuration_event' and (entity -> 'value' -> 'changed_fields' ? 'alongside'
+      or coalesce(entity #> '{value,previous_configuration}', '{}'::jsonb) ? 'alongside'
+      or entity #> '{value,next_configuration}' ? 'alongside')) then
+    raise exception 'Account sync contract 9 sees the answer in configuration history.';
+  end if;
+  -- Helmet's answer-only revisions (to false, to null, to true) are hidden from contract 9;
+  -- its pointer reads as its baseline, the closest earlier revision that changed more.
+  if (select count(*) from jsonb_array_elements(legacy_snapshot -> 'entities') entity
+      where entity ->> 'kind' = 'configuration_event' and entity #>> '{value,behavior_id}' = helmet_id) <> 1
+    or (select count(*) from jsonb_array_elements(current_snapshot -> 'entities') entity
+      where entity ->> 'kind' = 'configuration_event' and entity #>> '{value,behavior_id}' = helmet_id) <> 4 then
+    raise exception 'Contract 9 does not hide exactly the answer-only revisions.';
+  end if;
+  if (select entity #>> '{value,current_configuration_event_id}' from jsonb_array_elements(legacy_snapshot -> 'entities') entity
+      where entity ->> 'kind' = 'behavior' and entity ->> 'id' = helmet_id) is distinct from
+    (select id::text from public.behavior_configuration_events where behavior_id = helmet_id::uuid and event_kind = 'baseline')
+    or (select entity #>> '{value,behavior_configuration_event_id}' from jsonb_array_elements(legacy_snapshot -> 'entities') entity
+      where entity ->> 'kind' = 'occurrence' and entity #>> '{value,behavior_id}' = helmet_id) is distinct from
+    (select id::text from public.behavior_configuration_events where behavior_id = helmet_id::uuid and event_kind = 'baseline') then
+    raise exception 'Contract 9 does not read a hidden revision as the one before it.';
+  end if;
+  -- Every pointer contract 9 reads names an event contract 9 reads (its local foreign keys).
+  if exists (select 1 from jsonb_array_elements(legacy_snapshot -> 'entities') entity
+    where entity ->> 'kind' in ('behavior', 'occurrence')
+      and coalesce(entity #>> '{value,current_configuration_event_id}', entity #>> '{value,behavior_configuration_event_id}') is not null
+      and not exists (select 1 from jsonb_array_elements(legacy_snapshot -> 'entities') listed_event
+        where listed_event ->> 'kind' = 'configuration_event'
+          and listed_event ->> 'id' = coalesce(entity #>> '{value,current_configuration_event_id}', entity #>> '{value,behavior_configuration_event_id}'))) then
+    raise exception 'Contract 9 reads a pointer at a configuration event it cannot see.';
   end if;
 
   -- A contract-9 write (an older Cadence for Mac, no alongside field) keeps the stored answer.
@@ -284,8 +345,23 @@ begin
   perform public.apply_account_sync_plan(pg_temp.sync_payload(9, legacy_snapshot, jsonb_build_array(jsonb_build_object(
     'kind', 'behavior', 'id', helmet_id, 'operation', 'upsert', 'expected', stored, 'value', changed
   )), pg_temp.merged(legacy_snapshot, jsonb_build_array(jsonb_build_object('kind', 'behavior', 'id', helmet_id, 'value', changed))), repeat('c', 64)));
-  if (select sub_behavior_sort_order <> 3 or alongside is distinct from true from public.behaviors where id = helmet_id::uuid) then
-    raise exception 'A contract-9 Behavior write did not apply or erased the answer.';
+  if (select sub_behavior_sort_order <> 3 or alongside is distinct from true
+      or current_configuration_event_id is distinct from hidden_pointer from public.behaviors where id = helmet_id::uuid) then
+    raise exception 'A contract-9 Behavior write did not apply, erased the answer or moved the stored pointer.';
+  end if;
+
+  -- A contract-9 Occurrence write (a Note) keeps the stored pointer at the hidden revision.
+  legacy_snapshot := public.read_account_sync_snapshot(9);
+  select entity into stored from jsonb_array_elements(legacy_snapshot -> 'entities') entity
+    where entity ->> 'kind' = 'occurrence' and entity #>> '{value,behavior_id}' = helmet_id;
+  changed := (stored -> 'value') || '{"note": "Worn while reading"}'::jsonb;
+  perform public.apply_account_sync_plan(pg_temp.sync_payload(9, legacy_snapshot, jsonb_build_array(
+    jsonb_build_object('kind', 'occurrence', 'id', stored ->> 'id', 'operation', 'upsert', 'expected', stored -> 'value', 'value', changed)
+  ), pg_temp.merged(legacy_snapshot, jsonb_build_array(
+    jsonb_build_object('kind', 'occurrence', 'id', stored ->> 'id', 'value', changed))), repeat('b', 64)));
+  if (select note is distinct from 'Worn while reading' or behavior_configuration_event_id is distinct from hidden_pointer
+      from public.occurrences where id = (stored ->> 'id')::uuid) then
+    raise exception 'A contract-9 Occurrence write did not apply or moved the stored pointer.';
   end if;
 
   -- A contract-9 write that names the answer is refused.

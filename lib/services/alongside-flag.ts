@@ -15,6 +15,9 @@
  * 20261126230000, and 20261126250000 no later than it: account sync contract 11 hides
  * such a dismissal from Cadence for Mac builds on contracts 8 to 10, which would
  * otherwise delete it or fail to apply it.
+ * 20261126260000 (`account_sync_alongside_history`, after 20261126250000) must be on the
+ * database before the flag turns on: it hides the answer's configuration history from
+ * Cadence for Mac builds on contracts 8 and 9, whose export rejects the changed field.
  * Ticket 385's advice card `do-it-during-something-else` needs 20261126240000 (the
  * `alongside` tip link target) on the database before the card is activated; the flag
  * itself does not.

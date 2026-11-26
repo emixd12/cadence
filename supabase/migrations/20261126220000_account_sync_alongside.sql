@@ -3,10 +3,15 @@
 -- 20261125140000 added behaviors.alongside and kept it hosted-only: account sync contract
 -- 9 left it out, and configuration history did not record it. This migration carries it.
 --
--- Configuration history: the Behavior configuration snapshot gains 'alongside' (true,
--- false or null), and changing the answer is a configuration revision with the changed
--- field 'alongside'. Existing history is not rewritten; a snapshot without the key was
--- unanswered. A configuration plan without the key (a caller written before this
+-- Configuration history: changing the answer is a configuration revision with the changed
+-- field 'alongside', and both of its snapshots carry the answer (true, false or null).
+-- An unanswered Behavior leaves no trace (defect D1 of the 2026-11-26 local acceptance):
+-- its baseline does not name 'alongside', and no snapshot of an event whose two sides are
+-- both unanswered carries the key, so that history is stored exactly as before the
+-- setting existed. The stored-row helper behavior_configuration_history_snapshot applies
+-- this rule where an event is written; the live snapshot that plans are compared with
+-- still always carries the key. Existing history is not rewritten; a snapshot without the
+-- key was unanswered. A configuration plan without the key (a caller written before this
 -- migration, or a plan with no answer on either side) reads as keeping the stored answer,
 -- as a plan without 'is_opportunity' already does.
 --
@@ -14,11 +19,14 @@
 -- contract-9 writers keep syncing. Their projection hides the field, and the stored answer
 -- is restored on their Behavior writes, so an older Cadence for Mac never clears it. A
 -- contract-10 Behavior write must carry the field. The minimum writer contract stays 8.
+-- 20261126260000 hides the answer's configuration history from those older contracts.
 --
 -- Precedent: 20261122010000_sub_behaviors (contract 9). Like it, this migration replaces
 -- the changed_fields check constraint (drop and add, so history may name 'alongside') and
--- inserts one row into the private contract registry. Everything else is create or
--- replace of functions with unchanged signatures.
+-- inserts one row into the private contract registry. Everything else is create of one
+-- new immutable helper function or create or replace of functions with unchanged
+-- signatures, two of them (the configuration event writer and the BehaviorLog import
+-- apply) patched by text so that they store the history rule above.
 begin;
 
 comment on column public.behaviors.alongside is
@@ -52,12 +60,14 @@ immutable
 security invoker
 set search_path = ''
 as $$
-  select case when previous_configuration is null then array[
+  -- A baseline names every field, and 'alongside' only when the Behavior has an answer.
+  select case when previous_configuration is null then array_remove(array[
     'category_id', 'location_text', 'where_kind', 'schedule_graph',
     'browser_reminder_enabled', 'email_reminder_enabled',
     'reminder_offset_minutes', 'active', 'timezone', 'end', 'pause', 'is_opportunity',
-    'parent_behavior_id', 'inherit_parent_schedule', 'alongside'
-  ]::text[] else array_remove(array[
+    'parent_behavior_id', 'inherit_parent_schedule',
+    case when coalesce(next_configuration -> 'alongside', 'null'::jsonb) <> 'null'::jsonb then 'alongside' end
+  ]::text[], null) else array_remove(array[
     case when previous_configuration -> 'category_id' is distinct from next_configuration -> 'category_id' then 'category_id' end,
     case when previous_configuration -> 'location_text' is distinct from next_configuration -> 'location_text' then 'location_text' end,
     case when coalesce(previous_configuration -> 'where_kind', case when previous_configuration ->> 'location_text' is null then 'null'::jsonb else '"place"'::jsonb end)
@@ -79,6 +89,28 @@ as $$
       is distinct from coalesce(next_configuration -> 'alongside', 'null'::jsonb) then 'alongside' end
   ]::text[], null) end;
 $$;
+
+-- The snapshot a configuration event stores (D33 history rule, TypeScript's
+-- withHistoryAlongside): with no answer on either side of the event the 'alongside' key is
+-- left out; otherwise it is present, null for an unanswered side. 'other' is the event's
+-- other snapshot (null for a baseline).
+create or replace function cadence_private.behavior_configuration_history_snapshot(snapshot jsonb, other jsonb)
+returns jsonb
+language sql
+immutable
+security invoker
+set search_path = ''
+as $$
+  select case
+    when snapshot is null or jsonb_typeof(snapshot) <> 'object' then snapshot
+    when coalesce(snapshot -> 'alongside', 'null'::jsonb) = 'null'::jsonb
+      and coalesce(case when jsonb_typeof(other) = 'object' then other -> 'alongside' end, 'null'::jsonb) = 'null'::jsonb
+      then snapshot - 'alongside'
+    else snapshot || jsonb_build_object('alongside', coalesce(snapshot -> 'alongside', 'null'::jsonb))
+  end;
+$$;
+
+revoke all on function cadence_private.behavior_configuration_history_snapshot(jsonb, jsonb) from public, anon, authenticated;
 
 -- A plan without the 'alongside' key keeps the stored answer.
 create or replace function cadence_private.behavior_configuration_with_run(planned jsonb, stored jsonb)
@@ -147,12 +179,32 @@ do $migration$
 declare
   definition text;
 begin
-  -- Snapshot: the answer, always present.
+  -- Snapshot: the answer, always present. Plans are compared with it; stored events go
+  -- through behavior_configuration_history_snapshot below.
   select pg_get_functiondef('cadence_private.current_behavior_configuration_snapshot(uuid,uuid)'::regprocedure) into definition;
   definition := pg_temp.patch_definition(definition, $a$    'inherit_parent_schedule', behavior.inherit_parent_schedule
   )$a$, $p$    'inherit_parent_schedule', behavior.inherit_parent_schedule,
     'alongside', behavior.alongside
   )$p$, 'Behavior configuration snapshot');
+  execute definition;
+
+  -- The configuration event writer stores both snapshots under the history rule.
+  select pg_get_functiondef('cadence_private.insert_behavior_configuration_event(uuid,uuid,jsonb,jsonb,jsonb)'::regprocedure) into definition;
+  definition := pg_temp.patch_definition(definition, $a$    expected_event_kind,
+    previous_configuration,
+    next_configuration,
+    expected_changed_fields,$a$, $p$    expected_event_kind,
+    cadence_private.behavior_configuration_history_snapshot(previous_configuration, next_configuration),
+    cadence_private.behavior_configuration_history_snapshot(next_configuration, previous_configuration),
+    expected_changed_fields,$p$, 'Configuration event writer values');
+  execute definition;
+
+  -- A BehaviorLog import that replaces an imported Behavior's synthetic baseline stores it
+  -- under the same rule (changed_fields already follows it).
+  select pg_get_functiondef('public.apply_behaviorlog_import(jsonb)'::regprocedure) into definition;
+  definition := pg_temp.patch_definition(definition, $a$      set next_configuration = configuration_snapshot,$a$,
+    $p$      set next_configuration = cadence_private.behavior_configuration_history_snapshot(configuration_snapshot, null),$p$,
+    'BehaviorLog import baseline rewrite');
   execute definition;
 
   -- Account sync snapshot: contract 10 carries the answer; older contracts' projection hides it.

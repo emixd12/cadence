@@ -56,6 +56,7 @@
   ],
   "excluded": {
     "tests/acceptance-oauth-driver.local-integration.test.mjs": "Needs CADENCE_ACCEPT_248_LOCAL=1 and a running app server with its own issuer, CA file and app log.",
+    "tests/alongside-history.local-integration.test.ts": "Needs CADENCE_LOCAL_DB_CONTAINER naming a local Supabase database container with every migration applied; it calls psql through docker exec.",
     "tests/apple-sign-in.local-integration.test.ts": "Needs an app server (CADENCE_APPLE_SIGN_IN_E2E_URL), the Apple stub and CADENCE_SIGN_IN_APPLE.",
     "tests/auth-callback-rate-limit.local-integration.test.ts": "Needs an app server (CADENCE_CALLBACK_E2E_URL) and a rate-limit gateway.",
     "tests/behavior-configuration-events.local-integration.test.ts": "Needs CADENCE_LOCAL_HISTORY_USER_ID: a user pre-seeded with 1,001 configuration events, which the rehearsal does not create.",
