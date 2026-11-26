@@ -3543,6 +3543,20 @@ export type Database = {
         }
         Returns: Json
       }
+      integration_apply_period_write: {
+        Args: {
+          p_end_on: string
+          p_expected_revision: string
+          p_hash: string
+          p_key: string
+          p_label: string
+          p_note: string
+          p_operation: string
+          p_period_id: string
+          p_start_on: string
+        }
+        Returns: Json
+      }
       integration_apply_write: {
         Args: {
           p_args: Json
