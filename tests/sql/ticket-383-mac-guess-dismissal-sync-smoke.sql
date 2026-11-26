@@ -1,5 +1,5 @@
 -- Local-only: psql "postgresql://postgres:postgres@127.0.0.1:<db-port>/postgres" -X -v ON_ERROR_STOP=1 -f tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql
--- Ticket 383 (D37), Cadence for Mac: migration 20261126150000 (account sync contract 11).
+-- Ticket 383 (D37), Cadence for Mac: migration 20261126250000 (account sync contract 11).
 -- A guess dismissal stored while Completion places is off:
 --   - contract 11 reads it and may write or delete it;
 --   - contracts 8, 9 and 10 never see it, their unrelated writes keep it, and their plan

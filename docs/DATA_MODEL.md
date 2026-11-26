@@ -511,7 +511,7 @@ Triggers keep every writer consistent, including MCP and account sync:
 - Markers, labels and dismissals require `place_label_settings.enabled`, read
   under a share lock held until the write commits. A concurrent opt-out either
   deletes the admitted write or completes first and makes the write fail.
-  Exception (Ticket 383, migration `20261126130000`): a dismissal whose suggestion is
+  Exception (Ticket 383, migration `20261126230000`): a dismissal whose suggestion is
   one a model guess can produce (`home`, `anywhere`, `add_place`) is admitted while
   labels are off. A `saved_place:` dismissal still needs labels on. The web service
   accepts one while off only for the guess the Behavior's line shows, and only while
@@ -548,7 +548,7 @@ it: the side that turned labels off deleted the row, so the merge carries the de
 and a guess dismissal made after the turn-off survives. Mac builds on contracts 8 to 10
 would drop such a row (an ordinary sync would delete it from the hosted account) or
 refuse it (a first-link replacement would fail), so migration
-`20261126150000_account_sync_where_guess_dismissals.sql` hides it from them:
+`20261126250000_account_sync_where_guess_dismissals.sql` hides it from them:
 
 - `cadence_private.account_sync_contract_row_rules(contract, kind, rule)` lists rules
   that hide rows of an existing kind by their values. Its one row is
@@ -2592,7 +2592,7 @@ be done alongside other things?". Null means unanswered. Migration:
   Ticket 363 a web edit built from a stored Behavior (`select *`) carries the stored
   answer back unchanged, so configuration history compares like with like.
 - **Configuration history and account sync (Ticket 363).** Migration
-  `20261126120000_account_sync_alongside.sql` makes the answer part of the Behavior
+  `20261126220000_account_sync_alongside.sql` makes the answer part of the Behavior
   configuration: `current_behavior_configuration_snapshot` carries `alongside` (true,
   false or null), `behavior_configuration_changed_fields` and the `changed_fields` check
   include `alongside` (the last field, after `inherit_parent_schedule`), and changing the
@@ -2632,7 +2632,7 @@ be done alongside other things?". Null means unanswered. Migration:
   Daily Brief reads it; the Timeline row, the form and Chat do not, and an answer on any
   surface still closes the question through `behaviors.alongside`. Nothing reads or
   writes it while `CADENCE_ALONGSIDE` is off. Migration
-  `20261126100000_alongside_pairing_evidence_and_brief_asks.sql` (additive).
+  `20261126200000_alongside_pairing_evidence_and_brief_asks.sql` (additive).
 - **Exports and MCP (Ticket 364).** With `CADENCE_ALONGSIDE` on, Full JSON, JSONL, CSV
   and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, BehaviorLog
   import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
@@ -3831,7 +3831,7 @@ shown to the person; Phase 4 matches the signals to advice cards.
   day otherwise.
 - Account deletion cascades; deleting a Behavior removes its signals.
 - `advisor_read_pairing_evidence(local_date)` (Ticket 361, D33; migration
-  `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`): the Daily Brief and
+  `20261126200000_alongside_pairing_evidence_and_brief_asks.sql`): the Daily Brief and
   Chat agent tokens only (`daily_brief`, `chat`); the person's session, the coach token
   and MCP grant tokens get `42501`. Security definer, stable, empty `search_path`,
   execute granted to `authenticated` only. Returns, for the caller's own account,
@@ -3972,7 +3972,7 @@ carries its question; other tips link to the editor field their card names.
   No also answers the tip that carries the question "not now".
 - `coach_tips` gains `proposal_id` (the question the tip carries, set null when the
   proposal is deleted), `link_target` (`time`, `length`, `where`, `description`,
-  `behavior`, `unmarked`, `behaviors`; `20261126140000_alongside_tip_link_target.sql`,
+  `behavior`, `unmarked`, `behaviors`; `20261126240000_alongside_tip_link_target.sql`,
   Ticket 385, replaces the check to add `alongside`, the Behavior form's "Can be done
   alongside other things") and `link_behavior_id`. `coach_write_tips` takes
   them and drops a proposal of another Behavior; `tip_json` returns them;
@@ -3990,7 +3990,7 @@ a day already moved by hand keeps its move).
 
 ### Pairing the schedule (Ticket 362, D33)
 
-Migration `20261126110000_alongside_schedule_pairing.sql`. With `CADENCE_ALONGSIDE` on, the
+Migration `20261126210000_alongside_schedule_pairing.sql`. With `CADENCE_ALONGSIDE` on, the
 coach may propose moving an alongside Behavior (the guest) to the set time of another
 Behavior (the host), as an ordinary time proposal. Rules:
 `packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts` and

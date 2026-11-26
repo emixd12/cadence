@@ -48,11 +48,11 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 386 complete in source on `feat/alongside-386`; 383 Mac part, 384 and 385 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126230000`, push approved); 386 complete in source on `feat/alongside-386`; 383 Mac part, 384 and 385 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
-| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–364 complete, flag off. On `main`: 356–361 and 364; hosted migrations `20261125140000`–`20261125190000` pushed. In a draft PR: 362, 363, the 360/361 follow-ups and the audit fixes, with migrations `20261126100000`, `20261126110000` and `20261126120000` (hosted push approved by the owner November 25, D37). Web behind `CADENCE_ALONGSIDE`, Mac behind `VITE_CADENCE_ALONGSIDE` | Push the three migrations, merge the draft PR, run Ticket 365 acceptance. `CADENCE_ALONGSIDE` must not go on in Production until a contract-10 Mac build is released: a contract-9 Mac's export fails once a history event names `alongside`. The owner decides the Production flag and the Mac release | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33, D37) |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–364 complete, flag off. On `main`: 356–361 and 364; hosted migrations `20261125140000`–`20261125190000` pushed. In a draft PR: 362, 363, the 360/361 follow-ups and the audit fixes, with migrations `20261126200000`, `20261126210000` and `20261126220000` (hosted push approved by the owner November 25, D37). Web behind `CADENCE_ALONGSIDE`, Mac behind `VITE_CADENCE_ALONGSIDE` | Push the three migrations, merge the draft PR, run Ticket 365 acceptance. `CADENCE_ALONGSIDE` must not go on in Production until a contract-10 Mac build is released: a contract-9 Mac's export fails once a history event names `alongside`. The owner decides the Production flag and the Mac release | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33, D37) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -134,7 +134,7 @@ Branch `feat/alongside-385`. Closes the advisor-tip gap Ticket 360 recorded: `se
 - **Link:** new tip link target `alongside` opens the Behavior form at "Can be done
   alongside other things" (`?edit=<id>&field=alongside`); an account-wide tip picks the
   first Behavior whose question is open.
-- **Migration:** `20261126140000_alongside_tip_link_target.sql` replaces the
+- **Migration:** `20261126240000_alongside_tip_link_target.sql` replaces the
   `coach_tips.link_target` check to allow `alongside`. Not applied locally; not additive,
   so the hosted push needs the owner's yes. It must be on the database before the card is
   activated. Smoke: `tests/sql/alongside-tip-link-target-smoke.sql` (not run).
@@ -176,11 +176,11 @@ Branch `feat/alongside-383mac`, on the alongside branch with Ticket 383's web pa
   guessed Where and dismisses the shown guess with Completion places off; local mode has none.
 - **Sync:** account sync contract 11. `retainPlaceLabelInvariants` keeps a guess dismissal
   while labels are off; turning labels off still deletes every dismissal. Hosted migration
-  `20261126150000_account_sync_where_guess_dismissals.sql` (not applied or pushed) hides such
+  `20261126250000_account_sync_where_guess_dismissals.sql` (not applied or pushed) hides such
   rows from contracts 8 to 10 (Cadence for Mac 0.1.14 to 0.1.17), keeps them out of those
   contracts' apply results, and lets their own dismissal replace a hidden one. It inserts one
   registry row and changes the projection and apply functions for older contracts: it needs
-  the owner's yes, and must reach the database no later than `20261126130000`. Minimum writer
+  the owner's yes, and must reach the database no later than `20261126230000`. Minimum writer
   contract stays 8.
 - **Verification:** resolver, native, store-contract and SQL fixtures
   (`tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql`) against a scratch database
@@ -213,7 +213,7 @@ not applicable; future mobile inherits the server rules. Messaging impact: none.
   `whereSuggestionDismissible` in `place-label.resolver.ts`. The guesses read takes no label
   or position. Flag off: same reads, writes and DOM as before.
 - **Dismissal while off:** only the guess the line shows. Migration
-  `20261126130000_where_guess_dismissal_without_labels.sql` replaces
+  `20261126230000_where_guess_dismissal_without_labels.sql` replaces
   `cadence_private.require_place_labels_enabled()` so a dismissal row with `home`, `anywhere`
   or `add_place` is admitted while labels are off. Not applied or pushed. Fixture:
   `tests/sql/ticket-383-where-guess-dismissal-smoke.sql`.
@@ -249,12 +249,12 @@ Branch `feat/alongside-audit-fixes`, stacked on `feat/alongside-wave5`. No migra
 - **Open risk (not fixed):** a released contract-9 Mac that pulls a configuration event naming
   `alongside` fails its export (`normalizeBehaviorConfigurationChangedFields`); the hosted
   projection hides only the Behavior column. Needs an owner decision before
-  `20261126120000` is pushed.
+  `20261126220000` is pushed.
 
 ## Ticket 363 complete: alongside on Cadence for Mac — November 26, 2026
 
 - **Data:** SQLite schema 29 (`0029_behavior_alongside.sql`), account sync contract 10, writer
-  floor 8. Hosted `20261126120000_account_sync_alongside.sql` (not pushed) removes the
+  floor 8. Hosted `20261126220000_account_sync_alongside.sql` (not pushed) removes the
   contract-9 exclusions, adds the answer to the configuration snapshot and `changed_fields`
   (constraint replaced, as `20261122010000` did) and registers `(10, behavior, alongside)`.
   Older Macs keep syncing; the server restores the stored answer on their writes.
@@ -282,7 +282,7 @@ Branch `feat/alongside-audit-fixes`, stacked on `feat/alongside-wave5`. No migra
   panel and answers Try for two weeks, Change for good or No; a Yes runs
   `updateBehaviorForUser`, so configuration history records it. A host that moved or left
   closes it as `schedule_changed`.
-- **Migration:** `20261126110000_alongside_schedule_pairing.sql` drops and re-adds the
+- **Migration:** `20261126210000_alongside_schedule_pairing.sql` drops and re-adds the
   evidence check with the new source (the Nov 20 precedent) and adds one check. Not applied
   anywhere; it needs the owner's yes before a hosted push. Smoke:
   `tests/sql/ticket-362-alongside-schedule-pairing-smoke.sql`.

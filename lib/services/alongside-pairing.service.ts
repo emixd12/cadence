@@ -17,7 +17,7 @@ import { readBriefMoveDay } from "@/lib/services/brief-move-day.service";
  * Evidence: the coach's stored `done_together` and `crowded_hour` signals live in
  * `cadence_advisor_private.coach_signals`. The caller reads them on its own client
  * through `advisor_read_pairing_evidence`, which only the Daily Brief and Chat agent
- * channels may call and which returns ids and hours only (migration 20261126100000).
+ * channels may call and which returns ids and hours only (migration 20261126200000).
  * No other channel's client is minted here. The database picks the date: today's
  * signals once stored, else yesterday's. Any failure (no agent client, a refused or
  * failed read) means no evidence, so pairing then needs a crowded hour or a conflict.

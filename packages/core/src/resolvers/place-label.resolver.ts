@@ -435,7 +435,7 @@ export function resolveWhereGuessSuggestion(input: Readonly<{
 /**
  * Ticket 383 (D37): the suggestion keys a guess can produce. While Completion places is
  * off, only these can be dismissed; the hosted trigger
- * (`20261126130000_where_guess_dismissal_without_labels.sql`) accepts the same keys.
+ * (`20261126230000_where_guess_dismissal_without_labels.sql`) accepts the same keys.
  */
 export const WHERE_GUESS_DISMISSAL_KEYS: readonly WhereSuggestionKey[] = Object.freeze([...new Set(Object.values(WHERE_GUESS_SUGGESTION_KEYS))]);
 

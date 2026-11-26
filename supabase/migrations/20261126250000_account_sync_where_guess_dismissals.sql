@@ -1,7 +1,7 @@
 -- Ticket 383 (D37), Cadence for Mac: account sync contract 11 carries a guess dismissal
 -- stored while Completion places is off.
 --
--- 20261126130000 lets the web store a dismissal of a model guess (suggestion 'home',
+-- 20261126230000 lets the web store a dismissal of a model guess (suggestion 'home',
 -- 'anywhere' or 'add_place') while place_label_settings.enabled is off. Mac builds on
 -- contracts 8 to 10 cannot hold such a row: their shared planner drops every dismissal
 -- while labels are off, so an ordinary sync would delete it from the hosted account, and

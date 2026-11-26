@@ -1,4 +1,4 @@
--- Alongside setting (migrations 20261125140000, Ticket 356, and 20261126120000, Ticket 363).
+-- Alongside setting (migrations 20261125140000, Ticket 356, and 20261126220000, Ticket 363).
 -- Local-only rollback fixture. Covers: create with and without the answer, update with,
 -- without and clearing it, the answer as a configuration revision with the changed field
 -- 'alongside', a plan without the key keeping the stored answer, RLS isolation, and

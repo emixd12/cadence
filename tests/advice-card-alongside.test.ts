@@ -12,7 +12,7 @@ import { chooseTipMatches, visitAdvisorTips, withOffers, type TipSetup, type Tip
 import { advisorLinkAction, behaviorEditHref, parseBehaviorEditTarget } from "@/lib/ui/advisor";
 
 // Ticket 385 (D37): the alongside advice card ships as a draft. It shows no tip until the
-// owner reviews it, and its link target needs migration 20261126140000 on the database
+// owner reviews it, and its link target needs migration 20261126240000 on the database
 // first, so no code path may write link_target 'alongside' while the card is a draft.
 
 const CARD_ID = "do-it-during-something-else";
@@ -92,7 +92,7 @@ describe("the alongside advice card as shipped", () => {
     expect(matches.map((match) => match.card.id)).not.toContain(CARD_ID);
   });
 
-  it("produces no tip row, so nothing writes link_target 'alongside' before migration 20261126140000", async () => {
+  it("produces no tip row, so nothing writes link_target 'alongside' before migration 20261126240000", async () => {
     // The shipped library and the default statuses, as the scheduled run uses them.
     const draftRun = tipPort();
     await visitAdvisorTips(draftRun.port, { setting: SETTING, maxPerDay: 3 });

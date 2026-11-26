@@ -4,7 +4,7 @@ import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import type { Json } from "@/lib/db/database.types";
 
 // Ticket 361 follow-up (D33): the pairing planner's evidence from the coach's stored
-// signals, through `advisor_read_pairing_evidence` (migration 20261126100000). The
+// signals, through `advisor_read_pairing_evidence` (migration 20261126200000). The
 // database allows only the Daily Brief and Chat agent channels and returns, for the
 // caller's own account, `done_together` pairs and `crowded_hour` hours. It picks the
 // date: `localDate`, or the day before while no signal is stored for it yet.

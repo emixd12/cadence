@@ -2094,11 +2094,11 @@ Turn it on only after all nine alongside migrations are on the database:
 2. `20261125150000_advisor_estimate_where_guess.sql`
 3. `20261125180000_alongside_mcp_and_portability.sql`
 4. `20261125190000_advisor_estimate_where_guess_writer.sql`
-5. `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`
-6. `20261126110000_alongside_schedule_pairing.sql`
-7. `20261126120000_account_sync_alongside.sql` (before the Ticket 363 code deploys)
-8. `20261126130000_where_guess_dismissal_without_labels.sql` (Ticket 383)
-9. `20261126150000_account_sync_where_guess_dismissals.sql` (Ticket 383, Cadence for Mac)
+5. `20261126200000_alongside_pairing_evidence_and_brief_asks.sql`
+6. `20261126210000_alongside_schedule_pairing.sql`
+7. `20261126220000_account_sync_alongside.sql` (before the Ticket 363 code deploys)
+8. `20261126230000_where_guess_dismissal_without_labels.sql` (Ticket 383)
+9. `20261126250000_account_sync_where_guess_dismissals.sql` (Ticket 383, Cadence for Mac)
 
 The seventh differs: it must reach the database before the Ticket 363 code deploys,
 whatever the flag (below). With the flag on, the move-day read selects the column. The migration is
@@ -2117,7 +2117,7 @@ contract. It inserts one contract-registry row and changes the projection and ap
 functions for older contracts, so it needs the owner's yes before a hosted push.
 
 One more alongside migration is not needed for the flag but orders a content change:
-`20261126140000_alongside_tip_link_target.sql` (Ticket 385) lets a tip link open a
+`20261126240000_alongside_tip_link_target.sql` (Ticket 385) lets a tip link open a
 Behavior's alongside control. It must be on the database before the advice card
 `do-it-during-something-else` is activated (status `active`, with `reviewer` and
 `reviewed_at`). While the card is a draft, no code path writes that link target. It
@@ -2126,7 +2126,7 @@ cover its hosted push; the owner approves it.
 
 Since Ticket 363 the column syncs at account sync contract 10 and is part of
 configuration history, whatever the flag (schema is schema). Migration
-`20261126120000_account_sync_alongside.sql` must reach the database before a build of
+`20261126220000_account_sync_alongside.sql` must reach the database before a build of
 this code deploys: it replaces the `changed_fields` check constraint and inserts one
 contract-registry row, as the sub-behaviors contract did, so it needs the owner's yes
 before a hosted push. With the flag off, web code still selects the column by name

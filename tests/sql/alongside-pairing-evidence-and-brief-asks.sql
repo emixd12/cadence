@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 
--- Tickets 360 and 361 follow-up (migration 20261126100000, D33). Synthetic local
+-- Tickets 360 and 361 follow-up (migration 20261126200000, D33). Synthetic local
 -- fixtures only; all changes roll back. Run after `npm run supabase -- db reset`:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/alongside-pairing-evidence-and-brief-asks.sql
 --

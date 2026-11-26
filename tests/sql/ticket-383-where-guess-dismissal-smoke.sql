@@ -1,5 +1,5 @@
 -- Local-only: psql "postgresql://postgres:postgres@127.0.0.1:<db-port>/postgres" -X -v ON_ERROR_STOP=1 -f tests/sql/ticket-383-where-guess-dismissal-smoke.sql
--- Ticket 383 (D37): migration 20261126130000. While Completion places is off, a
+-- Ticket 383 (D37): migration 20261126230000. While Completion places is off, a
 -- dismissal is admitted for the guess keys only (home, anywhere, add_place); a
 -- saved-place dismissal and every marker stay refused. While on, nothing changes. Rows
 -- stay owner-only, and turning labels off still deletes every dismissal.

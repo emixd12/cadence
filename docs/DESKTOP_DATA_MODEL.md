@@ -98,7 +98,7 @@ hash and a null result, so the outbox never keeps marker positions. Domain-revis
 triggers cover all four tables. Account snapshots carry them as four entity kinds;
 older builds fail closed with "Update Cadence". Native backups include the tables.
 Schema version 30 (`0030_guess_dismissal_without_labels.sql`, Ticket 383) relaxes the
-two dismissal triggers as hosted `20261126130000` does: a dismissal of a model guess
+two dismissal triggers as hosted `20261126230000` does: a dismissal of a model guess
 (`home`, `anywhere`, `add_place`) is admitted while labels are off. Saved-place
 dismissals and markers keep requiring the opt-in, and turning labels off still deletes
 every dismissal. See "Guessed Where dismissals (Ticket 383, D37)".

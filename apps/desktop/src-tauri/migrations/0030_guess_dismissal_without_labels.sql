@@ -1,5 +1,5 @@
 -- Ticket 383 (D37): a guessed Where can be dismissed while Completion places is off.
--- Mirrors hosted 20261126130000_where_guess_dismissal_without_labels.sql. A dismissal row
+-- Mirrors hosted 20261126230000_where_guess_dismissal_without_labels.sql. A dismissal row
 -- is admitted while labels are off only for a suggestion a model guess can produce
 -- (WHERE_GUESS_DISMISSAL_KEYS: home, anywhere, add_place). Saved-place dismissals and
 -- markers keep requiring labels on. Turning labels off still deletes every dismissal

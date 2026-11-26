@@ -1,4 +1,4 @@
--- Ticket 385 smoke check for 20261126140000_alongside_tip_link_target.sql.
+-- Ticket 385 smoke check for 20261126240000_alongside_tip_link_target.sql.
 -- Run against a local database with all migrations applied, as postgres:
 --   psql -v ON_ERROR_STOP=1 -f tests/sql/alongside-tip-link-target-smoke.sql
 -- Everything runs in one transaction and rolls back.

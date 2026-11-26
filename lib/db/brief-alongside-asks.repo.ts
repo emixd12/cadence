@@ -1,7 +1,7 @@
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 
 // Ticket 360 follow-up (D33): which Behaviors' alongside question a saved Daily Brief
-// already included (`public.brief_alongside_asks`, migration 20261126100000). Owner-only
+// already included (`public.brief_alongside_asks`, migration 20261126200000). Owner-only
 // RLS; runs on the person's own client. Ids and dates only.
 
 /** The Behaviors among `behaviorIds` that a brief before `localDate` already asked about. */

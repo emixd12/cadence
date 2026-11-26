@@ -16,7 +16,7 @@ from automated tests, not watched live.
 |---|---|
 | Commit | `9cb59aa9` on `feat/alongside-365` (main plus Tickets 356–364) |
 | Node | 24.22.2 |
-| Supabase | CLI 2.105.0 (Go backend), project `habit-tracking-app`, started through `scripts/supabase-docker-proxy.mjs` on network `cadence-local`, every published port on `127.0.0.1`. `db reset` applied all 165 migrations through `20261126120000` (exit 0). A temporary workdir copy enabled `signing_keys_path` with a fresh ES256 key, as `docs/SUPABASE_WORKFLOW.md` describes, so agent tokens (Daily Brief, coach) work. API port 55341: Docker refused 55321 as "address already in use" although nothing listened. |
+| Supabase | CLI 2.105.0 (Go backend), project `habit-tracking-app`, started through `scripts/supabase-docker-proxy.mjs` on network `cadence-local`, every published port on `127.0.0.1`. `db reset` applied all 165 migrations through `20261126220000` (exit 0). A temporary workdir copy enabled `signing_keys_path` with a fresh ES256 key, as `docs/SUPABASE_WORKFLOW.md` describes, so agent tokens (Daily Brief, coach) work. API port 55341: Docker refused 55321 as "address already in use" although nothing listened. |
 | App | `next dev --port 3100 -H localhost`, `CADENCE_ENABLE_TEST_LOGIN=1`, local keys only, no `.env.local` |
 | Flag | `CADENCE_ALONGSIDE=on` for the main run; unset for the flag-off run |
 | Model | No provider. `OPENAI_BASE_URL` pointed at a loopback stub (127.0.0.1:55399) that answered every call with 503 and logged only the path and schema name. The stub logged 2 `cadence_daily_brief_opening` calls, 1 `cadence_duration_estimates_v1_3` call and the coach tip calls; all were refused, so the brief used Cadence's stock text. No call left the machine. |

@@ -1,4 +1,4 @@
--- Ticket 362 (D33, "Pairing the schedule") smoke check for 20261126110000_alongside_schedule_pairing.sql.
+-- Ticket 362 (D33, "Pairing the schedule") smoke check for 20261126210000_alongside_schedule_pairing.sql.
 -- Run against a local database with all migrations applied, as postgres:
 --   psql -v ON_ERROR_STOP=1 -f tests/sql/ticket-362-alongside-schedule-pairing-smoke.sql
 -- Everything runs in one transaction and rolls back.
