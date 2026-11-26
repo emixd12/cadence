@@ -20646,7 +20646,7 @@ Messaging impact: none.
 
 ## Ticket 376: MCP Apps server: `show_day`, view resources and the flag
 
-Status: not_started
+Status: complete. November 26, 2026: implemented behind `CADENCE_MCP_APPS` (exact value `true`), off in production. `show_day` is a transport tool in `lib/mcp/apps/`, over `getIntegrationDay` in the new `lib/services/integration-day.service.ts`, which adapts `getIntegrationTimeline` from `lib/services/integration-read.service.ts`; `get_timeline`, the registry and `editions.ts` are unchanged. `resources/list` and `resources/read` serve the one view URI with an explicit empty CSP and a 1,048,576-byte cap. The three reads check `cadence.read`, count against the per-grant read limit and write an activity row through `lib/integrations/transport-read.ts`; no migration was needed, because the activity table accepts any label matching `^[a-z][a-z0-9_]{0,63}$` (`show_day`, `list_view_resources`, `read_view_resource`). The view HTML is a static placeholder in `lib/mcp/apps/day-view-html.ts` until Ticket 377 replaces that file. The protocol suite expects `show_day` only when the server declares the MCP Apps extension. `app/mcp/route.ts` did not need a change. Not verified on a host: that is Ticket 378. Details: `docs/MCP_INTEGRATION.md`, section 17.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.2 and 3.4, package C.
 

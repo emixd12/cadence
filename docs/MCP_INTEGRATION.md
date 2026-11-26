@@ -123,7 +123,8 @@ adapter over one contract. It is not a connector SDK or provider registry.
 | Marketing | Planned: `/developers` docs section in `apps/marketing` (Ticket 229), plugin listing links, and disclosures after owner approval (231). No public claim before deployed evidence. |
 | Future mobile | Not applicable. A future client can reuse `docs/MCP_CONTRACT.md`. |
 
-MCP Apps (D36, planned, section 17): web in Tickets 375–381; desktop not applicable,
+MCP Apps (D36, section 17; the server half is implemented behind a flag under Ticket
+376): web in Tickets 375–381; desktop not applicable,
 because Cadence for Mac renders no MCP view; marketing and listings wait for the
 marketing site overhaul (Ticket 246; Ticket 380 prepares unpublished drafts); future
 mobile has no Cadence code, and host mobile apps render the view.
@@ -396,6 +397,8 @@ legacy responses use SSE without sessions. GET and DELETE return authenticated
 405 responses. No resumption or unsolicited server messages are supported.
 
 `server/discover` exposes tool-only capabilities and bounded cross-tool guidance.
+While `CADENCE_MCP_APPS` is `true` it also declares view resources and the MCP Apps
+extension, and `tools/list` ends with the transport tool `show_day` (section 17).
 `tools/list` follows the contract registry order, with private `ttlMs: 300000`
 cache hints. Every descriptor includes its title, description, annotations,
 input/output schema and OAuth scopes in both `securitySchemes` and `_meta` for
@@ -619,12 +622,14 @@ it off. Write receipts carry the answer through `cadence_private.integration_wri
 `alongside-*` checks, which run when a server reports 1.8.0. Live client acceptance
 for the field is Ticket 365.
 
-## 17. MCP Apps (planned, D36, Tickets 375–382)
+## 17. MCP Apps (D36, Tickets 375–382)
 
-Nothing in this section is implemented. The owner moved MCP Apps into scope on
-November 25, 2026 (`docs/DECISIONS.md`, D36). The plan is
-`docs/plans/2026-11-25-mcp-apps-expansion.md`. Ticket 375 is a spike that freezes the
-schema and the view contract, so the details below can change.
+The owner moved MCP Apps into scope on November 25, 2026 (`docs/DECISIONS.md`, D36).
+The plan is `docs/plans/2026-11-25-mcp-apps-expansion.md`. Ticket 375 froze the
+`show_day` schema and the view contract in `docs/qa/2026-11-26-mcp-apps-spike.md`.
+**Implemented: the server half (Ticket 376), behind `CADENCE_MCP_APPS`, off in
+production.** The view (Ticket 377), host acceptance (Ticket 378) and everything public
+are not done.
 
 - **Standard.** MCP Apps (extension `io.modelcontextprotocol/ui`). A tool links to a
   view with `_meta.ui.resourceUri`. The host reads the HTML with `resources/read` and
@@ -632,29 +637,94 @@ schema and the view contract, so the details below can change.
   text result.
 - **First view.** "Cadence day" shows today only: each Occurrence with Completed, Not
   Completed and Note, and Needs decision as one count line.
-- **Tool.** A new read tool, `show_day` (name tentative), scope `cadence.read`. It is a
-  one-day adapter over the Timeline service and adds one field per Occurrence: whether a
-  Completed status came from a connected service. `get_timeline` does not change.
 - **Writes.** The view calls the existing tools `set_occurrence_status`,
   `set_parent_occurrence_status` and `update_occurrence_note` through the host, under the
   user's existing grant, with the displayed precondition and an idempotency key. A click
   is the user's confirmation. No new scope.
-- **Server.** `lib/mcp/server.ts` gains the resources capability for view HTML only.
-  Resource methods need a valid grant with `cadence.read`, count against the per-grant
-  read limit, log a fixed label and have a byte cap. The view resource declares an empty
-  CSP.
-- **Flag.** `CADENCE_MCP_APPS` (working name), off in production. Off removes the tool
-  and the resources. The production flag waits for the marketing site overhaul
-  (Ticket 246), the consent fix (Ticket 379) and the contract fold.
-- **Contract.** During the trial `show_day` lives in `lib/mcp/`, outside the contract
-  registry, so Cadence Chat never lists or runs it. For general release it joins the
-  registry as the next minor version after the alongside edition folds in (Ticket 365).
 - **Rules.** A view makes no network request, loads no external asset and receives no
   credential. User text renders as text. The data exclusions in section 1 apply.
 - **Hosts required before release.** Claude web, ChatGPT web, Claude Desktop, Claude
   mobile, VS Code Copilot and Gemini Apps Developer Mode (Ticket 378). Ticket 381 covers
-  an OAuth change only if the spike shows a required host cannot sign in. Gemini
-  Enterprise is out of scope.
+  an OAuth change only if a required host cannot sign in. Gemini Enterprise is out of
+  scope.
 - **Listings.** Every submission, listing and public copy change waits for the marketing
   site overhaul and the owner's instruction. Ticket 380 prepares unpublished drafts.
   Messaging entries: P-097 to P-101.
+
+### Server implementation (Ticket 376)
+
+Code: `lib/mcp/apps/` (`config.ts`, `show-day.ts`, `view-resources.ts`,
+`day-view-html.ts`), wired in `lib/mcp/server.ts`. Admission and the activity row are
+`lib/integrations/transport-read.ts`. The day projection is
+`lib/services/integration-day.service.ts`.
+
+**Flag.** `CADENCE_MCP_APPS`, server-only, read on every request. Only the exact value
+`true` enables the trial. Any other value, or none, is off.
+
+| | Flag off (production) | Flag on |
+|---|---|---|
+| Capabilities | `tools: {}` | `tools: {}`, `resources: {}`, `extensions: { "io.modelcontextprotocol/ui": {} }` |
+| `tools/list` | The registry, byte-identical to before the trial | The registry, then `show_day` |
+| `tools/call` `show_day` | Tool error `invalid_input`, "Unknown Cadence tool name." | The day |
+| `resources/list`, `resources/read` | JSON-RPC `-32601` | Served |
+| `resources/templates/list`, `resources/subscribe`, prompts | JSON-RPC `-32601` | JSON-RPC `-32601` |
+
+- **`show_day`.** A transport tool outside the contract registry. Its descriptor, output
+  and rules are in `docs/MCP_CONTRACT.md`, "MCP Apps trial". It is always listed with the
+  flag on: a legacy request carries no client capabilities on `tools/list`, and the text
+  result serves a host without views.
+- **`resources/list`.** One descriptor and no HTML: `uri` `ui://cadence/day/v1.html`,
+  `name` `cadence-day`, `title` "Cadence day", `mimeType` `text/html;profile=mcp-app`,
+  and `_meta.ui`.
+- **`resources/read`.** The exact URI only. One `contents` entry with the HTML as
+  `text`, the same `mimeType`, and
+  `_meta.ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }`.
+  The CSP is explicit and empty. `_meta.ui.domain` is not set. Any other URI, including
+  a different case, a query string or a trailing slash, fails with the protocol's
+  resource-not-found error (`-32602` with `data.uri`).
+- **Byte cap.** 1,048,576 UTF-8 bytes (`MCP_APP_RESOURCE_BYTE_CAP`). A larger view is
+  refused with `internal_error`, never truncated.
+- **Admission.** Every request to `/mcp` already needs a valid grant with
+  `cadence.read`: no token, an unknown token and a grant without read get 401 or 403
+  before any handler runs. `show_day`, `resources/list` and `resources/read` then each
+  check the scope again, consume one read from the per-grant limit (120 a minute, shared
+  with the registry read tools) and write one activity row. An unknown URI still costs
+  one read. Past the limit the response is HTTP 429 with `Retry-After`. A resource
+  request has no tool-error shape, so a refusal is a JSON-RPC error `-32000` whose
+  `data` is the usual tool-error object.
+- **Never fails open.** When the limit counter or the activity write fails, the call
+  returns `service_unavailable` and no data, as `executeMcpOperation` does for registry
+  reads.
+- **Activity rows.** Operation labels `show_day`, `list_view_resources` and
+  `read_view_resource`. The activity table accepts only `^[a-z][a-z0-9_]{0,63}$`, so the
+  method name `resources/read` cannot be a label. No schema change was needed: the
+  table has no list of allowed operations. Rows hold the label, the outcome and an error
+  code. Connected apps shows them as "show day", "list view resources" and "read view
+  resource".
+- **Log line.** The existing `cadence_mcp` line, with the same labels as `operation`.
+  Never the URI, the HTML, a token, arguments or note text.
+- **View HTML seam.** `lib/mcp/apps/day-view-html.ts` exports
+  `DAY_VIEW_HTML: string`. It holds a static placeholder page with no script and no
+  request. Ticket 377 replaces that file with its generated module and keeps the export.
+- **Rollback.** Set the flag to anything but `true`. No migration and no stored state
+  belong to the trial. Clients may hold `tools/list` for five minutes; a call to
+  `show_day` in that window gets the stable tool error above.
+- **Protocol suite.** `scripts/acceptance/protocol.mjs` expects the registry plus
+  `show_day` when the server declares the `io.modelcontextprotocol/ui` extension, and
+  exactly the registry otherwise.
+- **Not done here.** `resources/templates/list` stays unimplemented; MCP Inspector calls
+  it and continues on `-32601`. Host behavior (approval prompts, the 403 step-up on a
+  view call, view caching) is Ticket 375's open part and Ticket 378.
+
+Evidence: `tests/mcp-apps-server.test.ts` (both protocol paths, flag on and off, no
+grant, the read limit, a stale descriptor, logs), `tests/mcp-apps-show-day.test.ts`
+(frozen schema, excluded data, admission, activity labels, byte cap),
+`tests/integration-day.service.test.ts`, `tests/mcp-apps-chat.test.ts`,
+`tests/acceptance-protocol.test.mjs` and `tests/sql/ticket-222-oauth-persistence-smoke.sql`
+(the activity table takes the three labels and refuses a method name).
+
+Platform impact: web only. Desktop is not applicable: the MCP server is hosted, and a
+linked Mac receives view-made changes through existing account sync. Marketing: the
+developer reference and `/developers` change at general release (`P-099`). Future
+mobile: not applicable; host mobile apps render the view. Messaging impact: `P-098`,
+`P-099`.

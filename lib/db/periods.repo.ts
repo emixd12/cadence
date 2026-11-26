@@ -52,6 +52,25 @@ export async function listPeriods(
   });
 }
 
+/**
+ * For readers that annotate other work (the Daily Brief, advisor tips) and must keep
+ * working when a deploy reaches production before the `periods` migration: a missing
+ * table (PostgREST `PGRST205`, Postgres `42P01`) reads as no Periods. Any other error throws.
+ */
+export async function listPeriodsOrNone(
+  supabase: AppSupabaseClient,
+  userId: string,
+  range?: { from: string; to: string },
+): Promise<PeriodRecord[]> {
+  try {
+    return await listPeriods(supabase, userId, range);
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    if (code === "PGRST205" || code === "42P01") return [];
+    throw error;
+  }
+}
+
 export async function getPeriod(
   supabase: AppSupabaseClient,
   userId: string,

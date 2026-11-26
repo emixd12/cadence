@@ -2121,6 +2121,34 @@ without it the guess is never stored, so planning falls back to evidence or unkn
 the flag on asks the estimate model once more for each cached Behavior (recipe 1.3 rows use
 a new input hash); turning it off asks once more for recipe 1.2.
 
+## MCP Apps trial flag (Ticket 376, D36)
+
+`CADENCE_MCP_APPS` gates the MCP Apps trial on the hosted MCP endpoint. Only the exact
+value `true` enables it; any other value or no value leaves `/mcp` as it was before
+Ticket 376. Default: off. Server-only. It has no effect unless `CADENCE_MCP_ENABLED` is
+also `true`. Leave it unset in Production until the marketing site overhaul (Ticket
+246), Ticket 379 and the host acceptance in Ticket 378.
+
+- **On.** `tools/list` ends with the transport tool `show_day`, the server declares
+  `resources` and the `io.modelcontextprotocol/ui` extension, and `resources/list` and
+  `resources/read` serve the one view `ui://cadence/day/v1.html`.
+- **Off.** No tool, no resources capability and no resource method. `tools/list` is
+  byte-identical to the published contract.
+- **No migration.** The trial adds no table, column or function. Its activity rows use
+  the operation labels `show_day`, `list_view_resources` and `read_view_resource` in the
+  existing activity table.
+- **Reads count.** Each `show_day` call and each resource request costs one read from
+  the grant's 120-a-minute limit.
+- **Rollback.** Unset the flag and redeploy or restart. The flag is read on every
+  request. Clients cache `tools/list` for up to five minutes; a call to `show_day` in
+  that window returns the tool error `invalid_input`, "Unknown Cadence tool name.".
+- **Until Ticket 377 lands** the view is a static placeholder page.
+- **Acceptance.** `npm run mcp:accept:protocol` expects `show_day` after the registry
+  tools only when the server declares the extension.
+
+Details: `docs/MCP_INTEGRATION.md`, section 17, and `docs/MCP_CONTRACT.md`, "MCP Apps
+trial".
+
 ## Desktop implementation and release gates
 
 Tickets 107–114 implement the macOS track in `docs/DESKTOP_BUILD.md`. Ticket 115

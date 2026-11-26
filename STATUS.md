@@ -49,7 +49,7 @@ Check the cited entry before acting on a row.
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
 | Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026; all `not_started` | 386 and 383 first, then 384; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
-| Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. Others not started; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 376 and 377 can start in parallel now; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
+| Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. Others not started; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 377 replaces the placeholder `lib/mcp/apps/day-view-html.ts`; 378 tests hosts; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
@@ -101,6 +101,24 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 376: MCP Apps server behind `CADENCE_MCP_APPS` — November 26, 2026
+
+- **Complete, flag off in production.** With `CADENCE_MCP_APPS=true`, `/mcp` lists the
+  transport tool `show_day` and serves `resources/list` and `resources/read` for
+  `ui://cadence/day/v1.html`. Off: `tools/list` is byte-identical (digest pinned).
+- **No migration, nothing to push.** The activity table accepts the labels `show_day`,
+  `list_view_resources` and `read_view_resource`. The three reads check `cadence.read`,
+  count against the read limit, write an activity row and fail closed.
+- **Key files:** `lib/mcp/apps/`, `lib/mcp/server.ts`, `lib/integrations/transport-read.ts`,
+  `lib/services/integration-day.service.ts`, `scripts/acceptance/protocol.mjs`.
+- **Open:** the view HTML is a placeholder until Ticket 377; no host has run it
+  (Ticket 378). Details: `docs/MCP_INTEGRATION.md`, section 17.
+- **Verification:** `dagger check --cadence` passed 11 of 11; `npm run test:web-client`
+  passed. The SQL smoke for the three labels runs only in `Local Supabase rehearsal`.
+
+Platform impact: web only; desktop, marketing (until `P-099`) and future mobile not
+applicable. Messaging impact: `P-098`, `P-099`.
 
 ## MCP Apps spike: local answers and the frozen `show_day` contract (Ticket 375) — November 26, 2026
 

@@ -304,7 +304,16 @@ import and restore services call it. Paired checks live in
 note normalization, the limits (`PERIOD_LIMITS`), create and edit validation, the
 "End today" rule, date coverage, range overlap, display order, the union of covered
 dates, the inside and outside split used with `resolveAdherenceCounts`, label
-suggestions, the date-range text and the natural key used by import.
+suggestions, the date-range text and the natural key used by import. It also owns what
+the Daily Brief and advisor tips read (Ticket 371): `briefPeriodRange` and
+`resolveBriefPeriods` (Periods covering today, at most 5, and those that ended in the 7
+days before it, at most 3), and `tipPeriodRange` and `resolveTipPeriods` (Periods with a
+day in today or the 7 days before it, at most 5). Both return labels and dates only.
+`lib/services/daily-brief.service.ts` (`readBriefPeriods`) and
+`lib/services/advisor-tips-job.service.ts` read the rows through
+`lib/db/periods.repo.ts` (`listPeriodsOrNone`) and must not choose or cap Periods
+themselves. `textQuotesDayNote` in the day-note resolver takes the labels as text a
+sentence may repeat.
 `lib/resolvers/period.resolver.ts` re-exports it. `tests/period.resolver.test.ts`
 pairs its checks; table and functions are in `docs/DATA_MODEL.md`, "Periods".
 
@@ -1011,6 +1020,28 @@ Forbidden bypasses: no recurrence, Needs decision, adherence, or status logic in
 that skips the scope check. This is one transport adapter over one contract, not a
 connector SDK or provider registry. `npm run resolvers:check` still applies to every
 new module. Required tests are named in Tickets 221–228 in `docs/TICKETS.md`.
+
+### MCP Apps transport reads (Ticket 376, D36)
+
+The trial tool `show_day` and the view resources are outside the contract registry, so
+they cannot run through `lib/integrations/operations/`. They keep the same layers:
+
+| Layer | Location | May call | Must not |
+|---|---|---|---|
+| Wire shape | `lib/mcp/apps/` (`show-day.ts`, `view-resources.ts`, `config.ts`, `day-view-html.ts`) | `getIntegrationDay`, `lib/integrations/transport-read.ts`, the contract's schema builders and validator | Decide a day's rows, grouping, Needs decision or a connector label; query a table; read another service |
+| Admission and activity | `lib/integrations/transport-read.ts` | The per-grant rate limit and `recordIntegrationActivity`, as `operations/execute.ts` does | Return data when the limit or the activity write fails |
+| Day projection | `lib/services/integration-day.service.ts` | `getIntegrationTimeline` and `readTimelineSourceEvidence` | Add a rule of its own; copy a Timeline field it does not name |
+| Connector label reader | `lib/services/timeline-source-evidence.service.ts` | `resolveTimelineSourceEvidence` (core), the source-match and status-event repositories | Decide "from a connected service" outside the core resolver |
+
+`lib/mcp/apps/` is the one place in the MCP transport that calls a service directly,
+and it calls only `getIntegrationDay`. `show_day` adds no recurrence, Needs decision,
+status or adherence logic: the day comes from the `get_timeline` read, and
+`connector_completion` is the core resolver's `fromConnector`, the rule the web
+Timeline uses. The web Timeline service and `show_day` share
+`readTimelineSourceEvidence`. Cadence Chat builds its tools from the registry and never
+calls these modules. Tests: `tests/mcp-apps-server.test.ts`,
+`tests/mcp-apps-show-day.test.ts`, `tests/integration-day.service.test.ts`,
+`tests/mcp-apps-chat.test.ts`.
 
 ### OAuth expiry maintenance (Ticket 232)
 

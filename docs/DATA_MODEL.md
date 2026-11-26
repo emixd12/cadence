@@ -2741,6 +2741,10 @@ notes already are. `agent_runs.prompt_version` records the revision of the instr
 that were sent, so a brief with day notes carries a different revision from one without.
 Day-note text is never written to application logs.
 
+Ticket 371 (D35) adds a second reader and no schema: the same Daily Brief call reads
+`periods` (below) for today and the 7 local days before it, whatever the Notes source
+says. See "Periods", "Readers".
+
 ### Day-note shortcut pool (Ticket 292)
 
 Migration `20261111120000_day_note_shortcut_pool.sql` lets `note_shortcut_states`
@@ -2850,6 +2854,35 @@ Ticket 368 adds no entry point: no Server Action, MCP tool, export field or Mac 
 reads or writes Periods yet. Migration: `20261126130000_periods.sql`; local check
 `tests/sql/periods.sql`. `periods` and the three functions are in the RLS smoke lists
 (`scripts/supabase-rls-smoke.mjs`).
+
+### Readers: Daily Brief and advisor tips (Ticket 371)
+
+Ticket 371 (D35) adds two readers and no schema. Both read `label`, `start_on` and
+`end_on` through `listPeriodsOrNone` in `lib/db/periods.repo.ts`, as the user under RLS.
+Neither reads or sends `note`. A missing `periods` table (PostgREST `PGRST205`, Postgres
+`42P01`) reads as no Periods, so the code may deploy before the migration.
+
+- **Daily Brief.** A brief that calls the model reads the Periods with a day in today or
+  the 7 local days before it, through the signed-in user's client. It is not gated by the
+  AI Notes source (`include_notes`). `resolveBriefPeriods` sends the opening request
+  `periods` (covering today, at most 5, display order) and `recentPeriods` (ended in the 7
+  days before today, at most 3, most recently ended first), each as
+  `{ label, since, until }` with dates written like `today` ("Friday, October 30"; a date
+  in another year carries its year) and a null `until` for an ongoing Period. Each key is
+  absent when empty. A quiet day reads none. A failed read leaves the brief without
+  Periods. Periods never reach the move planner, Re-check or Re-plan, and a changed
+  Period does not change a saved brief.
+- **Advisor tips.** With tips on, a run that has a tip to word reads the Periods with a
+  day in today or the 7 local days before it, through the coach agent's client as the
+  user. It is under the tips switch, not the notes choice. `resolveTipPeriods` sends the
+  tip prompt `periods: [{ label, start, end }]` (at most 5, display order, ISO local
+  dates). A failed read leaves the prompt without Periods.
+
+The facts of each model call, Period labels included, are kept in `agent_run_contents`
+until that row expires, as Behavior titles and day notes are.
+`agent_runs.prompt_version` records the revision of the brief instructions that were
+sent, so a brief with Periods carries a different revision from one without; tip runs
+record `coach-tips-4`. Period labels are never written to application logs.
 
 ## Google Calendar connector (Ticket 134)
 
