@@ -293,6 +293,30 @@ Shared `services/behaviorlog-day-note.service.ts` saves the plan through the
 import and restore services call it. Paired checks live in
 `tests/behaviorlog-day-note.resolver.test.ts`; rules in `docs/EXPORT_FORMATS.md`.
 
+## Periods (Ticket 368)
+
+`packages/core/src/resolvers/period.resolver.ts` owns every Period rule: label and
+note normalization, the limits (`PERIOD_LIMITS`), create and edit validation, the
+"End today" rule, date coverage, range overlap, display order, the union of covered
+dates, the inside and outside split used with `resolveAdherenceCounts`, label
+suggestions, the date-range text and the natural key used by import.
+`lib/resolvers/period.resolver.ts` re-exports it. `tests/period.resolver.test.ts`
+pairs its checks; table and functions are in `docs/DATA_MODEL.md`, "Periods".
+
+Shared `services/period.service.ts` orchestrates the owner-scoped `PeriodDataStore`
+(`tests/period.service.test.ts`). `lib/services/period.service.ts` adds the sign-in
+check and reads "today" from the profile timezone at the time of the write
+(`tests/period-web.service.test.ts`). Adapters compare-and-set on `revision`.
+
+- A Period is annotation only. No resolver, service or job may change an Occurrence
+  status, adherence, a reminder or a schedule because of a Period.
+- `today` is injected. The resolver has no I/O and no clock access, and compares
+  `YYYY-MM-DD` local dates without JavaScript `Date`.
+- UI, MCP handlers, export code and repositories must not validate, normalize,
+  order or date-match Periods themselves.
+- Period labels and notes are the person's own words and can describe health. Never
+  log them.
+
 ## Connector completion matching (Tickets 313 and 321)
 
 `packages/core/src/resolvers/activity-match.resolver.ts` decides which recorded

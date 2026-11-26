@@ -116,6 +116,13 @@ const resolverRegistry = [
     source: "docs/TICKETS.md",
   },
   {
+    domain: "Periods",
+    resolver: "packages/core/src/resolvers/period.resolver.ts",
+    compatibility: "lib/resolvers/period.resolver.ts",
+    test: "tests/period.resolver.test.ts",
+    source: "docs/DATA_MODEL.md",
+  },
+  {
     domain: "BehaviorLog day-note restore and import",
     resolver: "packages/core/src/resolvers/behaviorlog-day-note.resolver.ts",
     test: "tests/behaviorlog-day-note.resolver.test.ts",
