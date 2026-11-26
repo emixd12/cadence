@@ -717,6 +717,17 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
     return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(proposal), null), replayed: false };
   }
   const line = lineFromRow(proposal);
+  // Audit fix 2: a pairing line stands only while its host is unresolved at the time it
+  // had, the check Re-check makes. Otherwise Yes would move the guest into an empty slot
+  // and record an accepted pairing that Ticket 362's four-day rule counts.
+  if (line?.pairing && alongsideEnabled()) {
+    const refusal = await pairingHostRefusal(callers.person, proposal, line.pairing);
+    if (refusal) {
+      const recorded = await recordAnswer(callers.person, { proposal, kind: request.kind, outcome: "refused", key: request.idempotencyKey,
+        refusalReason: refusal.reason, batchId: request.batchId });
+      return { result: await lineResult(callers.person, recorded.proposal, "refused", refusal, null), replayed: recorded.replayed };
+    }
+  }
   const calendar = await resolveBriefCalendarBusy(callers.person, proposal.local_date, request.context);
   const moved = await moveOccurrenceForDay(await agentCaller(callers), {
     occurrenceId: proposal.occurrence_id,
@@ -801,6 +812,30 @@ async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, move
   const recorded = await recordAnswer(callers.person, { proposal, kind: answer.kind, outcome: "applied", key: answer.key,
     moveId: moved.move.id, batchId: answer.batchId });
   return { result: await lineResult(callers.person, recorded.proposal, "applied", null, moved.move.id, moved.occurrence), replayed: moved.replayed || recorded.replayed };
+}
+
+/** The refusal reason a Yes records when a pairing line's host no longer stands. */
+export const PAIRING_HOST_CHANGED_REASON = "pairing_host_changed";
+
+/**
+ * Audit fix 2: null while the pairing's host is still unresolved at the start the line
+ * named (`pairingHostStands`); otherwise the refusal, with a cause the brief already
+ * shows: the host marked ("already marked"), or moved, edited or gone ("changed").
+ */
+async function pairingHostRefusal(person: OccurrenceMoveCaller, proposal: ProposalRow,
+  pairing: NonNullable<BriefMoveLine["pairing"]>): Promise<BriefMoveRefusal | null> {
+  const day = await readBriefMoveDay(person.supabase, person.userId, proposal.local_date);
+  if (pairingHostStands(day.items, pairing)) return null;
+  const host = day.items.find((item) => item.occurrenceId === pairing.hostOccurrenceId);
+  const title = pairing.hostTitle;
+  const marked = !!host && host.status !== "unresolved";
+  return {
+    reason: PAIRING_HOST_CHANGED_REASON,
+    message: marked ? noticeText("brief-moves.refused.already-marked", { title }) : noticeText("brief-moves.refused.item-changed", { title }),
+    alternatives: [],
+    revision: day.occurrences.get(proposal.occurrence_id)?.updated_at ?? null,
+    cause: { kind: marked ? "answered_elsewhere" : "item_changed", title, changedAfterBrief: true },
+  };
 }
 
 function closedRefusal(proposal: ProposalRow): BriefMoveRefusal {
