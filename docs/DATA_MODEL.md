@@ -1009,7 +1009,13 @@ tap is kept. Cascades with its move.
 `chat`) and what the person did with it (`status`). Server only, mutable status,
 never synced. Links to the move it produced through `move_id`. The brief's re-check
 on open (`withdraw_brief_move_proposal`, Daily Brief agent token only) closes an
-undecided brief line as `withdrawn` when nothing else fits today.
+undecided brief line as `withdrawn` when nothing else fits today. Ticket 361 (D33): a pairing line
+stores `reason = 'alongside_pairing'` and, in `line`, a `pairing` object
+(`hostOccurrenceId`, `hostBehaviorId`, `hostTitle`, `hostStartAt`, `needs`) recording the
+host it was offered with. That is history, not a link: nothing reads it to move the guest,
+and a later move of the host leaves the guest where it is. A Yes writes an ordinary
+`occurrence_moves` row for the guest with `reason = 'alongside_pairing'`. No schema change:
+both `reason` columns accept any lowercase code.
 
 **`move_conflicts`**: a notice that a later base-schedule change put another
 Occurrence of the same Behavior next to a moved one on the same day. `status`

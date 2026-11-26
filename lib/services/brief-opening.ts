@@ -54,6 +54,17 @@ Return JSON with exactly opening and reasons.`;
 export const BRIEF_OPENING_PROMPT_REVISION = createHash("sha256")
   .update(`${BRIEF_OPENING_INSTRUCTIONS}\0${JSON.stringify(BRIEF_OPENING_SCHEMA)}`).digest("hex").slice(0, 16);
 
+/**
+ * Ticket 361 (D33): appended only when a line is a pairing (`why: alongside_pairing`),
+ * which happens only with `CADENCE_ALONGSIDE` on. Without a pairing line the request is
+ * the pinned prompt above, byte for byte.
+ */
+export const BRIEF_OPENING_PAIRING_INSTRUCTIONS = `Pairing lines: why alongside_pairing means the item can be done during the item named in with, which stays where it is, so its new time is when with starts. Write its reason as doing it during with, for example "Do it during Reading." Do not call it a clash or say it runs into anything.`;
+
+/** The revision of the prompt with the pairing rule, for the evals. */
+export const BRIEF_OPENING_PAIRING_PROMPT_REVISION = createHash("sha256")
+  .update(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_PAIRING_INSTRUCTIONS}\0${JSON.stringify(BRIEF_OPENING_SCHEMA)}`).digest("hex").slice(0, 16);
+
 const OPENING_MAX_WORDS = 40;
 const OPENING_MAX_CHARACTERS = 320;
 const REASON_MAX_WORDS = 30;
@@ -62,7 +73,7 @@ const MAX_ITEMS = 40;
 const MAX_BUSY = 30;
 
 /** Cadence's internal vocabulary. Text a person reads never uses it. */
-export const BRIEF_INTERNAL_WORDS = /\b(planner|slots?|buffers?|feasible|intervals?|constraints?|reason ?codes?|calendar_overlap|item_overlap|travel_overlap|tight_transition|time_passed|conflict_after_schedule_edit|lengthGuessed|occurrences?|coverage|configured)\b/i;
+export const BRIEF_INTERNAL_WORDS = /\b(planner|slots?|buffers?|feasible|intervals?|constraints?|reason ?codes?|calendar_overlap|item_overlap|travel_overlap|tight_transition|time_passed|conflict_after_schedule_edit|alongside_pairing|lengthGuessed|occurrences?|coverage|configured)\b/i;
 const URL = /https?:|www\.|\b[a-z0-9-]+\.(com|net|org|io|ai|app|co)\b/i;
 
 export type BriefOpeningRequest = Readonly<{ instructions: string; facts: string; labels: readonly string[] }>;
@@ -113,7 +124,8 @@ export function prepareBriefOpening(input: Readonly<{
     conflicts: input.conflicts.map((conflict) => ({ title: conflict.title, now: spanLabel(conflict.at), with: conflict.conflictingTitle })),
     day: { items, busyCalendarTimes: busy, calendar: input.calendar },
   };
-  return { instructions: BRIEF_OPENING_INSTRUCTIONS, facts: JSON.stringify(facts), labels: [...labels] };
+  const pairing = input.lines.some((line) => line.reasonCode === "alongside_pairing");
+  return { instructions: pairing ? `${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_PAIRING_INSTRUCTIONS}` : BRIEF_OPENING_INSTRUCTIONS, facts: JSON.stringify(facts), labels: [...labels] };
 }
 
 export type BriefOpeningFallback = "opening_shape" | "opening_words" | "opening_time" | "opening_jargon" | "opening_url" | "opening_placeholder"
@@ -200,6 +212,7 @@ export function stockBriefMoveReason(code: BriefMoveReasonCode, anchor: string |
     case "tight_transition": return anchor ? `It leaves no time in between with ${anchor}.` : "It leaves no time in between with what comes next.";
     case "time_passed": return "Its time passed and it is still open.";
     case "conflict_after_schedule_edit": return anchor ? `A schedule change made it clash with ${anchor}.` : "A schedule change made it clash.";
+    case "alongside_pairing": return anchor ? `Do it during ${anchor}.` : "It can happen during something else.";
   }
 }
 

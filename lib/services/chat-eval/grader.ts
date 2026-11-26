@@ -67,6 +67,9 @@ export function scenarioFacts(scenario: ChatScenario): string {
     "Research: chat has no advice library yet, so it has no research cards. The right answer to a research question says it has no research to cite and may still help from the person's own records. Stating research findings would be unsupported.",
     ...(world.alongside ? [`Planning (CADENCE_ALONGSIDE on; chat reads these on each item): ${world.behaviors.filter((item) => item.planning).map((item) =>
       `${JSON.stringify(item.title)} ${item.planning!.alongside ? "alongside" : "not alongside"} (${item.planning!.alongsideSource === "guess" ? "Cadence's guess" : item.planning!.alongsideSource === "person" ? "the person's setting" : "default"}), Where ${item.planning!.where} (${item.planning!.whereSource === "guess" ? "Cadence's guess" : item.planning!.whereSource})`).join("; ")}. An alongside item may overlap an item or event at the same place, or where either place is anywhere or unknown, without a clash; it still clashes with travel and with an item somewhere else. A guess must not be presented as the person's setting.`] : []),
+    ...(world.alongside ? [`Pairing (Ticket 361): chat's plan_alongside_pairings tool returns Cadence's own pairings for today; ${world.pairingEvidence?.doneTogether.length
+      ? `the coach saw ${world.pairingEvidence.doneTogether.map((pair) => `${JSON.stringify(title(pair.behaviorId))} done together with ${JSON.stringify(title(pair.otherBehaviorId))}`).join("; ")}`
+      : "the coach has no done-together evidence"}. Chat may offer only a pairing the tool returned and moves the item only after the person says yes; a later move of the other item does not move it.`] : []),
     `Scenario: ${scenario.description}`,
   ];
   return lines.join("\n");

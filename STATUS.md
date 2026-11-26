@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–360 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 adds none); 361–363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 361 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -97,6 +97,23 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 361 complete: pairing for today in the Daily Brief and Chat — November 25, 2026
+
+- **Planner:** `packages/core/src/resolvers/alongside-pairing.resolver.ts` (`planAlongsidePairings`,
+  `planBriefPairingLines`), re-exported from `lib/resolvers/`, registered, 21 resolver tests.
+  The target is the host's start and passes the Yes slot check on the guest's side.
+- **Daily Brief (flag on):** pairing lines after the move lines, reason code
+  `alongside_pairing`, stock words from notice `brief-moves.pairing`, the model told only when
+  a pairing line exists (flag off and pairing-free briefs keep the pinned prompt). Re-check and
+  Re-plan re-pair or close; Yes is an ordinary move (source `daily_brief`). No migration.
+- **Chat (flag on):** tool `plan_alongside_pairings`; the move after the person's yes is
+  `move_occurrence_for_day`. `CHAT_ALONGSIDE_INSTRUCTIONS` gains the pairing rule (still `chat-1.8`).
+- **Evidence:** the coach's `done_together` and `crowded_hour` signals, read through the coach
+  agent's read-only channel (no grant changed).
+- **Evals (offline):** brief fixture `alongside_pairing` and rule `pairing_off_host`; chat world
+  `alongside_pairing` and scenario `alongside_pairing`. No live or paid eval run.
+- **Not done:** the Mac (Ticket 363), the schedule proposal (Ticket 362).
 
 ## Ticket 360 complete: the agent asks whether a Behavior is alongside — November 25, 2026
 
@@ -207,137 +224,3 @@ marketing not applicable; future mobile inherits the server rules. Messaging imp
 
 Platform impact: web implemented (no UI change); desktop follow-up Ticket 363; marketing not
 applicable; future mobile inherits the core resolvers. Messaging impact: P-093.
-
-## Ticket 356 complete: alongside setting, flag and effective-value resolver — November 25, 2026
-
-- **Implemented:** migration `20261125140000_behavior_alongside.sql` (`behaviors.alongside`, nullable;
-  create and update RPCs; the `updated_at` trigger watches it; account sync leaves it out);
-  `packages/core/src/resolvers/alongside.resolver.ts` (`resolveAlongside`, `alongsideGuessWanted`,
-  `resolveRoutineBlockAlongside`, re-exported from `lib/resolvers/`); `lib/services/alongside-flag.ts`
-  (`CADENCE_ALONGSIDE`, exactly `on`); `brief-move-day.service.ts` builds each item's `alongside` and
-  `alongsideSource` through the resolver; `brief-moves.service.ts` asks answered Behaviors for length only.
-- **Flag off:** no code reads `behaviors.alongside`; planning and the estimate call match `2c413585`.
-- **Scope change:** the column stays out of account sync contract 9 and configuration history until
-  Ticket 363 (both are synced to the Mac and would force a contract bump). Ticket 364 carries it to
-  export, restore and MCP.
-- **Verification:** `agents:check`, `interactions:check`, `map:check`, `resolvers:check`, `lint`,
-  `typecheck`, `test`, `build` passed. Local `supabase db reset` applied every migration and the
-  seed (its container restart step could not reach the local API from the agent sandbox); every
-  `tests/sql/*.sql` fixture passed against that database, including the new
-  `behavior-alongside-smoke.sql`.
-- **Next:** push the migration to the hosted database before the flag is on anywhere; Ticket 357.
-
-Platform impact: web implemented (no UI change); desktop follow-up Ticket 363; marketing not
-applicable; future mobile inherits the core resolver. Messaging impact: P-093.
-
-## Google Workspace Calendar MCP migration, AI Tools Addendum compliance, and conversational travel organizing — November 25, 2026
-
-- **Owner's decisions (Q1–Q8, `docs/DECISIONS.md`, 2026-11-25; `docs/plans/2026-11-25-google-workspace-mcp-migration.md`):**
-  migrate all AI Google Calendar reads to `calendarmcp.googleapis.com` (`cadence-calendar-agent-prod`),
-  close all 4 REST-to-AI leak paths + latent `day_loads` + workbench §2(f), rebuild AI Google-event
-  travel fit from authorized MCP events with provenance-safe MCP/Routes caching, add hybrid `L-001`
-  7-day Chat travel organizing (inline exact travel cards, confirmed cross-day moves and recurring
-  remodeling, two-layer longitudinal patterns), cap persisted Google `daily_calendar_load` at ≤30d
-  with ephemeral >30d Chat MCP lookbacks and an opted-in activity-gated weekly/monthly longitudinal
-  review, enable Google Cloud Model Armor (`INSPECT_AND_BLOCK`, Cloud Logging OFF) while keeping T12
-  immediate single-record Chat writes with Undo, keep one canonical `Connected sources → Google Calendar`
-  dual-grant home with lightweight collapsed pills AI picker and inline `AI features` shortcut, bundle
-  versioned `purpose=ai_mcp` desktop support into Cadence for Mac `0.1.16`, and stay on Standard Tier
-  ($0, 40 req/user/day cap, 3,500 req/day alert, graceful degradation).
-- **Implemented (Phases 1A–4 in source on `feat/google-calendar-mcp-migration`):**
-  - Tolerant readers, transport gate & §2(f) guards: `lib/db/daily-brief.repo.ts`,
-    `packages/core/src/services/daily-brief-sources.ts`, `lib/services/google-calendar-ai-transport.ts`,
-    `lib/services/day-load.service.ts`, `lib/services/briefing-workbench.service.ts`,
-    `lib/services/briefing-history.service.ts`, `lib/services/briefing-sequence.service.ts` (and
-    deleted the two stale Oct 16 & Oct 23 `.local/briefing-bench/` live captures).
-  - Database & maintenance: `supabase/migrations/20261125120000_reactivate_agent_calendar_mcp.sql`
-    (5 `calendar_agent_*` RPCs, Ticket 335 identity-lock parity, provenance columns, Nov 19 Chat
-    backfill, atomic §2(d) disconnect purge, ≤30d summary/rollup/review expiry, `longitudinal_calendar_reviews`),
-    deleted retired `app/api/google-calendar/agent-grants/retire/route.ts`, updated
-    `lib/services/sign-in-methods.service.ts`, `lib/services/agent-run-maintenance.service.ts`, and
-    `tests/sql/google-calendar-agent-mcp-contract.sql`.
-  - MCP adapter, caching, Model Armor & leak closure: `lib/services/google-calendar-mcp-provider.ts`,
-    `lib/services/google-calendar-mcp-cache.ts`, `lib/services/model-armor.service.ts`,
-    `lib/services/google-calendar.service.ts`, `lib/services/daily-calendar-load.service.ts`,
-    `lib/services/travel-conclusions-token.ts` (`v2`), `lib/services/travel-route-refresh.service.ts`,
-    `lib/services/briefing-account-context.service.ts`, `lib/services/daily-brief.service.ts`,
-    `lib/services/brief-moves.service.ts`, `lib/services/brief-opportunities.service.ts`.
-  - Core resolvers & Chat: `packages/core/src/types/chat-travel.ts`,
-    `packages/core/src/resolvers/travel-horizon.resolver.ts`,
-    `packages/core/src/resolvers/longitudinal-patterns.resolver.ts`, `lib/db/chat.repo.ts`,
-    `lib/services/chat/{chat-tools,chat-executor,chat-turn,chat-writes,chat-prompt,chat.service,chat-settings}.ts`,
-    `components/chat/ChatMessages.tsx` (`travel_card`), `lib/services/longitudinal-calendar-review.service.ts`.
-  - Settings & Mac `0.1.16` broker: `app/api/google-calendar/{connection,calendars}/route.ts`,
-    `components/settings/GoogleCalendarPanel.tsx`, `components/briefing/DailyBriefSettingsPanel.tsx`,
-    `lib/ui/google-calendar.ts`, `lib/ui/settings-sections.ts`,
-    `apps/desktop/src/calendar/{google-calendar,use-google-calendar}.ts`, `apps/desktop/src/product.tsx`.
-- **Next actions (Phases 0, 5 & 6):** complete code review & CI/Supabase rehearsal, run Phase 0 live
-  `calendarmcp.googleapis.com` wire check, finish Ticket 245 `P-090` disclosures & Model Armor
-  provisioning, and submit data-access verification for `cadence-calendar-agent-prod` before cutover
-  and Mac `0.1.16`.
-
-Platform impact: web implemented (Phases 1A–4 in source); desktop implemented (versioned `purpose=ai_mcp`
-broker and shared Settings UI bundled for Mac `0.1.16`); marketing follow-up in Ticket 246; future mobile
-deferred. Messaging impact: `P-090`. Legal: `L-001`, `L-021`, `L-026`, `L-027`.
-
-## Tickets 356–365 written: alongside Behaviors and the guessed Where (D33) — November 25, 2026
-
-- **Owner's decision:** `docs/DECISIONS.md`, 2026-11-25 (D33). A Behavior can be marked as done
-  alongside other things; the model's guess applies until the person answers and is shown as a
-  guess; overlap is allowed at the same place only; planning also uses a guessed Where; the Daily
-  Brief and Chat pair items for today and the coach can propose a lasting schedule change.
-- **Written:** Tickets 356–365 in `docs/TICKETS.md`, messaging entry `P-093`, scope and domain
-  lines in `AGENTS.md`. No code changed.
-- **Next:** Tickets 356 and 357.
-
-Platform impact: web Tickets 356–362 and 364; desktop Ticket 363; marketing not applicable until
-the messaging pass; future mobile inherits the core resolvers. Messaging impact: P-093.
-
-## Note closure redesign: collapsed 1-line summary + auto-save + Done — November 25, 2026
-
-- **Owner's decision:** use a collapsed one-line summary (`Add day note`/`Add note`, or `Day note`/`Note`
-  + single-line preview) and auto-save + **Done** for both Day notes and per-behavior (Occurrence) notes
-  (`docs/DECISIONS.md`, 2026-11-25).
-- **Implemented:** `components/notes/NoteEditor.tsx` (750ms debounced auto-save, immediate shortcut-chip
-  save, flush-on-blur without closing, `Done` / `Cmd+Enter` / `Escape` flush-and-close, `Try again` on
-  conflict/error, `hideLabel` for disclosure callers, `DesktopDraftGuard`),
-  `components/timeline/DayNoteControl.tsx` (controlled disclosure, optimistic preview update, fading
-  2.5s `Saved` indicator), `components/timeline/OccurrenceNoteForm.tsx` (matching one-line disclosure
-  that collapses independently of the parent occurrence row), notice catalog (`timeline.note-saving`,
-  `timeline.note-saved`), docs (`docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, `interaction-registry.json`,
-  `docs/DECISIONS.md`), and UI tests (`tests/day-note-ui.test.tsx`,
-  `tests/occurrence-note-shortcuts-ui.test.tsx`, `tests/timeline-interactions-ui.test.tsx`,
-  `tests/behavior-review-ui.test.tsx`).
-
-Platform impact: web implemented; desktop implemented (shares `NoteEditor`, `DayNoteControl`, and
-`OccurrenceNoteForm`, ships in next Mac release); marketing not applicable; future mobile deferred.
-Messaging impact: none.
-
-## Place and Home autocomplete with Geoapify and safe auto-marker — November 25, 2026
-
-- **Owner's decision:** use Geoapify (OpenStreetMap/ODbL, free 3,000 credits/day) for address
-  and named-place autocomplete on Behavior `Place` and `Settings → Travel → Home`; automatically
-  record completion place markers from selected specific places when Completion places is enabled,
-  with quick Undo and safeguards so wrong or edited coordinates are never stored.
-- **Implemented:** `packages/core/src/types/place-search.ts`,
-  `packages/core/src/services/place-search.ts` (instant local saved-place matching, Geoapify
-  parsing, coarse admin-area coordinate exclusion), `lib/services/geoapify-provider.ts`,
-  `lib/services/place-search.service.ts` (3-char minimum, 5-minute normalized-query cache,
-  per-account 30/min and 200/hr rate limit), `app/api/travel/place-search/route.ts`,
-  `lib/ui/place-search.ts`, `apps/desktop/src/place-search.ts`,
-  `components/travel/PlaceAutocomplete.tsx`, `usePlaceLabelActions` in
-  `components/travel/PlaceLabels.tsx`, `components/behaviors/BehaviorForm.tsx`,
-  `components/behaviors/BehaviorCreateSection.tsx`, `components/behaviors/BehaviorList.tsx`,
-  `components/settings/TravelSettingsPanel.tsx`, `app/(app)/behaviors/page.tsx`,
-  `apps/desktop/src/behaviors-screen.tsx`, `apps/desktop/src/product.tsx`, `.env.example`,
-  `docs/COSTS.md`, `docs/MESSAGING_CHANGES.md` (`P-091`), `tests/place-search.service.test.ts`,
-  and `tests/place-autocomplete.dom.test.tsx`.
-- **Verified live:** `GEOAPIFY_API_KEY` configured in `.env.local` and Vercel Production/Preview;
-  verified `/api/travel/place-search` (401 unauthenticated, 200 for `YMCA Greenpoint` POI and
-  `99 Meserole Ave Brooklyn` address, 0-call short query) and live autocomplete + Undo flows in
-  both Behavior → Where → Place and Settings → Travel → Home.
-
-Platform impact: web implemented; desktop implemented (shares components and wires
-`createDesktopPlaceSearchClient` for linked Macs, local-only Macs fall back to saved places and
-free text; ships in next Mac release); marketing not applicable; future mobile deferred.
-Messaging impact: P-091.

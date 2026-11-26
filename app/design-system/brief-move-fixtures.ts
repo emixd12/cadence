@@ -60,6 +60,31 @@ export const BRIEF_MOVE_FIXTURE_LINES: readonly BriefMoveLine[] = [
   }),
 ];
 
+/**
+ * Ticket 361 (D33): a pairing line. The red-light helmet (alongside) goes during Reading at
+ * Reading's start; Yes moves only the helmet, as an ordinary move for today.
+ */
+export const BRIEF_MOVE_PAIRING_LINE: BriefMoveLine = line({
+  proposalId: "helmet", title: "Red light helmet",
+  from: { startAt: at("19:00"), endAt: at("19:10") }, to: { startAt: at("20:00"), endAt: at("20:10") },
+  reason: "Do it during Reading, while you're home anyway.",
+  reasonCode: "alongside_pairing", anchor: { kind: "item", title: "Reading" },
+  length: { minutes: 10, source: "behavior_duration", assumed: false }, otherTimes: [at("19:30"), at("21:00")],
+  pairing: { hostOccurrenceId: "occ-reading", hostBehaviorId: "beh-reading", hostTitle: "Reading", hostStartAt: at("20:00"), needs: ["done_together"] },
+});
+
+export const BRIEF_MOVE_PAIRING_BRIEFING: DailyBriefing = {
+  text: "A quiet evening. The helmet can go with your reading.",
+  generatedAt: at("07:02"),
+  expiresAt: at("23:59"),
+  timezone: TIMEZONE,
+  localDate: DATE,
+  coverage: "complete",
+  warnings: [],
+  moves: { version: "1", localDate: DATE, timezone: TIMEZONE, runId: "run-bench-pairing", lines: [BRIEF_MOVE_PAIRING_LINE], conflicts: [],
+    acceptAll: false, undoAllBatchId: null, calendar: "current" },
+};
+
 export const BRIEF_MOVE_FIXTURE: BriefMoves = {
   version: "1",
   localDate: DATE,
@@ -87,9 +112,9 @@ export const BRIEF_MOVE_FIXTURE_BRIEFING: DailyBriefing = {
 };
 
 /** A client that applies every answer at once, refusing Gym's Yes to show the refusal state when asked. */
-export function fixtureBriefMoveClient(options: Readonly<{ refuse?: readonly string[]; stale?: readonly string[]; delayMs?: number }> = {}): BriefMoveClient {
+export function fixtureBriefMoveClient(options: Readonly<{ refuse?: readonly string[]; stale?: readonly string[]; delayMs?: number; lines?: readonly BriefMoveLine[] }> = {}): BriefMoveClient {
   const refuse = new Set(options.refuse ?? []);
-  const lines = new Map(BRIEF_MOVE_FIXTURE_LINES.map((entry) => [entry.proposalId, entry]));
+  const lines = new Map((options.lines ?? BRIEF_MOVE_FIXTURE_LINES).map((entry) => [entry.proposalId, entry]));
   const wait = () => new Promise((resolve) => setTimeout(resolve, options.delayMs ?? 0));
   const result = (proposalId: string, kind: BriefMoveAnswerRequest["kind"], startAt?: string): BriefMoveLineResult => {
     const current = lines.get(proposalId)!;

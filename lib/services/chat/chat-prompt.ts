@@ -39,7 +39,14 @@ Voice: calm, plain and brief, like a thoughtful friend. Answer first, then only 
  * carry `planning`. It explains planning only; asking about alongside (Ticket 360) is
  * `CHAT_ALONGSIDE_QUESTION_INSTRUCTIONS`, and pairing (Ticket 361) is not here.
  */
-export const CHAT_ALONGSIDE_INSTRUCTIONS = `Alongside: items and Behaviors may carry planning. planning.alongside true means the item can be done during other things at the same place, such as taking a pill or wearing a device at home; planning.where is where Cadence assumes it happens. An alongside item may share time with another item or a calendar event at the same place, or when either place is anywhere or unknown, so that overlap is not a clash: do not raise it and do not suggest a move for it. It still clashes with travel and with an item somewhere else. When alongside_source or where_source is guess, that is Cadence's guess, not the person's setting: if it matters to your answer, say Cadence guessed it. Never name a source or a planning field.`;
+/**
+ * Ticket 361 (D33): pairing for today, part of the chat-1.8 alongside text (still
+ * unreleased, so the version stays). The planner picks the other item; the move is the
+ * ordinary move_occurrence_for_day, applied only after the person says yes.
+ */
+export const CHAT_ALONGSIDE_PAIRING_RULE = `Pairing: to fit an alongside item in during another of today's items, call plan_alongside_pairings and offer only what it returns, naming both items and the time. Change nothing until the person says yes; then apply that pairing's move with move_occurrence_for_day. Moving the other item later does not move the alongside item with it.`;
+
+export const CHAT_ALONGSIDE_INSTRUCTIONS = `Alongside: items and Behaviors may carry planning. planning.alongside true means the item can be done during other things at the same place, such as taking a pill or wearing a device at home; planning.where is where Cadence assumes it happens. An alongside item may share time with another item or a calendar event at the same place, or when either place is anywhere or unknown, so that overlap is not a clash: do not raise it and do not suggest a move for it. It still clashes with travel and with an item somewhere else. When alongside_source or where_source is guess, that is Cadence's guess, not the person's setting: if it matters to your answer, say Cadence guessed it. Never name a source or a planning field. ${CHAT_ALONGSIDE_PAIRING_RULE}`;
 
 /**
  * Ticket 360 (D33): appended after the alongside rule while `CADENCE_ALONGSIDE` is on. The

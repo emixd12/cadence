@@ -44,6 +44,7 @@ import type { ChatToolExecutor, ChatToolResult } from "./chat-writes";
 import { CHAT_PLANNING_READS, chatPlanningBehaviorIds, withChatPlanning } from "./chat-planning";
 import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
+import { planChatPairings } from "@/lib/services/alongside-pairing.service";
 
 /**
  * Advisor plan Phase 5 (5A): the live executor. Cadence tools run through
@@ -577,6 +578,12 @@ export function createLiveChatExecutor(input: Readonly<{
     if (name === "move_occurrence_to_date") {
       return moveOccurrenceToDateTool(input.context, args, timezone);
     }
+    // Ticket 361 (D33): the pairing planner. It changes nothing; on the person's Yes, Chat
+    // applies the returned move with move_occurrence_for_day, the same ordinary move.
+    if (name === "plan_alongside_pairings") {
+      if (!alongsideEnabled()) return { ok: false, error: { code: "not_found", message: "No tool named plan_alongside_pairings." } };
+      return pairingTool(input.context, args, input.today(), timezone, busyToday);
+    }
     if (name === "search_advice") {
       if (typeof args.query !== "string" || !args.query.trim()) return { ok: false, error: { code: "invalid_input", message: "Send a query of a few words." } };
       return { ok: true, result: searchAdviceCards(args.query.slice(0, 200)) };
@@ -619,6 +626,24 @@ export async function withPlanningFacts(name: string, value: unknown, context: P
     return withChatPlanning(value, facts);
   } catch {
     return value;
+  }
+}
+
+/** Ticket 361: today's pairings, checked against today's calendar the way a move is. */
+async function pairingTool(context: IntegrationContext, args: Readonly<Record<string, unknown>>, today: string, timezone: string,
+  busyToday: () => Promise<Readonly<{ busy: MoveCalendarBusy[]; partial: boolean }>>): Promise<ChatToolResult> {
+  const occurrenceId = typeof args.occurrence_id === "string" && args.occurrence_id.trim() ? args.occurrence_id.trim() : null;
+  try {
+    const busy = await busyToday();
+    const result = await planChatPairings({
+      supabase: context.supabase, userId: context.userId, localDate: today, timezone,
+      now: Temporal.Instant.fromEpochMilliseconds(context.now.getTime()),
+      calendarBusy: busy.busy.map((event, index) => ({ ref: event.ref ?? `calendar:${index}`, start: event.start, end: event.end })),
+      occurrenceId,
+    });
+    return { ok: true, result: { ...result, ...(busy.partial ? { calendar_check_partial: true } : {}) } };
+  } catch {
+    return { ok: false, error: { code: "unavailable", message: "Cadence could not plan pairings right now." } };
   }
 }
 

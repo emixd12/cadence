@@ -20173,7 +20173,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 361: Pairing for today in the Daily Brief and Chat
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration (both `reason` columns accept the new code `alongside_pairing`). Readings: "crowded" reuses the coach's `crowded_hour` threshold (3 items in a local hour, alongside items not counted) or an hour the stored signal names; `done_together` counts only when the named partner is one of today's hosts; the brief and Chat read the coach's signals through the coach agent's read-only channel. The proposal's `line.pairing` records the host offered, as history for Ticket 362, not a link. Re-check pairs a guest again when its host moved or left; Re-plan pairs it with another host. Chat skips the "helps" rule for an item the person asked about.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 

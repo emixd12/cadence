@@ -11,7 +11,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | outcome | 34 |
 | error | 90 |
 | note | 27 |
-| question | 4 |
+| question | 5 |
 
 ## Alongside Behaviors
 
@@ -109,6 +109,7 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 | `brief-moves.never-move` Confirms that the brief will stop suggesting moves for this Behavior, and where to change that. | outcome | The brief won’t suggest moving {title} again; you can change this in its settings. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
 | `brief-moves.no-other-free-time` Says in Other time that the planner found no other free start today, so the person picks one below. | question | No other free time found today. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx`, `components/briefing/BriefOpportunityLines.tsx` |
 | `brief-moves.no-time-fits` Says Re-plan found no other time that fits today. | error | Not changed. No other time fits today. | web, Mac | INT-BRIEF-006, `components/briefing/BriefMoveLines.tsx` |
+| `brief-moves.pairing` The reason on a brief pairing line (Ticket 361): do an alongside item during another of today's items, at that item's start. Cadence's own words when the model writes none. | question | Do {guest} during {host} at {time}. | web, Mac | INT-BRIEF-006, `packages/core/src/resolvers/alongside-pairing.resolver.ts` |
 | `brief-moves.refused.already-marked` Server refusal: the line's item was marked after the brief was written. | error | Not changed. {title} is already marked. | web, Mac | INT-BRIEF-006, `lib/services/brief-moves.service.ts` |
 | `brief-moves.refused.batch-taken` Server refusal: the same Accept all just moved another item into this line's time. | error | Not changed. {time} is taken: Accept all just moved {title} there. | web, Mac | INT-BRIEF-007, `lib/services/brief-moves.service.ts` |
 | `brief-moves.refused.batch-too-close` Server refusal: the same Accept all just moved another item too close to this line's time. | error | Not changed. {time} is too close to {title}, which Accept all just moved. | web, Mac | INT-BRIEF-007, `lib/services/brief-moves.service.ts` |

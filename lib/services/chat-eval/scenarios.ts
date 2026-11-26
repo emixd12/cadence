@@ -170,6 +170,12 @@ export const CHAT_SCENARIOS: readonly ChatScenario[] = [
     steps: [{ say: "Can I do my red light helmet while I read tonight?" }],
     allowedWrites: [], expect: { mentions: ["yes|can|fine|works"], final: [{ kind: "unchanged" }] } },
 
+  // Ticket 361 (D33): pairing for today. Chat offers the planner's pairing and moves only after a yes.
+  { id: "alongside_pairing", world: "alongside_pairing", description: "Asked to fit the helmet in tonight: offer it during Read at 9:30 PM, then move it once the person says yes.",
+    steps: [{ say: "Can I fit my red light helmet in with something else tonight?" }, { say: "Yes, do that." }],
+    allowedWrites: [{ tool: "move_occurrence_for_day", behavior: "Red light helmet" }],
+    expect: { mentions: ["Read", "9:30"], never: ["Journal"], final: [{ kind: "moved_to", behavior: "Red light helmet", time: "21:30" }] } },
+
   { id: "new_user_evening", world: "new_user", description: "First evening, no history: no invented track record.",
     steps: [{ say: "Hi! What should I focus on tonight?" }],
     allowedWrites: [], expect: { mentions: ["Walk", "Read"], never: ["streak", "usually", "in a row"], final: [{ kind: "unchanged" }] } },
