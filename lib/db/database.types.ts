@@ -674,6 +674,35 @@ export type Database = {
           },
         ]
       }
+      brief_alongside_asks: {
+        Row: {
+          behavior_id: string
+          created_at: string
+          local_date: string
+          user_id: string
+        }
+        Insert: {
+          behavior_id: string
+          created_at?: string
+          local_date: string
+          user_id: string
+        }
+        Update: {
+          behavior_id?: string
+          created_at?: string
+          local_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brief_alongside_asks_behavior_owner_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -2956,6 +2985,10 @@ export type Database = {
       }
       advisor_react_tip: {
         Args: { p_reaction: string; p_tip_id: string }
+        Returns: Json
+      }
+      advisor_read_pairing_evidence: {
+        Args: { p_local_date: string }
         Returns: Json
       }
       advisor_recent_tips: {
