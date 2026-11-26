@@ -38,6 +38,7 @@ import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import { PeriodDayControls } from "@/components/periods/PeriodControl";
 import type { PeriodActions, PeriodView } from "@/lib/types/period";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { PERIOD_NOTE_SHORTCUT_KEY } from "@cadence/core/resolvers/period.resolver";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
@@ -911,6 +912,7 @@ function DayProgressDay({
             periods={periods}
             today={todayLocalDate}
             labelSuggestions={periodLabelSuggestions}
+            noteShortcuts={shortcutsByBehavior?.[PERIOD_NOTE_SHORTCUT_KEY]}
             actions={periodActions}
           >
             {dayNoteAction ? <DayNoteControl

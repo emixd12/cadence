@@ -105,6 +105,50 @@ export function rankInlineNoteShortcuts(
   return ranked;
 }
 
+/** One saved note as the repeated-line rule reads it. `local_date` orders ties, newest first. */
+export type RepeatedNoteSource = Readonly<{ id: string; note: string | null; local_date: string }>;
+
+/**
+ * The repeated-line rule every note pool shares: a line becomes a proposal when it
+ * appears in at least two of the notes, compared without case, spacing or trailing
+ * punctuation. `notes` come newest first. Occurrence notes, day notes and Period
+ * notes all read this one function.
+ */
+export function repeatedNoteLineProposals(input: {
+  notes: readonly RepeatedNoteSource[];
+  now: Temporal.Instant;
+  /** Pattern keys never proposed: accepted or dismissed entries. */
+  suppressed?: ReadonlySet<string>;
+  /** Proposals that already exist keep their first proposal time and expiry. */
+  proposedAt?: ReadonlyMap<string, Pick<NoteShortcut, "created_at" | "expires_at">>;
+}): NoteShortcut[] {
+  const { now, suppressed, proposedAt } = input;
+  const groups = new Map<string, { text: string; notes: RepeatedNoteSource[] }>();
+  for (const note of input.notes) {
+    if (!note.note) continue;
+    const lines = note.note.split(/\r?\n/u);
+    const seenInNote = new Set<string>();
+    for (const rawLine of lines) {
+      let text: string;
+      try { text = validateNoteShortcutText(rawLine); } catch { continue; }
+      const key = notePatternKey(text);
+      if (suppressed?.has(key) || seenInNote.has(key)) continue;
+      seenInNote.add(key);
+      const group = groups.get(key) ?? { text, notes: [] };
+      group.notes.push(note);
+      groups.set(key, group);
+    }
+  }
+  return [...groups].filter(([, group]) => group.notes.length >= NOTE_SHORTCUT_LIMITS.evidence)
+    .sort(([a, left], [b, right]) => right.notes.length - left.notes.length || compare(right.notes[0].local_date, left.notes[0].local_date) || compare(a, b))
+    .slice(0, NOTE_SHORTCUT_LIMITS.proposals).map(([key, group]) => ({
+      key, text: group.text, status: "proposed", source: "repeated_text",
+      evidence: group.notes.slice(0, NOTE_SHORTCUT_LIMITS.evidenceMax).map((note) => ({ occurrence_id: note.id, note_hash: sha256(note.note!) })),
+      created_at: proposedAt?.get(key)?.created_at ?? now.toString(),
+      expires_at: proposedAt?.get(key)?.expires_at ?? now.add({ hours: 30 * 24 }).toString(),
+    }));
+}
+
 export function resolveNoteSuggestions(input: { context: NoteShortcutContext; userId: string; now: Temporal.Instant }): NoteShortcut[] {
   const current = currentNoteShortcuts(input);
   const retained = current.filter((entry) => entry.status !== "proposed");
@@ -112,29 +156,7 @@ export function resolveNoteSuggestions(input: { context: NoteShortcutContext; us
   const proposedAt = new Map(current.filter((entry) => entry.status === "proposed").map((entry) => [entry.key, entry]));
   const existingModelProposals = current.filter((entry) => entry.status === "proposed" && entry.source === "model");
   const suppressed = new Set(retained.flatMap((entry) => [entry.key, ...(entry.text ? [notePatternKey(entry.text)] : [])]));
-  const groups = new Map<string, { text: string; notes: NoteSource[] }>();
-  for (const note of eligibleNoteSources(input)) {
-    const lines = note.note!.split(/\r?\n/u);
-    const seenInNote = new Set<string>();
-    for (const rawLine of lines) {
-      let text: string;
-      try { text = validateNoteShortcutText(rawLine); } catch { continue; }
-      const key = notePatternKey(text);
-      if (suppressed.has(key) || seenInNote.has(key)) continue;
-      seenInNote.add(key);
-      const group = groups.get(key) ?? { text, notes: [] };
-      group.notes.push(note);
-      groups.set(key, group);
-    }
-  }
-  const deterministicProposals: NoteShortcut[] = [...groups].filter(([, group]) => group.notes.length >= NOTE_SHORTCUT_LIMITS.evidence)
-    .sort(([a, left], [b, right]) => right.notes.length - left.notes.length || compare(right.notes[0].local_date, left.notes[0].local_date) || compare(a, b))
-    .slice(0, NOTE_SHORTCUT_LIMITS.proposals).map(([key, group]) => ({
-      key, text: group.text, status: "proposed", source: "repeated_text",
-      evidence: group.notes.slice(0, NOTE_SHORTCUT_LIMITS.evidenceMax).map((note) => ({ occurrence_id: note.id, note_hash: sha256(note.note!) })),
-      created_at: proposedAt.get(key)?.created_at ?? input.now.toString(),
-      expires_at: proposedAt.get(key)?.expires_at ?? input.now.add({ hours: 30 * 24 }).toString(),
-    }));
+  const deterministicProposals = repeatedNoteLineProposals({ notes: eligibleNoteSources(input), suppressed, proposedAt, now: input.now });
   const deterministicKeys = new Set(deterministicProposals.map((entry) => entry.key));
   const remainingSlots = Math.max(0, NOTE_SHORTCUT_LIMITS.proposals - deterministicProposals.length);
   const keptModelProposals = existingModelProposals

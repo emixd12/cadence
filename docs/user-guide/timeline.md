@@ -371,16 +371,20 @@ for Mac does not show Periods yet.
 2. Enter a **Label** of up to 60 characters. Labels you used before are offered
    as you type.
 3. Check **First day**. It starts as today and may be a past or future day.
-4. Set **Last day**, or leave it empty if the Period is still going.
-5. Optionally enter a **Note**.
+4. Set **Last day**, or leave it empty if the Period is still going. **Clear**
+   empties a last day you set.
+5. Optionally enter a **Note**. A line you wrote in two or more Period notes is
+   offered above the field; choose it to add it.
 6. Choose **Save**. Cadence shows **Period saved.**
 
 **See and edit a Period**
 
 Each Timeline day that a Period covers shows the label as a small chip under the
 date. Periods may overlap, so a day can show several chips. Choose a chip to open
-that Period in place, change any field and choose **Save**. **Cancel** or Escape
-closes the form without saving.
+that Period in place. Change the label or the days and choose **Save**. The
+**Note** saves on its own a moment after you stop typing, like every other note,
+and shows **Saved**. **Close** or Escape closes the form; a label or day you
+changed without choosing **Save** is not kept.
 
 **End a Period today**
 

@@ -1,3 +1,4 @@
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 
 import { resolveAdherenceCounts } from "@cadence/core/resolvers/analytics.resolver";
@@ -25,6 +26,7 @@ import {
   resolvePeriodCreate,
   resolvePeriodEnd,
   resolvePeriodEndState,
+  resolvePeriodNoteShortcuts,
   resolvePeriodRange,
   resolvePeriodRevision,
   resolvePeriodUpdate,
@@ -543,5 +545,28 @@ describe("Periods for advisor tips", () => {
     ]);
     const many = Array.from({ length: 8 }, (_, index) => ({ id: `${index}`, label: `P${index}`, start_on: `2026-11-1${index}`, end_on: null }));
     expect(resolveTipPeriods({ localDate: TODAY, records: many }).map((item) => item.label)).toEqual(["P0", "P1", "P2", "P3", "P4"]);
+  });
+});
+
+describe("resolvePeriodNoteShortcuts", () => {
+  const now = Temporal.Instant.from("2026-11-26T15:00:00Z");
+
+  it("offers lines that repeat across Period notes, by the rule the other notes use", () => {
+    const shortcuts = resolvePeriodNoteShortcuts({ now, periods: [
+      period({ start_on: "2026-06-01", note: "No training\nFever" }),
+      period({ start_on: "2026-09-01", note: "no training." }),
+      period({ start_on: "2026-10-01", note: "Fever\nFever" }),
+      period({ start_on: "2026-11-01", note: "Only here" }),
+      period({ start_on: "2026-11-02", note: null }),
+    ] });
+    expect(shortcuts.map((entry) => [entry.text, entry.status, entry.source, entry.evidence.length])).toEqual([
+      ["Fever", "proposed", "repeated_text", 2],
+      ["no training.", "proposed", "repeated_text", 2],
+    ]);
+  });
+
+  it("needs two Periods, and offers nothing without notes", () => {
+    expect(resolvePeriodNoteShortcuts({ now, periods: [period({ note: "Rest\nRest" })] })).toEqual([]);
+    expect(resolvePeriodNoteShortcuts({ now, periods: [period(), period()] })).toEqual([]);
   });
 });

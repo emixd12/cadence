@@ -1,5 +1,6 @@
 "use client";
 
+import { COMPACT_UNDERLINED_FIELD_CONTROL_CLASS } from "@/lib/ui/field-classes";
 import {
   useActionState,
   useCallback,
@@ -130,8 +131,6 @@ const WHERE_OPTIONS: Array<{ value: BehaviorWhereKind | ""; label: string }> = [
 ];
 const MAX_SCHEDULE_ROWS = 6;
 const MAX_TIME_ENTRIES_PER_SCHEDULE = 8;
-const COMPACT_UNDERLINED_FIELD_CONTROL_CLASS =
-  "min-h-6 border-0 border-b border-line bg-background px-0 py-0.5 text-base text-foreground";
 
 export function BehaviorForm({
   mode,

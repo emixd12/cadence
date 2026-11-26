@@ -1379,11 +1379,13 @@
     {
       "path": "components/notes/NoteEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 18,
+      "interaction_marker_count": 19,
       "interaction_ids": [
         "INT-TIMELINE-008",
         "INT-TIMELINE-011",
-        "INT-TIMELINE-012"
+        "INT-TIMELINE-012",
+        "INT-PERIOD-001",
+        "INT-PERIOD-002"
       ]
     },
     {
@@ -23315,7 +23317,7 @@
         },
         {
           "kind": "input",
-          "control": "Label (with past labels offered), First day, Last day and Note fields"
+          "control": "Label (with past labels offered), First day, Last day (with Clear) and the shared Note field with its shortcut chips"
         },
         {
           "kind": "submit",
@@ -23338,6 +23340,7 @@
       "implementation": [
         "components/periods/PeriodControl.tsx#PeriodDayControls",
         "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "components/notes/NoteEditor.tsx#NoteField",
         "app/(app)/timeline/actions.ts#savePeriodAction",
         "lib/services/period.service.ts#createPeriodFromFormData",
         "packages/core/src/services/period.service.ts#createPeriod",
@@ -23370,7 +23373,7 @@
           "tests/period.resolver.test.ts",
           "tests/period-web.service.test.ts"
         ],
-        "notes": "The DOM test covers the add form on today only, its default first day, past-label options, the submitted fields, the saved notice and inline rule sentences; the action test covers the write, the notice and both revalidated paths."
+        "notes": "The DOM test covers the add form on today only, its default first day, past-label options, the note shortcut chips, Clear on the last day, the submitted fields, the saved notice and inline rule sentences; the action test covers the write, the notice and both revalidated paths."
       },
       "platforms": {
         "web": {
@@ -23428,7 +23431,7 @@
         "J07",
         "J10"
       ],
-      "intent": "Open a Period from its chip on a Timeline day, or from the Periods list on Behaviors, and change its label, days or note.",
+      "intent": "Open a Period from its chip on a Timeline day, or from the Periods list on Behaviors, and change its label, days or note. The note saves on its own, as every note does; the label and days save with Save.",
       "triggers": [
         {
           "kind": "activate",
@@ -23436,7 +23439,7 @@
         },
         {
           "kind": "input",
-          "control": "Label, First day, Last day and Note fields"
+          "control": "Label, First day and Last day (with Clear) fields; the shared auto-saving Note field with its shortcut chips"
         },
         {
           "kind": "submit",
@@ -23444,12 +23447,12 @@
         },
         {
           "kind": "activate",
-          "control": "Cancel (or Escape, or the chip or Edit again)"
+          "control": "Close (or Escape, or the chip or Edit again)"
         }
       ],
       "availability": "On every Timeline day a Period covers, including Needs decision days, and for every Period in the Periods list on Behaviors. The list is hidden when there is no Period.",
-      "success_result": "Saves the changed fields against the revision the form read, closes the form, shows period.saved and refreshes the page.",
-      "failure_result": "A broken rule shows its sentence under the form and keeps the draft. A Period that changed elsewhere, or is gone, shows period.conflict, refreshes and fills the form with the latest version; nothing is overwritten.",
+      "success_result": "Save stores the label and days against the revision the form read, closes the form, shows period.saved and refreshes the page. The note saves shortly after typing stops, when the field loses focus, or when a shortcut chip is used, shows the note-saved notice and keeps the form open with any label or day being edited.",
+      "failure_result": "A broken rule shows its sentence under the form and keeps the draft. A Period that changed elsewhere, or is gone, shows period.conflict, refreshes and fills the form with the latest version; nothing is overwritten. A note that changed elsewhere, or is too long, shows its sentence beside Try again under the note and keeps the text.",
       "effects": [
         "database_write",
         "ui_state"
@@ -23461,9 +23464,13 @@
         "components/periods/PeriodControl.tsx#PeriodList",
         "components/periods/PeriodEditor.tsx#PeriodEditor",
         "components/behaviors/BehaviorList.tsx#BehaviorList",
+        "components/notes/NoteEditor.tsx#NoteEditor",
         "app/(app)/timeline/actions.ts#savePeriodAction",
+        "app/(app)/timeline/actions.ts#savePeriodNoteAction",
         "lib/services/period.service.ts#updatePeriodFromFormData",
+        "lib/services/period.service.ts#savePeriodNoteFromFormData",
         "packages/core/src/services/period.service.ts#updatePeriod",
+        "packages/core/src/services/period.service.ts#savePeriodNote",
         "lib/db/periods.repo.ts"
       ],
       "effect_checks": [
@@ -23493,7 +23500,7 @@
           "tests/period-web.service.test.ts",
           "tests/period-behaviors.dom.test.tsx"
         ],
-        "notes": "The DOM test covers one chip per covering Period, the editor opening in place with the stored values, the submitted id and revision, the conflict notice and the reloaded form; the action test covers the compare-and-set update and the stale save."
+        "notes": "The DOM test covers one chip per covering Period, the editor opening in place with the stored values, the submitted id and revision, the conflict notice and the reloaded form, the note saving on its own and the revision the next write names; the action test covers the compare-and-set update, the stale save and the note save."
       },
       "platforms": {
         "web": {
