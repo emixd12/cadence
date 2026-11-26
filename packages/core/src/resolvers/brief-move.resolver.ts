@@ -207,11 +207,19 @@ export function resolveBriefMoveLength(input: Readonly<{
   return made(BRIEF_MOVE_FALLBACK_MINUTES, "fallback");
 }
 
-/** A routine block's place: its steps' shared Where, otherwise unknown. */
+/**
+ * A routine block's place: the one place its steps share. Anywhere steps defer to the
+ * place the other steps share (audit fix 10), so Home + Anywhere is Home and all
+ * Anywhere stays Anywhere. Two different places, or a step without a known place, make
+ * it unknown.
+ */
 function routineBlockWhere(members: readonly BriefMoveDayItem[]): EffectiveWhere {
-  const first = members[0]?.where;
-  const same = first && members.every((member) => member.where?.kind === first.kind && member.where?.placeKey === first.placeKey);
-  return same ? first : { kind: "unknown", source: "none" };
+  const unknown: EffectiveWhere = { kind: "unknown", source: "none" };
+  if (members.length === 0 || members.some((member) => !member.where)) return unknown;
+  const placed = members.filter((member) => member.where!.kind !== "anywhere");
+  const first = (placed[0] ?? members[0])!.where!;
+  const same = placed.every((member) => member.where!.kind === first.kind && member.where!.placeKey === first.placeKey);
+  return same && first.kind !== "unknown" ? first : unknown;
 }
 
 /** The moving item's side of an overlap: whether it is alongside, and its Where under the same-place rule. */

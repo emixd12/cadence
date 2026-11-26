@@ -128,6 +128,12 @@ describe("the free-slot rule with the same-place rule", () => {
       routine: { parentBehaviorId: "skin", parentTitle: "Skin routine", inheritParentSchedule: true, stepOrder: order } });
     expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, HOME)])[0]!.where).toEqual(HOME);
     expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, GYM)])[0]!.where).toEqual(UNKNOWN);
+    // Audit fix 10: Anywhere steps defer to the one place the others share.
+    expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, ANYWHERE)])[0]!.where).toEqual(HOME);
+    expect(collapseBriefMoveRoutines([step("serum", 0, ANYWHERE), step("helmet", 1, GYM), step("pill", 2, ANYWHERE)])[0]!.where).toEqual(GYM);
+    expect(collapseBriefMoveRoutines([step("serum", 0, ANYWHERE), step("helmet", 1, ANYWHERE)])[0]!.where).toEqual(ANYWHERE);
+    expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, ANYWHERE), step("pill", 2, GYM)])[0]!.where).toEqual(UNKNOWN);
+    expect(collapseBriefMoveRoutines([step("serum", 0, HOME), step("helmet", 1, UNKNOWN)])[0]!.where).toEqual(UNKNOWN);
   });
 
   it("an all-alongside routine block lasts the sum of its steps (audit fix 3)", () => {
