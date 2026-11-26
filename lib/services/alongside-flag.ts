@@ -12,7 +12,9 @@
  * whatever the flag: account sync contract 10 and configuration history carry the column.
  * See docs/OPERATIONS.md, "Alongside setting operation".
  * Ticket 383's dismissal of a guessed Where while Completion places is off also needs
- * 20261126130000.
+ * 20261126130000. Ticket 385's advice card `do-it-during-something-else` needs
+ * 20261126140000 (the `alongside` tip link target) on the database before the card is
+ * activated; the flag itself does not.
  */
 export const ALONGSIDE_FLAG = "CADENCE_ALONGSIDE";
 
