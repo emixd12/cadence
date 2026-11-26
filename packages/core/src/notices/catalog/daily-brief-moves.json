@@ -315,6 +315,14 @@
         "INT-BRIEF-006",
         "INT-BRIEF-007"
       ]
+    },
+    "brief-moves.pairing": {
+      "meaning": "The reason on a brief pairing line (Ticket 361): do an alongside item during another of today's items, at that item's start. Cadence's own words when the model writes none.",
+      "text": "Do {guest} during {host} at {time}.",
+      "style": "question",
+      "interactions": [
+        "INT-BRIEF-006"
+      ]
     }
   }
 }

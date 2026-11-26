@@ -182,6 +182,13 @@ const resolverRegistry = [
     source: "docs/DATA_MODEL.md",
   },
   {
+    domain: "alongside pairing",
+    resolver: "packages/core/src/resolvers/alongside-pairing.resolver.ts",
+    compatibility: "lib/resolvers/alongside-pairing.resolver.ts",
+    test: "tests/alongside-pairing.resolver.test.ts",
+    source: "docs/DATETIME_STRATEGY.md",
+  },
+  {
     domain: "Daily Brief opportunity lines",
     resolver: "packages/core/src/resolvers/brief-opportunity.resolver.ts",
     compatibility: "lib/resolvers/brief-opportunity.resolver.ts",

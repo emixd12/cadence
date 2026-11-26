@@ -5,6 +5,7 @@ import {
   BRIEF_MOVE_FALLBACK_MINUTES,
   type BriefMoveLength,
   type BriefMoveLengthSource,
+  type BriefMovePairing,
   type BriefMoveReasonCode,
   type BriefMoveRoutine,
   type BriefMoveTravel,
@@ -361,6 +362,8 @@ export type BriefMoveCandidate = Readonly<{
   calendarDerived: boolean;
   /** Set when the line moves a whole routine slot; `title` is then the routine's. */
   routine?: BriefMoveRoutine;
+  /** Ticket 361: set on a pairing line (alongside-pairing.resolver.ts). */
+  pairing?: BriefMovePairing;
 }>;
 
 export type BriefMovePlanInputs = Readonly<{
@@ -490,6 +493,9 @@ export function stockBriefMoveReason(code: BriefMoveReasonCode, title: string,
       return `${title}’s time has passed.`;
     case "conflict_after_schedule_edit":
       return `A schedule change now puts something else at ${title}’s moved time.`;
+    case "alongside_pairing":
+      // Pairing lines carry their own sentence with the time (alongside-pairing.resolver.ts).
+      return anchor ? `Do ${title} during ${anchor.title}.` : `${title} can happen during something else.`;
   }
 }
 
