@@ -20588,7 +20588,7 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Open the place a tip points at: Change the set time or Set a length opens that Behavior's editor at the field; Open Needs decision opens the Needs decision list.",
+      "intent": "Open the place a tip points at: Change the set time or Set a length opens that Behavior's editor at the field; Say if it can be done alongside opens it at Can be done alongside other things (Ticket 385, while CADENCE_ALONGSIDE is on; its card awaits the owner's review); Open Needs decision opens the Needs decision list.",
       "triggers": [
         {
           "kind": "activate",
@@ -20612,7 +20612,8 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/advisor-ui.dom.test.tsx"
+          "tests/advisor-ui.dom.test.tsx",
+          "tests/advice-card-alongside.test.ts"
         ],
         "notes": "DOM checks cover the link label and the editor address it opens."
       },

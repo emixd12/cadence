@@ -42,7 +42,7 @@ type BehaviorsPageProps = Readonly<{
     range?: string | string[];
     behavior?: string | string[];
     day?: string | string[];
-    /** A tip's link: `?edit=<behavior id>&field=time|length|where|description`. */
+    /** A tip's link: `?edit=<behavior id>&field=time|length|where|description|alongside`. */
     edit?: string | string[];
     field?: string | string[];
   }>;
