@@ -18,7 +18,7 @@ import type { IntegrationContext } from "@/lib/integrations/request-context";
 import { SHOW_DAY_TOOL_NAME } from "@/lib/mcp/apps/config";
 import { mcpListedTools } from "@/lib/mcp/server";
 import { createLiveChatExecutor } from "@/lib/services/chat/chat-executor";
-import { buildChatToolDefinitions, CHAT_TOOL_SUBJECT, isChatWrite, type ChatToolName } from "@/lib/services/chat/chat-tools";
+import { buildChatToolDefinitions, CHAT_TOOL_SUBJECT, isChatWrite, type ChatToolName, CHAT_UNOFFERED_OPERATIONS } from "@/lib/services/chat/chat-tools";
 
 const ALL_ON = { notes: true, googleCalendar: true, outlookCalendar: true, icloudCalendar: true, hevy: true };
 const context = { userId: "u", supabase: {}, now: new Date("2026-11-25T15:00:00Z"), tokenExpiresAt: new Date(),
@@ -39,8 +39,8 @@ describe.each([["on", "true"], ["off", ""]])("Cadence Chat with CADENCE_MCP_APPS
       const names = buildChatToolDefinitions(ALL_ON, { alongside }).map((tool) => tool.name as string);
       expect(names).not.toContain(SHOW_DAY_TOOL_NAME);
       expect(names.some((name) => name.includes("view_resource"))).toBe(false);
-      // Chat still offers every registry tool.
-      for (const name of INTEGRATION_OPERATION_NAMES) expect(names).toContain(name);
+      // Chat still offers every registry tool, except the Period writes it does not offer yet (Ticket 370).
+      for (const name of INTEGRATION_OPERATION_NAMES) expect(names.includes(name), name).toBe(!CHAT_UNOFFERED_OPERATIONS.has(name));
     }
     expect(CHAT_TOOL_SUBJECT[SHOW_DAY_TOOL_NAME]).toBeUndefined();
     expect(isChatWrite(SHOW_DAY_TOOL_NAME)).toBe(false);

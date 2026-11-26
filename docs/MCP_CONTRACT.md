@@ -1182,7 +1182,7 @@ developer reference or the plugins, and it has no contract version. The MCP endp
 adds it to `tools/list`, after the registry tools, only while the server flag
 `CADENCE_MCP_APPS` is exactly `true`. The flag is off in production. With it off,
 `tools/list` is byte-identical to the contract (`tests/mcp-apps-server.test.ts` pins the
-1.7.0 digest on both protocol paths). The frozen schema and view contract are in
+1.8.0 digest on both protocol paths). The frozen schema and view contract are in
 `docs/qa/2026-11-26-mcp-apps-spike.md`; `tests/mcp-apps-show-day.test.ts` compares the
 served schemas with that note.
 

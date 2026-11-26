@@ -22,8 +22,8 @@ vi.mock("@/lib/db/integration.repo", () => ({ recordIntegrationActivity: vi.fn()
 vi.mock("@/lib/services/integration-day.service", () => ({ getIntegrationDay: vi.fn() }));
 vi.mock("@/lib/services/integration-read.service", () => ({ IntegrationReadError: class extends Error {} }));
 
-// sha256 of JSON.stringify(mcpTools()) for published contract 1.7.0, as tests/integration-alongside-contract.test.ts pins it.
-const PUBLISHED_TOOLS_SHA256 = "bd602a832060c6c7c18c55a0fe6a50ddc547404eea030d0f24004020b6be80b8";
+// sha256 of JSON.stringify(mcpTools()) for published contract 1.8.0, as tests/integration-alongside-contract.test.ts pins it.
+const PUBLISHED_TOOLS_SHA256 = "693fd4257b1aa436e0b3edb76a170a2c94fbf4b4697e4b2d29ce645d3c268425";
 const sha256 = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const token = "a".repeat(43);
 const url = "http://127.0.0.1:4321/mcp";
@@ -225,7 +225,7 @@ describe.each(PATHS)("MCP Apps with the flag on, %s path", (label, pin) => {
 
   it("keeps the 403 step-up for a write tool unchanged", async () => {
     vi.mocked(executeMcpOperation).mockResolvedValue({ ok: false, error: { code: "insufficient_scope", message: "Reconnect.", retryable: false,
-      contract_version: "1.7.0", required_scopes: ["cadence.occurrences.write"] } } as never);
+      contract_version: "1.8.0", required_scopes: ["cadence.occurrences.write"] } } as never);
     const response = await raw(pin, "tools/call", { name: "set_occurrence_status", arguments: {} });
     expect(response.status).toBe(403);
     expect(response.headers.get("www-authenticate")).toContain('error="insufficient_scope", scope="cadence.read cadence.occurrences.write"');
