@@ -21050,3 +21050,52 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
 
 Messaging impact: none.
+
+## Ticket 387: The advisor compares tracked time with the intended duration
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25 (D34): the intended duration stays as a marker the advisor can compare tracked time against. The choices under "Open decisions" are not made.
+
+Dependencies: Ticket 366. The Daily Brief part follows Ticket 184's promotion rules.
+
+Goal: Let the advisor say when a Behavior takes longer or shorter than the person intended, with both numbers ("Gym usually takes 45 minutes; you intended 30").
+
+Current state, read from code on November 26, 2026:
+
+- Coach tips already compare the two. The `session_length` signal (`packages/core/src/resolvers/coach-signals-v2.resolver.ts`) carries `planned_minutes`, `median_minutes` and a `longer`, `shorter` or `on_target` pattern. The advice card `set-the-length-it-takes` applies to `longer` and offers to update the intended duration. No card applies to `shorter`.
+- The signal and the Timeline measure differently (`docs/RULES_REGISTER.md`, TIP-01, TIP-02, LEN-02, LEN-03): 4 sessions in 28 days against the 10 most recent completions with a floor of 3.
+- The Daily Brief model receives one selected duration per item. `selectDuration` in `packages/core/src/services/briefing-config.ts` drops the other candidate, and `tests/briefing-workbench.test.ts` asserts `durationCandidates` never reaches the model.
+- `resolveBehaviorDurationEstimate` returns `intendedSeconds` beside the tracked figure when tracked time decides. Only the Timeline row reads it.
+- Chat was not checked.
+
+Recommended scope:
+
+1. Make the `session_length` signal read the same tracked figure and floor as the Timeline (LEN-01 to LEN-04), so the tip and the row never give different numbers. Keep the 0.8 and 1.2 ratios (TIP-03).
+2. Add a `shorter` advice card, or record that Cadence stays silent when a Behavior takes less time than intended.
+3. Daily Brief: add `intendedSeconds` to an item's duration only when tracked time decides and the ratio passes TIP-03. This is a new recipe candidate, reviewed in the workbench, never a change to the pinned recipe.
+4. Rename `completed_stopped_occurrence_mean` in the same context version as step 3.
+
+Open decisions (owner):
+
+- Whether the Daily Brief should mention length at all, or leave it to coach tips.
+- Whether Cadence speaks when a Behavior takes less time than intended.
+- Whether the tip's 28-day window gives way to the 10 most recent completions.
+
+Requirements:
+
+- Wording states the two numbers plainly, with no guilt, in the `PRODUCT.md` voice.
+- Each new or changed threshold gets a row in `docs/RULES_REGISTER.md`.
+- A change to what the model receives logs a `docs/MESSAGING_CHANGES.md` entry.
+- Resolver tests cover the signal at 2, 3 and 10 tracked completions and at the 0.8 and 1.2 ratios.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `coach-signals-v2.resolver.ts`, `advice-library.json`, and for step 3 `briefing-config.ts` behind a recipe candidate. |
+| Desktop | Coach tips and the Daily Brief are hosted; the Mac shows the same text with no Mac change. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: none until step 3; step 3 logs an entry.
