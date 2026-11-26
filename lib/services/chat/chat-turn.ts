@@ -11,7 +11,7 @@ import {
 } from "@/lib/services/agent-model";
 import { chatSummaryPreamble, chatTimelinePreamble } from "./chat-prompt";
 import {
-  CHAT_TOOL_SUBJECT, buildChatTools, chatToolLineText, isChatWrite, isImmediateWrite, trimToolResult,
+  CHAT_TOOL_SUBJECT, buildChatTools, chatToolLineText, isChatWrite, isImmediateWrite, offeredPeriodWriteArgs, trimToolResult,
   type ChatToolDefinition, type ChatToolName, type ChatWriteName,
 } from "./chat-tools";
 import {
@@ -288,8 +288,11 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
         continue;
       }
 
+      // Ticket 370: with Notes off a Period write takes no note, so none is described, kept or run.
+      const writeArgs = offeredPeriodWriteArgs(input.tools, name, args);
+      if (!writeArgs) { answer({ error: "source_off", message: "Notes are off in Settings." }); continue; }
       // A write. Read its record first: the outcome, the confirm line and Undo need it.
-      const write: ChatWriteCall = { name: name as ChatWriteName, args };
+      const write: ChatWriteCall = { name: name as ChatWriteName, args: writeArgs };
       // Claim the one immediate slot before any await, so parallel calls never both run (T12).
       const runNow = isImmediateWrite(name) && !writeAttempted && pending.length === 0;
       if (runNow) writeAttempted = true;
