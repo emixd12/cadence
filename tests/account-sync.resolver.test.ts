@@ -721,7 +721,7 @@ describe("resolveAccountSync", () => {
     expect(plan(empty, snapshot([revised]), empty).hostedWrites[0].value).toEqual({
       archive_notes: [], default_duration_minutes: null, end_on: null, end_time: null,
       pause_from_on: null, pause_from_time: null, pause_back_on: null, auto_archived_at: null, location_text: null, is_opportunity: false,
-      where_kind: null, parent_behavior_id: null, sub_behavior_sort_order: 0, inherit_parent_schedule: false,
+      where_kind: null, parent_behavior_id: null, sub_behavior_sort_order: 0, inherit_parent_schedule: false, alongside: null,
       id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
     });
   });
@@ -1397,5 +1397,63 @@ describe("sub-behavior links (contract 9)", () => {
       reviewedFingerprints: review.fingerprints, decisions: [{ kind: "behavior", id: "c", choice: "local" }] });
     expect(resolved.hostedWrites.map(({ id }) => id)).toEqual(["c", "p"]);
     expect(resolved.mergedEntities.find(({ id }) => id === "c")?.value).toMatchObject({ parent_behavior_id: "p" });
+  });
+});
+
+describe("the alongside answer (contract 10, Ticket 363)", () => {
+  const answered = (alongside: boolean | null | undefined, title = "Red light helmet"): AccountSyncEntity => ({
+    kind: "behavior", id: "h", value: { id: "h", title, user_id: "owner", ...(alongside === undefined ? {} : { alongside }) },
+  });
+  const revision = (id: string, previous: boolean | null, next: boolean | null): AccountSyncEntity => ({
+    kind: "configuration_event", id, value: { id, behavior_id: "h", event_kind: "revision", changed_fields: ["alongside"],
+      previous_configuration: { alongside: previous }, next_configuration: { alongside: next }, reason_code: "alongside_answered" },
+  });
+
+  it("carries a Mac's answer and its configuration revision to the hosted account", () => {
+    const baseline = snapshot([answered(null)]);
+    const local = snapshot([answered(true), revision("e1", null, true)]);
+    const result = plan(baseline, local, baseline);
+    expect(result.conflicts).toEqual([]);
+    expect(result.localWrites).toEqual([]);
+    expect(result.hostedWrites).toMatchObject([
+      { kind: "behavior", id: "h", operation: "upsert", expected: { alongside: null }, value: { alongside: true } },
+      { kind: "configuration_event", id: "e1", operation: "upsert", expected: null, value: { changed_fields: ["alongside"] } },
+    ]);
+  });
+
+  it("brings a hosted answer to a Mac whose baseline and rows predate the field without writing it back", () => {
+    // The baseline was saved under contract 9 (no field); the local row has just gained the
+    // SQLite column (null). The web answered Yes meanwhile.
+    const baseline = snapshot([answered(undefined)]);
+    const local = snapshot([answered(null)]);
+    const hosted = snapshot([answered(true), revision("e1", null, true)]);
+    const result = plan(baseline, local, hosted);
+    expect(result.conflicts).toEqual([]);
+    expect(result.hostedWrites).toEqual([]);
+    expect(result.localWrites).toMatchObject([
+      { kind: "behavior", id: "h", value: { alongside: true } },
+      { kind: "configuration_event", id: "e1" },
+    ]);
+  });
+
+  it("reads a row without the field as unanswered, so contract-9 shapes compare equal", () => {
+    expect(accountSyncFingerprint(snapshot([answered(undefined)]))).toBe(accountSyncFingerprint(snapshot([answered(null)])));
+    expect(accountSyncFingerprint(snapshot([answered(true)]))).not.toBe(accountSyncFingerprint(snapshot([answered(null)])));
+    // An older Mac (contract 9) never sees or sends the field: the server projects it out and
+    // restores the stored answer on that Mac's writes (tests/sql/behavior-alongside-smoke.sql),
+    // so this planner only meets rows that carry it, and a title edit keeps the answer.
+    const result = plan(snapshot([answered(true)]), snapshot([answered(true, "Helmet")]), snapshot([answered(true)]));
+    expect(result.hostedWrites).toMatchObject([{ kind: "behavior", id: "h", value: { title: "Helmet", alongside: true } }]);
+  });
+
+  it("asks for review when both sides answered differently", () => {
+    const baseline = snapshot([answered(null)]);
+    const result = plan(baseline, snapshot([answered(true)]), snapshot([answered(false)]));
+    expect(result.conflicts).toMatchObject([{ kind: "behavior", id: "h", reason: "concurrent_update" }]);
+  });
+
+  it("rejects an answer that is not true, false or null", () => {
+    expect(() => plan(empty, snapshot([{ kind: "behavior", id: "h", value: { id: "h", title: "H", alongside: "yes" } }]), empty))
+      .toThrow("alongside answer is invalid");
   });
 });

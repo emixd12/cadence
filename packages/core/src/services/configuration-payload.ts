@@ -4,13 +4,19 @@ import type { BehaviorConfigurationEventPlan } from "../types/behavior-configura
 export function toBehaviorConfigurationEventPlanPayload(
   plan: BehaviorConfigurationEventPlan,
 ): Json {
+  // D33 (Ticket 363): both snapshots carry the alongside answer once either side has
+  // one. A plan with no answer on either side leaves the key out, and the database reads
+  // the stored (unanswered) value in its place, so a plan built before the hosted
+  // migration and one built after compare the same.
+  const alongside = typeof plan.previousConfiguration?.alongside === "boolean"
+    || typeof plan.nextConfiguration.alongside === "boolean";
   return {
     event_kind: plan.eventKind,
     previous_configuration: plan.previousConfiguration
-      ? toBehaviorConfigurationSnapshotPayload(plan.previousConfiguration)
+      ? toBehaviorConfigurationSnapshotPayload(plan.previousConfiguration, { alongside })
       : null,
     next_configuration: toBehaviorConfigurationSnapshotPayload(
-      plan.nextConfiguration,
+      plan.nextConfiguration, { alongside },
     ),
     changed_fields: plan.changedFields,
     recorded_at: plan.recordedAt,
@@ -24,7 +30,10 @@ export function toBehaviorConfigurationEventPlanPayload(
 
 export function toBehaviorConfigurationSnapshotPayload(
   snapshot: BehaviorConfigurationEventPlan["nextConfiguration"],
+  /** Carry `alongside` even when unanswered (null). By default only an answer is carried. */
+  options: Readonly<{ alongside?: boolean }> = {},
 ): Json {
+  const alongside = typeof snapshot.alongside === "boolean" ? snapshot.alongside : null;
   return {
     category_id: snapshot.categoryId,
     location_text: snapshot.locationText ?? null,
@@ -52,6 +61,7 @@ export function toBehaviorConfigurationSnapshotPayload(
     is_opportunity: snapshot.isOpportunity === true,
     parent_behavior_id: snapshot.parentBehaviorId ?? null,
     inherit_parent_schedule: snapshot.parentBehaviorId ? snapshot.inheritParentSchedule ?? false : false,
+    ...(options.alongside || alongside !== null ? { alongside } : {}),
   };
 }
 
@@ -95,6 +105,8 @@ export function toStoredConfigurationSnapshot(value: Json): Json {
       parent_behavior_id: snapshot.parentBehaviorId ?? null,
       inherit_parent_schedule: snapshot.inheritParentSchedule ?? false,
     }),
+    // D33 (Ticket 363): a Mac snapshot written since configuration history carries the answer.
+    ...(snapshot.alongside === undefined ? {} : { alongside: snapshot.alongside ?? null }),
   };
 }
 

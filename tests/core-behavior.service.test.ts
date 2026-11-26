@@ -4,7 +4,7 @@ import type {
   BehaviorDataStore,
 } from "../packages/core/src/behavior-store";
 import {
-  applyBehaviorRunAction, BehaviorRunStateError, createBehavior, setBehaviorActive, updateBehavior, updateBehaviorArchiveNote,
+  applyBehaviorRunAction, BehaviorRunStateError, createBehavior, setBehaviorActive, setBehaviorAlongside, updateBehavior, updateBehaviorArchiveNote,
 } from "../packages/core/src/services/behavior.service";
 
 import { recordedAt, stored, values } from "./helpers/behavior-graph-fixture";
@@ -264,5 +264,44 @@ describe("End now, Start again, Pause and Resume now", () => {
     await expect(applyBehaviorRunAction(store({ ...stored, end_on: "2026-08-29" }), { behaviorId: stored.id, recordedAt,
       action: { kind: "pause", pause: { fromOn: "2026-08-30", fromTime: null, backOn: "2026-09-02" } } }))
       .rejects.toBeInstanceOf(BehaviorRunStateError);
+  });
+});
+
+describe("the alongside answer in configuration history (Ticket 363)", () => {
+  it("writes one revision naming alongside and keeps every other stored field", async () => {
+    const adapter = store({ ...stored, alongside: null });
+    await setBehaviorAlongside(adapter, { behaviorId: "behavior", alongside: true, recordedAt });
+    const commit = adapter.updateBehaviorWithAtomicScheduleGraph.mock.calls[0]![0];
+    expect(commit.behavior).toMatchObject({ alongside: true, title: stored.title, active: stored.active });
+    expect(commit.definitionEventPlan).toBeNull();
+    expect(commit.configurationEventPlan).toMatchObject({
+      eventKind: "revision", changedFields: ["alongside"], reasonCode: "alongside_answered",
+      previousConfiguration: { alongside: null }, nextConfiguration: { alongside: true },
+    });
+  });
+
+  it("writes nothing for the same answer again", async () => {
+    const adapter = store({ ...stored, alongside: false });
+    await expect(setBehaviorAlongside(adapter, { behaviorId: "behavior", alongside: false, recordedAt })).resolves.toMatchObject({ alongside: false });
+    expect(adapter.updateBehaviorWithAtomicScheduleGraph).not.toHaveBeenCalled();
+  });
+
+  it("keeps the stored answer on an edit that does not send one, and records an edit that does", async () => {
+    const keep = store({ ...stored, alongside: true });
+    await updateBehavior(keep, { behaviorId: "behavior", expectedUpdatedAt: stored.updated_at, values, recordedAt });
+    const kept = keep.updateBehaviorWithAtomicScheduleGraph.mock.calls[0]![0];
+    expect(kept.behavior.alongside).toBe(true);
+    expect(kept.configurationEventPlan).toBeNull();
+    const change = store({ ...stored, alongside: true });
+    await updateBehavior(change, { behaviorId: "behavior", expectedUpdatedAt: stored.updated_at, values: { ...values, alongside: null }, recordedAt });
+    expect(change.updateBehaviorWithAtomicScheduleGraph.mock.calls[0]![0].configurationEventPlan).toMatchObject({ changedFields: ["alongside"] });
+  });
+
+  it("carries the stored answer through a lifecycle write", async () => {
+    const adapter = store({ ...stored, alongside: true });
+    await setBehaviorActive(adapter, { behaviorId: "behavior", active: false, recordedAt, newArchiveNoteId: "33333333-3333-4333-8333-333333333333" });
+    const commit = adapter.updateBehaviorWithAtomicScheduleGraph.mock.calls[0]![0];
+    expect(commit.behavior.alongside).toBe(true);
+    expect(commit.configurationEventPlan?.changedFields).toEqual(["active"]);
   });
 });

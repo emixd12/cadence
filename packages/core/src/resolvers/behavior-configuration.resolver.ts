@@ -101,6 +101,8 @@ export function normalizeBehaviorConfiguration(
       : null,
     isOpportunity: configuration.isOpportunity === true,
     ...normalizeParentLink(configuration),
+    // D33: older snapshots have no answer and read as unanswered.
+    alongside: typeof configuration.alongside === "boolean" ? configuration.alongside : null,
   };
 }
 
@@ -193,6 +195,9 @@ function findChangedFields(
   }
   if ((previous.inheritParentSchedule ?? false) !== (next.inheritParentSchedule ?? false)) {
     changedFields.push("inherit_parent_schedule");
+  }
+  if ((previous.alongside ?? null) !== (next.alongside ?? null)) {
+    changedFields.push("alongside");
   }
 
   return changedFields;

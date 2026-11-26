@@ -59,6 +59,7 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         isOpportunity: false,
         parentBehaviorId: null,
         inheritParentSchedule: false,
+        alongside: null,
         scheduleGraph: [
           {
             recurrenceRule: { frequency: "daily", interval: 1 },
@@ -90,6 +91,7 @@ describe("planInitialBehaviorConfigurationEvent", () => {
         "is_opportunity",
         "parent_behavior_id",
         "inherit_parent_schedule",
+        "alongside",
       ],
       recordedAt: RECORDED_AT,
       effectiveAt: RECORDED_AT,
@@ -296,8 +298,28 @@ describe("Behaviors of Opportunity configuration", () => {
       configuration: dailyConfiguration({ isOpportunity: true, scheduleGraph: [] }),
       recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
     });
-    // Sub-behavior link fields (Ticket 349) follow is_opportunity.
-    expect(baseline.changedFields.slice(-4)).toEqual(["pause", "is_opportunity", "parent_behavior_id", "inherit_parent_schedule"]);
+    // Sub-behavior link fields (Ticket 349) follow is_opportunity; the alongside answer (Ticket 363) comes last.
+    expect(baseline.changedFields.slice(-5)).toEqual(["pause", "is_opportunity", "parent_behavior_id", "inherit_parent_schedule", "alongside"]);
     expect(baseline.nextConfiguration).toMatchObject({ isOpportunity: true, scheduleGraph: [] });
+  });
+});
+
+describe("alongside configuration (Ticket 363)", () => {
+  const plan = (previous: Partial<BehaviorConfigurationSnapshot>, next: Partial<BehaviorConfigurationSnapshot>) =>
+    planBehaviorConfigurationChangeEvent({
+      previousConfiguration: dailyConfiguration(previous),
+      nextConfiguration: dailyConfiguration(next),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "alongside_answered",
+    });
+
+  it("records a changed answer as its own field and reads an older snapshot as unanswered", () => {
+    const answered = plan({}, { alongside: true });
+    expect(answered?.changedFields).toEqual(["alongside"]);
+    expect(answered?.previousConfiguration?.alongside).toBeNull();
+    expect(answered?.nextConfiguration.alongside).toBe(true);
+    expect(plan({ alongside: true }, { alongside: false })?.changedFields).toEqual(["alongside"]);
+    expect(plan({ alongside: false }, { alongside: null })?.changedFields).toEqual(["alongside"]);
+    // A snapshot written before the field existed (no key) is unanswered: no change against null.
+    expect(plan({}, { alongside: null })).toBeNull();
   });
 });

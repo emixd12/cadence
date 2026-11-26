@@ -21,8 +21,12 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * Contract 9 adds the sub-behavior link fields (`parent_behavior_id`,
  * `sub_behavior_sort_order`, `inherit_parent_schedule`), depth 1. It is additive: the
  * server keeps the minimum writer contract at 8.
+ * Contract 10 adds the person's alongside answer, `behavior.alongside` (true, false or
+ * null for unanswered; D33, Ticket 363). It is additive: a contract-9 writer never sees
+ * the field and the server restores the stored answer on its writes, so the minimum
+ * writer contract stays 8.
  */
-export const ACCOUNT_SYNC_CONTRACT = 9;
+export const ACCOUNT_SYNC_CONTRACT = 10;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -507,6 +511,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
       parent_behavior_id: null,
       sub_behavior_sort_order: 0,
       inherit_parent_schedule: false,
+      // Contract 10: a row saved before the alongside answer synced is unanswered.
+      alongside: null,
       ...value,
     };
     // A baseline saved before contract 7 holds end_date; it reads as the new fields.
@@ -785,6 +791,9 @@ function validateBehaviorPersistenceFields(value: Record<string, Json | undefine
     || typeof value.inherit_parent_schedule !== "boolean"
     || (parentId === null && value.inherit_parent_schedule)) {
     throw new Error("The account Behavior sub-behavior link is invalid.");
+  }
+  if (!(value.alongside === null || typeof value.alongside === "boolean")) {
+    throw new Error("The account Behavior alongside answer is invalid.");
   }
   const autoArchivedAt = value.auto_archived_at;
   if (autoArchivedAt !== null) {
