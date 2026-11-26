@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   listTimeSessionsByOccurrenceIds: vi.fn(),
   resolveAnalyticsDateRange: vi.fn(),
   resolveAnalytics: vi.fn(),
+  listPeriods: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
@@ -39,6 +40,9 @@ vi.mock("@/lib/db/timeSessions.repo", () => ({
   listTimeSessionHistory: mocks.listTimeSessionHistory,
   listTimeSessionsByOccurrenceIds: mocks.listTimeSessionsByOccurrenceIds,
 }));
+vi.mock("@/lib/db/periods.repo", () => ({
+  listPeriodsOrNone: mocks.listPeriods,
+}));
 vi.mock("@cadence/core/resolvers/analytics.resolver", () => ({
   resolveAnalyticsDateRange: mocks.resolveAnalyticsDateRange,
   resolveAnalytics: mocks.resolveAnalytics,
@@ -62,6 +66,7 @@ describe("analytics service time-session routing", () => {
       rangeDays: 90,
     });
     mocks.resolveAnalytics.mockReturnValue({ kind: "analytics-view" });
+    mocks.listPeriods.mockResolvedValue([]);
   });
 
   it("reads joined history by local-date range with a fixed high-water", async () => {
@@ -83,5 +88,18 @@ describe("analytics service time-session routing", () => {
       },
     );
     expect(mocks.listTimeSessionsByOccurrenceIds).not.toHaveBeenCalled();
+  });
+
+  // Ticket 369: the resolver splits adherence by the account's Periods.
+  it("hands the account's Periods to the analytics resolver", async () => {
+    const periods = [{ id: "p-1", user_id: "user-1", label: "Sick", start_on: "2026-08-01", end_on: null, note: null,
+      revision: 1, created_at: "2026-08-01T12:00:00Z", updated_at: "2026-08-01T12:00:00Z" }];
+    mocks.listPeriods.mockResolvedValue(periods);
+    const { getAnalyticsPageData } = await import("../lib/services/analytics.service");
+
+    await getAnalyticsPageData({ now: Temporal.Instant.from("2026-08-08T16:00:00Z"), rangeDays: 90 });
+
+    expect(mocks.listPeriods).toHaveBeenCalledWith(expect.anything(), "user-1");
+    expect(mocks.resolveAnalytics).toHaveBeenCalledWith(expect.objectContaining({ periods }));
   });
 });

@@ -826,3 +826,55 @@ describe("resolveAnalytics with Behaviors of Opportunity", () => {
     expect(overallHeatmap.find(({ localDate }) => localDate === "2026-06-06")?.state).toBe("empty");
   });
 });
+
+// Ticket 369 (D35): Periods sort Occurrences into two groups and change no count.
+describe("resolveAnalytics with Periods", () => {
+  const day = (n: number) => `2026-06-${String(n).padStart(2, "0")}`;
+  const on = (id: string, n: number, status: AnalyticsOccurrenceInput["status"], extra: Partial<AnalyticsOccurrenceInput> = {}) =>
+    occurrence({ id, status, localDate: day(n), scheduledFor: `${day(n)}T13:00:00Z`, ...extra });
+  // Outside (June 1 and 2): 3 Completed, 1 Not Completed. Inside (June 3 to 5): 1 Completed, 2 Not Completed.
+  const rows = [
+    on("a", 1, "completed"), on("b", 1, "completed"), on("c", 2, "completed"), on("d", 2, "not_completed"),
+    on("e", 3, "completed"), on("f", 4, "not_completed"), on("g", 5, "not_completed"),
+    on("h", 4, "unresolved"),
+    on("i", 4, "completed", { origin: "opportunity" }),
+  ];
+  const sick = { start_on: day(3), end_on: day(5) };
+
+  it("adds the outside and inside line when a Period overlaps the range", () => {
+    const view = resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE, periods: [sick] });
+    expect(view.periodAdherence).toEqual({
+      outside: { completedCount: 3, resolvedCount: 4, rate: 0.75 },
+      inside: { completedCount: 1, resolvedCount: 3, rate: 1 / 3 },
+      line: "Outside periods: 75% (3 of 4). In periods: 33.3% (1 of 3).",
+    });
+  });
+
+  it("leaves every existing adherence number as it was", () => {
+    const without = resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE });
+    const { periodAdherence, ...withPeriods } = resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE, periods: [sick] });
+    expect(without.periodAdherence).toBeUndefined();
+    expect(withPeriods).toEqual(without);
+    // The two sides add up to the summary: Unresolved and added Occurrences stay out of both.
+    expect(periodAdherence!.outside.resolvedCount + periodAdherence!.inside.resolvedCount).toBe(without.summary.resolvedCount);
+    expect(periodAdherence!.outside.completedCount + periodAdherence!.inside.completedCount).toBe(without.summary.completedCount);
+  });
+
+  it("counts a day once under overlapping Periods and gives no rate when nothing is marked", () => {
+    const view = resolveAnalytics({
+      occurrences: [on("a", 3, "completed"), on("b", 4, "unresolved")], now: NOW, timezone: DEFAULT_TIMEZONE,
+      periods: [sick, { start_on: day(4), end_on: null }],
+    });
+    expect(view.periodAdherence).toEqual({
+      outside: { completedCount: 0, resolvedCount: 0, rate: null },
+      inside: { completedCount: 1, resolvedCount: 1, rate: 1 },
+      line: "Outside periods: nothing marked. In periods: 100% (1 of 1).",
+    });
+  });
+
+  it("adds no line when no Period has a day in the range", () => {
+    const outsideRange = [{ start_on: "2026-01-01", end_on: "2026-01-09" }, { start_on: "2026-07-01", end_on: null }];
+    expect(resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE, periods: outsideRange }).periodAdherence).toBeUndefined();
+    expect(resolveAnalytics({ occurrences: rows, now: NOW, timezone: DEFAULT_TIMEZONE, periods: [] }).periodAdherence).toBeUndefined();
+  });
+});

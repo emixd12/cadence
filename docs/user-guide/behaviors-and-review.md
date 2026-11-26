@@ -35,6 +35,32 @@ neutral and excluded from final adherence.
 current page state. Use Tab and Enter. Calendar labels, percentages, and status
 names supplement color; at high zoom, summary and calendar content stack.
 
+## Review Periods and adherence around them
+
+**Prerequisites:** You are signed in on the web and have added at least one
+Period (see "Add, edit, end or remove a Period" in the Timeline guide).
+
+1. Open **Behaviors** and scroll to **Periods**, below **Category counts**. Every
+   Period is listed, newest first, with its dates and the first line of its note.
+2. Choose **Edit** on a Period to open the same form as on Timeline: **Label**,
+   **First day**, **Last day**, **Note**, **End today** when it applies, and
+   **Remove**, which asks for a second choice, **Remove this period**.
+3. When a Period covers a day in the selected range, read the extra line under the
+   status counts in **Overall adherence**, for example **Outside periods: 85% (17
+   of 20). In periods: 20% (1 of 5).**
+
+**Result and persistence:** The line only sorts the range's marked Occurrences
+into days inside a Period and days outside every Period. Each rate is Completed
+out of Completed plus Not Completed. Unresolved Occurrences stay out, and a side
+with nothing marked reads **nothing marked**. Overall adherence and every other
+number are unchanged. The **Periods** section is hidden when you have no Period.
+
+**Recovery or undo:** Edits and **End today** can be changed again in the form. A
+removed Period cannot be brought back; add it again from Timeline.
+
+**Keyboard and mobile:** **Edit** and every form control are reached with Tab. The
+list and the form stack in one column on phones.
+
 ## Review and correct one day
 
 **Prerequisites:** An active Behavior has at least one non-empty cell in its

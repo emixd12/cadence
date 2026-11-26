@@ -53,6 +53,8 @@ import type {
   BehaviorView,
   CategoryOption,
 } from "@/lib/types/behavior";
+import { PeriodList } from "@/components/periods/PeriodControl";
+import type { PeriodActions, PeriodView } from "@/lib/types/period";
 import type {
   OccurrenceFormAction,
   TimeTrackingFormAction,
@@ -105,6 +107,14 @@ type BehaviorListProps = Readonly<{
    * suggestion line moves below Where in the form. Without it nothing changes.
    */
   alongsideViews?: Readonly<Record<string, AlongsideFormView>> | null;
+  /**
+   * Ticket 369 (D35): every Period, newest first, listed below the analytics with its
+   * editor. FormData for the three actions is documented on `PeriodActions`. Without
+   * `periodActions`, or with no Period, the section is hidden.
+   */
+  periods?: readonly PeriodView[];
+  periodLabelSuggestions?: readonly string[];
+  periodActions?: PeriodActions;
 }>;
 
 /** The first control of each field a tip's link can open. */
@@ -184,6 +194,9 @@ export function BehaviorList({
   createAction,
   subBehaviorsEnabled = reminderRuntime === "web",
   alongsideViews = null,
+  periods,
+  periodLabelSuggestions,
+  periodActions,
 }: BehaviorListProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
     : reminderRuntime === "desktop" ? null : webSourceLinkCoordinator;
@@ -493,6 +506,9 @@ export function BehaviorList({
 
       <CategoryCounts analytics={analytics} />
 
+      <PeriodList periods={periods} today={analytics.rangeEndLocalDate}
+        labelSuggestions={periodLabelSuggestions} actions={periodActions} />
+
       <ArchivedBehaviorDisclosure
         archivedBehaviors={archivedList.rows}
         visibleIds={archivedList.visibleIds}
@@ -553,6 +569,11 @@ function OverallAdherence({
           {analytics.summary.opportunityCompletedCount ? (
             <p className="-mt-3 text-sm text-muted-readable" data-testid="opportunity-completed-count">
               +{analytics.summary.opportunityCompletedCount} opportunity Completed
+            </p>
+          ) : null}
+          {analytics.periodAdherence ? (
+            <p className="-mt-3 text-sm text-muted-readable tabular-nums" data-testid="period-adherence-line">
+              {analytics.periodAdherence.line}
             </p>
           ) : null}
         </div>
