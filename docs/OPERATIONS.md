@@ -2100,9 +2100,9 @@ a Mac write keeps the stored answer (`docs/DATA_MODEL.md`, "Alongside setting").
 
 Since Ticket 364 the flag also selects the MCP contract edition and the export shape.
 With it on, the MCP endpoint, its errors and Cadence chat's tool list speak contract
-1.8.0 (`alongside` on Behaviors and Occurrences, optional on `create_behavior` and
+1.9.0 (`alongside` on Behaviors and Occurrences, optional on `create_behavior` and
 `update_behavior`), and Full JSON, JSONL, CSV and BehaviorLog exports carry the answer;
-BehaviorLog import and restore read it. With it off they serve contract 1.7.0 and the
+BehaviorLog import and restore read it. With it off they serve contract 1.8.0 and the
 pre-364 export bytes. Turn it on only after migration
 `20261125180000_alongside_mcp_and_portability.sql` is also on the database: it keeps
 the answer in MCP write receipts and lets import and restore store it. Without it, an
