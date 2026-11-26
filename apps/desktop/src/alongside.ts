@@ -85,14 +85,49 @@ export function alongsideWhereGuessMap(context: DesktopAlongsideContext | null):
   return new Map([...context.guesses].flatMap(([id, guess]) => guess.whereGuess ? [[id, guess.whereGuess] as const] : []));
 }
 
+/** The minimum time between two guess reads, unless the account changed or a new synchronization completed. */
+export const ALONGSIDE_READ_INTERVAL_MS = 60_000;
+
 /**
- * Ticket 363 (D33): with the Mac's alongside switch on, BehaviorLog import reads and
+ * Audit fix 9a: whether a linked Mac reads the guesses again. A changed account or a
+ * synchronization that completed since the last read always reads; otherwise at most
+ * one read a minute.
+ */
+export function alongsideReadDue(input: Readonly<{
+  nowMs: number; lastReadMs: number; readAccountId: string | null; accountId: string;
+  syncCompletedAt: string | null; lastReadSyncCompletedAt: string | null;
+}>): boolean {
+  if (input.readAccountId !== input.accountId) return true;
+  if (input.syncCompletedAt && input.syncCompletedAt !== input.lastReadSyncCompletedAt) return true;
+  return input.nowMs - input.lastReadMs >= ALONGSIDE_READ_INTERVAL_MS;
+}
+
+/**
+ * Audit fix 9b: whether the alongside surfaces are on for the current account, as the
+ * screens see it (`desktopAlongsideContext` not null). Product reports each new context
+ * here, so export, import and restore follow the server like the UI does: on a linked
+ * Mac whose server answers `enabled: false` they behave as with the switch off. Until a
+ * context is reported, the build switch decides. Memory only.
+ */
+let surfacesOn: boolean | null = null;
+
+export function reportAlongsideContext(context: DesktopAlongsideContext | null): void {
+  surfacesOn = context !== null;
+}
+
+export function alongsideSurfacesOn(switchOn: boolean = alongsideSwitchOn()): boolean {
+  return switchOn && surfacesOn !== false;
+}
+
+/**
+ * Ticket 363 (D33): with the Mac's alongside surfaces on, BehaviorLog import reads and
  * compares the person's answer (the bundle's Cadence extension), as the web does with
- * `CADENCE_ALONGSIDE` on. Off, previews and writes are unchanged.
+ * `CADENCE_ALONGSIDE` on. Off (the switch, or a linked account's server), previews and
+ * writes are unchanged.
  */
 export function alongsideOption(): { includeAlongside?: true } {
-  return alongsideSwitchOn() ? { includeAlongside: true } : {};
+  return alongsideSurfacesOn() ? { includeAlongside: true } : {};
 }
 export function readAlongsideOption(): { readAlongside?: true } {
-  return alongsideSwitchOn() ? { readAlongside: true } : {};
+  return alongsideSurfacesOn() ? { readAlongside: true } : {};
 }

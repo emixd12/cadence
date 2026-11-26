@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AlongsideRowView } from "@cadence/core/resolvers/alongside.resolver";
 import { parseAlongsideGuessesResponse } from "@cadence/core/services/alongside-facts";
 import {
-  alongsideSwitchOn, alongsideWhereGuessMap, createDesktopAlongsideGuessClient, desktopAlongsideContext,
+  alongsideReadDue, alongsideSurfacesOn, alongsideSwitchOn, alongsideWhereGuessMap, createDesktopAlongsideGuessClient, desktopAlongsideContext,
+  reportAlongsideContext,
 } from "../apps/desktop/src/alongside";
 import { loadLocalTimeline } from "../apps/desktop/src/local-timeline.service";
 import { createLocalOccurrenceActions } from "../apps/desktop/src/local-actions";
@@ -74,6 +75,32 @@ describe("the Mac's alongside gates", () => {
     expect(linked?.guesses).toBe(guesses);
     expect(alongsideWhereGuessMap(linked)).toEqual(new Map([["pill", "home"]]));
     expect(alongsideWhereGuessMap(null)).toBeNull();
+  });
+});
+
+describe("the Mac's alongside read timing and data gates (audit fix 9)", () => {
+  const due = (extra: Partial<Parameters<typeof alongsideReadDue>[0]>) => alongsideReadDue({
+    nowMs: 100_000, lastReadMs: 90_000, readAccountId: "a", accountId: "a", syncCompletedAt: "s1", lastReadSyncCompletedAt: "s1", ...extra,
+  });
+
+  it("a new synchronization reads again inside the minute; nothing new waits a minute", () => {
+    expect(due({})).toBe(false);
+    expect(due({ syncCompletedAt: "s2" })).toBe(true);
+    expect(due({ syncCompletedAt: null })).toBe(false);
+    expect(due({ nowMs: 150_000 })).toBe(true);
+    expect(due({ readAccountId: "b" })).toBe(true);
+    expect(due({ readAccountId: null })).toBe(true);
+  });
+
+  it("export, import and restore follow the server's answer like the screens", () => {
+    expect(alongsideSurfacesOn(false)).toBe(false);
+    reportAlongsideContext({ guesses: new Map() });
+    expect(alongsideSurfacesOn(true)).toBe(true);
+    // A linked Mac whose server says enabled: false.
+    reportAlongsideContext(desktopAlongsideContext({ switchOn: true, accountId: "a", read: { accountId: "a", enabled: false, guesses: new Map() } }));
+    expect(alongsideSurfacesOn(true)).toBe(false);
+    reportAlongsideContext(desktopAlongsideContext({ switchOn: true, accountId: null, read: null }));
+    expect(alongsideSurfacesOn(true)).toBe(true);
   });
 });
 

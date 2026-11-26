@@ -34,7 +34,7 @@ import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { CHAT_CONVERSATIONS_CHANGED_EVENT, type ChatConversationsChangedDetail } from "@/lib/ui/chat";
 import { createDesktopDailyBriefClient, type DesktopDailyBriefPlan } from "./daily-brief";
-import { alongsideSwitchOn, alongsideWhereGuessMap, createDesktopAlongsideGuessClient, desktopAlongsideContext, type AlongsideHostedRead, type DesktopAlongsideContext } from "./alongside";
+import { alongsideReadDue, alongsideSwitchOn, alongsideWhereGuessMap, createDesktopAlongsideGuessClient, desktopAlongsideContext, reportAlongsideContext, type AlongsideHostedRead, type DesktopAlongsideContext } from "./alongside";
 import { chatGptPlanSwitchOn } from "./chatgpt/plan-switch";
 import { createChatGptAccountScope, createChatGptConnection } from "./chatgpt/connection";
 import { ChatGptPlanSettings } from "./chatgpt/chatgpt-plan-settings";
@@ -385,18 +385,23 @@ export function Product() {
     ? createDesktopAlongsideGuessClient(calendarClient) : null, [calendarClient, accountUserId]);
   const [alongsideRead, setAlongsideRead] = useState<AlongsideHostedRead | null>(null);
   const alongsideReadAt = useRef(0);
+  const alongsideReadSync = useRef<string | null>(null);
   const syncCompletedAt = syncStatus.state === "current" ? syncStatus.completedAt : null;
   useEffect(() => {
     if (!alongsideGuessClient || !accountUserId) return;
-    // At most one read a minute: after the account changes and after a synchronization.
-    if (Date.now() - alongsideReadAt.current < 60_000 && alongsideRead?.accountId === accountUserId) return;
+    // After the account changes and after each new synchronization; otherwise at most one read a minute.
+    if (!alongsideReadDue({ nowMs: Date.now(), lastReadMs: alongsideReadAt.current, readAccountId: alongsideRead?.accountId ?? null,
+      accountId: accountUserId, syncCompletedAt, lastReadSyncCompletedAt: alongsideReadSync.current })) return;
     let active = true;
     alongsideReadAt.current = Date.now();
+    alongsideReadSync.current = syncCompletedAt;
     void alongsideGuessClient.read(accountUserId).then((read) => { if (active && read) setAlongsideRead(read); });
     return () => { active = false; };
   }, [accountUserId, alongsideGuessClient, alongsideRead?.accountId, syncCompletedAt]);
   useEffect(() => {
     const next = desktopAlongsideContext({ switchOn: alongsideSwitch, accountId: accountUserId, read: alongsideRead });
+    // Export, import and restore follow the same answer as the screens.
+    reportAlongsideContext(next);
     if (alongsideContextKey(next) === alongsideContextKey(alongsideContext.current)) return;
     alongsideContext.current = next;
     void refreshScreen();
