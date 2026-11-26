@@ -14,6 +14,7 @@ import { alongsideMayOverlap, resolveRoutineBlockAlongside, type AlongsideSource
 import type { EffectiveWhere } from "./effective-where.resolver";
 import { localDateAt, localDayBounds } from "./time.resolver";
 import { trackedDurationWins } from "./time-tracking.resolver";
+import type { BehaviorDurationEstimate } from "../types/day-progress";
 
 /**
  * Advisor Phase 3A1: the one free-slot rule. The Daily Brief's lines, Other time,
@@ -165,6 +166,19 @@ export type BriefMoveBlock = BriefMoveInterval & Readonly<{
 export type BriefMoveSlotCheck =
   | Readonly<{ ok: true }>
   | Readonly<{ ok: false; reason: "slot_taken" | "too_close" | "calendar_busy" | "travel_busy"; ref: string }>;
+
+/**
+ * A move's length from the shared estimate (`resolveBehaviorDurationEstimate`), so a
+ * move plans with the figure the Timeline shows (Ticket 366). An unknown estimate
+ * falls back to 30 minutes.
+ */
+export function briefMoveLengthFromEstimate(estimate: BehaviorDurationEstimate | undefined): BriefMoveLength {
+  const made = (minutes: number, source: BriefMoveLengthSource): BriefMoveLength =>
+    ({ minutes: Math.min(Math.max(1, Math.round(minutes)), 1440), source, assumed: source === "model_estimate" || source === "fallback" });
+  if (!estimate || estimate.kind !== "known") return made(BRIEF_MOVE_FALLBACK_MINUTES, "fallback");
+  return made(estimate.seconds / 60, estimate.provenance === "behavior_default" ? "behavior_duration"
+    : estimate.provenance === "description_estimate" ? "model_estimate" : "logged_average");
+}
 
 /**
  * The length order (Ticket 366, D34): the logged figure once it rests on 3 samples,

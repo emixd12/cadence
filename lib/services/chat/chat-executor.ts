@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { readBehaviorLengths } from "@/lib/services/behavior-length.service";
 import type { IntegrationOperationName } from "@cadence/core/integration";
 import { resolveDailyCalendarLoad } from "@cadence/core/resolvers/calendar-load.resolver";
 import {
@@ -1100,8 +1101,14 @@ async function moveOccurrenceToDateTool(
     } catch {
       durationSeconds = null;
     }
-  } else if (typeof behavior?.default_duration_minutes === "number" && behavior.default_duration_minutes > 0) {
-    durationSeconds = Math.round(behavior.default_duration_minutes * 60);
+  } else {
+    // Ticket 366: the same length order as the Timeline and every other move. With
+    // neither a tracked figure nor an intended duration, the schedule's own length stays.
+    const length = (await readBehaviorLengths(context.supabase, {
+      userId: context.userId,
+      behaviors: [{ id: occurrence.behavior_id, defaultDurationMinutes: behavior?.default_duration_minutes ?? null }],
+    }).catch(() => null))?.get(occurrence.behavior_id);
+    if (length?.kind === "known" && length.seconds > 0) durationSeconds = Math.max(60, Math.round(length.seconds));
   }
 
   // The RPC keeps the planned time and writes the target as effective time; a null end

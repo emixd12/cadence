@@ -374,9 +374,9 @@ export type AdvisorOpportunityPoolItem = Readonly<{
   behaviorRevision: string;
   timezone: string;
   defaultDurationMinutes: number | null;
-  /** Median of the 10 most recent finished time sessions, or null with none (Ticket 366). */
+  /** The tracked figure: median of the 10 most recent tracked completions, or null with none (Ticket 366). */
   loggedAverageSeconds: number | null;
-  /** How many sessions that figure rests on. From 3, it outranks `defaultDurationMinutes`. */
+  /** How many tracked completions that figure rests on. From 3, it outranks `defaultDurationMinutes`. */
   loggedSampleCount?: number;
   whereKind: "anywhere" | "home" | "place" | null;
   /** Whole days from the last Completed Occurrence to today; null when never Completed. */

@@ -20333,7 +20333,9 @@ Requirements:
 
 - One length order in `@cadence/core`: the tracked figure from 3 tracked completions, then the intended duration (`default_duration_minutes`), then the tracked figure from 1 or 2, then a description estimate.
 - The tracked figure is the median of the 10 most recent tracked completions. It replaces the mean.
-- The same order applies to the Timeline estimate, day load, travel timing, the Opportunity pool, the Daily Brief's selected duration and its `duration` field, and move lengths (on finished time sessions).
+- The same order and the same measurement apply to the Timeline estimate, day load, travel timing, the Opportunity pool, the Daily Brief's selected duration and its `duration` field, and every move length (Move for today, Daily Brief moves, Opportunity suggestions, Chat moves). One sample is one Completed Occurrence before today with its time sessions added together. Services read lengths through `lib/services/behavior-length.service.ts`; no caller measures sessions on its own.
+- The coach's length tip offers to update the intended duration ("Update Gym's intended duration to 45 minutes?").
+- `docs/RULES_REGISTER.md` lists each length rule, its value, its constant and what to look at in real use. `AGENTS.md` tells agents to keep it current.
 - The Timeline row shows the intended duration beside the tracked figure when the tracked figure decides, and offers no "Set intended duration" action then.
 - The UI says "Intended duration" in the Behavior form, the Timeline row and the saved notice. The column, sync, export and MCP field names do not change.
 - No schema change. Stored names `completed_stopped_occurrence_mean` and `logged_average` stay; they now name a median.
@@ -20341,15 +20343,14 @@ Requirements:
 Out of scope, each needing its own ticket:
 
 - Wording for the Daily Brief, coach and Chat to compare tracked and intended time. The brief's model input still carries one selected duration per item.
-- A length the person corrects in the Daily Brief is saved as the intended duration, so from 3 tracked completions it no longer changes the length.
-- The length tip that proposes setting the duration to the tracked median (`lib/services/behavior-change-proposals.service.ts`).
-- A Chat move keeps using the intended duration when the item has no end.
+- Rows in `docs/RULES_REGISTER.md` for the rule sets under its "Not yet listed".
+- The length tip reads a 28-day window and needs 4 tracked completions; the length order uses the 10 most recent and a floor of 3 (register rows TIP-01, TIP-02).
 
 Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | `packages/core/src/resolvers/timeline-context.resolver.ts`, `time-tracking.resolver.ts`, `move.resolver.ts`, `brief-move.resolver.ts`, `packages/core/src/services/briefing-config.ts`, `components/timeline/InlineDurationControl.tsx`, `components/behaviors/BehaviorForm.tsx`. |
+| Web | `packages/core/src/resolvers/timeline-context.resolver.ts`, `time-tracking.resolver.ts`, `move.resolver.ts`, `brief-move.resolver.ts`, `packages/core/src/services/briefing-config.ts`, `lib/services/behavior-length.service.ts`, `lib/services/brief-move-day.service.ts`, `lib/services/chat/chat-executor.ts`, `components/timeline/InlineDurationControl.tsx`, `components/behaviors/BehaviorForm.tsx`. |
 | Desktop | Same resolvers and components; ships in the next Mac release. Installed check with that release. |
 | Marketing | Not applicable: no public claim names the duration order. |
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers. |

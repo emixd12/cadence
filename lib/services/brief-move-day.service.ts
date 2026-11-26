@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { effectiveEndAt, effectiveStartInstant, zonedInstant } from "@cadence/core/resolvers/time.resolver";
-import { resolveLoggedLength } from "@cadence/core/resolvers/move.resolver";
-import { resolveBriefMoveLength, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
+import { briefMoveLengthFromEstimate, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
+import { readBehaviorLengths } from "@/lib/services/behavior-length.service";
 import { alongsideGuessWanted, alongsideQuestionOpen, resolveAlongside } from "@cadence/core/resolvers/alongside.resolver";
 import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, resolveEffectiveWhere, type EffectiveWhere, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
@@ -13,9 +13,10 @@ import { alongsideEnabled } from "@/lib/services/alongside-flag";
 /**
  * Advisor Phase 3A1: the day as the one free-slot rule sees it. The Daily Brief's
  * lines, Re-plan, Other time, Yes and the Timeline's own "Move for today" all read the
- * day here, so every caller resolves the same lengths for the same items:
- * the Behavior's setting, the logged average (last 20 finished sessions, two or more),
- * the cached model estimate (only while its inputs are unchanged), then 30 minutes.
+ * day here, so every caller resolves the same lengths for the same items, by the
+ * order the Timeline uses (Ticket 366, `readBehaviorLengths`): the tracked figure from
+ * 3 tracked completions, the intended duration, the tracked figure from fewer, the
+ * cached model estimate (only while its inputs are unchanged), then 30 minutes.
  * Each item's `alongside` comes from `resolveAlongside` (Ticket 356): with
  * `CADENCE_ALONGSIDE` on, the person's setting, then the cached guess, then false;
  * with it off, the cached guess, then false, and `behaviors.alongside` is not read.
@@ -26,7 +27,6 @@ import { alongsideEnabled } from "@/lib/services/alongside-flag";
  * nothing, as before.
  */
 
-const SESSION_SAMPLE = 20;
 
 export type BriefMoveBehaviorFacts = Readonly<{
   id: string;
@@ -120,16 +120,13 @@ export async function readBriefMoveDay(
   if (behaviorIds.length === 0) {
     return { items: [], behaviors: new Map(), occurrences: new Map(), neverMoveBehaviorIds: new Set(), staleEstimateBehaviorIds: new Set() };
   }
-  const [behaviorRows, sessions, estimates, preferences, labels] = await Promise.all([
+  const [behaviorRows, estimates, preferences, labels] = await Promise.all([
     // The columns are read only while the flag is on, so the flag never runs ahead of the migrations.
     personSetting
       ? supabase.from("behaviors").select("id, title, description, timezone, default_duration_minutes, where_kind, location_text, updated_at, parent_behavior_id, inherit_parent_schedule, sub_behavior_sort_order, alongside")
         .eq("user_id", userId).in("id", behaviorIds)
       : supabase.from("behaviors").select("id, title, description, timezone, default_duration_minutes, where_kind, updated_at, parent_behavior_id, inherit_parent_schedule, sub_behavior_sort_order")
         .eq("user_id", userId).in("id", behaviorIds),
-    supabase.from("occurrence_time_sessions").select("behavior_id, started_at, stopped_at")
-      .eq("user_id", userId).in("behavior_id", behaviorIds).not("stopped_at", "is", null)
-      .order("started_at", { ascending: false }).limit(SESSION_SAMPLE * behaviorIds.length),
     personSetting
       ? supabase.from("behavior_advisor_estimates").select("behavior_id, input_hash, duration_minutes, alongside, where_guess")
         .eq("user_id", userId).in("behavior_id", behaviorIds)
@@ -144,7 +141,7 @@ export async function readBriefMoveDay(
         .gte("local_date", date.subtract({ days: EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS - 1 }).toString()).lte("local_date", localDate)
       : Promise.resolve({ data: [] as LabelRow[], error: null }),
   ]);
-  for (const result of [behaviorRows, sessions, estimates, preferences, labels]) if (result.error) throw result.error;
+  for (const result of [behaviorRows, estimates, preferences, labels]) if (result.error) throw result.error;
 
   const behaviorData: readonly BehaviorFactsRow[] = behaviorRows.data ?? [];
   const parentIds = [...new Set(behaviorData.flatMap((row) => row.parent_behavior_id ? [row.parent_behavior_id] : []))];
@@ -164,12 +161,6 @@ export async function readBriefMoveDay(
   for (const row of (labels.data ?? []) as readonly LabelRow[]) {
     labelsByBehavior.set(row.behavior_id, [...(labelsByBehavior.get(row.behavior_id) ?? []), { label: row.label, localDate: row.local_date }]);
   }
-  const sessionsByBehavior = new Map<string, Array<{ started_at: string; stopped_at: string | null }>>();
-  for (const session of sessions.data ?? []) {
-    const list = sessionsByBehavior.get(session.behavior_id) ?? [];
-    if (list.length < SESSION_SAMPLE) list.push(session);
-    sessionsByBehavior.set(session.behavior_id, list);
-  }
   const staleEstimateBehaviorIds = new Set<string>();
   const estimateByBehavior = new Map<string, Readonly<{ minutes: number | null; alongside: boolean | null; whereGuess: string | null }>>();
   for (const behavior of behaviors.values()) {
@@ -179,18 +170,17 @@ export async function readBriefMoveDay(
   }
   const neverMoveBehaviorIds = new Set((preferences.data ?? []).filter((row) => row.never_suggest_move).map((row) => row.behavior_id));
 
+  const lengths = await readBehaviorLengths(supabase, { userId, behaviors: [...behaviors.values()].map((behavior) => ({
+    id: behavior.id, defaultDurationMinutes: behavior.defaultDurationMinutes,
+    estimateMinutes: estimateByBehavior.get(behavior.id)?.minutes ?? null,
+  })) });
+
   const items: BriefMoveDayItem[] = [];
   for (const row of rows) {
     const behavior = behaviors.get(row.behavior_id);
     if (!behavior) continue;
     const estimate = estimateByBehavior.get(behavior.id);
-    const logged = resolveLoggedLength(sessionsByBehavior.get(behavior.id) ?? []);
-    const length = resolveBriefMoveLength({
-      behaviorDefaultMinutes: behavior.defaultDurationMinutes,
-      loggedAverageSeconds: logged?.seconds ?? null,
-      loggedSampleCount: logged?.sampleCount ?? 0,
-      estimateMinutes: estimate?.minutes ?? null,
-    });
+    const length = briefMoveLengthFromEstimate(lengths.get(behavior.id));
     const alongside = resolveAlongside({ setting: personSetting ? behavior.alongside : null, guess: estimate?.alongside ?? null });
     const where = personSetting ? resolveEffectiveWhere({
       whereKind: behavior.whereKind, locationText: behavior.locationText ?? null,

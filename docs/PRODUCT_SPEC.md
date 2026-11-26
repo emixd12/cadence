@@ -624,8 +624,9 @@ A tracked completion is a Completed Occurrence before today with a positive
 stopped-session total. The tracked figure is the median of the 10 most recent tracked
 completions. A running session is not a finished sample. Missing history remains
 unknown. When the tracked figure decides, the intended duration is kept and shown
-beside it, and it no longer changes the length. Moves use the same order on finished
-time sessions (`docs/DATETIME_STRATEGY.md`, "Moves").
+beside it, and it no longer changes the length. Moves, Opportunity suggestions and
+Chat moves use the same measurement and order (`docs/DATETIME_STRATEGY.md`, "Moves").
+`docs/RULES_REGISTER.md` lists each value.
 Tracked-time records and measured averages stay independent from the default.
 Possible-overlap cues are advisory. They use half-open timed intervals and exclude
 all-day events. They never prove availability or change a schedule or status.

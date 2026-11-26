@@ -107,6 +107,8 @@ Footguns that cost a second commit most often:
 - Adding or removing a `<button>`, link, form control or `onClick`-style handler changes
   that file's `interaction_marker_count` in `interaction-registry.json`. Update the
   count and the interactions that cite the file.
+- A floor, window, order or threshold that decides something from a person's data has a
+  row in `docs/RULES_REGISTER.md`. Update the row when you add or change one.
 - A new environment variable needs a line in `.env.example`. A new core resolver needs
   an entry in `scripts/check-resolvers.mjs`, a paired test and `docs/AGENT_RESOLVERS.md`.
   A new token in `packages/ui/tokens.css` needs a description comment.

@@ -7,9 +7,7 @@ import {
   MOVE_REFUSAL_REASONS,
   checkMoveSlot,
   findMoveConflicts,
-  loggedAverageSeconds,
   moveAlternatives,
-  resolveLoggedLength,
   resolveMoveDuration,
 } from "@cadence/core/resolvers/move.resolver";
 
@@ -30,31 +28,6 @@ describe("resolveMoveDuration", () => {
 
   it("caps a logged average at one day", () => {
     expect(resolveMoveDuration({ behaviorDefaultMinutes: null, loggedAverageSeconds: 200_000, plannedSeconds: null }).seconds).toBe(86_400);
-  });
-});
-
-describe("loggedAverageSeconds", () => {
-  it("takes the median of finished sessions between one minute and one day", () => {
-    const sessions = [
-      { started_at: "2026-11-16T10:00:00Z", stopped_at: "2026-11-16T10:20:00Z" },
-      { started_at: "2026-11-15T10:00:00Z", stopped_at: "2026-11-15T10:40:00Z" },
-      { started_at: "2026-11-14T10:00:00Z", stopped_at: "2026-11-14T10:00:30Z" },
-      { started_at: "2026-11-13T10:00:00Z", stopped_at: null },
-    ];
-    expect(loggedAverageSeconds(sessions)).toBe(1800);
-    expect(loggedAverageSeconds(sessions.slice(0, 1))).toBe(1200);
-    expect(loggedAverageSeconds(sessions.slice(2))).toBeNull();
-  });
-
-  it("uses the 10 most recent sessions, whatever order they arrive in, so one long session does not move the figure", () => {
-    const day = (index: number, minutes: number) => ({
-      started_at: `2026-11-${String(index).padStart(2, "0")}T10:00:00Z`,
-      stopped_at: `2026-11-${String(index).padStart(2, "0")}T${String(10 + Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}:00Z`,
-    });
-    // Days 1 and 2 are older than the 10 most recent and are left out.
-    const sessions = [day(1, 5), day(2, 5), ...Array.from({ length: 9 }, (_, index) => day(index + 3, 20)), day(12, 600)];
-    expect(resolveLoggedLength([...sessions].reverse())).toEqual({ seconds: 1200, sampleCount: 10 });
-    expect(resolveLoggedLength(sessions)).toEqual({ seconds: 1200, sampleCount: 10 });
   });
 });
 

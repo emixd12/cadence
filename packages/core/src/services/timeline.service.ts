@@ -54,16 +54,7 @@ export function resolvePersistedTimeline(input: {
     input.behaviors.some((behavior) => behavior.default_duration_minutes != null) ||
     (input.advisorEstimates && Object.keys(input.advisorEstimates).length > 0)
   ) {
-    const historySessions = new Map<string, TimeSession[]>();
-    for (const session of (input.durationHistory?.timeSessions ?? [])) {
-      const group = historySessions.get(session.occurrenceId) ?? [];
-      group.push(session);
-      historySessions.set(session.occurrenceId, group);
-    }
-    const history: BehaviorDurationHistoryOccurrence[] = (input.durationHistory?.occurrences ?? []).map((row) => ({
-      id: row.id, behaviorId: row.behavior_id, localDate: row.local_date,
-      status: normalizeOccurrenceStatus(row.status), sessions: historySessions.get(row.id) ?? [],
-    }));
+    const history = durationHistoryFrom(input.durationHistory ?? { occurrences: [], timeSessions: [] });
     timeline.durationEstimates = Object.fromEntries([...activeBehaviorById.keys()].map((behaviorId) => [behaviorId,
       resolveBehaviorDurationEstimate({
         behaviorId,
@@ -80,6 +71,27 @@ export function resolvePersistedTimeline(input: {
     behaviors: input.behaviors, timeline, now: input.now, timezone: input.timezone,
   });
   return timeline;
+}
+
+/**
+ * Duration history in the shape `resolveBehaviorDurationEstimate` reads: each
+ * Occurrence with its own time sessions. The Timeline and every move caller build
+ * their history here (Ticket 366), so both count the same samples.
+ */
+export function durationHistoryFrom(input: Readonly<{
+  occurrences: readonly Pick<OccurrenceRecord, "id" | "behavior_id" | "local_date" | "status">[];
+  timeSessions: readonly TimeSession[];
+}>): BehaviorDurationHistoryOccurrence[] {
+  const sessionsByOccurrence = new Map<string, TimeSession[]>();
+  for (const session of input.timeSessions) {
+    const group = sessionsByOccurrence.get(session.occurrenceId) ?? [];
+    group.push(session);
+    sessionsByOccurrence.set(session.occurrenceId, group);
+  }
+  return input.occurrences.map((row) => ({
+    id: row.id, behaviorId: row.behavior_id, localDate: row.local_date,
+    status: normalizeOccurrenceStatus(row.status), sessions: sessionsByOccurrence.get(row.id) ?? [],
+  }));
 }
 
 export type OpportunityRemovalReadFacts = Readonly<{

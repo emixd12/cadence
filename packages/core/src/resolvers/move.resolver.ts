@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { localDayBounds } from "./time.resolver";
-import { recentMedianSeconds, trackedDurationWins } from "./time-tracking.resolver";
+import { trackedDurationWins } from "./time-tracking.resolver";
 import { noticeText } from "../notices";
 
 /**
@@ -57,15 +57,16 @@ export type MovePersonReason = (typeof MOVE_PERSON_REASONS)[number];
 export type MoveDurationSource = "behavior_duration" | "logged_average" | "planned_length" | "explicit";
 
 /**
- * The length a moved Occurrence keeps (Ticket 366, D34): the logged figure once the
- * Behavior has 3 logged sessions, then the intended duration the person set, then
- * the logged figure from fewer sessions, then the planned length (30 minutes when
- * the plan has none). `logged_average` keeps its stored name; the figure is a median.
+ * The length a moved Occurrence keeps (Ticket 366, D34): the tracked figure once the
+ * Behavior has 3 tracked completions, then the intended duration the person set, then
+ * the tracked figure from fewer, then the planned length (30 minutes when the plan has
+ * none). `logged_average` keeps its stored name; the figure is the Timeline's median
+ * (`resolveBehaviorDurationSources`), never a separate per-session measurement.
  */
 export function resolveMoveDuration(input: Readonly<{
   behaviorDefaultMinutes: number | null;
   loggedAverageSeconds: number | null;
-  /** How many sessions the logged figure rests on. Omitted counts as fewer than 3. */
+  /** How many tracked completions the figure rests on. Omitted counts as fewer than 3. */
   loggedSampleCount?: number | null;
   plannedSeconds: number | null;
 }>): Readonly<{ seconds: number; source: MoveDurationSource }> {
@@ -80,28 +81,6 @@ export function resolveMoveDuration(input: Readonly<{
     return { seconds: Math.min(Math.round(input.plannedSeconds), 86_400), source: "planned_length" };
   }
   return { seconds: DEFAULT_MOVE_SECONDS, source: "planned_length" };
-}
-
-type LoggedSession = Readonly<{ started_at: string; stopped_at: string | null }>;
-
-/**
- * The median length of the 10 most recent finished time sessions and how many it
- * rests on, or null with none. Sessions under a minute or over a day are left out.
- */
-export function resolveLoggedLength(sessions: readonly LoggedSession[]): Readonly<{ seconds: number; sampleCount: number }> | null {
-  const lengths = [...sessions]
-    .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(right.started_at), Temporal.Instant.from(left.started_at)))
-    .flatMap((session) => {
-      if (!session.stopped_at) return [];
-      const seconds = Temporal.Instant.from(session.started_at).until(Temporal.Instant.from(session.stopped_at)).total({ unit: "seconds" });
-      return seconds >= 60 && seconds <= 86_400 ? [seconds] : [];
-    });
-  return recentMedianSeconds(lengths);
-}
-
-/** The logged figure alone; see `resolveLoggedLength`. The name predates the median. */
-export function loggedAverageSeconds(sessions: readonly LoggedSession[]): number | null {
-  return resolveLoggedLength(sessions)?.seconds ?? null;
 }
 
 export type MoveInterval = Readonly<{ start: Temporal.Instant; end: Temporal.Instant }>;

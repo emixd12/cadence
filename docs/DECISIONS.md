@@ -3344,6 +3344,17 @@ The choices:
 - **A median replaces the mean.** The tracked figure is the median of the 10 most
   recent tracked completions, so one timer left running cannot move it.
 
+Added the same day, after the first review:
+
+- **One measurement.** Moves measure the way the Timeline does: one sample is one
+  Completed Occurrence before today with its time sessions added together. Move for
+  today, Daily Brief moves, Opportunity suggestions and Chat moves share one function.
+- **Chat moves follow the rule.** The owner's reason: the tracked figure is closer to
+  what the person actually does.
+- **The length tip updates the intended duration** and says so.
+- **A rules register.** `docs/RULES_REGISTER.md` lists these rules, their values and
+  what to look at in real use, so they can be changed later with a reason.
+
 Not decided here: the wording the Daily Brief, coach and Chat use to compare tracked
 and intended time. That is prompt work with its own ticket.
 
