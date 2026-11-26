@@ -130,3 +130,34 @@ export type DayNoteDataStore = {
   listDayNotes(range: { from: string; to: string }): Promise<import("./resolvers/day-note.resolver").DayNoteRecord[]>;
   saveDayNote(input: DayNoteSaveCommit): Promise<import("./resolvers/day-note.resolver").DayNoteRecord | null>;
 };
+
+export type PeriodCreateCommit = {
+  label: string;
+  startOn: string;
+  endOn: string | null;
+  note: string | null;
+};
+
+export type PeriodUpdateCommit = PeriodCreateCommit & {
+  id: string;
+  expectedRevision: number;
+};
+
+export type PeriodDeleteCommit = {
+  id: string;
+  expectedRevision: number;
+};
+
+// Periods belong to the account, never to a Behavior or an Occurrence (Ticket 368).
+// Adapters are scoped to one authorized web user or the stable local profile and
+// compare-and-set on `revision`. A null result from updatePeriod or deletePeriod
+// means the Period changed or is gone. createPeriod throws when the account already
+// holds PERIOD_LIMITS.perAccount Periods. listPeriods returns every Period of the
+// account, or with a range at least those with a day inside it.
+export type PeriodDataStore = {
+  listPeriods(range?: { from: string; to: string }): Promise<import("./resolvers/period.resolver").PeriodRecord[]>;
+  getPeriod(id: string): Promise<import("./resolvers/period.resolver").PeriodRecord | null>;
+  createPeriod(input: PeriodCreateCommit): Promise<import("./resolvers/period.resolver").PeriodRecord>;
+  updatePeriod(input: PeriodUpdateCommit): Promise<import("./resolvers/period.resolver").PeriodRecord | null>;
+  deletePeriod(input: PeriodDeleteCommit): Promise<string | null>;
+};

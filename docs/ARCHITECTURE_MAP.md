@@ -156,9 +156,9 @@ one on differs:
   - Forbidden identifiers: `window document navigator localStorage sessionStorage Notification fetch process Buffer global globalThis require eval Function`.
     The check matches names, not usage. A local variable named `process` or `window`
     fails.
-- Eight service names exist in both `lib/services` (I/O) and `packages/core/src/services`
+- Nine service names exist in both `lib/services` (I/O) and `packages/core/src/services`
   (pure): `behavior`, `timeline`, `occurrence`, `settings`, `category`, `day-note`,
-  `time-tracking`, `note-shortcut`. Check the import path.
+  `time-tracking`, `note-shortcut`, `period`. Check the import path.
 
 ### `lib/services` clusters
 

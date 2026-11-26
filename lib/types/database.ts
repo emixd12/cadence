@@ -42,6 +42,7 @@ export type Occurrence = Omit<
   added_by?: string | null;
 };
 export type DayNote = Tables<"day_notes">;
+export type Period = Tables<"periods">;
 export type OccurrenceSyncState = Tables<"occurrence_sync_state">;
 export type OccurrenceTimeSession = Tables<"occurrence_time_sessions">;
 export type OccurrenceStatusEvent = Tables<"occurrence_status_events">;
