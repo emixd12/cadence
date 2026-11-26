@@ -90,12 +90,9 @@ Still deferred:
 Promote these separately only when their own scope is approved. Ticket 134
 capability research is recorded in `docs/qa/google-calendar-capabilities.md`.
 
-## Day notes in the Daily Brief
+## Day notes and Periods in the other brief paths
 
-Decided November 25, 2026 (D35): Ticket 367 makes the production Daily Brief read day
-notes. The disclosure text is logged as P-095 and does not block the ticket. Still
-future: day notes and Periods in the layered recipes and the ChatGPT-plan device path,
-which the owner paused.
+The layered workbench recipes and the ChatGPT-plan device path do not read day notes or Periods yet; only the hosted brief's opening does (Ticket 367, D35).
 
 ## AI-friendly routing provider for prose-level travel reasoning
 
