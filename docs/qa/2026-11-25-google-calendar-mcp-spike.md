@@ -58,10 +58,12 @@ Advisor Chat (`/chat`) was asked to list all Google Calendar events today (timed
   - Atomically deleted the Google-Calendar-touched Chat thread (`/chat` no longer contained the conversation or any event titles).
   - Left the **Timeline & Travel** connection untouched (`status: "connected"`, `generation: 26`), with Timeline still displaying today's events.
 
-## Ticket 245 verification demo video
+## Ticket 245 verification demo video (dry run — submission held for marketing update)
 
-Recorded in one continuous unedited English take (`1920×1200` H.264 MP4, `2m 28s`) on `https://cadence-me.com` and `https://app.cadence-me.com` covering all 8 shots in `docs/qa/2026-10-12-agentic-calendar.md`, visually audited across 8 extracted keyframes confirming:
+A full dry-run recording (`1920×1200` H.264 MP4, `2m 28s`) on `https://cadence-me.com` and `https://app.cadence-me.com` covered all 8 shots in `docs/qa/2026-10-12-agentic-calendar.md` and passed visual keyframe audit confirming:
 - Browser address bar visible throughout, with `client_id=855808383971-r30agviivl9h76f0igu292rg9u8k1op3` clearly legible on the Google OAuth consent screen alongside app name **Cadence** and both read-only scopes.
 - Live Advisor Chat reading today's events via `calendarmcp.googleapis.com`.
 - Independent AI disconnect warning, atomic Chat purge, and preserved Timeline connection.
 - Live `/privacy` disclosure dated November 25, 2026 (`calendarmcp.googleapis.com`, Model Armor, ≤30-day derived caps, AI/ML non-training).
+
+**Owner hold (November 25, 2026):** Do not upload this dry-run video or submit `cadence-calendar-agent-prod` to Google Verification Center yet. Wait until the public marketing site (`apps/marketing`, `https://cadence-me.com`) is updated to match the current product, then re-record the single-take video and submit well ahead of Google's February 1, 2027 Workspace AI Tools Addendum deadline.
