@@ -21,8 +21,9 @@ import type { BehaviorDurationEstimate } from "../types/day-progress";
  * Re-plan, Yes, Accept all and the Timeline's own "Move for today" all decide "is
  * this time free" here, so a time the brief offers is never refused at Yes on the
  * same data (docs/DATETIME_STRATEGY.md, "Brief moves"):
- *   - Every item has a length: the Behavior's setting, the logged average, the
- *     cached model estimate, then 30 minutes.
+ *   - Every item has a length, in the order of Ticket 366 (D34): the tracked figure
+ *     from 3 tracked completions, the intended duration, the tracked figure from 1 or
+ *     2, the cached model estimate, then 30 minutes.
  *   - An exact-time item blocks its own length; a range item blocks only its own
  *     length, placed at the earliest point in its range that is free.
  *   - An "alongside" item (a pill, a device) blocks only what `alongsideMayOverlap`
