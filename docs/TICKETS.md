@@ -20918,3 +20918,125 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active). Host mobile apps would render each view. |
 
 Messaging impact: none until a view is ticketed.
+
+## Ticket 383: The guessed Where shows without Completion places
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Tickets 357–359 and 363.
+
+Goal: Show a guessed or evidence-based Where in the Behavior form whether or not Completion places is on, and let the person dismiss it.
+
+Requirements:
+
+- With `CADENCE_ALONGSIDE` on, the Behavior form shows the guessed Where line ("Cadence guesses this happens at Home." and its variants) whenever the effective Where comes from a guess or from evidence, independent of `place_label_settings.enabled`.
+- Position markers, "I'm here" controls and completion place counts stay hidden unless Completion places is on. Evidence needs stored labels, so with Completion places off only the model guess can appear.
+- Dismissal works while Completion places is off. The trigger that requires the setting for `where_suggestion_dismissals` is relaxed for the guess suggestion keys only. The migration replaces a trigger; the owner approved its hosted push on November 25, 2026 (D37).
+- A dismissal stops the line and never changes planning (D33).
+- Mac parity through the shared components and `apps/desktop/src/local-place-labels.service.ts`; a linked Mac shows the hosted guess, local mode has none.
+- Resolver tests for the new state, DOM tests for both settings, SQL fixture for the trigger. Update `docs/UI_SPEC.md` (the line that documents the old gating), `docs/USER_FLOWS.md`, `DESIGN.md`, `docs/DATA_MODEL.md` and `interaction-registry.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `place-label.resolver.ts`, `place-labels.service.ts`, `components/travel/PlaceLabels.tsx`, migration. |
+| Desktop | Same components; `local-place-labels.service.ts`. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-103`.
+
+## Ticket 384: Calendar event places for the same-place rule
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Tickets 357, 361 and the Google Calendar MCP migration on `main`.
+
+Goal: Give each busy calendar event a coarse place for planning, so the same-place rule can refuse an alongside item during a meeting somewhere else.
+
+Requirements:
+
+- Each busy event that reaches the free-slot rule carries one coarse place: Home, a saved-place key, or unknown. It is computed from the event's location text with the existing place-key rule (`travelPlaceKey`) and compared with Home and the person's saved places.
+- Find every path that feeds calendar busy events to the free-slot rule today (the Daily Brief, Yes, Other time, Re-plan, Re-check, the Timeline's "Move for today", Chat) after the Calendar MCP migration, and compute the label where the location text already is: on the device for device-sent events, in the request for server-read events. Add no provider call and no geocoding.
+- The label lives for the request only. Nothing is stored, logged or sent to a model. Add a boundary test in the style of `tests/effective-where.boundary.test.ts`.
+- `alongsideMayOverlap` and `timeline-context.resolver.ts` use the label: an alongside item at Home is refused during an event at a saved place, allowed during an event at Home or with no known place. The Timeline shows its overlap cue again for refused overlaps.
+- An event with a location that matches neither Home nor a saved place is unknown, so behavior for such events does not change.
+- Calendar events stay out of pairing hosts (D33).
+- Behind `CADENCE_ALONGSIDE`; with the flag off request bodies and outputs are unchanged. Update `docs/DATETIME_STRATEGY.md` and `docs/DATA_MODEL.md` ("Effective Where").
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Brief and move request inputs, `alongside.resolver.ts` callers, Timeline overlap cues. |
+| Desktop | The Mac sends the same label with its brief requests; follow-up inside this ticket if the Mac path differs. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-103`.
+
+## Ticket 385: An advice card for the alongside question
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Ticket 360.
+
+Goal: Give the advisor tip surface a reviewed card so it can ask about an unanswered alongside guess.
+
+Requirements:
+
+- The existing card `stack-after-a-routine` does not fit: its study (Judah 2013) compared flossing after brushing with flossing before, and its own limitation says it did not compare pairing with not pairing.
+- Add one card, `do-it-during-something-else`, resting on Milkman, Minson and Volpp (2014), "Holding the Hunger Games Hostage at the Gym: An Evaluation of Temptation Bundling", Management Science 60(2), 283–299, doi:10.1287/mnsc.2013.1784. Kind: field experiment. Strength: limited.
+- Quote, from the abstract, verbatim: "Initially, full and intermediate treatment participants visited the gym 51% and 29% more frequently, respectively, than control participants, but treatment effects declined over time (particularly following Thanksgiving)."
+- Claim: people who could listen to tempting audiobooks only at the gym visited the gym more often than a control group at first, and the effect declined over time.
+- Limitation, stated on the card: one study of gym visits paired with audiobooks; the effect faded; applying it to a passive item such as a device is Cadence's reading, not what was tested.
+- Advice and action in the `PRODUCT.md` voice. Action: answer whether the Behavior can be done alongside other things, so Cadence can book it during another item. The offer opens the Behavior's alongside control.
+- Applies when `setup_gaps` reports `alongside_unanswered` (signal version `coach-signals-4`).
+- The card ships in the library's not-yet-reviewed state and shows no tip until the owner reviews it and the card records `reviewer` and `reviewed_at`. No agent sets those fields.
+- Library validation and advice-matcher tests cover the card. Behind `CADENCE_ALONGSIDE`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/data/advice-library.json`, advice matcher, tip offer link. |
+| Desktop | Not applicable: tips come from the hosted server. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: `P-103`.
+
+## Ticket 386: The estimate hash leaves Where out
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
+
+Dependencies: Tickets 356 and 359, and the audit fixes.
+
+Goal: Stop a Where change from discarding a Behavior's cached length and alongside guess.
+
+Requirements:
+
+- `behaviorEstimateInputHash` hashes only what the model receives: title and description (plus the existing recipe markers). `where_kind` leaves the hash.
+- Setting Where still suppresses reading `where_guess` for that Behavior, as today.
+- This changes every stored hash once, with the flag on or off: each Behavior's estimate is asked again one time. Record the one-time cost in `docs/COSTS.md` and the change in `docs/DATETIME_STRATEGY.md` ("asked again only when its title or description changes").
+- Update the pinned-hash tests deliberately and add a test that changing Where keeps the cached length and guess.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/brief-move-day.service.ts` and every reader of a cached estimate. |
+| Desktop | Not applicable: estimates are hosted. |
+| Marketing | Not applicable: no public claim changes until the messaging pass. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: none.

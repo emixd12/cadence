@@ -2720,3 +2720,20 @@ cite has not changed.
 - **Related:** P-090, P-097.
 - **Status:** logged. Waits on the marketing site overhaul (P-048, Ticket 246) and the owner's
   instruction. Developer Mode testing publishes nothing and does not wait.
+
+## P-103: Guessed Where shown without Completion places; calendar event places for planning (D37)
+
+- **Change:** planned November 25, 2026 (Tickets 383 and 384), behind `CADENCE_ALONGSIDE`.
+  The Behavior form shows Cadence's guess of a Behavior's kind of place whether or not
+  Completion places is on. Each busy calendar event gets a coarse place (Home, a saved
+  place or unknown) computed from its location text for one request, to decide whether an
+  alongside Behavior may overlap it.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D37); Tickets 383 and 384.
+- **Surfaces:** Privacy, in-app Calendar and Daily Brief disclosures, user guide.
+- **Conflicting current text:** disclosures describe calendar event locations as read for
+  routing only.
+- **Update needed:** say that an event's location is also compared with Home and saved
+  places to plan around it, that the result is not stored and not sent to a model, and
+  that a guessed place never requests a route or a reminder.
+- **Related:** P-093.
+- **Status:** logged.

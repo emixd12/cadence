@@ -2731,6 +2731,16 @@ never feeds adherence, Needs decision, reminders or analytics. Migration:
 `20261110120000_day_notes.sql`; local check `tests/sql/ticket-292-day-notes.sql`.
 Desktop mirrors the table in SQLite (`docs/DESKTOP_DATA_MODEL.md`).
 
+Ticket 367 (D35) adds a reader and no schema: with the AI Notes source on
+(`include_notes`), the hosted Daily Brief reads the rows for today and the two local
+days before it through `listDayNotesInRange`, as the signed-in user under RLS, and
+sends each note, cut to 280 characters, in the opening request's `dayNotes` facts. A
+quiet day reads none. The facts of each model call, day notes included, are kept in
+`agent_run_contents` until that row expires, as Behavior titles and the tip run's day
+notes already are. `agent_runs.prompt_version` records the revision of the instructions
+that were sent, so a brief with day notes carries a different revision from one without.
+Day-note text is never written to application logs.
+
 ### Day-note shortcut pool (Ticket 292)
 
 Migration `20261111120000_day_note_shortcut_pool.sql` lets `note_shortcut_states`

@@ -11,7 +11,9 @@ import { agentBriefRefreshFunded } from "@/lib/db/agent-runs.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { agentCallerConfigured, createAgentClient } from "@/lib/integrations/agent-caller";
 import { modelPrice } from "./agent-model-pricing";
-import { BRIEF_OPENING_PROMPT_REVISION, prepareBriefOpening, stockBriefOpening, validateBriefOpening, type BriefOpeningLine, type BriefOpeningText } from "./brief-opening";
+import { BRIEF_OPENING_PROMPT_REVISION, briefOpeningInstructions, briefOpeningPromptRevision, prepareBriefOpening, stockBriefOpening, validateBriefOpening, type BriefOpeningLine, type BriefOpeningRequest, type BriefOpeningText } from "./brief-opening";
+import { briefDayNoteRange, resolveBriefDayNotes, type BriefDayNote } from "@cadence/core/resolvers/day-note.resolver";
+import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
 import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBriefConflicts, saveBriefProposals } from "./brief-moves.service";
 import { briefOpportunitiesFor, planBriefOpportunityDay, readBriefOpportunities, saveBriefOpportunityProposals } from "./brief-opportunities.service";
 import { BRIEF_OPPORTUNITY_LINES_FEATURE } from "@cadence/core/types/brief-opportunities";
@@ -294,6 +296,16 @@ export type DailyBriefServiceOptions = Readonly<{
  *    one reason per line; any part it gets wrong, or a failed call, falls back to stock text.
  * 3. The lines are stored as proposals, then the brief is saved. Saving is required: a
  *    brief that cannot be saved is not shown.
+ *
+ * Ticket 367 (D35): with the AI Notes source on, the one model call also reads the day
+ * notes of today and the two days before it. They change the words only: the planner,
+ * Re-check and Re-plan never see them, and a quiet day reads none.
+ *
+ * The run log's prompt revision is the revision of the instructions that are sent, so the
+ * run starts once they are known: after the lines are planned. One case starts it earlier:
+ * a length estimate that needs a model call, which must reserve spend against the run
+ * before the lines exist. That run records the revision known then (with or without day
+ * notes); a pairing line planned afterwards (`CADENCE_ALONGSIDE`) is not in it.
  */
 export async function requestInAppDailyBrief(caller: CalendarCaller, value: unknown, options: DailyBriefServiceOptions = {}): Promise<DailyBriefResponse> {
   const attempt = readDailyBriefAttemptInput(value);
@@ -337,20 +349,20 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
     const leaseToken = admission.leaseToken;
     const refreshing = admission.refresh === true;
     let successful = false;
-    let agentRun: DailyBriefAgentRun | null = null;
+    // Advisor plan Phase 1A: one agent_runs row per attempt; each model call goes through the spend budget.
+    let runStart: Promise<DailyBriefAgentRun | null> | null = null;
+    const startRun = (promptRevision: string, runSignal: AbortSignal = signal): Promise<DailyBriefAgentRun | null> =>
+      runStart ??= phase("run_log", () => beginDailyBriefAgentRun({
+        userId: caller.user.id, trigger: refreshing ? "refresh" : attempt.retry ? "retry" : "on_demand", model: setting.model,
+        maxOutputTokens: setting.maxOutputTokens, promptVersion: `${promptRevision}:${configurationRevision}`, signal: runSignal,
+        ...(agentClient ? { client: agentClient } : {}),
+      }));
     try {
       // A refresh may not eat into the rest of the month's morning briefs (Emi, Nov 18).
       if (refreshing) {
         const funded = await phase("refresh_budget", () => refreshState(agentClient, admission.refreshesUsed ?? 0));
         if (!funded.available) throw new DailyBriefError("budget_reached", funded.retryAfterSeconds, "budget_refresh_unfunded");
       }
-      signal.throwIfAborted();
-      // Advisor plan Phase 1A: one agent_runs row per attempt; each model call goes through the spend budget.
-      agentRun = await phase("run_log", () => beginDailyBriefAgentRun({
-        userId: caller.user.id, trigger: refreshing ? "refresh" : attempt.retry ? "retry" : "on_demand", model: setting.model,
-        maxOutputTokens: setting.maxOutputTokens, promptVersion: `${BRIEF_OPENING_PROMPT_REVISION}:${configurationRevision}`, signal,
-        ...(agentClient ? { client: agentClient } : {}),
-      }));
       signal.throwIfAborted();
       const prepared = await phase("context", () => captureLiveDailyBriefContext(caller, {
         configuration, preferences, localDate: admission.localDate, travelConclusions: attempt.travelConclusions, sourceDeadlineAt, signal, clock,
@@ -362,8 +374,16 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       };
       await assertCurrent();
       const generator: DailyBriefGenerator = options.generate ?? ((input) => generateBriefOpeningWithModel(input));
-      const metered = withAgentRun(agentRun, generator);
       const now = clock().toString();
+      // Read at most once, and only when a model call will be made. A failed read leaves the brief without day notes.
+      let dayNotesRead: Promise<BriefDayNote[]> | null = null;
+      const readDayNotes = (): Promise<BriefDayNote[]> => dayNotesRead ??= !preferences.includeNotes ? Promise.resolve([])
+        : phase("day_notes", () => readBriefDayNotes(caller.client, caller.user.id, context.localDate)).catch(() => []);
+      // A length estimate that calls the model starts the run before the lines exist (see above).
+      const estimateGenerator: DailyBriefGenerator = async (input) => {
+        const known = briefOpeningPromptRevision(briefOpeningInstructions((await readDayNotes()).length ? ["dayNotes"] : []));
+        return withAgentRun(await startRun(known), (request) => generateDurationEstimatesWithModel(request))(input);
+      };
       // Usage reaches only the performance log and the run log, never the response.
       const usage: DailyBriefCallUsage[] = [];
       const includedGoogleCalendar = prepared.calendar !== null;
@@ -373,17 +393,22 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       // WS-2B (Path 4): ignore client-supplied calendarBusy; busy intervals come strictly from server-side AI context.
       const [plan, conflicts] = await phase("moves", async () => {
         const [, open] = await Promise.all([
-          ensureBehaviorEstimates(agentRun?.client ?? null, context,
-            withAgentRun(agentRun, (input) => generateDurationEstimatesWithModel(input)), signal),
+          ensureBehaviorEstimates(agentClient, context, estimateGenerator, signal),
           readOpenBriefConflicts(caller.client, { userId: caller.user.id, localDate: context.localDate }),
         ]);
         const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
         return [planned, open] as const;
       });
+      signal.throwIfAborted();
+      // The words' request, or null on a quiet day. Day notes go into the words only; `plan` is already made.
+      const quiet = !plan.candidates.length && !conflicts.length;
+      const request = quiet ? null : briefWordsRequest({ context, candidates: plan.candidates, conflicts, calendar: plan.calendar, now, dayNotes: await readDayNotes() });
+      const agentRun = await startRun(request?.revision ?? BRIEF_OPENING_PROMPT_REVISION);
+      signal.throwIfAborted();
       const words = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
-        () => writeBriefWords({ context, candidates: plan.candidates, conflicts, calendar: plan.calendar, now, requestSignal: signal,
+        () => writeBriefWords({ context, candidates: plan.candidates, conflicts, calendar: plan.calendar, now, request, requestSignal: signal,
           signal: AbortSignal.any([signal, AbortSignal.timeout(Math.min(setting.timeoutMs, DAILY_BRIEF_WORDS_TIMEOUT_MS))]),
-          generate: metered, onUsage: (item) => { usage.push({ call: "brief", ...item }); } }));
+          generate: withAgentRun(agentRun, generator), onUsage: (item) => { usage.push({ call: "brief", ...item }); } }));
       signal.throwIfAborted();
       const lines = wantsMoves ? await phase("proposals", () => saveBriefProposals(agentRun?.client ?? null, {
         runId: agentRun?.runId ?? "", localDate: context.localDate, refresh: refreshing,
@@ -439,7 +464,9 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         linkedProposalIds: lines.map((line) => line.proposalId).filter((id) => UUID.test(id)) }, logSignal);
       return { state: "ready", briefing };
     } catch (error) {
-      await agentRun?.finish({ ok: false, error }, logSignal);
+      // A failure before the run started is still logged: no instructions were sent, so it carries the plain revision.
+      const failedRun = logSignal.aborted && !runStart ? null : await startRun(BRIEF_OPENING_PROMPT_REVISION, logSignal).catch(() => null);
+      await failedRun?.finish({ ok: false, error }, logSignal);
       throw error;
     } finally {
       if (!successful) void finishDailyBrief(caller.client, { installationId, leaseToken, success: false, expectedRevision: preferences.revision }).catch(() => undefined);
@@ -478,13 +505,17 @@ export async function writeBriefWords(input: Readonly<{
   requestSignal: AbortSignal;
   generate: DailyBriefGenerator;
   onUsage?: (usage: DailyBriefModelUsage) => void;
+  /** Ticket 367: the person's recent day notes, for the words only. Ignored when `request` is given. */
+  dayNotes?: readonly BriefDayNote[];
+  /** The request `briefWordsRequest` built from the same input, when the caller needed its revision first. */
+  request?: BriefOpeningRequest | null;
 }>): Promise<DailyBriefWords> {
-  if (!input.candidates.length && !input.conflicts.length) return { ...stockBriefOpening([], []), fallbacks: [], source: "stock", failure: null };
-  const request = prepareBriefOpening({ context: input.context, lines: input.candidates, conflicts: input.conflicts, calendar: input.calendar, now: input.now });
+  const request = input.request !== undefined ? input.request : briefWordsRequest(input);
+  if (!request) return { ...stockBriefOpening([], []), fallbacks: [], source: "stock", failure: null };
   try {
     const output = await raceAbort(input.generate({ instructions: request.instructions, facts: request.facts, signal: input.signal,
       ...(input.onUsage ? { onUsage: input.onUsage } : {}) }), input.signal);
-    return { ...validateBriefOpening(output, { lines: input.candidates, conflicts: input.conflicts, labels: request.labels }), failure: null };
+    return { ...validateBriefOpening(output, { lines: input.candidates, conflicts: input.conflicts, labels: request.labels, dayNotes: request.dayNotes }), failure: null };
   } catch (error) {
     if (input.requestSignal.aborted) throw error;
     // The run log records why the words fell back, though the brief itself is shown.
@@ -495,6 +526,29 @@ export async function writeBriefWords(input: Readonly<{
       : { kind: "words_unavailable" as const, error: cause };
     return { ...stockBriefOpening(input.candidates, input.conflicts), fallbacks: ["output_shape"], source: "stock", failure };
   }
+}
+
+/** The one model request for a brief's words. Null on a quiet day (no line and no conflict): no call is made. */
+export function briefWordsRequest(input: Readonly<{
+  context: AdvisorDayContext;
+  candidates: readonly BriefOpeningLine[];
+  conflicts: readonly BriefMoveConflictLine[];
+  calendar: "current" | "stale" | "none";
+  now: string;
+  dayNotes?: readonly BriefDayNote[];
+}>): BriefOpeningRequest | null {
+  if (!input.candidates.length && !input.conflicts.length) return null;
+  return prepareBriefOpening({ context: input.context, lines: input.candidates, conflicts: input.conflicts, calendar: input.calendar, now: input.now,
+    ...(input.dayNotes?.length ? { dayNotes: input.dayNotes } : {}) });
+}
+
+/**
+ * Ticket 367: the day notes of `localDate` and the two days before it, as the brief's
+ * opening reads them. The caller checks the AI Notes source first. Note text goes to
+ * the model request and the run-content store only, never to a log.
+ */
+export async function readBriefDayNotes(client: AppSupabaseClient, userId: string, localDate: string): Promise<BriefDayNote[]> {
+  return resolveBriefDayNotes({ localDate, records: await listDayNotesInRange(client, userId, briefDayNoteRange(localDate)) });
 }
 
 export type DailyBriefWords = BriefOpeningText & Readonly<{

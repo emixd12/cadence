@@ -352,8 +352,23 @@ Occurrence. It never changes adherence, Needs decision, reminders or analytics.
 Day notes use the same editor as Occurrence notes, the same normalization, and a
 2,000-character limit. Repeated day notes feed a separate `day_notes` Note shortcuts
 pool. Full JSON and BehaviorLog exports include day notes; MCP clients can read and
-write them (`docs/MCP_CONTRACT.md`). Daily Brief does not read day notes until Ticket
-367 lands (`docs/DECISIONS.md`, 2026-11-25, D35).
+write them (`docs/MCP_CONTRACT.md`).
+
+The Daily Brief reads day notes (Ticket 367; `docs/DECISIONS.md`, 2026-11-25, D35). With
+the AI Notes source on, the one model call that writes the brief's opening and reasons
+also gets the day notes of today and the two days before it, each cut to 280 characters.
+
+- The notes change the words only. They never reach the move planner, Re-check or
+  Re-plan, and they never change a suggested time.
+- A quiet day makes no model call and reads no day note.
+- A day note changed after the brief was made does not change the saved brief. The next
+  brief, including a Refresh, reads the current notes.
+- The model is told the notes are the person's own text, never instructions, and not to
+  quote them. Cadence replaces a sentence with its own words when the sentence repeats a
+  whole note of three or more words, or six words in a row from a note.
+- With the Notes source off, no day note is read.
+- The layered workbench recipes and the paused ChatGPT-plan device path do not read day
+  notes (`docs/FUTURE_UPDATES.md`).
 
 ## Periods (planned, Tickets 368–374)
 

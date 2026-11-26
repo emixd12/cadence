@@ -14,7 +14,8 @@ import fixture from "./fixtures/advisor-day-context.valid.json";
 // prompt (brief-opening.ts) in place of the ~38 KB layered prompt. The layered prompt still
 // serves the workbench and the paused device path; its hash below changed once more because
 // "Suggestions never change the record." left briefing-references.json (Emi, Phase 3).
-const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), prepare: vi.fn(), current: vi.fn(), config: vi.fn(), plan: vi.fn(), proposals: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), prepare: vi.fn(), current: vi.fn(), config: vi.fn(), plan: vi.fn(), proposals: vi.fn(), dayNotes: vi.fn() }));
+vi.mock("@/lib/db/dayNotes.repo", () => ({ listDayNotesInRange: mocks.dayNotes }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
   saveDailyBrief: mocks.saveBrief }));
 vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), readOpenBriefConflicts: vi.fn(async () => []), ensureBehaviorEstimates: vi.fn() }));
@@ -33,7 +34,10 @@ vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: vi.fn() }));
 import { requestInAppDailyBrief } from "@/lib/services/daily-brief.service";
 import { generateDailyBrief } from "@/lib/services/daily-brief-consumer";
 import { DAILY_BRIEF_MODEL } from "@/lib/services/daily-brief-model";
-import { BRIEF_OPENING_INSTRUCTIONS, BRIEF_OPENING_PROMPT_REVISION, BRIEF_OPENING_SCHEMA, BRIEF_OPENING_SCHEMA_NAME } from "@/lib/services/brief-opening";
+import {
+  BRIEF_OPENING_DAY_NOTES_INSTRUCTIONS, BRIEF_OPENING_INSTRUCTIONS, BRIEF_OPENING_PAIRING_INSTRUCTIONS, BRIEF_OPENING_PAIRING_PROMPT_REVISION,
+  BRIEF_OPENING_PROMPT_REVISION, BRIEF_OPENING_SCHEMA, BRIEF_OPENING_SCHEMA_NAME, briefOpeningInstructions, briefOpeningPromptRevision,
+} from "@/lib/services/brief-opening";
 import { responsesReply } from "./helpers/model-responses";
 import { dailyBriefPreferences } from "./helpers/daily-brief-preferences";
 
@@ -59,7 +63,11 @@ beforeEach(() => {
   mocks.prepare.mockImplementation(async (_caller, options) => ({ contexts: [fixture], assertCurrent: mocks.current, configurationRefs: {}, preferences: options.preferences }));
   mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
   mocks.proposals.mockImplementation(async (_client, value) => value.lines.map(({ key: _key, ...line }: typeof candidate) => ({ ...line, proposalId: "p-1", status: "proposed", moveId: null })));
+  mocks.dayNotes.mockResolvedValue([]);
 });
+
+/** A saved day note on today's local date, as the repository returns it. */
+const todayNote = { local_date: fixture.localDate, note: "Head cold, slept four hours." };
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 /** Runs `/api/advisor/brief`'s service with the real model adapter and returns the exact request bodies it sent. */
@@ -99,6 +107,60 @@ describe("pinned production generation", () => {
     mocks.plan.mockResolvedValue({ candidates: [], calendar: "current" });
     expect(await productionBodies()).toHaveLength(0);
     expect(await productionBodies([])).toHaveLength(0);
+    // Ticket 367: nor with the Notes source on and a note saved; a quiet day reads no day notes.
+    mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, includeNotes: true }));
+    mocks.dayNotes.mockResolvedValue([todayNote]);
+    expect(await productionBodies()).toHaveLength(0);
+    expect(mocks.dayNotes).not.toHaveBeenCalled();
+  });
+
+  // Ticket 367 (D35). The hash is the request the service sent before day notes existed
+  // (origin/main at 72380e33, the same fixture, line and clock).
+  it("sends the same bytes as before day notes when the brief has none", async () => {
+    const pinned = "942f34dfaf13945dad8a48f352dfc0d98fed437233604b941ce3552394fca601";
+    const off = await productionBodies();
+    expect(off).toHaveLength(1);
+    expect(sha(off[0]!)).toBe(pinned);
+    expect(mocks.dayNotes).not.toHaveBeenCalled();
+    // Notes on with nothing written on the three days: the same request, byte for byte.
+    mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, includeNotes: true }));
+    const on = await productionBodies();
+    expect(mocks.dayNotes).toHaveBeenCalledWith(caller.client, "owner", { from: "2026-10-30", to: "2026-11-01" });
+    expect(on[0]).toBe(off[0]);
+    // Notes off with a note saved: the note is not read.
+    mocks.dayNotes.mockClear();
+    mocks.dayNotes.mockResolvedValue([todayNote]);
+    mocks.read.mockResolvedValue(prefs);
+    expect((await productionBodies())[0]).toBe(off[0]);
+    expect(mocks.dayNotes).not.toHaveBeenCalled();
+  });
+
+  it("pins the day-note variant: its instructions, its revision and where the notes go", async () => {
+    expect(briefOpeningInstructions()).toBe(BRIEF_OPENING_INSTRUCTIONS);
+    expect(briefOpeningInstructions(["dayNotes"])).toBe(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_DAY_NOTES_INSTRUCTIONS}`);
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["dayNotes"]))).toBe("c95ee3847b059ff8");
+    // With a pairing line too: pairing first, so the pairing-only prompt (Ticket 361) keeps its revision.
+    expect(briefOpeningInstructions(["dayNotes", "pairing"])).toBe(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_PAIRING_INSTRUCTIONS}\n${BRIEF_OPENING_DAY_NOTES_INSTRUCTIONS}`);
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["pairing", "dayNotes"]))).toBe("8b106a8dc5ea83bb");
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["pairing"]))).toBe(BRIEF_OPENING_PAIRING_PROMPT_REVISION);
+    expect(BRIEF_OPENING_PAIRING_PROMPT_REVISION).toBe("6f3ca1a4796ef317");
+
+    mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, includeNotes: true }));
+    mocks.dayNotes.mockResolvedValue([todayNote]);
+    const plain = await productionBodies();
+    mocks.dayNotes.mockResolvedValue([]);
+    const without = JSON.parse((await productionBodies())[0]!);
+    const body = JSON.parse(plain[0]!);
+    const role = (value: typeof body, name: string) => value.input.find((item: { role: string }) => item.role === name).content;
+    expect(role(body, "developer")).toBe(briefOpeningInstructions(["dayNotes"]));
+    const userFacts = (value: typeof body) => JSON.parse(role(value, "user")[0].text as string);
+    const facts = userFacts(body);
+    expect(Object.keys(facts)).toEqual(["today", "now", "lines", "conflicts", "day", "dayNotes"]);
+    expect(facts.dayNotes).toEqual([{ day: "today", note: "Head cold, slept four hours." }]);
+    // Nothing else in the request changes.
+    const { dayNotes: _dayNotes, ...rest } = facts;
+    expect(rest).toEqual(userFacts(without));
+    expect({ ...body, input: null }).toEqual({ ...without, input: null });
   });
 
   it("builds the same instructions in the consumer for every recipe, fixture and flag", async () => {

@@ -20,7 +20,7 @@ How to use it:
   implementation default and says so.
 
 Coverage: this first version holds the length rules from Ticket 366 and the rules beside
-them. The sets in "Not yet listed" still live only in code.
+them, and the Daily Brief's day-note rules from Ticket 367. The sets in "Not yet listed" still live only in code.
 
 ## Behavior length
 
@@ -41,6 +41,18 @@ Brief. One measurement and one order serve every caller:
 | LEN-07 | History the Timeline and moves read | all time | `readDurationHistory` | Implementation default | Behaviors with no tracked completion in 90 days |
 | LEN-08 | History the Daily Brief reads | 90 days | `lookbackDays: 90`, `lib/services/advisor-day-context.service.ts` | Implementation default | Whether LEN-07 and LEN-08 give different figures for one Behavior |
 | LEN-09 | Length of a move when nothing is known | 30 minutes | `BRIEF_MOVE_FALLBACK_MINUTES`, `DEFAULT_MOVE_SECONDS` | Advisor plan, Phase 2A | How often a 30-minute assumption is corrected with "set length" |
+
+## Daily Brief day notes
+
+The day notes the hosted Daily Brief's opening reads with the AI Notes source on
+(Ticket 367). `BRIEF_DAY_NOTE_LIMITS` in `packages/core/src/resolvers/day-note.resolver.ts`
+holds every value.
+
+| ID | Rule | Value | Where | Decided | What to look at |
+|---|---|---|---|---|---|
+| NOTE-01 | Days of day notes the brief reads | today and the 2 local days before it | `BRIEF_DAY_NOTE_LIMITS.days`, `briefDayNoteRange` | D35 chose that the brief reads day notes; the 3 days are an implementation default | Day notes older than 2 days that still describe today (an illness, a trip) |
+| NOTE-02 | Characters of each day note sent | the first 280 | `BRIEF_DAY_NOTE_LIMITS.characters`, `resolveBriefDayNotes` | Implementation default | Day notes longer than 280 characters; whether what matters comes after the cut |
+| NOTE-03 | A sentence repeats a day note, and Cadence's own words replace it | the whole note when it has 3 or more words, or 6 words in a row | `wholeNoteWords`, `sharedWords`, `textQuotesDayNote` | Plan review, 2026-11-25 (`docs/plans/2026-11-25-periods.md`, section 14, row 6) | Runs whose fallbacks hold `opening_day_note` or `reason_day_note`; short notes made of everyday words |
 
 ## Length tip
 

@@ -278,7 +278,12 @@ resolvers, account-sync validation, and tests may call it. Paired checks live in
 ## Day notes (Ticket 292)
 
 `packages/core/src/resolvers/day-note.resolver.ts` owns day-note date parsing,
-normalization, the character limit, read ranges, and Timeline attachment.
+normalization, the character limit, read ranges, and Timeline attachment. It also
+owns the Daily Brief's day-note rules (Ticket 367): `briefDayNoteRange` (today and the
+two local days before it), `resolveBriefDayNotes` (the day words and the 280-character
+cut) and `textQuotesDayNote` (the check that a sentence repeats a note).
+`lib/services/daily-brief.service.ts` reads the rows and `lib/services/brief-opening.ts`
+runs the check; neither may choose the days, cut a note or compare text itself.
 `tests/day-note.resolver.test.ts` pairs its checks with the shared
 `services/day-note.service.ts`, which orchestrates the owner-scoped
 `DayNoteDataStore`. Web and desktop adapters compare-and-set on the stored note.
