@@ -5,6 +5,7 @@ import type { BehaviorGraphRecord } from "../behavior-store";
 import type { Json } from "../types/json";
 import { resolveExportBundle } from "../resolvers/export.resolver";
 import { parseArchiveNotes } from "../resolvers/archive-note.resolver";
+import type { PeriodRecord } from "../resolvers/period.resolver";
 import { normalizeRecurrenceRule, recurrenceDefaultsFromRule, storedRecurrenceRuleOrNull, summarizeRecurrenceRule } from "./behavior-values";
 import { isBehaviorWhereKind, storedBehaviorWhere } from "./behavior-where";
 import { toStoredConfigurationSnapshot } from "./configuration-payload";
@@ -43,6 +44,11 @@ export type ExportAssemblyInput = ExportOptions & ExportImportedHistory & {
   occurrenceMoves?: ExportOccurrenceMoveInput[];
   /** Day note rows (Ticket 292); exported only when notes are included. */
   dayNotes?: ReadonlyArray<{ id: string; local_date: string; note: string | null; created_at: string; updated_at: string }>;
+  /**
+   * Every Period of the account (Ticket 373). Optional: a caller that does not pass
+   * it exports no Periods and its bytes are unchanged.
+   */
+  periods?: ReadonlyArray<Pick<PeriodRecord, "id" | "label" | "start_on" | "end_on" | "note" | "created_at" | "updated_at">>;
   /**
    * Ticket 364: carry the person's alongside answer (`behaviors.alongside`). The web app
    * sets it while CADENCE_ALONGSIDE is on; the Mac export leaves it off until Ticket 363.
@@ -89,6 +95,10 @@ export function assembleExportBundle(input: ExportAssemblyInput): ExportBundle {
     timeSessions: timeSessions.map(toExportTimeSessionInput),
     dayNotes: (input.dayNotes ?? []).map((row) => ({
       id: row.id, localDate: row.local_date, note: row.note, createdAt: row.created_at, updatedAt: row.updated_at,
+    })),
+    periods: (input.periods ?? []).map((row) => ({
+      id: row.id, label: row.label, startOn: row.start_on, endOn: row.end_on, note: row.note,
+      createdAt: row.created_at, updatedAt: row.updated_at,
     })),
     now,
     timezone,
