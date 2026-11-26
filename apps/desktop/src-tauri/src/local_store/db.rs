@@ -157,6 +157,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "sub_behaviors",
         include_str!("../../migrations/0028_sub_behaviors.sql"),
     ),
+    (
+        29,
+        "behavior_alongside",
+        include_str!("../../migrations/0029_behavior_alongside.sql"),
+    ),
 ];
 
 /// Migrations that rebuild a table other tables reference. SQLite ignores the foreign-key

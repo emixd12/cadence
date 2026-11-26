@@ -220,7 +220,15 @@ impl Fixture {
         if before_links {
             self.db.execute_batch(&LINK_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors ADD COLUMN {column};")).collect::<String>()).unwrap();
         }
+        // A schema before 0029 has no alongside column; it comes and goes the same way.
+        let before_alongside = self.db.prepare("SELECT alongside FROM behaviors").is_err();
+        if before_alongside {
+            self.db.execute_batch("ALTER TABLE behaviors ADD COLUMN alongside INTEGER;").unwrap();
+        }
         let result = execute(&mut self.db, serde_json::from_value(request).unwrap());
+        if before_alongside {
+            self.db.execute_batch("ALTER TABLE behaviors DROP COLUMN alongside;").unwrap();
+        }
         if before_opportunity {
             self.db.execute_batch(OPPORTUNITY_COLUMNS_DROP).unwrap();
         }
@@ -2827,7 +2835,7 @@ fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
     let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
         .map(|table| (table, fixture.count(table)));
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 28);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 29);
     for (table, count) in before {
         assert_eq!(fixture.count(table), count, "{table}");
     }
@@ -3011,6 +3019,61 @@ fn migration_0028_keeps_every_schema_27_row_standalone() {
     assert_eq!(link(&fixture, 1), (None, 0, false));
     let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
     assert!(rows.iter().all(|row| row.parent_behavior_id.is_none() && !row.inherit_parent_schedule));
+}
+
+#[test]
+fn migration_0029_leaves_every_schema_28_behavior_unanswered() {
+    let mut fixture = Fixture::at_schema(28);
+    let profile = fixture.profile.clone();
+    fixture.db.execute("INSERT INTO behaviors(id,user_id,category_id,title,description,recurrence_rule,scheduled_time,timezone,browser_reminder_enabled,email_reminder_enabled,reminder_offset_minutes,active,created_at,updated_at,archived_at,current_configuration_event_id) VALUES(?1,?2,NULL,'Helmet',NULL,'{\"type\":\"daily\",\"interval\":1}','09:00:00','America/New_York',1,0,0,1,?3,?3,NULL,NULL)", params![id(1), profile, NOW]).unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 29);
+    let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].alongside, None);
+    // Only unanswered, yes and no are stored.
+    assert!(fixture.db.execute("UPDATE behaviors SET alongside=2 WHERE id=?1", [id(1)]).is_err());
+}
+
+/// D33 (Ticket 363): the answer is configuration. A change needs a revision naming it whose
+/// snapshots carry the answer; a snapshot that disagrees with the row is refused.
+#[test]
+fn alongside_answer_joins_the_configuration_snapshot() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let answer = |fixture: &mut Fixture, previous: Value, next: Value, mutation: u32, event_next: Value| {
+        let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+        let revision = graph["revision"].clone();
+        graph.as_object_mut().unwrap().remove("revision");
+        graph["behavior"]["alongside"] = next;
+        graph["behavior"]["current_configuration_event_id"] = json!(id(mutation));
+        let mut event = create_request(&fixture.profile)["configurationEvent"].clone();
+        event["id"] = json!(id(mutation));
+        event["event_kind"] = json!("revision");
+        event["previous_configuration"] = event["next_configuration"].clone();
+        event["previous_configuration"]["alongside"] = previous;
+        event["next_configuration"]["alongside"] = event_next;
+        event["changed_fields"] = json!(["alongside"]);
+        event["reason_code"] = json!("alongside_answered");
+        fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":event}), mutation)
+    };
+    // A snapshot that disagrees with the row is refused.
+    let refused = answer(&mut fixture, Value::Null, json!(true), 60, json!(false)).unwrap_err();
+    assert!(refused.contains("configuration event does not match"), "{refused}");
+    answer(&mut fixture, Value::Null, json!(true), 61, json!(true)).unwrap();
+    let stored: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+    assert_eq!(stored.alongside, Some(true));
+    // The baseline snapshot had no answer: it read as unanswered, so the previous side was null.
+    answer(&mut fixture, json!(true), json!(false), 62, json!(false)).unwrap();
+    let stored: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+    assert_eq!(stored.alongside, Some(false));
+    // Changing the answer without a revision is refused.
+    let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+    let revision = graph["revision"].clone();
+    graph.as_object_mut().unwrap().remove("revision");
+    graph["behavior"]["alongside"] = Value::Null;
+    let silent = fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":null}), 63).unwrap_err();
+    assert!(silent.contains("requires its planned history event"), "{silent}");
 }
 
 #[test]

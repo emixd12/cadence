@@ -133,7 +133,7 @@ fn snapshot(graph: &GraphRows) -> Value {
             schedule.to_string(),
         )
     });
-    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior),"isOpportunity":behavior.is_opportunity,"parentBehaviorId":behavior.parent_behavior_id,"inheritParentSchedule":behavior.parent_behavior_id.is_some() && behavior.inherit_parent_schedule})
+    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone,"end":run_end(behavior),"pause":run_pause(behavior),"isOpportunity":behavior.is_opportunity,"parentBehaviorId":behavior.parent_behavior_id,"inheritParentSchedule":behavior.parent_behavior_id.is_some() && behavior.inherit_parent_schedule,"alongside":behavior.alongside})
 }
 
 /// Ended and Paused: the snapshot's `end`, as core's toBehaviorConfigurationSnapshot writes it.
@@ -185,6 +185,10 @@ fn normalize_configuration_snapshot(value: &Value) -> Value {
         if !parent {
             *inherit = json!(false);
         }
+        // Snapshots written before configuration history carried the alongside answer are unanswered.
+        object
+            .entry("alongside".to_string())
+            .or_insert(Value::Null);
     }
     normalized
 }
@@ -264,6 +268,7 @@ fn validate_history(
             "is_opportunity",
             "parent_behavior_id",
             "inherit_parent_schedule",
+            "alongside",
         ];
         if event.changed_fields.is_empty()
             || event
