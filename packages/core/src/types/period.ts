@@ -24,3 +24,14 @@ export type PeriodActionState = Readonly<{
   message: string;
   noticeId?: PeriodNoticeId;
 }>;
+
+/**
+ * The result of the auto-saving Period note field. It has the shape the shared note
+ * editor reads, plus the Period's revision after the save, so a following write can
+ * name it.
+ */
+export type PeriodNoteActionState = Readonly<{
+  status: "idle" | "success" | "error";
+  message: string;
+  revision?: number;
+}>;

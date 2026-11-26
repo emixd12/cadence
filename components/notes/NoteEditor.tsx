@@ -13,6 +13,7 @@ import {
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { noticeText } from "@cadence/core/notices";
@@ -61,7 +62,14 @@ export type NoteEditorProps = Readonly<{
   shortcutsLabel?: string;
   autoFocus?: boolean;
   focusSignal?: number;
+  /**
+   * Each increase asks the editor to finish as Done does: save an unsaved draft, wait for
+   * a save in flight, then call `onDone`. For a parent whose own control closes the note.
+   */
+  doneSignal?: number;
   autoSave?: boolean;
+  /** False leaves out Done, for a note that sits inside a larger editor with its own close control. */
+  showDone?: boolean;
   onSaved?: (savedNote: string) => void;
   onDone?: (result: Readonly<{ saved: boolean }>) => void;
 }>;
@@ -90,8 +98,9 @@ export function insertNoteShortcutDraft(draft: string, shortcut: string): string
 }
 
 /**
- * The shared note editor for Occurrence notes and day notes. It owns the
- * compare-and-set expected note, shortcut chips, auto-save, and unsaved-draft handling.
+ * The shared note editor for Occurrence notes, day notes and the note of an existing
+ * Period. It owns the compare-and-set expected note, auto-save, and unsaved-draft
+ * handling. The field and its shortcut chips are `NoteField`.
  */
 export function NoteEditor({
   targetFields,
@@ -107,15 +116,14 @@ export function NoteEditor({
   shortcutsLabel = "Note shortcuts",
   autoFocus = false,
   focusSignal = 0,
+  doneSignal = 0,
   autoSave = true,
+  showDone = true,
   onSaved,
   onDone,
 }: NoteEditorProps) {
   const [state, formAction, isPending] = useActionState(action, EMPTY_ACTION_STATE);
   const refresh = useRefresh();
-  const contextDismiss = useContext(NoteShortcutDismissContext);
-  const dismissHandler = onDismissShortcut ?? contextDismiss;
-  const [dismissedKeys, setDismissedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftRevisionRef = useRef(0);
@@ -266,6 +274,14 @@ export function NoteEditor({
     onDoneRef.current?.({ saved: hadSaved });
   }, [cancelDebounce, state.status, submitCurrentDraft]);
 
+  const handleDoneRef = useRef(handleDone);
+  useEffect(() => {
+    handleDoneRef.current = handleDone;
+  });
+  useEffect(() => {
+    if (doneSignal > 0) handleDoneRef.current();
+  }, [doneSignal]);
+
   const activeBaseline = useCallback(() => (
     isPendingRef.current && submittedDraftRef.current
       ? canonicalNoteValue(submittedDraftRef.current.value)
@@ -328,95 +344,45 @@ export function NoteEditor({
       ))}
       <input type="hidden" name="expected_note" value={expectedNoteValue} readOnly />
       <input type="hidden" name="used_shortcut" value={String(usedShortcutValue)} readOnly />
-      {(() => {
-        const visibleShortcuts = shortcuts
-          .filter((shortcut) => (shortcut.status === "accepted" || shortcut.status === "proposed") && Boolean(shortcut.text) && !dismissedKeys.has(shortcut.key))
-          .slice(0, 5);
-        if (visibleShortcuts.length === 0) return null;
-        return (
-          <div className="flex flex-wrap gap-2" aria-label={shortcutsLabel}>
-            {visibleShortcuts.map((shortcut) => {
-              const text = shortcut.text!;
-              const canDismiss = Boolean(dismissHandler && poolId);
-              return (
-                <span key={shortcut.key} className="inline-flex max-w-full items-stretch">
-                  <button
-                    type="button"
-                    className="product-action product-action-secondary min-h-11 max-w-full break-words py-2 text-left text-sm"
-                    onClick={() => {
-                      const textarea = textareaRef.current;
-                      if (!textarea) return;
-                      textarea.value = insertNoteShortcutDraft(textarea.value, text);
-                      draftValueRef.current = textarea.value;
-                      setDraftValue(textarea.value);
-                      draftRevisionRef.current += 1;
-                      usedShortcutRef.current = true;
-                      setUsedShortcutValue(true);
-                      textarea.focus();
-                      if (autoSave) {
-                        submitCurrentDraft();
-                      }
-                    }}
-                  >
-                    {text}
-                  </button>
-                  {canDismiss ? (
-                    <button
-                      type="button"
-                      aria-label={`Dismiss shortcut "${text}"`}
-                      title="Dismiss shortcut"
-                      className="product-action product-action-secondary min-h-11 border-l-0 px-2 py-2 text-sm text-muted-readable hover:text-foreground"
-                      onClick={() => {
-                        setDismissedKeys((prev) => new Set([...prev, shortcut.key]));
-                        void Promise.resolve(dismissHandler!(poolId!, shortcut.key)).then(() => {
-                          refresh();
-                        });
-                      }}
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </span>
-              );
-            })}
-          </div>
-        );
-      })()}
-      <label
-        className={[
-          "grid font-bold text-foreground",
-          compact ? "gap-1" : "gap-2",
-        ].join(" ")}
-      >
-        <span className={hideLabel ? "sr-only" : undefined}>{label}</span>
-        <textarea
-          ref={textareaRef}
-          name="note"
-          defaultValue={note}
-          onChange={(event) => {
-            const nextValue = event.currentTarget.value;
-            draftValueRef.current = nextValue;
-            setDraftValue(nextValue);
-            draftRevisionRef.current += 1;
-            cancelDebounce();
-            if (autoSave && canonicalNoteValue(nextValue) !== activeBaseline()) {
-              debounceTimerRef.current = setTimeout(() => {
-                debounceTimerRef.current = null;
-                if (canonicalNoteValue(draftValueRef.current) !== activeBaseline()) {
-                  submitCurrentDraft();
-                }
-              }, NOTE_AUTO_SAVE_DELAY_MS);
-            }
-          }}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          rows={3}
-          autoFocus={autoFocus}
-          data-surface="default"
-          className="min-h-24 resize-y border border-line bg-background px-3 py-2 text-base font-normal leading-7 text-foreground placeholder:text-muted-readable"
-          placeholder={placeholder}
-        />
-      </label>
+      <NoteField
+        textareaRef={textareaRef}
+        defaultValue={note}
+        shortcuts={shortcuts}
+        poolId={poolId}
+        onDismissShortcut={onDismissShortcut}
+        compact={compact}
+        label={label}
+        hideLabel={hideLabel}
+        placeholder={placeholder}
+        shortcutsLabel={shortcutsLabel}
+        autoFocus={autoFocus}
+        onValueChange={(nextValue) => {
+          draftValueRef.current = nextValue;
+          setDraftValue(nextValue);
+          draftRevisionRef.current += 1;
+          cancelDebounce();
+          if (autoSave && canonicalNoteValue(nextValue) !== activeBaseline()) {
+            debounceTimerRef.current = setTimeout(() => {
+              debounceTimerRef.current = null;
+              if (canonicalNoteValue(draftValueRef.current) !== activeBaseline()) {
+                submitCurrentDraft();
+              }
+            }, NOTE_AUTO_SAVE_DELAY_MS);
+          }
+        }}
+        onShortcutInsert={(nextValue) => {
+          draftValueRef.current = nextValue;
+          setDraftValue(nextValue);
+          draftRevisionRef.current += 1;
+          usedShortcutRef.current = true;
+          setUsedShortcutValue(true);
+          if (autoSave) {
+            submitCurrentDraft();
+          }
+        }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+      />
 
       <div
         className={[
@@ -440,7 +406,7 @@ export function NoteEditor({
           >
             {isPending ? "Saving..." : "Try again"}
           </button>
-        ) : (
+        ) : showDone ? (
           <button
             type="button"
             disabled={isPending}
@@ -454,7 +420,7 @@ export function NoteEditor({
           >
             {isPending ? "Saving..." : "Done"}
           </button>
-        )}
+        ) : null}
         {state.status === "error" && onDone ? (
           <button
             type="button"
@@ -477,6 +443,134 @@ export function NoteEditor({
         <NoteStatusMessage state={state} isPending={isPending} isDirty={isDirty} />
       </div>
     </form>
+  );
+}
+
+export type NoteFieldProps = Readonly<{
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  /** Uncontrolled: the starting text. Pass this or `value`. */
+  defaultValue?: string;
+  /** Controlled: the text to show, for a field that belongs to a larger form's draft. */
+  value?: string;
+  /** The ID of the form this field submits with, when it is not inside that form. */
+  form?: string;
+  shortcuts?: readonly NoteShortcut[];
+  poolId?: string;
+  onDismissShortcut?: NoteShortcutDismissHandler;
+  compact?: boolean;
+  label?: string;
+  hideLabel?: boolean;
+  placeholder?: string;
+  shortcutsLabel?: string;
+  autoFocus?: boolean;
+  /** The person typed. */
+  onValueChange: (value: string) => void;
+  /** A shortcut chip added its text; `value` is the whole note after it. */
+  onShortcutInsert: (value: string) => void;
+  onBlur?: (event: FocusEvent<HTMLTextAreaElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+}>;
+
+/**
+ * The note field every note uses: shortcut chips above one text area. It owns the
+ * look and the chips; the caller owns saving. `NoteEditor` wraps it with auto-save.
+ * A form that saves the note with its other fields, such as a new Period, uses it
+ * directly with `value`.
+ */
+export function NoteField({
+  textareaRef,
+  defaultValue,
+  value,
+  form,
+  shortcuts = [],
+  poolId,
+  onDismissShortcut,
+  compact = false,
+  label = "Note",
+  hideLabel = false,
+  placeholder = "Add a note",
+  shortcutsLabel = "Note shortcuts",
+  autoFocus = false,
+  onValueChange,
+  onShortcutInsert,
+  onBlur,
+  onKeyDown,
+}: NoteFieldProps) {
+  const refresh = useRefresh();
+  const contextDismiss = useContext(NoteShortcutDismissContext);
+  const dismissHandler = onDismissShortcut ?? contextDismiss;
+  const [dismissedKeys, setDismissedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const visibleShortcuts = shortcuts
+    .filter((shortcut) => (shortcut.status === "accepted" || shortcut.status === "proposed") && Boolean(shortcut.text) && !dismissedKeys.has(shortcut.key))
+    .slice(0, 5);
+  const canDismiss = Boolean(dismissHandler && poolId);
+
+  return (
+    <>
+      {visibleShortcuts.length > 0 ? (
+        <div className="flex flex-wrap gap-2" aria-label={shortcutsLabel}>
+          {visibleShortcuts.map((shortcut) => {
+            const text = shortcut.text!;
+            return (
+              <span key={shortcut.key} className="inline-flex max-w-full items-stretch">
+                <button
+                  type="button"
+                  className="product-action product-action-secondary min-h-11 max-w-full break-words py-2 text-left text-sm"
+                  onClick={() => {
+                    const textarea = textareaRef.current;
+                    if (!textarea) return;
+                    const nextValue = insertNoteShortcutDraft(textarea.value, text);
+                    if (value === undefined) textarea.value = nextValue;
+                    textarea.focus();
+                    onShortcutInsert(nextValue);
+                  }}
+                >
+                  {text}
+                </button>
+                {canDismiss ? (
+                  <button
+                    type="button"
+                    aria-label={`Dismiss shortcut "${text}"`}
+                    title="Dismiss shortcut"
+                    className="product-action product-action-secondary min-h-11 border-l-0 px-2 py-2 text-sm text-muted-readable hover:text-foreground"
+                    onClick={() => {
+                      setDismissedKeys((prev) => new Set([...prev, shortcut.key]));
+                      void Promise.resolve(dismissHandler!(poolId!, shortcut.key)).then(() => {
+                        refresh();
+                      });
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+      <label
+        className={[
+          "grid font-bold text-foreground",
+          compact ? "gap-1" : "gap-2",
+        ].join(" ")}
+      >
+        <span className={hideLabel ? "sr-only" : undefined}>{label}</span>
+        <textarea
+          ref={textareaRef}
+          name="note"
+          form={form}
+          {...(value === undefined ? { defaultValue } : { value })}
+          onChange={(event) => onValueChange(event.currentTarget.value)}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+          rows={3}
+          autoFocus={autoFocus}
+          data-surface="default"
+          className="min-h-24 resize-y border border-line bg-background px-3 py-2 text-base font-normal leading-7 text-foreground placeholder:text-muted-readable"
+          placeholder={placeholder}
+        />
+      </label>
+    </>
   );
 }
 

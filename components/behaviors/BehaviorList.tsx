@@ -114,6 +114,8 @@ type BehaviorListProps = Readonly<{
    */
   periods?: readonly PeriodView[];
   periodLabelSuggestions?: readonly string[];
+  /** Lines that repeat across Period notes, offered in the Period note field. */
+  periodNoteShortcuts?: readonly NoteShortcut[];
   periodActions?: PeriodActions;
 }>;
 
@@ -196,6 +198,7 @@ export function BehaviorList({
   alongsideViews = null,
   periods,
   periodLabelSuggestions,
+  periodNoteShortcuts,
   periodActions,
 }: BehaviorListProps) {
   const linkCoordinator = sourceLinkCoordinator !== undefined ? sourceLinkCoordinator
@@ -507,7 +510,7 @@ export function BehaviorList({
       <CategoryCounts analytics={analytics} />
 
       <PeriodList periods={periods} today={analytics.rangeEndLocalDate}
-        labelSuggestions={periodLabelSuggestions} actions={periodActions} />
+        labelSuggestions={periodLabelSuggestions} noteShortcuts={periodNoteShortcuts} actions={periodActions} />
 
       <ArchivedBehaviorDisclosure
         archivedBehaviors={archivedList.rows}

@@ -22,6 +22,7 @@ import {
   resetTimeTrackingAction,
   saveDayNoteAction,
   savePeriodAction,
+  savePeriodNoteAction,
   setBehaviorDefaultDurationAction,
   startTimeTrackingAction,
   stopTimeTrackingAction,
@@ -64,6 +65,7 @@ const PERIOD_ACTIONS: PeriodActions = {
   save: savePeriodAction,
   end: endPeriodAction,
   remove: deletePeriodAction,
+  saveNote: savePeriodNoteAction,
 };
 
 const MOVE_ACTIONS: OccurrenceMoveActions = {

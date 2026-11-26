@@ -50,7 +50,7 @@ Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 383–386: alongside follow-ups after the audit (D37) | Written November 25, 2026; all `not_started` | 386 and 383 first, then 384; 385's card needs the owner's review before it shows a tip | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. 377 (view) complete November 26: the real view replaces the placeholder. 380 (listing preparation) `in_progress`: drafts, capture script, skill draft and owner checklist done November 26, host screenshots wait for 378. 378 and 381 not started; 379 complete; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 378 tests hosts (notes for it: `docs/qa/2026-11-25-mcp-day-view.md`); 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
-| Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) blocked | Owner: say yes or no to draft PR #423 (Chat writes Periods; its migration drops and re-adds a check constraint). 374 starts when Ticket 363 (PR #407) is on `main`. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
+| Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) blocked | Chat writes Periods since PR #423 (owner's yes, November 26; hosted migration `20261126150000` pushed). 374 starts from an hourly scheduled check when Ticket 363 (PR #407) is on `main`. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
@@ -101,6 +101,33 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Periods: Chat writes and editor polish — November 26, 2026
+
+- **Chat writes Periods (Ticket 370 follow-up, PR #423).** The owner said yes to migration
+  `20261126150000_chat_period_actions.sql`, which drops and re-adds
+  `chat_actions_kind_check`. Pushed to hosted November 26; read back: the constraint is
+  validated and lists `period`. CI `verify` and the Local Supabase rehearsal passed.
+- **Period editor polish (Ticket 369, owner's request).** Label uses the standard
+  underlined field, now one constant in `lib/ui/field-classes.ts`. First day and Last day
+  are compact and side by side, with "Still going" or Clear beside Last day. Note is the
+  shared field: `NoteField`, taken out of `components/notes/NoteEditor.tsx`. An existing
+  Period's note saves on its own through `NoteEditor`, `savePeriodNoteAction` and
+  `savePeriodNote` (compare-and-set on the note, no new migration); Save stores label and
+  days and names the revision the note save returned. Period note chips come from
+  `repeatedNoteLineProposals`, the rule Occurrence and day notes use, and are not stored.
+- **Not done:** kept, edited or dismissed Period note shortcuts
+  (`docs/FUTURE_UPDATES.md`, "Stored Period note shortcuts").
+- **Ticket 374:** still blocked on Ticket 363 (draft PR #407). An hourly scheduled check
+  starts it when #407 is on `main`.
+- **Verification:** the eight required checks passed locally with Node 24. The editor was
+  seen on the `/design-system` bench (`module.period-control`) in headless Chrome at
+  1100px and 390px. Not run: the real `/timeline` and `/behaviors` pages against a
+  database, Dagger.
+
+Platform impact: web implemented; desktop follow-up Ticket 374 (the shared components
+change, but the Mac passes no Period actions yet); marketing not applicable; future
+mobile inherits the core rule and service. Messaging impact: none.
 
 ## Ticket 380: MCP Apps listing preparation, nothing published — November 26, 2026
 

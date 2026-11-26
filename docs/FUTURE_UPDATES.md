@@ -94,6 +94,10 @@ capability research is recorded in `docs/qa/google-calendar-capabilities.md`.
 
 The layered workbench recipes and the ChatGPT-plan device path do not read day notes or Periods yet; only the hosted brief's opening does (Ticket 367, D35).
 
+## Stored Period note shortcuts
+
+The Period note field offers lines that repeat across Period notes, worked out on each read by the rule Occurrence notes and day notes use (`repeatedNoteLineProposals`). Nothing is stored, so a person cannot keep, edit or dismiss one, Settings does not list them, and the model pass that proposes patterns does not read Period notes. A stored pool needs a `period_notes` row in `note_shortcut_states`, whose ID check constraint must be dropped and added again (outside the standing approval for additive pushes), a read function for the pool's context, a sync contract version so the Mac accepts the new ID, and Mac storage. Do it with or after Ticket 374.
+
 ## AI-friendly routing provider for prose-level travel reasoning
 
 Follow-up logged November 25, 2026 (unscheduled; cross-referenced with `docs/LEGAL.md` **L-001**

@@ -610,12 +610,21 @@ Period actions until Ticket 374, so nothing renders there.
 - **Add period.** Only today's header has a quiet "Add period" disclosure, beside "Add
   day note" and styled like it. An open disclosure takes the full width, so the other
   wraps to its own line.
-- **Editor.** One form: Label (text, with a `datalist` of past labels), First day and
-  Last day (native date inputs; the help text under Last day reads "Leave empty if it is
-  still going"), Note, then Save and Cancel. An existing Period also gets "End today",
-  only when the Period resolver allows it, and "Remove". Remove swaps to "Remove this
-  period" and "Keep" in place; the second choice removes. No modal, no date picker of
-  our own, and no wording that suggests an undo.
+- **Editor.** Label is the standard underlined text field, with a `datalist` of past
+  labels. First day and Last day are compact native date inputs side by side; they
+  stack on a narrow phone. An empty Last day reads "Still going. Set a last day when it
+  ends." beside it; a set one gets a "Clear" action, and its picker starts at the First
+  day. Note is the shared note field (`components/notes/NoteEditor.tsx`): the same
+  text area, and chips for lines that repeat across Period notes. For an existing
+  Period the note saves on its own, like an Occurrence note or a day note, and shows
+  the same saving and saved notices; Save stores the label and days, and Close closes
+  the editor. A new Period has nothing to save into yet, so Save sends all four fields
+  and the second action is Cancel. An existing Period also gets "End today", only when
+  the Period resolver allows it, and "Remove". Remove swaps to "Remove this period" and
+  "Keep" in place; the second choice removes. No modal, no date picker of our own, and
+  no wording that suggests an undo. Period note chips are worked out on each read and
+  not stored, so they cannot be kept, edited or dismissed, and Settings does not list
+  them; the account's Note shortcuts switch turns them off with the rest.
 - **Outcomes.** "Period saved.", "Period ended today." and "Period removed." show as
   outcome notices beside the control after the form closes. A broken rule shows the
   resolver's sentence under the form and keeps the draft. A stale write shows the

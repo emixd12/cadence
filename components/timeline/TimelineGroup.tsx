@@ -12,6 +12,7 @@ import { DayNoteControl } from "@/components/timeline/DayNoteControl";
 import { PeriodDayControls } from "@/components/periods/PeriodControl";
 import type { PeriodActions, PeriodView } from "@/lib/types/period";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { PERIOD_NOTE_SHORTCUT_KEY } from "@cadence/core/resolvers/period.resolver";
 
 type TimelineGroupProps = Readonly<{
   section: TimelineDaySection;
@@ -77,6 +78,7 @@ export function TimelineGroup({
       periods={periods}
       today={todayLocalDate}
       labelSuggestions={periodLabelSuggestions}
+      noteShortcuts={shortcutsByBehavior[PERIOD_NOTE_SHORTCUT_KEY]}
       actions={periodActions}
     >
       {dayNoteOnly}

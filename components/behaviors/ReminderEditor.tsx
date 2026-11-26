@@ -1,3 +1,5 @@
+import { COMPACT_UNDERLINED_FIELD_CONTROL_CLASS } from "@/lib/ui/field-classes";
+
 type ReminderEditorProps = Readonly<{
   browserReminderEnabled: boolean;
   emailReminderEnabled: boolean;
@@ -7,9 +9,6 @@ type ReminderEditorProps = Readonly<{
   /** False for a Behavior with no fixed schedule: the offset is kept but not shown. */
   showOffset?: boolean;
 }>;
-
-const COMPACT_UNDERLINED_FIELD_CONTROL_CLASS =
-  "min-h-6 border-0 border-b border-line bg-background px-0 py-0.5 text-base text-foreground";
 
 export function ReminderEditor({
   browserReminderEnabled,

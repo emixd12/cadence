@@ -14,6 +14,7 @@ import {
   endPeriodFromFormData,
   listPeriodsForUser,
   periodTodayForUser,
+  savePeriodNoteFromFormData,
   updatePeriodFromFormData,
 } from "@/lib/services/period.service";
 import { createClient } from "@/lib/supabase/server";
@@ -141,6 +142,23 @@ describe("period web service (Ticket 368)", () => {
     expect(state.calls[0]).toEqual({ fn: "update_period", args: {
       p_id: row().id, p_expected_revision: 1, p_label: "Flu", p_start_on: "2026-11-02", p_end_on: "2026-11-09", p_note: "Fever\nRest",
     } });
+  });
+
+  it("keeps the note when the edit form has no note field", async () => {
+    const { state } = signedIn({ rows: [row({ note: "Old" })] });
+    const result = await updatePeriodFromFormData(form({ period_id: row().id, expected_revision: "1", label: "Flu", start_on: "2026-11-02", end_on: "" }));
+    expect(result.period).toMatchObject({ label: "Flu", note: "Old", revision: 2 });
+    expect(state.calls[0]!.args).toMatchObject({ p_note: "Old" });
+  });
+
+  it("saves the note alone from the note field's form", async () => {
+    const { state } = signedIn({ rows: [row({ note: "Old", revision: 3 })] });
+    const result = await savePeriodNoteFromFormData(form({ period_id: row().id, expected_note: "Old", note: "Old\r\nRest", used_shortcut: "false" }));
+    expect(result.period).toMatchObject({ note: "Old\nRest", revision: 4 });
+    expect(state.calls).toEqual([{ fn: "update_period", args: {
+      p_id: row().id, p_expected_revision: 3, p_label: row().label, p_start_on: row().start_on, p_end_on: row().end_on, p_note: "Old\nRest",
+    } }]);
+    await expect(savePeriodNoteFromFormData(form({ period_id: row().id, expected_note: "Old", note: "Other" }))).rejects.toThrow(PERIOD_CONFLICT_MESSAGE);
   });
 
   it("reports a conflict for a stale form and for another account's Period id", async () => {

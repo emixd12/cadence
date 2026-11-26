@@ -4,6 +4,7 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { CalendarRange } from "lucide-react";
 
 import { periodRangeLabel } from "@cadence/core/resolvers/period.resolver";
+import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import type { PeriodActions, PeriodNoticeId, PeriodView } from "@/lib/types/period";
 
 import { Notice } from "@/components/feedback/Notice";
@@ -27,7 +28,9 @@ type Shared = Readonly<{
   today: string;
   /** Past labels, newest first, offered in the Label field. */
   labelSuggestions?: readonly string[];
-  /** Save, End today and Remove. Absent: no Period control is drawn. */
+  /** Lines that repeat across Period notes, offered in the Note field. */
+  noteShortcuts?: readonly NoteShortcut[];
+  /** Save, End today, Remove and the note's own save. Absent: no Period control is drawn. */
   actions?: PeriodActions;
 }>;
 
@@ -54,6 +57,7 @@ export function PeriodDayControls({
   periods = [],
   today,
   labelSuggestions = NO_SUGGESTIONS,
+  noteShortcuts,
   actions,
   children = null,
 }: PeriodDayControlsProps) {
@@ -61,22 +65,23 @@ export function PeriodDayControls({
   return (
     <>
       <PeriodChips localDate={localDate} dayLabel={dayLabel} periods={periods} today={today}
-        labelSuggestions={labelSuggestions} actions={actions} />
+        labelSuggestions={labelSuggestions} noteShortcuts={noteShortcuts} actions={actions} />
       <div className="flex flex-wrap items-start gap-x-5">
         {children ? <div className="min-w-0 has-[details[open]]:w-full">{children}</div> : null}
-        {localDate === today ? <PeriodAdd today={today} labelSuggestions={labelSuggestions} actions={actions} /> : null}
+        {localDate === today ? <PeriodAdd today={today} labelSuggestions={labelSuggestions} noteShortcuts={noteShortcuts} actions={actions} /> : null}
       </div>
     </>
   );
 }
 
 /** One chip per Period that covers the day. A chip opens that Period's editor in place. */
-function PeriodChips({ localDate, dayLabel, periods, today, labelSuggestions, actions }: Readonly<{
+function PeriodChips({ localDate, dayLabel, periods, today, labelSuggestions, noteShortcuts, actions }: Readonly<{
   localDate: string;
   dayLabel: string;
   periods: readonly PeriodView[];
   today: string;
   labelSuggestions: readonly string[];
+  noteShortcuts?: readonly NoteShortcut[];
   actions: PeriodActions;
 }>) {
   const panelId = useId();
@@ -116,7 +121,7 @@ function PeriodChips({ localDate, dayLabel, periods, today, labelSuggestions, ac
       ) : null}
       {open ? (
         <div id={panelId} className="mt-1 mb-2">
-          <PeriodEditor key={open.id} period={open} today={today} labelSuggestions={labelSuggestions} actions={actions}
+          <PeriodEditor key={open.id} period={open} today={today} labelSuggestions={labelSuggestions} noteShortcuts={noteShortcuts} actions={actions}
             onDone={(noticeId) => { setNotice(noticeId); close(open.id); }}
             onCancel={() => close(open.id)} />
         </div>
@@ -127,9 +132,10 @@ function PeriodChips({ localDate, dayLabel, periods, today, labelSuggestions, ac
 }
 
 /** "Add period", a disclosure styled like "Add day note". Shown on today only. */
-function PeriodAdd({ today, labelSuggestions, actions }: Readonly<{
+function PeriodAdd({ today, labelSuggestions, noteShortcuts, actions }: Readonly<{
   today: string;
   labelSuggestions: readonly string[];
+  noteShortcuts?: readonly NoteShortcut[];
   actions: PeriodActions;
 }>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -161,7 +167,7 @@ function PeriodAdd({ today, labelSuggestions, actions }: Readonly<{
         </summary>
         {isOpen ? (
           <div className="mt-2">
-            <PeriodEditor today={today} labelSuggestions={labelSuggestions} actions={actions}
+            <PeriodEditor today={today} labelSuggestions={labelSuggestions} noteShortcuts={noteShortcuts} actions={actions}
               onDone={(noticeId) => { setNotice(noticeId); close(); }}
               onCancel={close} />
           </div>
@@ -178,7 +184,7 @@ export type PeriodListProps = Shared & Readonly<{
 }>;
 
 /** Every Period, newest first, each with the same editor. Hidden when there is none. */
-export function PeriodList({ periods = [], today, labelSuggestions = NO_SUGGESTIONS, actions }: PeriodListProps) {
+export function PeriodList({ periods = [], today, labelSuggestions = NO_SUGGESTIONS, noteShortcuts, actions }: PeriodListProps) {
   const titleId = useId();
   const panelId = useId();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -225,7 +231,7 @@ export function PeriodList({ periods = [], today, labelSuggestions = NO_SUGGESTI
                 {isOpen ? (
                   <div id={panelId} className="mb-2">
                     <PeriodEditor key={period.id} period={period} today={today} labelSuggestions={labelSuggestions}
-                      actions={actions}
+                      noteShortcuts={noteShortcuts} actions={actions}
                       onDone={(noticeId) => { setNotice(noticeId); close(period.id); }}
                       onCancel={() => close(period.id)} />
                   </div>

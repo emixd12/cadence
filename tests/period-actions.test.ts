@@ -112,6 +112,22 @@ describe("Period Server Actions (Ticket 369)", () => {
     expect(state.rows[0]).toMatchObject({ label: "Flu", end_on: "2026-11-09", revision: 2 });
   });
 
+  it("saves the note field on its own and answers with the next revision", async () => {
+    const { state, supabase } = hosted({ rows: [row()] });
+    vi.mocked(createClient).mockResolvedValue(supabase as never);
+    const { savePeriodNoteAction } = await actions();
+
+    const saved = await savePeriodNoteAction(IDLE, form({ period_id: ID, expected_note: row().note ?? "", note: "Fever" }));
+    expect(saved).toEqual({ status: "success", message: "", revision: 2 });
+    expect(state.rows[0]).toMatchObject({ label: row().label, note: "Fever", revision: 2 });
+    expect(mocks.revalidatePath.mock.calls).toEqual([["/timeline"], ["/behaviors"]]);
+
+    const stale = await savePeriodNoteAction(IDLE, form({ period_id: ID, expected_note: "Something else", note: "Rest" }));
+    expect(stale).toEqual({ status: "error", message: PERIOD_CONFLICT_MESSAGE });
+    const long = await savePeriodNoteAction(IDLE, form({ period_id: ID, expected_note: "Fever", note: "x".repeat(2001) }));
+    expect(long).toEqual({ status: "error", message: PERIOD_MESSAGES.noteTooLong });
+  });
+
   it("returns the service's own sentence for a broken rule and writes nothing", async () => {
     const { state, supabase } = hosted();
     vi.mocked(createClient).mockResolvedValue(supabase as never);
