@@ -47,7 +47,8 @@ function fakeClient(tables: Readonly<{ behaviors: Row[]; estimates: unknown[]; l
 }
 
 // With the flag on only recipe 1.3 rows are current (Ticket 359).
-const hash = (title: string, whereKind: string | null = null) => behaviorEstimateInputHash({ title, description: null, whereKind }, { whereAsked: true });
+// Ticket 386: the hash is title and description only; Where is not part of it.
+const hash = (title: string) => behaviorEstimateInputHash({ title, description: null }, { whereAsked: true });
 
 describe("readAlongsideBehaviorFacts", () => {
   it("reads nothing and returns null while the flag is off", async () => {
@@ -69,7 +70,7 @@ describe("readAlongsideBehaviorFacts", () => {
       ],
       estimates: [
         { behavior_id: "helmet", input_hash: hash("Red light helmet"), duration_minutes: 10, alongside: true, where_guess: "home" },
-        { behavior_id: "reading", input_hash: hash("Reading", "home"), duration_minutes: 30, alongside: false, where_guess: "anywhere" },
+        { behavior_id: "reading", input_hash: hash("Reading"), duration_minutes: 30, alongside: false, where_guess: "anywhere" },
         { behavior_id: "stale", input_hash: "old", duration_minutes: 5, alongside: true, where_guess: "home" },
       ],
     });
@@ -106,7 +107,7 @@ describe("readAlongsideGuesses", () => {
       ],
       estimates: [
         { behavior_id: "helmet", input_hash: hash("Red light helmet"), duration_minutes: 10, alongside: true, where_guess: "home" },
-        { behavior_id: "reading", input_hash: hash("Reading", "home"), duration_minutes: 30, alongside: false, where_guess: null },
+        { behavior_id: "reading", input_hash: hash("Reading"), duration_minutes: 30, alongside: false, where_guess: null },
         { behavior_id: "stale", input_hash: "old", duration_minutes: 10, alongside: true, where_guess: "home" },
       ],
     });

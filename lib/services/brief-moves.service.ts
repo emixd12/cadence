@@ -446,10 +446,11 @@ export async function cacheBehaviorEstimates(input: Readonly<{
     // A length-only row stores false; its hash keeps it from being read as a guess.
     alongside: alongsideAsked && answer.alongside === true,
     model: input.model,
-    // Ticket 359, flag on only: the Where guess, null when the person set Where (none is
-    // needed). The database function writes null when the key is absent, so a stale
-    // guess never survives a new input hash.
-    ...(personSetting ? { where_guess: byId.get(answer.behaviorId)!.whereKind ? null : isWhereGuess(answer.whereGuess) ? answer.whereGuess : null } : {}),
+    // Ticket 359, flag on only: the Where guess. Since Ticket 386 it is stored even when the
+    // person set Where: the request is the same either way, readers skip it while Where is
+    // set, and clearing Where then reads it without another call. The database function
+    // writes null when the key is absent, so a stale guess never survives a new input hash.
+    ...(personSetting ? { where_guess: isWhereGuess(answer.whereGuess) ? answer.whereGuess : null } : {}),
   }));
   if (!rows.length) return input.day;
   const { error } = await input.agent.rpc("upsert_behavior_advisor_estimates", { p_estimates: rows });

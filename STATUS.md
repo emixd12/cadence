@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 383 Mac part, 384, 385 and 386 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 web part complete in the draft PR (migration `20261126130000`, push approved); 386 complete in source on `feat/alongside-386`; 383 Mac part, 384 and 385 open | 383 Mac: SQLite and sync planner must accept a guess dismissal while Completion places is off, before the flag is on for an account with a linked Mac. 385: the card needs a `coach_tips.link_target` constraint change and the owner's review | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | Scoped November 25, 2026; plan audited; none started; 382 (later views) `deferred` | 375 (spike) first; then 376 and 377 in parallel; 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | Planned November 25, 2026; plan reviewed; none started | 367 and 368 first; 374 (Mac) needs Ticket 363 on `main` and a Mac release | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; DECISIONS, 2026-11-25 (D35) |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Implemented in source November 25, 2026; all checks pass; not yet looked at in a browser | Check a Behavior with 3 tracked completions on production web after merge; installed Mac check with the next Mac release; advisor wording that compares tracked and intended time needs its own ticket | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
@@ -101,6 +101,21 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 386 complete in source: the estimate hash leaves Where out — November 25, 2026
+
+- **Hash:** `behaviorEstimateInputHash` hashes the title, description and the recipe
+  markers only (`v: 2`). Setting, changing or clearing Where keeps the cached length and
+  alongside guess and makes no model call. A title or description change still asks again.
+- **Where guess:** `cacheBehaviorEstimates` now stores the model's Where guess also when
+  the person set Where. `currentEstimate` skips it while Where is set; clearing Where reads
+  it again with no call. The request bytes are unchanged, flag on or off.
+- **One-time cost:** every stored hash changes once, so each Behavior is asked again one
+  time: one request per brief for up to 40 Behaviors with the flag off, at most two with it
+  on (`docs/COSTS.md`). No compatibility path for old hashes (D37). No migration.
+
+Platform impact: web implemented; desktop not applicable (estimates are hosted); marketing
+not applicable; future mobile inherits the server rules. Messaging impact: none.
 
 ## Ticket 383 web complete: the guessed Where without Completion places — November 26, 2026
 

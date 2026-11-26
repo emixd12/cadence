@@ -541,7 +541,16 @@ under 10 output tokens each, not measured) and the instructions by one paragraph
 under 120 input tokens, not measured). The model input is unchanged: titles and
 descriptions only. Turning the flag on asks each cached Behavior once more, because recipe
 1.3 rows use a new input hash; after that, estimates are cached as before. With the flag
-off the request is recipe 1.2, byte for byte. No estimate call runs for recipe 1.0, when the input is disabled,
+off the request is recipe 1.2, byte for byte.
+Ticket 386 (D37), flag on or off: the input hash leaves Where out, so every stored hash
+changes once and each Behavior is asked again one time. The step runs at most once per
+brief, for at most 40 stale Behaviors (`ESTIMATE_BATCH`) with an Occurrence from the day
+before to the day after. An account with up to 40 such Behaviors pays one request on its
+next brief with the flag off, and at most two with it on (the alongside and length-only
+requests); each further 40 Behaviors adds one brief's worth. At the planning figure below
+(US$0.001 per request) that is about US$0.001–0.002 per account, once (assumed, not
+measured). After that, setting or changing Where asks nothing; only a title or description
+change does. No estimate call runs for recipe 1.0, when the input is disabled,
 or when no Behavior qualifies. The shared abort signal bounds both requests;
 the estimate request adds no automatic retry.
 

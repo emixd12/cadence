@@ -2556,7 +2556,8 @@ be done alongside other things?". Null means unanswered. Migration:
   (`default`). A routine block is alongside only when every step that follows it is.
 - **The cached guess.** `behavior_advisor_estimates.alongside` holds the model's guess
   from the Daily Brief estimate call, read only while its `input_hash` matches the
-  Behavior's title, description and Where. With `CADENCE_ALONGSIDE` on, a Behavior the
+  Behavior's title and description (since Ticket 386 Where is not hashed: the model never
+  receives it, so a Where change keeps the cached length and guesses). With `CADENCE_ALONGSIDE` on, a Behavior the
   person answered is asked for its length only. That row is stored with a distinct
   length-only hash and `alongside = false`, so it never reads as a guess; clearing the
   answer makes the estimate stale and the next brief asks about alongside again.
@@ -2632,8 +2633,10 @@ or place key. Ticket 357 added the column and its read path.
   update always sets it, so a guess made under an earlier `input_hash` never survives a
   new estimate. With `CADENCE_ALONGSIDE` on, the estimate call is recipe 1.3: both its
   requests (the alongside one and the length-only one) also return `whereGuess`, and
-  `cacheBehaviorEstimates` stores it, or null for a Behavior whose `where_kind` the person
-  set. Recipe 1.3 rows hash with `whereAsked` (`behaviorEstimateInputHash`), so turning
+  `cacheBehaviorEstimates` stores it. Since Ticket 386 it stores the guess also for a
+  Behavior whose `where_kind` the person set: the request is the same either way, readers
+  (`currentEstimate`) skip the guess while `where_kind` is set, and clearing Where reads
+  it again with no model call. Recipe 1.3 rows hash with `whereAsked` (`behaviorEstimateInputHash`), so turning
   the flag on asks each Behavior once more and the flag-on reader accepts only recipe 1.3
   rows. With the flag off the request is recipe 1.2, the rows carry no `where_guess` key
   and the function stores null. The model input stays the title and description under a

@@ -21015,7 +21015,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 386: The estimate hash leaves Where out
 
-Status: not_started
+Status: complete in source November 25, 2026, on `feat/alongside-386` (not merged). No migration. Every stored estimate hash changes once on deploy, flag on or off.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 

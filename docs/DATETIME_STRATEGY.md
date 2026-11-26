@@ -231,7 +231,8 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   completion is a Completed Occurrence before today with its sessions added together,
   as on the Timeline. The stored source name `logged_average` is unchanged; the figure
   is a median. The estimate is stored per Behavior
-  and asked again only when its title, description or kind of place changes. A Yes applies
+  and asked again only when its title or description changes (Ticket 386: Where is not
+  sent to the model, so it is not part of the estimate's input hash). A Yes applies
   the length the line showed. A correction from the person becomes the Behavior's
   default length.
 - **Gaps.** Items and calendar events keep 10 minutes on each side. An exact-time

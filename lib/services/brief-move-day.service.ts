@@ -65,6 +65,12 @@ export type BriefMoveDay = Readonly<{
  * The inputs an estimate depends on. A different hash means the model is asked again;
  * the same hash reuses the cached length and "alongside" answer.
  *
+ * Ticket 386 (D37): only what the model receives is hashed, the title and description,
+ * plus the recipe markers below. Where is not sent, so it is not hashed: setting,
+ * changing or clearing Where keeps the cached length and guesses and asks nothing.
+ * `currentEstimate` stops reading `where_guess` while the person's Where is set. This
+ * changed every stored hash once (`v: 2`), so each Behavior was asked again one time.
+ *
  * `alongsideAsked: false` (Ticket 356) marks a length-only estimate, made while the
  * person's answer was set and the model was not asked about alongside. It hashes
  * differently, so its stored `alongside` is never read as a guess, and clearing the
@@ -75,10 +81,10 @@ export type BriefMoveDay = Readonly<{
  * flag on asks each Behavior once more, and turning it off reads only recipe 1.2 rows.
  */
 export function behaviorEstimateInputHash(
-  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind">,
+  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description">,
   options: Readonly<{ alongsideAsked?: boolean; whereAsked?: boolean }> = {},
 ): string {
-  const inputs = { v: 1, title: behavior.title.trim(), description: behavior.description?.trim() ?? "", where: behavior.whereKind ?? null };
+  const inputs = { v: 2, title: behavior.title.trim(), description: behavior.description?.trim() ?? "" };
   const asked = options.alongsideAsked === false ? { ...inputs, alongside: "not_asked" } : inputs;
   return createHash("sha256").update(JSON.stringify(options.whereAsked === true ? { ...asked, whereGuess: "asked" } : asked)).digest("hex");
 }
@@ -112,7 +118,8 @@ export function currentEstimate(
   if (!cached) return undefined;
   const validity = estimateValidity(cached, behavior, personSetting);
   if (!validity) return undefined;
-  // Flag off reads no Where guess. A Behavior whose Where the person set was not given one.
+  // Flag off reads no Where guess. While the person's Where is set, the guess is not read;
+  // it was made from the title and description alone, so clearing Where reads it again.
   const whereGuess = !personSetting || behavior.whereKind ? null : cached.where_guess ?? null;
   return { minutes: cached.duration_minutes, alongside: validity === "guess" ? cached.alongside : null, whereGuess };
 }
