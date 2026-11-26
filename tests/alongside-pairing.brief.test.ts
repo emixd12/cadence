@@ -213,6 +213,39 @@ describe("Re-check and Re-plan of a pairing line", () => {
   });
 });
 
+describe("Re-check and Re-plan keep the coach's evidence (audit fix 6)", () => {
+  beforeEach(() => { vi.stubEnv("CADENCE_ALONGSIDE", "on"); });
+  const withBath = () => [...PAIRABLE(), item("bath", "19:00", 45, { title: "bath" })];
+
+  it("Re-plan prefers the host the done_together signal names over a nearer one", async () => {
+    mocks.evidence.mockResolvedValue({ doneTogether: [{ behaviorId: "b-helmet", otherBehaviorId: "b-tv" }], crowdedHours: [] });
+    const items = withBath();
+    mocks.readDay.mockResolvedValue(day(items));
+    const { callers: c } = callers({ move_proposals: [pairingRow(items)] });
+    const result = await replanBriefMove(c, { proposalId: PROPOSAL, context: { calendarBusy: [] } });
+    expect(result.line).toMatchObject({ pairing: { hostOccurrenceId: "tv" } });
+    expect(mocks.evidence).toHaveBeenCalledWith(expect.anything(), DAY);
+  });
+
+  it("Re-check pairs again with the named host when the offered one left", async () => {
+    mocks.evidence.mockResolvedValue({ doneTogether: [{ behaviorId: "b-helmet", otherBehaviorId: "b-tv" }], crowdedHours: [] });
+    const items = withBath();
+    const row = pairingRow(items);
+    mocks.readDay.mockResolvedValue(day(items.map((entry) => entry.occurrenceId === "reading" ? { ...entry, status: "completed" as const } : entry)));
+    const { callers: c } = callers({ move_proposals: [row] });
+    const { replaced } = await recheckBriefMoves(c, { localDate: DAY, context: { calendarBusy: [] }, proposalIds: [PROPOSAL] });
+    expect(replaced[0]!.line).toMatchObject({ pairing: { hostOccurrenceId: "tv" } });
+  });
+
+  it("Re-check reads no evidence when no pairing line needs repair", async () => {
+    const items = PAIRABLE();
+    mocks.readDay.mockResolvedValue(day(items));
+    const { callers: c } = callers({ move_proposals: [pairingRow(items)] });
+    await recheckBriefMoves(c, { localDate: DAY, context: { calendarBusy: [] }, proposalIds: [PROPOSAL] });
+    expect(mocks.evidence).not.toHaveBeenCalled();
+  });
+});
+
 describe("Yes and Accept all on a pairing line (audit fix 2)", () => {
   beforeEach(() => { vi.stubEnv("CADENCE_ALONGSIDE", "on"); });
   const context = { calendarBusy: [] };

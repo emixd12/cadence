@@ -987,6 +987,10 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
   const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, request.localDate));
   /** Occurrence id to the line that now stands for it (null: none). */
   const outcome = new Map<string, Readonly<{ proposalId: string; line: BriefMoveLine | null }>>();
+  // Audit fix 6: the coach's evidence, read once and only when a pairing line needs it, on
+  // the Daily Brief agent's own client, so the done_together host still comes first.
+  let evidence: AlongsidePairingEvidence | undefined;
+  const pairingEvidence = async () => evidence ??= await readAlongsidePairingEvidence(await callers.agent(), request.localDate);
 
   for (const row of latest.values()) {
     if (row.status !== "proposed") continue;
@@ -1009,7 +1013,7 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
     let candidate: BriefMoveCandidate | null;
     if (pairing) {
       // The one rule pairs the guest again (the same host at its new time, or another), or the line closes.
-      candidate = repairedPairing(day, row, line, { now: person.now, calendar, travel, positions });
+      candidate = repairedPairing(day, row, line, { now: person.now, calendar, travel, positions, evidence: await pairingEvidence() });
     } else if (check.ok && !passed) {
       // The time still fits but the item changed (edited, or moved and back): the same
       // move, rebuilt from the item as it is, so Yes is not refused for a stale revision.
@@ -1069,17 +1073,19 @@ function googleProvenance(proposal: ProposalRow, serverCalendar: BriefServerCale
 /**
  * Ticket 361: a pairing line's guest paired again on the day as it is now, holding the
  * other open lines' times. The need was found when the line was written, so it is not
- * asked again. Null when no host fits.
+ * asked again; the evidence still orders the hosts. Null when no host fits.
  */
 function repairedPairing(day: BriefMoveDay, row: ProposalRow, line: BriefMoveLine, input: Readonly<{
   now: Temporal.Instant; calendar: readonly BriefMoveCalendarBusy[]; travel: BriefMoveTravelInput | null;
   positions: ReadonlyMap<string, BriefMoveInterval>; excludeHosts?: ReadonlySet<string>;
+  /** The coach's evidence, so a host the done_together signal names still comes first. */
+  evidence: AlongsidePairingEvidence;
 }>): BriefMoveCandidate | null {
   const positions = new Map(input.positions);
   positions.delete(row.occurrence_id);
   const [next] = planAlongsidePairings({
     localDate: row.local_date, timezone: line.timezone, now: input.now, items: day.items, calendarBusy: input.calendar,
-    travel: input.travel, evidence: { doneTogether: [], crowdedHours: [] }, positions,
+    travel: input.travel, evidence: input.evidence, positions,
     onlyGuests: new Set([row.occurrence_id]), requireNeed: false, limit: 1,
     ...(input.excludeHosts ? { excludeHosts: input.excludeHosts } : {}),
   });
@@ -1209,7 +1215,8 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   // Ticket 361: Re-plan on a pairing line pairs the guest with another host, or offers nothing.
   if (old.pairing && alongsideEnabled()) {
     const candidate = repairedPairing(day, proposal, old, { now: person.now, calendar: serverCalendar.busy, travel,
-      positions: openLinePositions(latest.values()), excludeHosts: new Set([old.pairing.hostOccurrenceId]) });
+      positions: openLinePositions(latest.values()), excludeHosts: new Set([old.pairing.hostOccurrenceId]),
+      evidence: await readAlongsidePairingEvidence(await callers.agent(), proposal.local_date) });
     if (!candidate) return { line: null, replacedProposalId: proposal.id };
     const [line] = await saveBriefProposals(await callers.agent(), {
       runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false, candidates: [candidate],
