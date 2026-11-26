@@ -37,16 +37,19 @@ export const CHAT_IMMEDIATE_WRITES = [
   "set_occurrence_status", "set_parent_occurrence_status", "update_occurrence_note", "update_day_note", "move_occurrence_for_day",
   "revert_occurrence_move", "add_opportunity_occurrence", "remove_opportunity_occurrence",
 ] as const satisfies readonly IntegrationOperationName[];
-/** Writes that always wait for a Yes (including cross-day moves and recurring schedule remodeling). */
+/**
+ * Writes that always wait for a Yes (including cross-day moves and recurring schedule remodeling).
+ * Period writes (Ticket 370) are here because chat cannot take one back: no tool removes a
+ * Period, and an edit keeps no earlier values, so they have no Undo.
+ */
 export const CHAT_CONFIRM_WRITES = [
   "create_behavior", "update_behavior", "archive_behavior", "restore_behavior", "move_occurrence_to_date",
+  "create_period", "update_period", "end_period",
 ] as const;
-/**
- * Period writes in the MCP catalog that Chat does not offer yet (Ticket 370). Chat reads
- * Periods; creating, editing and ending one from Chat is the follow-up on branch
- * `feat/370-chat-period-writes`, which needs the `period` kind in `chat_actions`.
- */
-export const CHAT_UNOFFERED_OPERATIONS: ReadonlySet<string> = new Set(["create_period", "update_period", "end_period"]);
+/** Period writes. They are not note tools: a label is not a note, so they stay offered with Notes off. */
+export const CHAT_PERIOD_WRITES = ["create_period", "update_period", "end_period"] as const satisfies readonly IntegrationOperationName[];
+const PERIOD_WRITES: ReadonlySet<string> = new Set(CHAT_PERIOD_WRITES);
+export function isPeriodWrite(name: string): name is (typeof CHAT_PERIOD_WRITES)[number] { return PERIOD_WRITES.has(name); }
 export type ChatWriteName = (typeof CHAT_IMMEDIATE_WRITES)[number] | (typeof CHAT_CONFIRM_WRITES)[number];
 
 const WRITES: ReadonlySet<string> = new Set([...CHAT_IMMEDIATE_WRITES, ...CHAT_CONFIRM_WRITES]);
@@ -62,6 +65,7 @@ export const CHAT_OUTCOME_KIND: Readonly<Record<ChatWriteName, ChatOutcomeKind>>
   move_occurrence_for_day: "move", move_occurrence_to_date: "move", revert_occurrence_move: "move", create_behavior: "create_behavior",
   update_behavior: "update_behavior", archive_behavior: "archive_behavior", restore_behavior: "restore_behavior",
   add_opportunity_occurrence: "opportunity", remove_opportunity_occurrence: "opportunity",
+  create_period: "period", update_period: "period", end_period: "period",
 };
 
 /** What a read looked at, for the muted line under the reply. */
@@ -104,6 +108,33 @@ function withoutServerKeys(schema: JsonSchemaObject): JsonSchemaObject {
   // The operation still validates its full schema when it runs.
   const rest = Object.fromEntries(Object.entries(schema).filter(([key]) => !TOP_LEVEL_DROPPED.has(key)));
   return { ...rest, properties: kept, ...(required ? { required } : {}) } as JsonSchemaObject;
+}
+
+/** With Notes off, the Period writes offer no `note`: chat then neither reads nor writes a Period's note. */
+function withoutNoteInput(schema: JsonSchemaObject): JsonSchemaObject {
+  const properties = (schema.properties ?? {}) as Record<string, JsonSchemaObject>;
+  return { ...schema, properties: Object.fromEntries(Object.entries(properties).filter(([key]) => key !== "note")) } as JsonSchemaObject;
+}
+
+/**
+ * The arguments of a Period write as chat may run them. With Notes off a `note` is
+ * dropped, so the stored note is kept and none is added. An edit that names only the
+ * note has nothing left to change: `null` says so.
+ */
+export function periodWriteArgs(name: string, args: Readonly<Record<string, unknown>>, notes: boolean): Readonly<Record<string, unknown>> | null {
+  if (notes || !isPeriodWrite(name) || !("note" in args)) return args;
+  const kept = Object.fromEntries(Object.entries(args).filter(([key]) => key !== "note"));
+  const changes = ["label", "start_local_date", "end_local_date"].some((key) => key in kept);
+  return name === "update_period" && !changes ? null : kept;
+}
+
+/** The same rule from the tool list a turn offers: a Period write that offers no `note` takes none. */
+export function offeredPeriodWriteArgs(
+  tools: readonly Readonly<{ name: string; inputSchema: JsonSchemaObject }>[], name: string, args: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> | null {
+  const offered = tools.find((tool) => tool.name === name);
+  const notes = !offered || "note" in ((offered.inputSchema.properties ?? {}) as Record<string, unknown>);
+  return periodWriteArgs(name, args, notes);
 }
 
 const LOCAL_DATE = { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } as const;
@@ -200,8 +231,8 @@ export function buildChatToolDefinitions(sources: ChatSourceFlags, options: Read
   // The same contract edition the MCP endpoint validates against (Ticket 364).
   const cadence = listIntegrationToolDescriptors(integrationContractOptions())
     .filter((descriptor) => sources.notes || !NOTE_TOOLS.has(descriptor.name))
-    .filter((descriptor) => !CHAT_UNOFFERED_OPERATIONS.has(descriptor.name))
-    .map((descriptor) => ({ name: descriptor.name, description: descriptor.description, inputSchema: withoutServerKeys(descriptor.inputSchema) }));
+    .map((descriptor) => ({ name: descriptor.name, description: descriptor.description,
+      inputSchema: !sources.notes && isPeriodWrite(descriptor.name) ? withoutNoteInput(withoutServerKeys(descriptor.inputSchema)) : withoutServerKeys(descriptor.inputSchema) }));
   const anyCalendar = sources.googleCalendar || sources.outlookCalendar || sources.icloudCalendar;
   const connectors = CHAT_CONNECTOR_TOOLS
     .filter((name) => name === "list_workouts" ? sources.hevy : anyCalendar)
