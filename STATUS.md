@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–361 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000` and `20261125190000` not pushed; 360 and 361 add none); 362, 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere; 362 next; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–362 and 364 complete November 25, 2026 (flag off; hosted migrations `20261125140000`, `20261125150000`, `20261125180000`, `20261125190000` and `20261126110000` not pushed; 360 and 361 add none; `20261126110000` drops and re-adds one check, so it needs the owner's yes); 363 and 365 `not_started`; behind `CADENCE_ALONGSIDE` | Push the additive migrations before the flag goes on anywhere, and `20261126110000` after the owner's yes; the alongside advice card needs a reviewed source (Ticket 360 gap); 363 adds sync, configuration history and the Mac export of the column; the owner decides the Production flag and the Mac release after Ticket 365 | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33) |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -98,6 +98,29 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Ticket 362 complete: pairing the schedule through the coach — November 25, 2026
+
+- **Rule:** `packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts`
+  (`planSchedulePairings`, `evaluateSchedulePairing`, `schedulePairingHostHolds`), re-exported
+  from `lib/resolvers/`, registered, paired tests. Evidence: today's `done_together` signal
+  names the pair, or Yes to the same Daily Brief pairing on 4 local dates in the last 28.
+  Guest alongside, host not, places known or guessed and compatible.
+- **Days:** both schedules daily or weekly every week; the guest's one set time moves to
+  the host's one set time on the shared weekdays only. Every N days, every N weeks, monthly,
+  ranges, two times a day and times that differ by weekday are refused.
+- **Proposal:** an ordinary base schedule proposal on the coach's tip run (flag on only, at
+  most one per run), evidence source `alongside_pairing`. The person sees it in the advisor
+  panel and answers Try for two weeks, Change for good or No; a Yes runs
+  `updateBehaviorForUser`, so configuration history records it. A host that moved or left
+  closes it as `schedule_changed`.
+- **Migration:** `20261126110000_alongside_schedule_pairing.sql` drops and re-adds the
+  evidence check with the new source (the Nov 20 precedent) and adds one check. Not applied
+  anywhere; it needs the owner's yes before a hosted push. Smoke:
+  `tests/sql/ticket-362-alongside-schedule-pairing-smoke.sql`.
+- **Evals (offline):** `lib/services/advisor-eval/coach-pairing-fixtures.ts`: accept,
+  refuse (No and five guards) and no-evidence. No model call.
+- **Not done:** the Mac shows the same route's view (Ticket 363 has no work for this).
+
 ## Ticket 361 complete: pairing for today in the Daily Brief and Chat — November 25, 2026
 
 - **Planner:** `packages/core/src/resolvers/alongside-pairing.resolver.ts` (`planAlongsidePairings`,
@@ -113,7 +136,7 @@ Check the cited entry before acting on a row.
   agent's read-only channel (no grant changed).
 - **Evals (offline):** brief fixture `alongside_pairing` and rule `pairing_off_host`; chat world
   `alongside_pairing` and scenario `alongside_pairing`. No live or paid eval run.
-- **Not done:** the Mac (Ticket 363), the schedule proposal (Ticket 362).
+- **Not done:** the Mac (Ticket 363); the schedule proposal is Ticket 362 (entry above).
 
 ## Ticket 360 complete: the agent asks whether a Behavior is alongside — November 25, 2026
 

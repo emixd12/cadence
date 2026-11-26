@@ -323,6 +323,34 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   - The coach's signals are read through the coach agent's read-only channel
     (`coach_read_signals`), today's or else yesterday's, ids and hours only. Without them
     only a crowded hour or a conflict makes a pairing help.
+- **Pairing the schedule (Ticket 362, D33).** With `CADENCE_ALONGSIDE` on, the coach's
+  nightly tip run may store one base schedule proposal (Try for two weeks · Change for
+  good · No) that moves an alongside Behavior's set time to its host's. The rule is
+  `packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts`; local dates only,
+  no instants, no clock.
+  - Evidence: today's stored `done_together` signal names the pair (either direction), or
+    the person said Yes to the same guest-and-host pairing line in the Daily Brief on at
+    least 4 different local dates in the 28 dates ending today (`move_proposals` rows with
+    source `daily_brief`, reason `alongside_pairing`, status `accepted`, host from
+    `line.pairing.hostBehaviorId`; Other time and undone lines do not count).
+  - Guest effectively alongside, host not; both effective Wheres known or guessed and
+    compatible under `alongsideMayOverlap`; the guest no longer than the host when both
+    lengths are set. Never for a step that follows its routine's schedule (either side),
+    an Opportunity Behavior without a schedule (either side) or a guest marked "Don't
+    suggest moving this".
+  - "The days both are scheduled": both schedule lists must be daily every day or weekly
+    every week, whose days are fixed weekdays. The shared days are the weekdays on which
+    both have a time. On each shared day the guest has one set time and the host one set
+    time, the same pair on every shared day. The guest's time moves to the host's on those
+    weekdays only; a schedule that also covers other days is split
+    (`buildChangedSchedules`), and those days keep their time. Every N days, every N
+    weeks and monthly schedules, ranges, two times on one day and times that differ by
+    weekday are refused rather than guessed.
+  - The first affected date, the trial's check-in, the 30-day No cooldown by direction and
+    the seven-day expiry are the base proposal's own rules. When the proposal is shown and
+    again before a Yes applies it, the host must still be active with the new time on every
+    changed weekday; otherwise the proposal closes as `schedule_changed`. After the change,
+    nothing links the two Behaviors: a later edit of the host does not carry the guest.
 
 ### Brief opportunity lines
 
