@@ -230,6 +230,18 @@ describe("desktop preference and dialog side effects", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it("keeps a rail choice made before the stored preference is applied", async () => {
+    // The stored preference is applied one frame after mount. Hold that frame, then choose.
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => frames.push(callback));
+    localStorage.setItem("sidebar-open", "false");
+    await render(<DesktopApp activeScreen="timeline" onNavigate={vi.fn()}>Content</DesktopApp>);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage denied"); });
+    await click(button("Expand navigation"));
+    await act(async () => { for (const frame of frames.splice(0)) frame(0); });
+    expect(button("Collapse navigation")).toBeTruthy();
+  });
+
   it("shows the connected account in both footers and opens Settings from the collapsed rail and drawer", async () => {
     const navigate = vi.fn();
     const props = { activeScreen: "timeline" as const, availableScreens: ["timeline", "settings"] as const, onNavigate: navigate };
