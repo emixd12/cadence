@@ -312,7 +312,8 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
     `crowded_hour` threshold, alongside items not counted) or the coach's stored
     `crowded_hour` signal names that hour; the guest runs into travel or an item somewhere
     else; or the coach's `done_together` signal names the guest with one of today's hosts.
-    A guest already inside a compatible host's time is left alone.
+    A guest already inside a compatible host's time is left alone, including a host already
+    in progress.
   - The host the `done_together` signal names comes first, then the nearest host. At most
     one pairing per guest and per host. The new time is the host's start for the guest's
     length, and it passes the same slot check Yes runs on the guest's side of the

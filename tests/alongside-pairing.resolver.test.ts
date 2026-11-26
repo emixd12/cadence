@@ -168,6 +168,28 @@ describe("alongside pairing: the rule", () => {
     expect(plan([guest("helmet", "20:10"), item("reading", "20:00", 45, { where: HOME }), item("tv", "21:30", 60, { where: HOME })], { evidence })).toEqual([]);
   });
 
+  it("leaves a guest inside a compatible host that started before now (audit fix 5b)", () => {
+    // A crowded hour makes pairing help, and tv (later) would otherwise host it.
+    const evidence: AlongsidePairingEvidence = { doneTogether: [], crowdedHours: [20] };
+    const items = [guest("helmet", "20:10"), item("reading", "20:00", 45, { where: HOME }), item("tv", "21:30", 60, { where: HOME })];
+    expect(plan(items, { evidence, now: local("20:05") })).toEqual([]);
+    // Before reading starts it is already inside reading too; after reading ends it is not.
+    expect(plan(items, { evidence, now: local("19:00") })).toEqual([]);
+  });
+
+  // Audit finding 5a was not a defect: briefMoveFreeStarts always excludes `near`, the host's start. Pinned here.
+  it("never offers the host's start again as another time", () => {
+    const evidence: AlongsidePairingEvidence = { doneTogether: [{ behaviorId: "b-helmet", otherBehaviorId: "b-reading" }], crowdedHours: [] };
+    for (const start of ["14:00", "20:00", "20:05", "21:00"]) {
+      for (const host of ["20:00", "20:05", "20:20", "20:35"]) {
+        const items = [guest("helmet", start), item("reading", host, 45, { where: HOME })];
+        for (const pairing of plan(items, { evidence })) {
+          expect(pairing.otherTimes.some((other) => other.equals(pairing.to.start))).toBe(false);
+        }
+      }
+    }
+  });
+
   it("does not pair a guest answered No today or set to Don't suggest moving this", () => {
     const items = [...crowdedSeven(), guest("helmet", "19:10"), item("reading", "20:00", 45, { where: HOME })];
     expect(plan(items, { declinedToday: new Set(["helmet"]) })).toEqual([]);

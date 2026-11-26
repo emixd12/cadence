@@ -53,7 +53,8 @@ import { COACH_SIGNAL_V2_THRESHOLDS } from "./coach-signals-v2.resolver";
  *     stored `crowded_hour` signal names.
  *   - Host order: a host the done_together signal names first, then the nearest host to
  *     the guest's current start, then the earlier, then by id. At most one pairing per
- *     guest and per host. A guest already inside a compatible host's time is left alone.
+ *     guest and per host. A guest already inside a compatible host's time is left alone,
+ *     including a host that started before `now`.
  *   - The target is the host's start for the guest's own length. It must pass the same
  *     slot check a Yes runs (`checkBriefMoveSlot` on the guest's blocks under the
  *     same-place rule, with the guest's own travel), so a proposed pairing is not
@@ -131,11 +132,15 @@ export function planAlongsidePairings(input: AlongsidePairingInputs): AlongsideP
     && !(input.declinedToday?.has(item.occurrenceId) ?? false)
     && !(input.neverMoveBehaviorIds?.has(item.behaviorId) ?? false)
     && (!input.onlyGuests || input.onlyGuests.has(item.occurrenceId))).sort(byStart);
-  const hosts = today.filter((item) => open(item) && !item.alongside && placed(item)
+  // Every open item that could host, including ones already in progress: a guest inside
+  // one of them is already paired (audit fix 5b). Only those starting now or later, by
+  // the latest start, may be offered.
+  const openHosts = today.filter((item) => open(item) && !item.alongside && placed(item)
     && (!followsRoutine(item) || routineSlots.has(item.occurrenceId))
-    && !positions.has(item.occurrenceId) && !(input.excludeHosts?.has(item.occurrenceId) ?? false)
+    && !positions.has(item.occurrenceId)).sort(byStart);
+  const hosts = openHosts.filter((item) => !(input.excludeHosts?.has(item.occurrenceId) ?? false)
     && Temporal.Instant.compare(item.start, input.now) >= 0
-    && briefMoveStartAllowed(item.start, input.localDate, input.timezone, latest)).sort(byStart);
+    && briefMoveStartAllowed(item.start, input.localDate, input.timezone, latest));
 
   const calendar: BriefMoveBlock[] = input.calendarBusy.map((event) => ({ kind: "calendar", ref: event.ref, title: event.title, start: event.start, end: event.end }));
   const used = new Set<string>();
@@ -151,10 +156,12 @@ export function planAlongsidePairings(input: AlongsidePairingInputs): AlongsideP
       ...calendar,
       ...travelBlocksFor(input.travel, guest.occurrenceId),
     ], subject);
-    const compatible = hosts.filter((host) => host.end.since(host.start).total("seconds") >= seconds
-      && alongsideMayOverlap(guest, { kind: "item", where: host.where }));
-    // Already during a compatible host: nothing to book.
-    if (compatible.some((host) => Temporal.Instant.compare(host.start, guest.start) <= 0 && Temporal.Instant.compare(guest.end, host.end) <= 0)) continue;
+    const fits = (host: BriefMoveDayItem) => host.end.since(host.start).total("seconds") >= seconds
+      && alongsideMayOverlap(guest, { kind: "item", where: host.where });
+    // Already during a compatible host, even one that started before now: nothing to book.
+    if (openHosts.some((host) => fits(host)
+      && Temporal.Instant.compare(host.start, guest.start) <= 0 && Temporal.Instant.compare(guest.end, host.end) <= 0)) continue;
+    const compatible = hosts.filter(fits);
     const candidates = compatible.filter((host) => !used.has(host.occurrenceId) && !host.start.equals(guest.start));
     if (!candidates.length) continue;
 
