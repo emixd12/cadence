@@ -2,6 +2,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { createContext, Fragment, useContext, useId, useState, type ReactNode } from "react";
+import { noticeText } from "@cadence/core/notices";
 import { MARK_DETAIL_PROMPTS, markDetailPromptPicked, NOT_DONE_REASONS, type MarkDetailPromptSettings, type NotDoneReason } from "@cadence/core/resolvers/status.resolver";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
 
@@ -16,6 +17,12 @@ import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
  * Both are never required and need no dialog. The page passes the actions in: the web
  * its server actions, the Mac its local store, the design bench fakes. Without a
  * provider (an old caller) the rows show nothing new.
+ *
+ * Ticket 360 (D33): a third line after a Completed mark, "Done alongside other things?
+ * Yes · No", while the Behavior's alongside question is open (the row's
+ * `alongsideQuestion`, from `alongsideQuestionOpen`). It shows only when the page passes
+ * an `alongside` action and no "Done at" line shows: a row shows one line at a time and
+ * "Done at" keeps priority. The answer is the Behavior's setting, not this mark's.
  */
 
 export type MarkDetailState =
@@ -26,6 +33,11 @@ export type OccurrenceMarkDetailActions = Readonly<{
   /** `doneAt` is a UTC instant. */
   doneAt(input: Readonly<{ occurrenceId: string; doneAt: string }>): Promise<MarkDetailState>;
   notDoneReason(input: Readonly<{ occurrenceId: string; reason: NotDoneReason }>): Promise<MarkDetailState>;
+  /**
+   * Ticket 360: the answer to "Done alongside other things?", written to the Behavior's
+   * alongside setting. Optional: without it no row asks (the Mac until Ticket 363).
+   */
+  alongside?(input: Readonly<{ occurrenceId: string; behaviorId: string; alongside: boolean }>): Promise<MarkDetailState>;
 }>;
 
 export const NOT_DONE_REASON_LABELS: Readonly<Record<NotDoneReason, string>> = {
@@ -154,7 +166,26 @@ export function useOccurrenceMarkDetailParts({ occurrence, justMarked, toneClass
   }
 
   const offer = lateMarkOffer(occurrence, justMarked.at, context.timezone, context.prompts.doneAt.lateAfterMinutes);
-  if (!offer || !markDetailPromptPicked("done_at", occurrence.id, occurrence.localDate, context.prompts.doneAt.share)) return NONE;
+  if (!offer || !markDetailPromptPicked("done_at", occurrence.id, occurrence.localDate, context.prompts.doneAt.share)) {
+    // Ticket 360: the alongside question only where no "Done at" line shows.
+    const answerAlongside = context.actions.alongside;
+    const alongsideShare = (context.prompts.alongside ?? MARK_DETAIL_PROMPTS.alongside).share;
+    if (!occurrence.alongsideQuestion || !answerAlongside
+      || !markDetailPromptPicked("alongside", occurrence.id, occurrence.localDate, alongsideShare)) return NONE;
+    const answer = (alongside: boolean) => void run(
+      () => answerAlongside({ occurrenceId: occurrence.id, behaviorId: occurrence.behaviorId, alongside }),
+      noticeText("alongside.answer-saved", { answer: alongside ? "yes" : "no" }));
+    return {
+      inline: inline("alongside", <>
+        {"Done alongside other things? "}
+        {choices([
+          <button key="yes" type="button" className={LINK} disabled={pending} data-alongside-answer="yes" onClick={() => answer(true)}>Yes</button>,
+          <button key="no" type="button" className={LINK} disabled={pending} data-alongside-answer="no" onClick={() => answer(false)}>No</button>,
+        ])}
+      </>),
+      below: null,
+    };
+  }
   const saveAt = (instant: string) => run(() => context.actions.doneAt({ occurrenceId: occurrence.id, doneAt: instant }), `Saved as done at ${timeLabel(instant)}.`);
 
   if (current.state === "other") {

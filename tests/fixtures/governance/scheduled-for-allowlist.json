@@ -6,7 +6,7 @@
     "app/design-system/CalendarBench.tsx": 1,
     "app/design-system/DayProgressBench.tsx": 5,
     "app/design-system/DepartureStatesBench.tsx": 2,
-    "app/design-system/MarkDetailsBench.tsx": 1,
+    "app/design-system/MarkDetailsBench.tsx": 2,
     "app/design-system/OccurrenceMoveBench.tsx": 5,
     "app/design-system/OpportunityBasketBench.tsx": 2,
     "app/design-system/TimelineSubBehaviorsBench.tsx": 1,

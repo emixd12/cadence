@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
+import { MARK_DETAIL_PROMPTS, type MarkDetailPromptSettings } from "@cadence/core/resolvers/status.resolver";
 import { OccurrenceMarkDetailsProvider, type OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import type { OccurrenceActionState } from "@/lib/types/timeline";
@@ -11,6 +12,8 @@ import timelineStyles from "@/components/timeline/day-progress-timeline.module.c
 // Advisor plan Phase 4, workstream 4G. Synthetic rows set five hours ago, so a tap on
 // Completed is a late mark and offers "Done at"; a tap on Not Completed offers "Why?".
 // Nothing is stored. Walk is a range ("Morning") and offers only Just now and Other time.
+// Ticket 360: Red light helmet is set for now with its alongside question open, so a tap
+// on Completed asks "Done alongside other things? Yes · No" (every time on the bench).
 
 const NARROW = "(max-width: 639px)";
 function subscribeNarrow(onChange: () => void) {
@@ -29,6 +32,8 @@ function rows(): TimelineOccurrenceView[] {
   fiveHoursAgo.setUTCMinutes(0, 0, 0);
   const label = fiveHoursAgo.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ });
   const localDate = fiveHoursAgo.toLocaleDateString("en-CA", { timeZone: TZ });
+  const now = new Date();
+  const nowLabel = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ });
   const base: TimelineOccurrenceView = {
     id: "bench-gym", behaviorId: "bench-b1", title: "Gym", scheduledFor: fiveHoursAgo.toISOString(), scheduledTimeLabel: label,
     scheduleKind: "exact", localDate, status: "unresolved", statusMarkedAt: null, statusLabel: "Unresolved", statusDetail: "",
@@ -42,10 +47,14 @@ function rows(): TimelineOccurrenceView[] {
     { ...base, id: "bench-reading", behaviorId: "bench-b2", title: "Reading", description: "Twenty pages." },
     { ...base, id: "bench-walk", behaviorId: "bench-b3", title: "Walk", scheduleKind: "range", scheduledTimeLabel: "Morning",
       scheduleEndTime: "00:00", description: "Outside if it is dry." },
+    { ...base, id: "bench-helmet", behaviorId: "bench-b4", title: "Red light helmet", scheduledFor: now.toISOString(), scheduledTimeLabel: nowLabel,
+      localDate: now.toLocaleDateString("en-CA", { timeZone: TZ }), description: "Ten minutes.", alongside: { source: "guess" }, alongsideQuestion: true },
   ];
 }
 
 const BENCH_STATUSES = ["completed", "not_completed", "unresolved"] as const;
+/** The bench asks the alongside question on every eligible mark, so it can be seen. */
+const BENCH_PROMPTS: MarkDetailPromptSettings = { ...MARK_DETAIL_PROMPTS, alongside: { share: 1 } };
 
 const markAction = async (_state: OccurrenceActionState, formData: FormData): Promise<OccurrenceActionState> => {
   const status = String(formData.get("status"));
@@ -67,9 +76,13 @@ export function MarkDetailsBench() {
       await new Promise((resolve) => setTimeout(resolve, 150));
       return { status: "saved" };
     },
+    async alongside() {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return { status: "saved" };
+    },
   }), []);
   return (
-    <OccurrenceMarkDetailsProvider actions={actions} timezone={TZ}>
+    <OccurrenceMarkDetailsProvider actions={actions} timezone={TZ} prompts={BENCH_PROMPTS}>
       <div className={`grid max-w-3xl gap-1 ${timelineStyles.timeline}`}>
         {occurrences.map((occurrence) => (
           <div key={occurrence.id} className={timelineStyles.row} data-status-icons-only={narrow ? "true" : "false"}>
