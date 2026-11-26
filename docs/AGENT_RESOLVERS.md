@@ -299,6 +299,30 @@ Shared `services/behaviorlog-day-note.service.ts` saves the plan through the
 import and restore services call it. Paired checks live in
 `tests/behaviorlog-day-note.resolver.test.ts`; rules in `docs/EXPORT_FORMATS.md`.
 
+## Periods (Ticket 368)
+
+`packages/core/src/resolvers/period.resolver.ts` owns every Period rule: label and
+note normalization, the limits (`PERIOD_LIMITS`), create and edit validation, the
+"End today" rule, date coverage, range overlap, display order, the union of covered
+dates, the inside and outside split used with `resolveAdherenceCounts`, label
+suggestions, the date-range text and the natural key used by import.
+`lib/resolvers/period.resolver.ts` re-exports it. `tests/period.resolver.test.ts`
+pairs its checks; table and functions are in `docs/DATA_MODEL.md`, "Periods".
+
+Shared `services/period.service.ts` orchestrates the owner-scoped `PeriodDataStore`
+(`tests/period.service.test.ts`). `lib/services/period.service.ts` adds the sign-in
+check and reads "today" from the profile timezone at the time of the write
+(`tests/period-web.service.test.ts`). Adapters compare-and-set on `revision`.
+
+- A Period is annotation only. No resolver, service or job may change an Occurrence
+  status, adherence, a reminder or a schedule because of a Period.
+- `today` is injected. The resolver has no I/O and no clock access, and compares
+  `YYYY-MM-DD` local dates without JavaScript `Date`.
+- UI, MCP handlers, export code and repositories must not validate, normalize,
+  order or date-match Periods themselves.
+- Period labels and notes are the person's own words and can describe health. Never
+  log them.
+
 ## Connector completion matching (Tickets 313 and 321)
 
 `packages/core/src/resolvers/activity-match.resolver.ts` decides which recorded
@@ -356,6 +380,17 @@ marks only; time of day is the set time. It also exports `resolveCoachAccountFac
 setup facts the advice matcher uses, and `repeated_move` gains per-weekday move counts.
 Fact names follow `ADVICE_SIGNAL_FACTS` in `packages/core/src/types/advice-cards.ts`.
 Paired test: `tests/coach-signals-v2.resolver.test.ts`.
+
+Versions 5 and 6 (`coach-signals-5`, and `coach-signals-6` while `CADENCE_ALONGSIDE` is
+on; Ticket 372, D35) replace versions 3 and 4. The resolver takes an optional
+`periodDates`: the local dates covered by any Period in the read window, which
+`lib/services/coach-signals-job.service.ts` computes with `periodCoveredDates` from the
+dates `lib/db/coach-signals.repo.ts` reads under RLS. `completion_drop` facts gain the
+counts `recent_period_days` and `baseline_period_days`, 0 without a Period. The input is
+dates only, so a Period's label or note cannot reach a fact. A Period is annotation
+only: the resolver must not read `periodDates` to suppress, delay or re-threshold a
+signal, and `tests/coach-signals.resolver.test.ts` proves the emitted signals and every
+other fact are identical with and without it.
 
 ## Advice matcher (advisor plan Phase 4, workstream 4A)
 

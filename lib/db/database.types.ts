@@ -2374,6 +2374,50 @@ export type Database = {
           },
         ]
       }
+      periods: {
+        Row: {
+          created_at: string
+          end_on: string | null
+          id: string
+          label: string
+          note: string | null
+          revision: number
+          start_on: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_on?: string | null
+          id?: string
+          label: string
+          note?: string | null
+          revision?: number
+          start_on: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_on?: string | null
+          id?: string
+          label?: string
+          note?: string | null
+          revision?: number
+          start_on?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "periods_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       place_label_settings: {
         Row: {
           enabled: boolean
@@ -3403,6 +3447,35 @@ export type Database = {
         }
         Returns: Json
       }
+      create_period: {
+        Args: {
+          p_end_on: string
+          p_label: string
+          p_note: string
+          p_start_on: string
+        }
+        Returns: {
+          created_at: string
+          end_on: string | null
+          id: string
+          label: string
+          note: string | null
+          revision: number
+          start_on: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "periods"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      delete_period: {
+        Args: { p_expected_revision: number; p_id: string }
+        Returns: string[]
+      }
       purge_ended_daily_brief_days: { Args: never; Returns: number }
       record_brief_opportunity_proposals: {
         Args: {
@@ -4154,6 +4227,33 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "occurrences"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      update_period: {
+        Args: {
+          p_end_on: string
+          p_expected_revision: number
+          p_id: string
+          p_label: string
+          p_note: string
+          p_start_on: string
+        }
+        Returns: {
+          created_at: string
+          end_on: string | null
+          id: string
+          label: string
+          note: string | null
+          revision: number
+          start_on: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "periods"
           isOneToOne: false
           isSetofReturn: true
         }

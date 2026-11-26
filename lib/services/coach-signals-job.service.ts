@@ -4,6 +4,7 @@ import {
   resolveCoachSignals,
   type CoachSignal,
 } from "@cadence/core/resolvers/coach-signals.resolver";
+import { periodCoveredDates } from "@cadence/core/resolvers/period.resolver";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { readBehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 import { Temporal } from "@js-temporal/polyfill";
@@ -120,7 +121,7 @@ export type CoachVisitPort = Readonly<{
   reads: CoachSignalReads;
   /**
    * Ticket 359: each Behavior's effective alongside value, present only while
-   * `CADENCE_ALONGSIDE` is on. With it the visit computes and stores signal version 4.
+   * `CADENCE_ALONGSIDE` is on. With it the visit computes and stores signal version 6.
    */
   alongside?: (behaviorIds: readonly string[], today: string) => Promise<ReadonlyMap<string, boolean | AlongsideVisitFacts>>;
   record(runId: string, signals: readonly CoachSignal[]): Promise<number>;
@@ -132,19 +133,25 @@ export async function visitCoachAccount(port: CoachVisitPort): Promise<CoachVisi
   try {
     const today = run.localDate;
     const T = COACH_SIGNAL_THRESHOLDS;
-    const [behaviors, occurrences, decisions, moves, answers, reminders, sessions] = await Promise.all([
+    const historyStart = addDays(today, -T.historyDays);
+    const [behaviors, occurrences, decisions, moves, answers, reminders, sessions, periods] = await Promise.all([
       port.reads.behaviors(),
       // Through today: today's items give the per-weekday move counts and account facts.
       // Every rate still ends yesterday.
-      port.reads.occurrences(addDays(today, -T.historyDays), addDays(today, 1)),
+      port.reads.occurrences(historyStart, addDays(today, 1)),
       // 28 days: reminder response reads the whole period; late marking keeps its own 14.
       port.reads.decisions(addDays(today, -T.reminderDecisionDays), today),
       port.reads.moves(addDays(today, -T.repeatedMove.weekdayLookbackDays)),
       port.reads.answers(addDays(today, -T.briefAnswers.windowDays)),
       port.reads.reminders(addDays(today, -T.reminderDecisionDays), today),
       port.reads.sessions(addDays(today, -T.reminderDecisionDays), today),
+      // Ticket 372: Periods with a day in the Occurrence read window. A port without the
+      // read counts none.
+      port.reads.periods ? port.reads.periods(historyStart, today) : [],
     ]);
-    // Version 4 (flag on): every Behavior carries its effective alongside value.
+    // Dates only reach the resolver, so no Period label or note can reach a fact.
+    const periodDates = [...periodCoveredDates(periods, historyStart, today)].sort();
+    // Versions 4 and 6 (flag on): every Behavior carries its effective alongside value.
     const alongside = port.alongside ? await port.alongside(behaviors.map((behavior) => behavior.id), today) : null;
     const read = alongside ? behaviors.map((behavior) => {
       const entry = alongside.get(behavior.id);
@@ -153,7 +160,7 @@ export async function visitCoachAccount(port: CoachVisitPort): Promise<CoachVisi
         ? { ...behavior, alongside: entry.value, alongsideQuestionOpen: entry.questionOpen }
         : { ...behavior, alongside: entry === true };
     }) : behaviors;
-    const signals = resolveCoachSignals({ today, behaviors: read, occurrences, decisions, moves, answers: answers.rows, reminders, sessions });
+    const signals = resolveCoachSignals({ today, behaviors: read, occurrences, decisions, moves, answers: answers.rows, reminders, sessions, periodDates });
     const stored = await port.record(run.runId, signals);
     await port.finishRun(run.runId, "success", null);
     return { signals: stored, answersSource: answers.source };
@@ -172,7 +179,7 @@ export function createHostedCoachVisitPort(userId: string, options: CreateAgentC
 export function createCoachVisitPort(client: AppSupabaseClient, userId: string,
   env: Readonly<Record<string, string | undefined>> = process.env): CoachVisitPort {
   const alongside = alongsideEnabled(env);
-  // coach-signals-4 while CADENCE_ALONGSIDE is on (Ticket 359); coach-signals-3 otherwise.
+  // coach-signals-6 while CADENCE_ALONGSIDE is on (Ticket 359); coach-signals-5 otherwise (Ticket 372).
   const version = coachSignalVersion(alongside);
   return {
     async startRun() {

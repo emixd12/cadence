@@ -102,6 +102,25 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## MCP Apps spike: local answers and the frozen `show_day` contract (Ticket 375) — November 26, 2026
+
+- **In progress.** Note: `docs/qa/2026-11-26-mcp-apps-spike.md`. Tickets 376 and 377 can
+  start from the frozen schema and view contract in it.
+- **Answered locally:** the stateless handler serves `resources/list` and
+  `resources/read` on the 2026-07-28 and legacy paths; the view completed status, note
+  and parent slot writes in `basic-host` 2.0.4 and MCP Inspector 2.13.0; React 19 with
+  `ext-apps` is 461 KB raw, Preact is 261 KB, so the note recommends Preact.
+- **Not obtained:** approval prompts, the 403 step-up and view caching on Claude web and
+  ChatGPT web. The `mcp-web` preflight exited 10 with four owner steps, and Preview has no
+  Supabase or MCP variables, so no flag-on server is reachable from a host.
+- **Ticket 381:** no gap found for VS Code from documentation; Gemini undecided.
+- **Docs only on `main`:** the note, plan corrections, Ticket 375 and this file. Spike
+  code stays on the local branch `spike/mcp-apps-375`. No production setting changed.
+
+Platform impact: web only (`docs/qa/` note); desktop, marketing and future mobile not
+applicable. Messaging impact: none.
+
+## MCP Apps moved into scope; Tickets 375–382 filed (D36) — November 25, 2026
 ## Ticket 385 complete in code: an advice card for the alongside question — November 26, 2026
 
 Branch `feat/alongside-385`. Closes the advisor-tip gap Ticket 360 recorded: `setup_gaps`'s

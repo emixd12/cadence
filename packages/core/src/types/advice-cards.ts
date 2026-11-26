@@ -100,7 +100,8 @@ export const ADVICE_COMMON_FACTS = ["window_days"] as const;
  * Not Completed marks: no fact counts an unmarked day (Phase 4 decision D5).
  */
 export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly string[]>> = Object.freeze({
-  completion_drop: ["recent_days", "recent_completed", "recent_resolved", "recent_rate", "baseline_days", "baseline_completed", "baseline_resolved", "baseline_rate", "drop"],
+  // `recent_period_days` and `baseline_period_days` (counts of days a Period covers) appear from coach-signals-5 and -6 (Ticket 372).
+  completion_drop: ["recent_days", "recent_completed", "recent_resolved", "recent_rate", "baseline_days", "baseline_completed", "baseline_resolved", "baseline_rate", "drop", "recent_period_days", "baseline_period_days"],
   repeated_move: ["window_days", "moved_days", "same_direction_days", "direction", "median_shift_minutes", "median_target_time", "target_spread_minutes", "weekdays", "last_moved_date", "weekday_matching", "weekday_later", "weekday_earlier"],
   late_marking: ["window_days", "decisions", "later_day", "late_share", "median_lag_days"],
   new_behavior_settled: ["age_days", "first_days", "completed", "not_completed", "completion_rate"],
@@ -115,7 +116,7 @@ export const ADVICE_SIGNAL_FACTS: Readonly<Record<AdviceSignalKind, readonly str
   day_shape: ["pattern", "bad_days", "missed_total", "miss_share_on_bad_days"],
   unmarked_items: ["unmarked", "oldest_days"],
   marking_time: ["decisions", "median_lag_hours", "median_mark_time", "same_day_share"],
-  // `alongside` and `other_alongside` (booleans) appear from coach-signals-4 (Ticket 359, CADENCE_ALONGSIDE on).
+  // `alongside` and `other_alongside` (booleans) appear from coach-signals-4 and -6 (Ticket 359, CADENCE_ALONGSIDE on).
   done_together: ["other_behavior_id", "pattern", "together_days", "either_days", "alongside", "other_alongside"],
   crowded_hour: ["hour", "items_in_hour", "hour_rate", "other_rate", "hour_resolved"],
   setup_gaps: ["missing_length", "missing_place", "without_length", "without_place", "active_behaviors", "alongside_unanswered", "without_alongside_answer"],

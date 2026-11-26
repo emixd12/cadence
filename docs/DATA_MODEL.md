@@ -2688,7 +2688,7 @@ or place key. Ticket 357 added the column and its read path.
   turn's Timeline carry `planning: { alongside, alongside_source, where, where_source }`
   (the Where kind only, never a key); an exact-time opportunity add checks the added
   Behavior's side of the same-place rule; the coach reads the effective alongside value
-  (see "Coach signals in shadow", version 4).
+  (see "Coach signals in shadow", versions 4 and 6).
 - **Planning only.** The free-slot rule uses it for the same-place overlap rule
   (`docs/DATETIME_STRATEGY.md`, "Brief moves"). Travel, departure and leave-reminder code
   reads `where_kind` alone, and `tests/effective-where.boundary.test.ts` pins that. A
@@ -2874,6 +2874,69 @@ removes that filter and adds sync contract 4:
 The Mac app mirrors the row in SQLite schema 23 (`docs/DESKTOP_DATA_MODEL.md`).
 Local checks `tests/sql/ticket-292-day-note-shortcut-sync.sql` and the account-sync
 contract fixtures.
+
+## Periods (Ticket 368, D35)
+
+`periods` stores labeled ranges of local dates that the person declares for the whole
+account, for example "Sick", November 3 to 9. A Period is annotation only. It has no
+status, Behavior or Occurrence reference and never changes a status, adherence, Needs
+decision, a reminder or a schedule. Periods may overlap and may lie in the future.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid | Primary key. |
+| `user_id` | uuid | Owner; references `profiles(id)`, cascades on account deletion. |
+| `label` | text | One line, 1 to 60 characters, no leading or trailing spaces. |
+| `start_on` | date | First local date, inclusive. Past, today or future. |
+| `end_on` | date, nullable | Last local date, inclusive, on or after `start_on`. Null means ongoing. |
+| `note` | text, nullable | Normalized like a day note; non-blank, at most 2,000 characters, or null. |
+| `revision` | integer | Starts at 1 and increases on each change. |
+| `created_at`, `updated_at` | timestamptz | Server time. |
+
+Dates are local calendar dates, never instants, like Behavior pause and day notes. A
+timezone change does not move a Period.
+
+Constraints: `periods_user_id_key` unique `(user_id, id)`; `periods_label_valid`;
+`periods_range_valid`; `periods_note_valid`; `periods_revision_valid`. There is no
+uniqueness rule on label or dates. Index: `periods_user_start_idx (user_id, start_on)`.
+
+RLS allows the owner to select rows. Direct writes are revoked from every Data API
+role, and `service_role` has no grant. Three `security definer` functions with an empty
+`search_path` bind ownership to `auth.uid()` and are executable by `authenticated` only:
+
+- `public.create_period(p_label, p_start_on, p_end_on, p_note)` returns the new row.
+- `public.update_period(p_id, p_expected_revision, p_label, p_start_on, p_end_on, p_note)`
+  compares the stored `revision` with `p_expected_revision`. It returns no row when they
+  differ, when the Period is gone, or when it belongs to another account. A write that
+  changes nothing returns the row with the same `revision` and `updated_at`. Any other
+  write raises `revision` by 1 and sets `updated_at`.
+- `public.delete_period(p_id, p_expected_revision)` returns the deleted id, or no row on
+  a mismatch.
+
+The functions validate their input and raise SQLSTATE `22023` with a plain message.
+`cadence_private.period_input_error` holds the shared rules. Its label rule is stricter
+than the table check: it also refuses Unicode whitespace at either end and Unicode line
+breaks, as `packages/core/src/resolvers/period.resolver.ts` does. A writer that inserts
+directly is held to the table checks only, so it must send resolver-normalized values.
+
+**Cap.** An account holds at most 500 Periods. The `before insert` trigger
+`periods_enforce_account_cap` (function `cadence_private.periods_enforce_account_cap`)
+takes a per-user advisory transaction lock, counts the owner's rows and raises SQLSTATE
+`54000` at 500. Because it is a trigger, the cap holds for every writer: the user
+functions above and any later function that inserts directly, such as integration
+writes, import or the account sync apply path. The lock makes two concurrent creates at
+499 run one after the other, so only one succeeds. `lib/db/periods.repo.ts` turns `54000`
+from `create_period` into the limit message.
+
+**Hard delete.** Removing a Period deletes its row. Adding it again makes a new Period
+with a new id. There is no soft-delete column and no tombstone: account sync plans a
+delete as "in the saved baseline, absent on one side", which needs no deleted row on the
+server. Account deletion removes Periods through the `profiles` cascade.
+
+Ticket 368 adds no entry point: no Server Action, MCP tool, export field or Mac code
+reads or writes Periods yet. Migration: `20261126130000_periods.sql`; local check
+`tests/sql/periods.sql`. `periods` and the three functions are in the RLS smoke lists
+(`scripts/supabase-rls-smoke.mjs`).
 
 ## Google Calendar connector (Ticket 134)
 
@@ -3733,11 +3796,21 @@ shown to the person; Phase 4 matches the signals to advice cards.
   the count `without_alongside_answer`. Ticket 385's card `do-it-during-something-else`
   reads the Behavior row's `alongside_unanswered`; it ships as a draft and shows no tip
   until the owner reviews it. `signal_version`'s check is
-  a pattern, so no migration was needed. With the flag off the visit writes version 3,
-  unchanged. At most
+  a pattern, so no migration was needed. With the flag off the visit writes the base
+  version, unchanged. Versions 5 and 6 (`coach-signals-5`, and `coach-signals-6` while
+  `CADENCE_ALONGSIDE` is on; Ticket 372, D35) replace versions 3 and 4 and add no kind.
+  The visit reads the first and last day of the account's Periods under RLS (never a
+  label or a note) and every `completion_drop` row gains two counts:
+  `recent_period_days`, the days of the recent 14 that a Period covers, and
+  `baseline_period_days`, the days of the 28 before them. Both are 0 when no Period
+  covers a day. A Period is annotation only: the counts change no rate, no threshold
+  and no decision about which signals fire. Version 6 is version 4 plus these counts.
+  No migration was needed. Rows stored under versions 3 and 4 stay as written and stay
+  readable: no reader branches on `signal_version`, a visit replaces only its own local
+  day, and a `completion_drop` row without the two counts reads as "not counted". At most
   one row per kind per Behavior and one account-wide row per kind; `behavior_id` is null for an
   account-wide signal; `facts` (at most 4 KB) holds counts, dates, weekdays and
-  local times of day only, never titles, notes or calendar data; `signal_version`
+  local times of day only, never titles, notes, Period labels or calendar data; `signal_version`
   names the resolver version; `run_id` links the visit's `agent_runs` row. RLS on,
   no policies, no grants to any API role. Rows older than 180 days are removed when
   the same account is visited again.
@@ -3753,7 +3826,9 @@ shown to the person; Phase 4 matches the signals to advice cards.
   call. Thresholds and definitions: `packages/core/src/resolvers/coach-signals.resolver.ts`.
   Job: `lib/services/coach-signals-job.service.ts` (database access in `lib/db/coach-signals.repo.ts`), hourly cron
   `/api/advisor/coach/signals/process`. It reads `move_proposal_answers` when that
-  table exists (Phase 3A1) and each brief proposal's final status otherwise.
+  table exists (Phase 3A1) and each brief proposal's final status otherwise. It reads
+  `periods` when that table exists (migration `20261126130000`) and counts no Period
+  day otherwise.
 - Account deletion cascades; deleting a Behavior removes its signals.
 - `advisor_read_pairing_evidence(local_date)` (Ticket 361, D33; migration
   `20261126100000_alongside_pairing_evidence_and_brief_asks.sql`): the Daily Brief and

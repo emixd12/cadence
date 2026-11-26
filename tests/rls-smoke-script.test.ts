@@ -78,8 +78,12 @@ describe("Supabase RLS smoke script helpers", () => {
       "imported_interventions",
       "launch_rate_limits",
       "occurrence_time_sessions",
+      "periods",
     ]);
-    expect(smokeScript.PUBLIC_AUTHENTICATED_FUNCTIONS).toHaveLength(12);
+    expect(smokeScript.PUBLIC_AUTHENTICATED_FUNCTIONS).toHaveLength(15);
+    expect(smokeScript.PUBLIC_AUTHENTICATED_FUNCTIONS).toEqual(
+      expect.arrayContaining(["create_period", "update_period", "delete_period"]),
+    );
   });
 
   it("creates behaviors through the history-aware RPC and expects direct updates to fail", () => {

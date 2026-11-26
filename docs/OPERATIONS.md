@@ -2151,7 +2151,8 @@ it was on.
 Since Ticket 359 the flag also selects the advisor readers' versions. With it on, the
 Daily Brief estimate call is recipe 1.3 (it also returns the coarse Where guess), Chat's
 prompt is `chat-1.8` and its timeline and Behavior reads carry `planning`, the advisor day
-context carries `planning`, and the coach writes `coach-signals-4`. Turn it on only after
+context carries `planning`, and the coach writes `coach-signals-6` (`coach-signals-5`
+with the flag off; Ticket 372 moved the pair from 3 and 4). Turn it on only after
 migration `20261125190000_advisor_estimate_where_guess_writer.sql` is also on the database:
 without it the guess is never stored, so planning falls back to evidence or unknown. Turning
 the flag on asks the estimate model once more for each cached Behavior (recipe 1.3 rows use
