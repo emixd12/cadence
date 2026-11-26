@@ -3796,6 +3796,29 @@ Local verification: `tests/sql/tips-one-tap-changes-smoke.sql` and
 `tests/tips-one-tap.local-integration.test.ts` (a Yes moves today's unmarked Occurrence;
 a day already moved by hand keeps its move).
 
+### Pairing the schedule (Ticket 362, D33)
+
+Migration `20261126110000_alongside_schedule_pairing.sql`. With `CADENCE_ALONGSIDE` on, the
+coach may propose moving an alongside Behavior (the guest) to the set time of another
+Behavior (the host), as an ordinary time proposal. Rules:
+`packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts` and
+`docs/DATETIME_STRATEGY.md`, "Pairing the schedule".
+
+- Evidence `source` adds `alongside_pairing`: `basis` (`done_together` or `brief_yes`),
+  `host_behavior_id`, `signal_ids`, `yes_days` and `window_days`. Ids and counts only, never
+  titles. The evidence check was dropped and re-added with the new value, as Nov 20 did for
+  `tip`; every existing row still passes.
+- `behavior_change_proposals_pairing_fields`: a pairing row is a `time` change, has a known
+  `basis` and names a host in uuid form that is not the guest. No foreign key: the host is
+  checked when the proposal is shown and before a Yes applies it, and a missing or moved
+  host closes the proposal as `schedule_changed`.
+- No new table, function or grant. The coach reads its evidence on its own channel:
+  `coach_read_signals` for `done_together`, and the person's `move_proposals` rows and
+  `behavior_move_preferences` under RLS. The view (`GET /api/advisor/coach/schedule-proposal`)
+  adds `pairing: {hostBehaviorId, hostTitle}` to such a question; Macs ignore it.
+
+Local verification: `tests/sql/ticket-362-alongside-schedule-pairing-smoke.sql`.
+
 ## Mark details and day load (advisor plan Phase 4, workstream 4G)
 
 Migration `20261119220000_mark_details_and_day_load.sql`. Rules that need no database:
