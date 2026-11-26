@@ -20017,7 +20017,7 @@ Messaging impact: `P-089`. Legal: `L-026`.
 
 ## Ticket 356: Alongside setting: column, flag and effective-value resolver
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. Scope change: the column stays out of account sync and configuration history until Ticket 363, which adds them with the Mac's SQLite column and a sync contract bump (configuration events are synced, so either would force that bump now). Export, restore and MCP carriage stay with Ticket 364.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20048,7 +20048,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 357: Effective Where and the same-place overlap rule
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare).
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20079,7 +20079,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 358: Alongside in the Behavior form and on the Timeline (web)
 
-Status: not_started
+Status: complete (November 25, 2026; behind `CADENCE_ALONGSIDE`, off)
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20110,7 +20110,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 359: Advisor readers and the Where guess in the estimate call
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending (`20261125190000`). Estimate recipe 1.3, Chat prompt `chat-1.8` and coach signals `coach-signals-4` apply only with the flag on. Scope note: an exact-time opportunity add (Chat and MCP) also checks the added Behavior's side of the same-place rule. The in-consumer estimate request (workbench and evals) stays recipe 1.2; only its result now yields to the person's answer.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20141,7 +20141,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 360: The agent asks whether a Behavior is alongside
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. The brief keeps one question per brief and never asks an answered Behavior again; an ignored question can return in a later brief because no "asked" record is stored.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20173,7 +20173,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 361: Pairing for today in the Daily Brief and Chat
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration (both `reason` columns accept the new code `alongside_pairing`). Readings: "crowded" reuses the coach's `crowded_hour` threshold (3 items in a local hour, alongside items not counted) or an hour the stored signal names; `done_together` counts only when the named partner is one of today's hosts; the brief and Chat read the coach's signals through the coach agent's read-only channel. The proposal's `line.pairing` records the host offered, as history for Ticket 362, not a link. Re-check pairs a guest again when its host moved or left; Re-plan pairs it with another host. Chat skips the "helps" rule for an item the person asked about.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20264,7 +20264,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 364: Alongside in the MCP contract, exports and BehaviorLog
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migrations `20261125140000` and `20261125180000` pending. Contract 1.8.0 is a flag-selected edition of the published 1.7.0 registry (`docs/MCP_CONTRACT.md`, "Alongside"); folding it into the registry and the public developer reference waits for the Production flag (Ticket 365). BehaviorLog has no fitting field, so the setting is a Cadence extension and the gap is recorded in `docs/EXPORT_FORMATS.md`, "Alongside".
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20318,3 +20318,41 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
 
 Messaging impact: `P-093`.
+
+## Ticket 366: Tracked time decides a Behavior's length from 3 tracked completions
+
+Status: in_progress
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Tracked time decides a Behavior's length from 3 tracked completions (D34)".
+
+Dependencies: none.
+
+Goal: Plan with measured time once there is enough of it, and stop asking the person for a duration Cadence already measures.
+
+Requirements:
+
+- One length order in `@cadence/core`: the tracked figure from 3 tracked completions, then the intended duration (`default_duration_minutes`), then the tracked figure from 1 or 2, then a description estimate.
+- The tracked figure is the median of the 10 most recent tracked completions. It replaces the mean.
+- The same order and the same measurement apply to the Timeline estimate, day load, travel timing, the Opportunity pool, the Daily Brief's selected duration and its `duration` field, and every move length (Move for today, Daily Brief moves, Opportunity suggestions, Chat moves). One sample is one Completed Occurrence before today with its time sessions added together. Services read lengths through `lib/services/behavior-length.service.ts`; no caller measures sessions on its own.
+- The coach's length tip offers to update the intended duration ("Update Gym's intended duration to 45 minutes?").
+- `docs/RULES_REGISTER.md` lists each length rule, its value, its constant and what to look at in real use. `AGENTS.md` tells agents to keep it current.
+- The Timeline row shows the intended duration beside the tracked figure when the tracked figure decides, and offers no "Set intended duration" action then.
+- The UI says "Intended duration" in the Behavior form, the Timeline row and the saved notice. The column, sync, export and MCP field names do not change.
+- No schema change. Stored names `completed_stopped_occurrence_mean` and `logged_average` stay; they now name a median.
+
+Out of scope, each needing its own ticket:
+
+- Wording for the Daily Brief, coach and Chat to compare tracked and intended time. The brief's model input still carries one selected duration per item.
+- Rows in `docs/RULES_REGISTER.md` for the rule sets under its "Not yet listed".
+- The length tip reads a 28-day window and needs 4 tracked completions; the length order uses the 10 most recent and a floor of 3 (register rows TIP-01, TIP-02).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `packages/core/src/resolvers/timeline-context.resolver.ts`, `time-tracking.resolver.ts`, `move.resolver.ts`, `brief-move.resolver.ts`, `packages/core/src/services/briefing-config.ts`, `lib/services/behavior-length.service.ts`, `lib/services/brief-move-day.service.ts`, `lib/services/chat/chat-executor.ts`, `components/timeline/InlineDurationControl.tsx`, `components/behaviors/BehaviorForm.tsx`. |
+| Desktop | Same resolvers and components; ships in the next Mac release. Installed check with that release. |
+| Marketing | Not applicable: no public claim names the duration order. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers. |
+
+Messaging impact: `P-094`.

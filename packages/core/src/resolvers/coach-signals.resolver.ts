@@ -22,6 +22,20 @@ import { resolveCoachSignalsV2, weekdayMoveCounts } from "./coach-signals-v2.res
 /** Version 3 adds `sub_behavior_dropoff` and counts a routine's steps at one time as one item. */
 export const COACH_SIGNAL_VERSION = "coach-signals-3";
 
+/**
+ * Version 4 (Ticket 359, D33), only while `CADENCE_ALONGSIDE` is on: each Behavior carries
+ * its effective alongside value. `crowded_hour` does not count alongside items, and
+ * `done_together` facts say whether each side is alongside. Ticket 360 adds the
+ * unanswered alongside question to `setup_gaps` (`alongside_unanswered`,
+ * `without_alongside_answer`). No new kind. With the flag off the visit stays version 3
+ * and its output is unchanged.
+ */
+export const COACH_SIGNAL_VERSION_ALONGSIDE = "coach-signals-4";
+
+export function coachSignalVersion(alongside: boolean): string {
+  return alongside ? COACH_SIGNAL_VERSION_ALONGSIDE : COACH_SIGNAL_VERSION;
+}
+
 export const COACH_SIGNAL_THRESHOLDS = Object.freeze({
   /** Read this many days of Occurrences before today (version 2: eight weeks for dip and recovery). */
   historyDays: 56,
@@ -108,6 +122,16 @@ export type CoachSignalBehavior = Readonly<{
   parentBehaviorId?: string | null;
   /** Version 3: the step follows its routine's schedule. */
   inheritParentSchedule?: boolean;
+  /**
+   * Version 4: the effective alongside value (the person's answer, else the model's
+   * current guess, else false). Undefined when not read: `CADENCE_ALONGSIDE` is off.
+   */
+  alongside?: boolean;
+  /**
+   * Version 4 (Ticket 360): `alongsideQuestionOpen`, the person has not answered and the
+   * guess is yes. `setup_gaps` reports it. Undefined when not read: the flag is off.
+   */
+  alongsideQuestionOpen?: boolean;
 }>;
 
 export type CoachSignalOccurrence = Readonly<{

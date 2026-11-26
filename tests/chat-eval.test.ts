@@ -49,6 +49,24 @@ describe("chat eval fake executor", () => {
     expect(calls.map((item) => item.replayed)).toEqual([false, true]);
   });
 
+  it("Ticket 361: pairs the helmet with Read through the real planner, and the move then lands under the same-place rule", async () => {
+    const world = chatEvalWorld("alongside_pairing");
+    const { execute } = createFakeExecutor(world);
+    const helmet = occurrence(world, "Red light helmet", TODAY);
+    const planned = await execute("plan_alongside_pairings", {}, {});
+    const pairing = (planned as { result: { pairings: { occurrence_id: string; start_time: string; expected_revision: string; host: { title: string }; helps: string[] }[] } }).result.pairings;
+    expect(pairing).toEqual([expect.objectContaining({ occurrence_id: helmet.id, start_time: "21:30", host: expect.objectContaining({ title: "Read" }), helps: ["done_together"] })]);
+    const moved = await execute("move_occurrence_for_day", { occurrence_id: helmet.id, start_time: "21:30", expected_revision: pairing[0]!.expected_revision }, {});
+    expect((moved as { result: { outcome: string } }).result.outcome).toBe("moved");
+    // Without the flag the tool is not there, and an item still refuses a time another item holds.
+    expect((await createFakeExecutor(chatEvalWorld("everyday")).execute("plan_alongside_pairings", {}, {})).ok).toBe(false);
+    const everyday = chatEvalWorld("everyday");
+    const read = await createFakeExecutor(everyday).execute("move_occurrence_for_day", { occurrence_id: occurrence(everyday, "Magnesium", TODAY).id, start_time: "21:30", expected_revision: "r1" }, {});
+    expect((read as { result: { outcome: string } }).result.outcome).toBe("refused");
+    // The alongside world without the coach's evidence offers nothing: nothing about the helmet helps.
+    expect((await createFakeExecutor(chatEvalWorld("alongside")).execute("plan_alongside_pairings", {}, {}))).toEqual({ ok: true, result: { pairings: [] } });
+  });
+
   it("rejects malformed input with the real schema", async () => {
     const { execute } = createFakeExecutor(chatEvalWorld("everyday"));
     const result = await execute("move_occurrence_for_day", { occurrence_id: "not-a-uuid", start_time: "7pm" }, {});
@@ -95,6 +113,33 @@ describe("chat eval layer 1 rules", () => {
     const off = chatEvalWorld("calendar_off");
     const leak = checkChatRules({ scenario: chatScenario("calendar_off"), world: off, turns: [{ turn: 1, user: "", parts: [{ type: "text", text: "You have Standup at 9." }] }], calls: [], undoResults: [] });
     expect(leak.map((item) => item.rule)).toEqual(["off_source_data"]);
+  });
+
+  it("Ticket 359: flags a planning field name in a reply, and moving an alongside item nobody asked to move", () => {
+    const alongside = chatEvalWorld("alongside");
+    const helmet = occurrence(alongside, "Red light helmet", TODAY);
+    const words = checkChatRules({ scenario: chatScenario("alongside_guess"), world: alongside,
+      turns: [{ turn: 1, user: "", parts: [{ type: "text", text: "Yes: its alongside_source is guess." }] }], calls: [], undoResults: [] });
+    expect(words.map((item) => item.rule)).toEqual(["planning_words"]);
+    const move: PhasedCall = { name: "move_occurrence_for_day", args: { occurrence_id: helmet.id, start_time: "22:00" },
+      idempotencyKey: null, outcome: { ok: true, result: {} }, changed: true, replayed: false, turn: 1, phase: "turn" };
+    const moved = checkChatRules({ scenario: chatScenario("alongside_clashes"), world: alongside, turns: [{ turn: 1, user: "", parts: [] }], calls: [move], undoResults: [] });
+    expect(moved.map((item) => item.rule)).toEqual(["unasked_write"]);
+  });
+});
+
+describe("chat eval alongside world (Ticket 359)", () => {
+  it("reads carry planning for the helmet, pill and gym; other worlds carry none", async () => {
+    const world = chatEvalWorld("alongside");
+    const timeline = await createFakeExecutor(world).execute("get_timeline", { days: 1 }, {});
+    const items = (timeline as { result: { days: Array<{ occurrences: Array<{ behavior_title: string; planning?: unknown }> }> } }).result.days[0]!.occurrences;
+    const planning = Object.fromEntries(items.map((item) => [item.behavior_title, item.planning]));
+    expect(planning["Red light helmet"]).toEqual({ alongside: true, alongside_source: "guess", where: "home", where_source: "guess" });
+    expect(planning["Vitamin D"]).toEqual({ alongside: true, alongside_source: "person", where: "anywhere", where_source: "person" });
+    expect(planning["Gym session"]).toEqual({ alongside: false, alongside_source: "guess", where: "elsewhere", where_source: "guess" });
+    expect(planning["Read"]).toEqual({ alongside: false, alongside_source: "person", where: "home", where_source: "person" });
+    const everyday = await createFakeExecutor(chatEvalWorld("everyday")).execute("get_timeline", { days: 1 }, {});
+    expect(JSON.stringify(everyday)).not.toContain("planning");
   });
 });
 

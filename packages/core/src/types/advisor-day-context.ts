@@ -1,4 +1,6 @@
 import type { CompletionTimingSummary } from "../resolvers/completion-timing.resolver";
+import type { AlongsideSource } from "../resolvers/alongside.resolver";
+import type { EffectiveWhereKind, EffectiveWhereSource } from "../resolvers/effective-where.resolver";
 
 import type {
   ExternalEventAvailability,
@@ -124,6 +126,24 @@ export type AdvisorOccurrence = Readonly<{
    * collide with each other and move together.
    */
   routine?: AdvisorOccurrenceRoutine;
+  /**
+   * Ticket 359 (D33): the Behavior's effective alongside value and effective Where, only
+   * while `CADENCE_ALONGSIDE` is on. Planning only and server-side: the brief's model
+   * facts never carry it (the projection lists its fields), and it never reaches travel,
+   * departure, route or leave-reminder code.
+   */
+  planning?: AdvisorOccurrencePlanning;
+}>;
+
+export type AdvisorOccurrencePlanning = Readonly<{
+  alongside: boolean;
+  alongsideSource: AlongsideSource;
+  where: Readonly<{
+    kind: EffectiveWhereKind;
+    source: EffectiveWhereSource;
+    /** Only for `place` with a saved place: its one-way key, for the same-place rule. Never sent to a model. */
+    placeKey?: string;
+  }>;
 }>;
 
 export type AdvisorOccurrenceRoutine = Readonly<{
@@ -354,8 +374,10 @@ export type AdvisorOpportunityPoolItem = Readonly<{
   behaviorRevision: string;
   timezone: string;
   defaultDurationMinutes: number | null;
-  /** Average of the last finished time sessions, or null with fewer than two. */
+  /** The tracked figure: median of the 10 most recent tracked completions, or null with none (Ticket 366). */
   loggedAverageSeconds: number | null;
+  /** How many tracked completions that figure rests on. From 3, it outranks `defaultDurationMinutes`. */
+  loggedSampleCount?: number;
   whereKind: "anywhere" | "home" | "place" | null;
   /** Whole days from the last Completed Occurrence to today; null when never Completed. */
   daysSinceLastCompleted: number | null;

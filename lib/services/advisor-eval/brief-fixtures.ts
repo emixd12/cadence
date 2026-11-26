@@ -1,8 +1,9 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { validateVersionedAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
-import type { AdvisorDayContext, AdvisorOccurrence } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorOccurrence, AdvisorOccurrencePlanning } from "@cadence/core/types/advisor-day-context";
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE, BRIEF_MOVE_FALLBACK_MINUTES, type BriefMoveLength } from "@cadence/core/types/brief-moves";
 import type { BriefMoveCalendarBusy, BriefMoveDayItem, BriefMovePlanInputs } from "@cadence/core/resolvers/brief-move.resolver";
+import type { AlongsidePairingEvidence } from "@cadence/core/resolvers/alongside-pairing.resolver";
 import { advisorEvalFixture, type AdvisorEvalFixtureId } from "./fixtures";
 
 /**
@@ -13,11 +14,11 @@ import { advisorEvalFixture, type AdvisorEvalFixtureId } from "./fixtures";
  * the browser sends with the request). Under Phase 3 every time-based Behavior may
  * move, so no fixture lists movable Behaviors.
  */
-export const BRIEF_EVAL_FIXTURE_VERSION = "brief-eval-2026-11-18.1";
+export const BRIEF_EVAL_FIXTURE_VERSION = "brief-eval-2026-11-25.2";
 
 export const BRIEF_EVAL_FIXTURE_IDS = ["busy_professional", "irregular_schedule", "new_user", "heavy_mover", "daylight_saving",
   "near_midnight", "timezone_change", "mac_linked", "stale_calendar", "hidden_instructions",
-  "quiet_day", "declined_and_undone", "alongside_and_never_move", "late_evening"] as const;
+  "quiet_day", "declined_and_undone", "alongside_and_never_move", "late_evening", "alongside_places", "alongside_pairing"] as const;
 export type BriefEvalFixtureId = typeof BRIEF_EVAL_FIXTURE_IDS[number];
 
 export type BriefEvalExpectations = Readonly<{
@@ -31,6 +32,8 @@ export type BriefEvalExpectations = Readonly<{
   noHistoryClaims?: true;
   /** Text that must never appear in the brief (case-insensitive). */
   forbiddenText?: readonly string[];
+  /** Ticket 361: these guests must get a pairing line with this host. */
+  pairs?: readonly Readonly<{ guest: string; host: string }>[];
 }>;
 
 export type BriefEvalFixture = Readonly<{
@@ -40,6 +43,11 @@ export type BriefEvalFixture = Readonly<{
   /** When the brief is asked for. */
   now: string;
   plan: BriefMovePlanInputs;
+  /**
+   * Ticket 361: set on fixtures read with CADENCE_ALONGSIDE on (those with `planning`): the
+   * coach's evidence the pairing planner reads after the move lines.
+   */
+  pairing?: AlongsidePairingEvidence;
   expect: BriefEvalExpectations;
 }>;
 
@@ -54,6 +62,16 @@ type Scenario = Readonly<{
   behaviorOf?: Readonly<Record<string, string>>;
   /** When the brief is asked for, as a local wall time. Defaults to just after capture. */
   at?: string;
+  /** Titles for single occurrences, over the busy day's titles. */
+  titles?: Readonly<Record<string, string>>;
+  /**
+   * Ticket 359: read as with CADENCE_ALONGSIDE on. Each Behavior's effective alongside value
+   * and Where, by behaviorRef; unlisted Behaviors are not alongside and their Where is
+   * unknown. Every item then carries a Where, and the day context carries `planning`.
+   */
+  planning?: Readonly<Record<string, AdvisorOccurrencePlanning>>;
+  /** Ticket 361: the coach's done_together and crowded_hour evidence, with `planning` only. */
+  pairingEvidence?: AlongsidePairingEvidence;
 }>;
 
 /** Readable titles for the busy day's twelve hourly items, so graders read a real day. */
@@ -107,6 +125,40 @@ export function briefEvalFixture(id: BriefEvalFixtureId): BriefEvalFixture {
     case "late_evening":
       // Latest start 5 PM: afternoon clashes may not be pushed into the evening.
       return build(id, "busy_professional", "Wants nothing suggested after 5 PM.", { latestStartMinute: 17 * 60, eventTitles: BUSY_EVENTS }, {});
+    case "alongside_places":
+      // Ticket 359 (D33), flag on: the pill (the person's yes, Anywhere) stays inside Team
+      // sync; the red-light helmet (a guess: alongside, at Home) stays at 1 PM; the gym
+      // session (a guess: elsewhere) leaves lunch. The Spanish class (counted elsewhere)
+      // leaves its 1:1 but may not land on the helmet, which is at a different place; under
+      // the earlier rule it would have moved to 1:10 PM, during the helmet.
+      return build(id, "busy_professional", "Vitamin D during a meeting, a red-light helmet at Home, a gym session and a Spanish class elsewhere.", {
+        behaviorOf: { occurrence_fixture_1: "behavior_pill", occurrence_fixture_3: "behavior_spanish_class", occurrence_fixture_4: "behavior_gym",
+          occurrence_fixture_5: "behavior_helmet" },
+        titles: { occurrence_fixture_1: "Vitamin D", occurrence_fixture_3: "Spanish class", occurrence_fixture_4: "Gym session", occurrence_fixture_5: "Red light helmet" },
+        planning: {
+          behavior_pill: { alongside: true, alongsideSource: "person", where: { kind: "anywhere", source: "person" } },
+          behavior_helmet: { alongside: true, alongsideSource: "guess", where: { kind: "home", source: "guess" } },
+          behavior_gym: { alongside: false, alongsideSource: "guess", where: { kind: "elsewhere", source: "guess" } },
+          behavior_spanish_class: { alongside: false, alongsideSource: "person", where: { kind: "elsewhere", source: "evidence" } },
+        },
+        eventTitles: BUSY_EVENTS,
+      }, { keepsOccurrences: ["occurrence_fixture_1", "occurrence_fixture_5"], movesOccurrences: ["occurrence_fixture_3", "occurrence_fixture_4"] });
+    case "alongside_pairing":
+      // Ticket 361 (D33), flag on: the coach found the red-light helmet (a guess: alongside, at
+      // Home) done together with reading (at Home), so the brief pairs the helmet with Read at
+      // 6 PM. Read itself stays; the gym session (elsewhere) is no host for the helmet.
+      return build(id, "busy_professional", "A red-light helmet the coach sees done with reading, a Home reading slot at 6 PM, and a gym session elsewhere.", {
+        behaviorOf: { occurrence_fixture_4: "behavior_gym", occurrence_fixture_5: "behavior_helmet", occurrence_fixture_10: "behavior_reading" },
+        titles: { occurrence_fixture_4: "Gym session", occurrence_fixture_5: "Red light helmet" },
+        planning: {
+          behavior_helmet: { alongside: true, alongsideSource: "guess", where: { kind: "home", source: "guess" } },
+          behavior_reading: { alongside: false, alongsideSource: "person", where: { kind: "home", source: "person" } },
+          behavior_gym: { alongside: false, alongsideSource: "guess", where: { kind: "elsewhere", source: "guess" } },
+        },
+        pairingEvidence: { doneTogether: [{ behaviorId: "behavior_helmet", otherBehaviorId: "behavior_reading" }], crowdedHours: [] },
+        eventTitles: BUSY_EVENTS,
+      }, { movesOccurrences: ["occurrence_fixture_5"], keepsOccurrences: ["occurrence_fixture_10"],
+        pairs: [{ guest: "occurrence_fixture_5", host: "occurrence_fixture_10" }] });
   }
 }
 
@@ -115,11 +167,13 @@ const BUSY_EVENTS: Readonly<Record<string, string>> = { event_busy_0: "Team sync
 
 function build(id: BriefEvalFixtureId, base: AdvisorEvalFixtureId, description: string, scenario: Scenario, expect: BriefEvalExpectations): BriefEvalFixture {
   const source = advisorEvalFixture(base).context;
-  const context = base === "busy_professional" ? withTitles(source, BUSY_TITLES, scenario.behaviorOf ?? {}) : source;
+  const titled = base === "busy_professional" ? withTitles(source, { ...BUSY_TITLES, ...scenario.titles }, scenario.behaviorOf ?? {}) : source;
+  const context = scenario.planning ? withPlanning(titled, scenario.planning) : titled;
   const now = scenario.at
     ? Temporal.PlainDate.from(context.localDate).toZonedDateTime({ timeZone: context.timezone, plainTime: scenario.at }).toInstant().toString()
     : Temporal.Instant.from(context.capturedAt).add({ seconds: 1 }).toString();
-  return { id, description, context, now, plan: planInputs(context, now, scenario), expect };
+  return { id, description, context, now, plan: planInputs(context, now, scenario), expect,
+    ...(scenario.planning ? { pairing: scenario.pairingEvidence ?? { doneTogether: [], crowdedHours: [] } } : {}) };
 }
 
 function withTitles(context: AdvisorDayContext, titles: Readonly<Record<string, string>>, behaviorOf: Readonly<Record<string, string>>): AdvisorDayContext {
@@ -134,6 +188,14 @@ function withTitles(context: AdvisorDayContext, titles: Readonly<Record<string, 
     cadence: { ...context.cadence, occurrences, history: { ...context.cadence.history, behaviors: [...rows, ...added] } } }));
 }
 
+/** Ticket 359: the day context's planning field, as the flag-on day context reader adds it. */
+function withPlanning(context: AdvisorDayContext, planning: Readonly<Record<string, AdvisorOccurrencePlanning>>): AdvisorDayContext {
+  const occurrences = context.cadence.occurrences.map((item) => ({ ...item, planning: planning[item.behaviorRef] ?? NO_PLANNING }));
+  return validateVersionedAdvisorDayContext(structuredClone({ ...context, cadence: { ...context.cadence, occurrences } }));
+}
+
+const NO_PLANNING: AdvisorOccurrencePlanning = { alongside: false, alongsideSource: "default", where: { kind: "unknown", source: "none" } };
+
 /** A day where nothing clashes: three Behaviors spread out, no calendar events in the way. */
 function quietDay(): BriefEvalFixture {
   const base = advisorEvalFixture("irregular_schedule").context;
@@ -146,12 +208,18 @@ function quietDay(): BriefEvalFixture {
 
 /** What the Phase 3 planner reads, built from a day context the way 3A1's day reader does. */
 export function planInputs(context: AdvisorDayContext, now: string, scenario: Scenario): BriefMovePlanInputs {
-  const alongside = new Set(scenario.alongsideBehaviorIds ?? []);
+  const alongside = new Set([...(scenario.alongsideBehaviorIds ?? []),
+    ...Object.entries(scenario.planning ?? {}).filter(([, item]) => item.alongside).map(([ref]) => ref)]);
   // Every expected title must exist, so a renamed base fixture fails loudly.
   for (const ref of [...(scenario.declinedToday ?? []), ...Object.keys(scenario.behaviorOf ?? {})]) {
     if (!context.cadence.occurrences.some((item) => item.ref === ref)) throw new Error(`unknown occurrence ${ref}`);
   }
-  const items = context.cadence.occurrences.map((item) => dayItem(context, item, alongside.has(item.behaviorRef)));
+  const items = context.cadence.occurrences.map((item) => {
+    const day = dayItem(context, item, alongside.has(item.behaviorRef));
+    if (!scenario.planning) return day;
+    const facts = scenario.planning[item.behaviorRef] ?? NO_PLANNING;
+    return { ...day, alongsideSource: facts.alongsideSource, where: facts.where };
+  });
   const calendar = calendarState(context);
   const calendarBusy: BriefMoveCalendarBusy[] = context.connectors.flatMap((connector) => "events" in connector ? connector.events : [])
     .flatMap((event) => event.interval.kind === "timed" && event.availability === "busy" && event.state !== "cancelled"

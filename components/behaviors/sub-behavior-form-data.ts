@@ -27,13 +27,14 @@ export function hasDraftSubBehaviors(formData: FormData): boolean {
 }
 
 /** A create form with drafted sub-behaviors: the parent plus each sub-behavior, in order. */
-export function parseBehaviorGroupFormData(formData: FormData): {
+export function parseBehaviorGroupFormData(formData: FormData, options: Readonly<{ readAlongside?: boolean }> = {}): {
   parent: BehaviorInput;
   subBehaviors: BehaviorInput[];
 } {
   const parentForm = withoutSubBehaviorFields(formData);
   parentForm.delete("parent_behavior_id");
-  const parent = parseBehaviorFormData(parentForm, { mode: "create" });
+  // Ticket 358: the alongside answer is the parent's own; drafted sub-behaviors start unanswered.
+  const parent = parseBehaviorFormData(parentForm, { mode: "create", readAlongside: options.readAlongside === true });
   const count = Math.min(Number(formData.get(SUB_BEHAVIOR_COUNT_FIELD) ?? 0), MAX_DRAFT_SUB_BEHAVIORS);
   const subBehaviors: BehaviorInput[] = [];
 

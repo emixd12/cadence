@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { COACH_EVAL_FIXTURE_IDS, coachEvalFixture, coachEvalFixtures } from "@/lib/services/advisor-eval/coach-fixtures";
 import { runCoachEval, summarizeCoachEval } from "@/lib/services/advisor-eval/coach-harness";
+import { resolveCoachSignals } from "@cadence/core/resolvers/coach-signals.resolver";
 
 // Advisor plan Phase 4, workstream 4B step 8: the coach eval's accounts and layer-1 rules,
 // run with no model (every line is the card's own wording) so it costs nothing.
@@ -9,9 +10,20 @@ import { runCoachEval, summarizeCoachEval } from "@/lib/services/advisor-eval/co
 const seedsOnly = { label: "seeds", model: "openai/gpt-5.6-luna", generate: async () => null };
 
 describe("coach eval accounts", () => {
-  it("has the 14 brief-eval accounts plus the five the review added", () => {
-    expect(COACH_EVAL_FIXTURE_IDS).toHaveLength(19);
-    expect(COACH_EVAL_FIXTURE_IDS).toEqual(expect.arrayContaining(["brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions"]));
+  it("has the 14 brief-eval accounts plus the five the review added and the alongside account", () => {
+    expect(COACH_EVAL_FIXTURE_IDS).toHaveLength(20);
+    expect(COACH_EVAL_FIXTURE_IDS).toEqual(expect.arrayContaining(["brand_new", "steady", "month_of_moves", "lapsed", "notes_hidden_instructions", "alongside_evening"]));
+  });
+
+  it("Ticket 359: alongside items (the helmet and the pill) do not crowd the evening hour", () => {
+    const input = coachEvalFixture("alongside_evening").inputFor("2026-11-19");
+    expect(input.behaviors.filter((behavior) => behavior.alongside).map((behavior) => behavior.id)).toEqual(["helmet", "pill"]);
+    const crowded = (value: typeof input) => resolveCoachSignals(value).filter((signal) => signal.kind === "crowded_hour");
+    // Version 3 (flag off, the value unread) counts all four 8 PM items and calls the hour crowded.
+    const unread = { ...input, behaviors: input.behaviors.map((behavior) => ({ ...behavior, alongside: undefined })) };
+    expect(crowded(unread)).toEqual([expect.objectContaining({ facts: expect.objectContaining({ hour: 20 }) })]);
+    // Version 4 leaves the helmet and the pill out: two items in the hour are not a crowd.
+    expect(crowded(input)).toEqual([]);
   });
 
   it("is repeatable", () => {
@@ -28,7 +40,7 @@ describe("coach eval accounts", () => {
 });
 
 describe("coach eval with the cards' own wording", () => {
-  // One test per account. As a single test the 19 accounts took 2.7 to 4.4 s on GitHub's
+  // One test per account. As a single test the 19 accounts (20 since Ticket 359) took 2.7 to 4.4 s on GitHub's
   // runners and passed the 5 s limit on 3 of 11 runs on November 20, 2026.
   const tipsByFixture = new Map<string, number>();
 

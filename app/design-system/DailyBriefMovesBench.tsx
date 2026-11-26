@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { OccurrenceMovesProvider, type OccurrenceMoveActions } from "@/components/timeline/OccurrenceMoves";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
-import { BRIEF_MOVE_FIXTURE, BRIEF_MOVE_FIXTURE_BRIEFING, BRIEF_MOVE_FIXTURE_LINES, fixtureBriefMoveClient } from "./brief-move-fixtures";
+import { BRIEF_MOVE_FIXTURE, BRIEF_MOVE_FIXTURE_BRIEFING, BRIEF_MOVE_FIXTURE_LINES, BRIEF_MOVE_PAIRING_BRIEFING, BRIEF_MOVE_PAIRING_LINE, fixtureBriefMoveClient } from "./brief-move-fixtures";
 import { BRIEF_OPPORTUNITY_FIXTURE, fixtureBriefOpportunityClient } from "./brief-opportunity-fixtures";
 
 // Advisor plan Phase 3B. The brief's move lines with synthetic data and no account:
@@ -41,6 +41,8 @@ export function DailyBriefMovesBench() {
   const recheckedClient = useMemo(() => fixtureBriefMoveClient({ stale: ["gym"] }), []);
   const opportunityMoveClient = useMemo(() => fixtureBriefMoveClient(), []);
   const opportunityClient = useMemo(() => fixtureBriefOpportunityClient(), []);
+  // Ticket 361: a pairing line (an alongside item during another item), answered like any move line.
+  const pairingClient = useMemo(() => fixtureBriefMoveClient({ lines: [BRIEF_MOVE_PAIRING_LINE] }), []);
   const actions = useMemo<OccurrenceMoveActions>(() => ({
     async suggest() { return []; },
     async move(input) { return { status: "moved", occurrenceId: input.occurrenceId, moveId: "bench", effectiveStartAt: null, revision: "r2" }; },
@@ -63,6 +65,9 @@ export function DailyBriefMovesBench() {
         <div data-bench-state="opportunities">
           <DailyBriefBubble state="ready" briefing={WITH_OPPORTUNITIES} moves={{ client: opportunityMoveClient, planningContext: () => ({ calendarBusy: [] }) }}
             opportunities={{ client: opportunityClient, planningContext: () => ({ calendarBusy: [] }) }} onDismiss={() => undefined} />
+        </div>
+        <div data-bench-state="pairing">
+          <DailyBriefBubble state="ready" briefing={BRIEF_MOVE_PAIRING_BRIEFING} moves={{ client: pairingClient, planningContext: () => ({ calendarBusy: [] }) }} onDismiss={() => undefined} />
         </div>
         <div data-bench-state="answered">
           <DailyBriefBubble state="ready" briefing={ANSWERED} moves={{ client: answeredClient, planningContext: () => ({ calendarBusy: [] }) }} onDismiss={() => undefined}

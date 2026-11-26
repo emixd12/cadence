@@ -30,6 +30,7 @@ import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { briefCalendarBusy } from "@/lib/ui/brief-calendar";
 import { DAILY_BRIEF_MOVE_FEATURES } from "@/lib/ui/daily-brief-moves";
 import { DAILY_BRIEF_OPPORTUNITY_FEATURES } from "@/lib/ui/daily-brief-opportunities";
+import { DAILY_BRIEF_ALONGSIDE_FEATURES } from "@/lib/ui/daily-brief-alongside";
 import type { BriefPlanningContext } from "@cadence/core/types/brief-moves";
 import { noticeText, type NoticeId, type NoticeParams } from "@cadence/core/notices";
 import { DailyBriefBubble } from "./DailyBriefBubble";
@@ -381,7 +382,9 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     } : null;
     const opportunityClient = resolvedClient.opportunities;
     const opportunities = moves && opportunityClient ? { client: opportunityClient, planningContext: moves.planningContext } : null;
-    return place(<DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} opportunities={opportunities} refresh={refresh} embedded={embedded} />);
+    // Ticket 360: the alongside question needs the move transport too (the same signed-in hosted client).
+    const alongside = moves && resolvedClient.alongside ? resolvedClient.alongside : null;
+    return place(<DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} plan={plan} moves={moves} opportunities={opportunities} alongside={alongside} refresh={refresh} embedded={embedded} />);
   }
   if (shown.kind !== "notice") return null;
   const action = planControls && shown.action === "manage_usage" ? { label: "Manage usage", onClick: planControls.manageUsage }
@@ -429,7 +432,8 @@ function closedOrHidden(settings: DailyBriefSettings): View {
 function moveRequestFields(client: DailyBriefClient, travelAccountId: string | null, localDate: string) {
   if (!client.moves) return {};
   const travelTimes = travelTimesToken(travelAccountId, localDate);
-  const features = [...DAILY_BRIEF_MOVE_FEATURES, ...(client.opportunities ? DAILY_BRIEF_OPPORTUNITY_FEATURES : [])];
+  const features = [...DAILY_BRIEF_MOVE_FEATURES, ...(client.opportunities ? DAILY_BRIEF_OPPORTUNITY_FEATURES : []),
+    ...(client.alongside ? DAILY_BRIEF_ALONGSIDE_FEATURES : [])];
   return { features, ...(travelTimes ? { travelTimes } : {}) };
 }
 

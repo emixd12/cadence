@@ -1,10 +1,12 @@
 "use server";
 
 import { Temporal } from "@js-temporal/polyfill";
+import { revalidatePath } from "next/cache";
 import { isNotDoneReason } from "@cadence/core/resolvers/status.resolver";
 import { parseOccurrenceId } from "@cadence/core/services/occurrence.service";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import { recordOccurrenceDoneAt, recordOccurrenceNotDoneReason } from "@/lib/services/occurrence.service";
+import { recordBehaviorAlongsideAnswer } from "@/lib/services/alongside-answer.service";
 import { createClient } from "@/lib/supabase/server";
 import type { MarkDetailState } from "@/components/timeline/OccurrenceMarkDetails";
 
@@ -27,6 +29,23 @@ export async function recordNotDoneReasonAction(input: Readonly<{ occurrenceId: 
     if (!isNotDoneReason(input.reason)) throw new Error("Choose one of the listed reasons.");
     await recordOccurrenceNotDoneReason(supabase, userId, { occurrenceId: parseOccurrenceId(input.occurrenceId), reason: input.reason, now: Temporal.Now.instant() });
   });
+}
+
+/**
+ * Ticket 360 (D33): "Done alongside other things? Yes · No" writes the Behavior's alongside
+ * setting through the Behavior definition service, which closes the question everywhere.
+ * The Timeline and Behaviors pages are refreshed so the row label and the form show it.
+ */
+export async function recordAlongsideAnswerAction(input: Readonly<{ occurrenceId: string; behaviorId: string; alongside: boolean }>): Promise<MarkDetailState> {
+  const result = await run(async (supabase, userId) => {
+    if (typeof input.behaviorId !== "string" || !input.behaviorId || typeof input.alongside !== "boolean") throw new Error("Choose Yes or No.");
+    await recordBehaviorAlongsideAnswer(supabase, userId, { behaviorId: input.behaviorId, alongside: input.alongside });
+  });
+  if (result.status === "saved") {
+    revalidatePath("/timeline");
+    revalidatePath("/behaviors");
+  }
+  return result;
 }
 
 async function run(write: (supabase: Awaited<ReturnType<typeof createClient>>, userId: string) => Promise<void>): Promise<MarkDetailState> {

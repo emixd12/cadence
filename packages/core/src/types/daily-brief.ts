@@ -2,6 +2,7 @@ import type { BriefingReference } from "../services/briefing-references";
 import type { BriefingPlanOption } from "./briefing-plan";
 import type { BriefMoves } from "./brief-moves";
 import type { BriefOpportunities } from "./brief-opportunities";
+import type { BriefAlongsideQuestion } from "./brief-alongside";
 
 /** Daily Brief interprets practical constraints; it does not recap the ledger. */
 export const DAILY_BRIEF_POLICY_VERSION = "3.0" as const;
@@ -42,6 +43,12 @@ export type DailyBriefing = Readonly<{
    * sent `opportunity_lines_v1` (packages/core/src/types/brief-opportunities.ts).
    */
   opportunities?: BriefOpportunities;
+  /**
+   * Ticket 360 (D33): the brief's one alongside question, "Can {title} be done alongside
+   * other things? Yes · No". Present only for a client that sent `alongside_question_v1`
+   * while `CADENCE_ALONGSIDE` is on and a question is open (packages/core/src/types/brief-alongside.ts).
+   */
+  alongsideQuestion?: BriefAlongsideQuestion;
   /**
    * Advisor Phase 3: refreshes left today (one morning brief plus up to two refreshes
    * per account). `available` is false when none are left or a refresh would leave the

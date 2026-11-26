@@ -7,6 +7,11 @@ import {
   clockLabel, effectiveTime, minutesOf, timeOf, toInstant,
   type ChatWorld, type WorldBehavior, type WorldOccurrence, type Weekday,
 } from "./world";
+import { CHAT_PLANNING_READS, withChatPlanning } from "../chat/chat-planning";
+import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
+import { NO_ALONGSIDE_PAIRING_EVIDENCE, planAlongsidePairings } from "@cadence/core/resolvers/alongside-pairing.resolver";
+import type { BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
+import { chatPairingProposal } from "../alongside-pairing.service";
 
 /**
  * Phase 5 (5D) chat eval: an in-memory stand-in for the chat route's tool executor.
@@ -36,7 +41,7 @@ export type ToolCallRecord = Readonly<{
   replayed: boolean;
 }>;
 
-export const CHAT_ONLY_TOOLS = ["list_calendar_events", "list_calendar_load", "list_workouts", "search_advice"] as const;
+export const CHAT_ONLY_TOOLS = ["list_calendar_events", "list_calendar_load", "list_workouts", "search_advice", "plan_alongside_pairings"] as const;
 
 export const WRITE_OPERATIONS: ReadonlySet<string> = new Set([
   "set_occurrence_status", "update_occurrence_note", "move_occurrence_for_day", "revert_occurrence_move", "update_day_note",
@@ -62,13 +67,26 @@ export function createFakeExecutor(world: ChatWorld): FakeExecutor {
       return outcome;
     }
     const before = WRITE_OPERATIONS.has(name) ? snapshot(world) : null;
-    const outcome = run(world, name, args);
+    const outcome = withWorldPlanning(world, name, run(world, name, args));
     const changed = before !== null && outcome.ok && snapshot(world) !== before;
     if (replayKey && WRITE_OPERATIONS.has(name)) replays.set(replayKey, outcome);
     calls.push({ name, args, idempotencyKey: key, outcome, changed, replayed: false });
     return outcome;
   };
   return { execute, calls, world };
+}
+
+/**
+ * Ticket 359: in a world read with CADENCE_ALONGSIDE on, timeline and Behavior reads carry
+ * `planning` the way the live executor adds it (after the output schema check).
+ */
+function withWorldPlanning(world: ChatWorld, name: string, outcome: ChatToolResult): ChatToolResult {
+  if (!world.alongside || !outcome.ok || !CHAT_PLANNING_READS.has(name)) return outcome;
+  const facts = new Map(world.behaviors.map((item) => {
+    const planning = item.planning ?? { alongside: false, alongsideSource: "default" as const, where: "unknown" as const, whereSource: "none" as const };
+    return [item.id, { alongside: { value: planning.alongside, source: planning.alongsideSource }, where: { kind: planning.where, source: planning.whereSource } }];
+  }));
+  return { ok: true, result: withChatPlanning(outcome.result, facts) };
 }
 
 function snapshot(world: ChatWorld): string {
@@ -80,6 +98,7 @@ function run(world: ChatWorld, name: string, args: unknown): ChatToolResult {
   if (name === "list_calendar_load") return { ok: true, result: { days: [], sources: [], note: null } };
   if (name === "list_workouts") return workouts(world, args);
   if (name === "search_advice") return searchAdvice(world, args);
+  if (name === "plan_alongside_pairings") return pairings(world, args);
   if (!isIntegrationOperationName(name)) return fail("not_found", `No tool named ${name}.`);
   const input = validateOperationInput(name, args ?? {});
   if (!input.ok) return fail("invalid_input", `${input.error.message} ${input.issues.slice(0, 3).map((item) => `${item.path} ${item.message}`).join("; ")}`.trim());
@@ -464,11 +483,23 @@ function moveRecord(world: ChatWorld, item: WorldOccurrence, from: string, kind:
     to_planned: to === item.time, chain_position: item.moves.length + (kind === "revert" ? 1 : 0), source: "chat", created_at: nowInstant(world) };
 }
 
-/** Busy minutes today: calendar events (when calendars are on) and other timed Cadence items. */
+/**
+ * Busy minutes today: calendar events (when calendars are on) and other timed Cadence items.
+ * Ticket 361: in a world read with CADENCE_ALONGSIDE on, an alongside item follows the
+ * same-place rule, as the live move check does: it may share time with a calendar event or
+ * an item where `alongsideMayOverlap` allows it.
+ */
 function busyIntervals(world: ChatWorld, except: WorldOccurrence | null): { start: number; end: number; kind: "calendar_busy" | "slot_taken"; label: string }[] {
-  const events = world.sourcesOff.has("calendar") ? [] : world.events.filter((item) => item.localDate === world.today)
+  const planningOf = (item: WorldOccurrence) => world.alongside ? findBehavior(world, item.behaviorId)?.planning : undefined;
+  const placeOf = (item: WorldOccurrence) => ({ kind: planningOf(item)?.where ?? "unknown" as const });
+  const mover = except ? planningOf(except) : undefined;
+  const moverAlongside = mover?.alongside === true;
+  const sharesTime = (item: WorldOccurrence) => world.alongside && except !== null
+    && ((moverAlongside && alongsideMayOverlap({ where: placeOf(except) }, { kind: "item", where: placeOf(item) }))
+      || (planningOf(item)?.alongside === true && alongsideMayOverlap({ where: placeOf(item) }, { kind: "item", where: placeOf(except) })));
+  const events = world.sourcesOff.has("calendar") || (world.alongside && moverAlongside) ? [] : world.events.filter((item) => item.localDate === world.today)
     .map((item) => ({ start: minutesOf(item.start), end: minutesOf(item.end), kind: "calendar_busy" as const, label: item.title }));
-  const items = world.occurrences.filter((item) => item.localDate === world.today && item.id !== except?.id && item.status === "unresolved").flatMap((item) => {
+  const items = world.occurrences.filter((item) => item.localDate === world.today && item.id !== except?.id && item.status === "unresolved" && !sharesTime(item)).flatMap((item) => {
     const minutes = findBehavior(world, item.behaviorId)!.durationMinutes;
     return minutes ? [{ start: minutesOf(effectiveTime(item)), end: minutesOf(effectiveTime(item)) + minutes, kind: "slot_taken" as const,
       label: findBehavior(world, item.behaviorId)!.title }] : [];
@@ -507,6 +538,34 @@ function move(world: ChatWorld, input: Record<string, unknown>): ChatToolResult 
   item.moves.push(input.start_time as string);
   item.revision += 1;
   return ok({ outcome: "moved", occurrence: occurrenceOutput(world, item), move: moveRecord(world, item, from, "move"), refusal: null });
+}
+
+/** Ticket 361: Chat's pairing tool on the world's today, through the real planner. */
+function pairings(world: ChatWorld, args: unknown): ChatToolResult {
+  if (!world.alongside) return fail("not_found", "No tool named plan_alongside_pairings.");
+  const occurrenceId = isRecord(args) && typeof args.occurrence_id === "string" ? args.occurrence_id : null;
+  const items: BriefMoveDayItem[] = world.occurrences.filter((item) => item.localDate === world.today).flatMap((item) => {
+    const behavior = findBehavior(world, item.behaviorId);
+    if (!behavior) return [];
+    const start = Temporal.Instant.from(toInstant(world, item.localDate, effectiveTime(item)));
+    const minutes = behavior.durationMinutes ?? 30;
+    const planning = behavior.planning;
+    return [{
+      occurrenceId: item.id, behaviorId: behavior.id, title: behavior.title, status: item.status, localDate: item.localDate,
+      scheduleKind: item.rangeEnd ? "range" as const : "exact" as const, start, end: start.add({ minutes }),
+      length: { minutes, source: behavior.durationMinutes ? "behavior_duration" as const : "fallback" as const, assumed: !behavior.durationMinutes },
+      alongside: planning?.alongside === true, alongsideSource: planning?.alongsideSource ?? "default",
+      where: { kind: planning?.where ?? "unknown", source: planning?.whereSource ?? "none" }, revision: `r${item.revision}`, behaviorRevision: `r${behavior.revision}`,
+    }];
+  });
+  const calendarBusy = world.sourcesOff.has("calendar") ? [] : world.events.filter((item) => item.localDate === world.today).map((item) => ({
+    ref: item.id, start: Temporal.Instant.from(toInstant(world, item.localDate, item.start)), end: Temporal.Instant.from(toInstant(world, item.localDate, item.end)) }));
+  const found = planAlongsidePairings({
+    localDate: world.today, timezone: world.timezone, now: Temporal.Instant.from(nowInstant(world)), items, calendarBusy, travel: null,
+    evidence: world.pairingEvidence ?? NO_ALONGSIDE_PAIRING_EVIDENCE,
+    ...(occurrenceId ? { onlyGuests: new Set([occurrenceId]), requireNeed: false } : {}),
+  });
+  return ok({ pairings: found.map((pairing) => chatPairingProposal(pairing, world.timezone)) });
 }
 
 const PRESET_TIMES: Readonly<Record<string, readonly [string, string]>> = {

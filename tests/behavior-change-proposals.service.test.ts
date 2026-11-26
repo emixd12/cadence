@@ -333,14 +333,14 @@ describe("length questions", () => {
   it("shows the tip, its question and the length line", async () => {
     expect(await readScheduleProposal(caller(THURSDAY))).toMatchObject({
       kind: "proposal", changeKind: "length", firstAffectedDate: "2026-11-19",
-      line: "Change the length: Gym to 45 minutes (now 1 hour).",
-      tip: { question: "Set Gym to 45 minutes?", research: { cardId: "set-the-length-it-takes" } },
+      line: "Update the intended duration: Gym to 45 minutes (now 1 hour).",
+      tip: { question: "Update Gym's intended duration to 45 minutes?", research: { cardId: "set-the-length-it-takes" } },
     });
   });
 
   it("Change for good sets the length on any day, and Undo puts it back", async () => {
     const result = await answerScheduleProposal(caller("2026-11-24T15:00:00Z"), { proposalId: PROPOSAL, answer: "for_good" });
-    expect(result).toMatchObject({ applied: true, undoable: true, message: "Gym is now 45 minutes." });
+    expect(result).toMatchObject({ applied: true, undoable: true, message: "Gym's intended duration is now 45 minutes." });
     expect((mocks.update.mock.calls[0]![2] as { values: { defaultDurationMinutes: number } }).values.defaultDurationMinutes).toBe(45);
     expect(behavior.default_duration_minutes).toBe(45);
     const undone = await answerScheduleProposal(caller("2026-11-24T15:00:00Z"), { proposalId: PROPOSAL, answer: "undo" });

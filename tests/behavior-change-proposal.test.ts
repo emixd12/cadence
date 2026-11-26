@@ -155,8 +155,8 @@ describe("length changes", () => {
     const input = toProposeBehaviorChangeInput(result.plan, TODAY, null);
     expect(input).toMatchObject({ change_kind: "length", from_minutes: 30, to_minutes: 45, first_affected_date: TODAY });
     expect(validateProposeBehaviorChangeInput(input).ok).toBe(true);
-    expect(formatTipQuestion({ title: "Gym", length: result.plan.change })).toBe("Set Gym to 45 minutes?");
-    expect(formatLengthChangeLine({ title: "Gym", change: result.plan.change })).toBe("Change the length: Gym to 45 minutes (now 30 minutes).");
+    expect(formatTipQuestion({ title: "Gym", length: result.plan.change })).toBe("Update Gym's intended duration to 45 minutes?");
+    expect(formatLengthChangeLine({ title: "Gym", change: result.plan.change })).toBe("Update the intended duration: Gym to 45 minutes (now 30 minutes).");
     expect(evaluateBehaviorLengthCandidate({ today: TODAY, behavior: { ...behavior, lengthMinutes: null }, change: { fromMinutes: 30, toMinutes: 45 }, evidence, hasOpenProposal: false, declined: [] }))
       .toEqual({ ok: false, reason: "no_length" });
     expect(evaluateBehaviorLengthCandidate({ today: TODAY, behavior, change: { fromMinutes: 30, toMinutes: 45 }, evidence, hasOpenProposal: false, declined: [{ behaviorId: GYM, direction: "longer", declinedOn: "2026-11-10" }] }))

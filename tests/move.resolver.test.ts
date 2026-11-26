@@ -7,7 +7,6 @@ import {
   MOVE_REFUSAL_REASONS,
   checkMoveSlot,
   findMoveConflicts,
-  loggedAverageSeconds,
   moveAlternatives,
   resolveMoveDuration,
 } from "@cadence/core/resolvers/move.resolver";
@@ -32,16 +31,12 @@ describe("resolveMoveDuration", () => {
   });
 });
 
-describe("loggedAverageSeconds", () => {
-  it("averages finished sessions between one minute and one day, and needs two", () => {
-    const sessions = [
-      { started_at: "2026-11-16T10:00:00Z", stopped_at: "2026-11-16T10:20:00Z" },
-      { started_at: "2026-11-15T10:00:00Z", stopped_at: "2026-11-15T10:40:00Z" },
-      { started_at: "2026-11-14T10:00:00Z", stopped_at: "2026-11-14T10:00:30Z" },
-      { started_at: "2026-11-13T10:00:00Z", stopped_at: null },
-    ];
-    expect(loggedAverageSeconds(sessions)).toBe(1800);
-    expect(loggedAverageSeconds(sessions.slice(0, 1))).toBeNull();
+describe("resolveMoveDuration with a sample count (Ticket 366)", () => {
+  it("lets the logged figure outrank the intended duration from 3 samples only", () => {
+    const input = { behaviorDefaultMinutes: 45, loggedAverageSeconds: 600, plannedSeconds: 900 };
+    expect(resolveMoveDuration({ ...input, loggedSampleCount: 2 })).toEqual({ seconds: 2700, source: "behavior_duration" });
+    expect(resolveMoveDuration({ ...input, loggedSampleCount: 3 })).toEqual({ seconds: 600, source: "logged_average" });
+    expect(resolveMoveDuration({ ...input, loggedAverageSeconds: 30, loggedSampleCount: 5 })).toEqual({ seconds: 2700, source: "behavior_duration" });
   });
 });
 

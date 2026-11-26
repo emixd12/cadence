@@ -19,6 +19,8 @@ export function assembleBehaviorLogExistingRecords(input: {
   mappings: PortabilityMappingRow[]; importedNotes: PortabilityNoteRow[]; importedInterventions: PortabilityInterventionRow[];
   configurationEvents: PortabilityConfigurationEventRow[];
   importRuns?: PortabilityImportRunRow[];
+  /** Ticket 364: carry each Behavior's alongside answer. Off, rows' `alongside` is ignored. */
+  includeAlongside?: boolean;
 }): BehaviorLogExistingRecords {
   const { behaviors, occurrences, statusEvents, definitionEvents, timeSessions, mappings, importedNotes, importedInterventions } = input;
   const behaviorById = new Map(
@@ -62,7 +64,8 @@ export function assembleBehaviorLogExistingRecords(input: {
   }
 
   return {
-    behaviors: behaviors.map((behavior) => toExistingBehavior(behavior, schedules.filter((schedule) => schedule.behaviorId === behavior.id))),
+    behaviors: behaviors.map((behavior) => toExistingBehavior(behavior, schedules.filter((schedule) => schedule.behaviorId === behavior.id),
+      input.includeAlongside === true)),
     schedules,
     occurrences: occurrences.map((occurrence) =>
       toExistingOccurrence(occurrence, behaviorById.get(occurrence.behavior_id)),
@@ -96,7 +99,7 @@ export function assembleBehaviorLogExistingRecords(input: {
 function jsonObject(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
-function toExistingBehavior(behavior: BehaviorGraphRecord, schedules: BehaviorLogExistingSchedule[]) {
+function toExistingBehavior(behavior: BehaviorGraphRecord, schedules: BehaviorLogExistingSchedule[], includeAlongside = false) {
   return {
     id: behavior.id,
     rowUpdatedAtUtc: behavior.updated_at,
@@ -117,6 +120,7 @@ function toExistingBehavior(behavior: BehaviorGraphRecord, schedules: BehaviorLo
     },
     autoArchivedAt: behavior.auto_archived_at ?? null,
     ...(behavior.is_opportunity === undefined ? {} : { isOpportunity: behavior.is_opportunity }),
+    ...(includeAlongside ? { alongside: typeof behavior.alongside === "boolean" ? behavior.alongside : null } : {}),
     parentBehaviorId: behavior.parent_behavior_id ?? null,
     subBehaviorSortOrder: behavior.sub_behavior_sort_order ?? 0,
     inheritParentSchedule: behavior.inherit_parent_schedule ?? false,

@@ -5,7 +5,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { effectiveStartAt, isMoved, plannedStartAt } from "@cadence/core/resolvers/time.resolver";
 import type { User } from "@supabase/supabase-js";
 import { runFieldsFromStored } from "@cadence/core/resolvers/behavior-run.resolver";
-import { loggedAverageSeconds } from "@cadence/core/resolvers/move.resolver";
+import { readBehaviorLengths } from "@/lib/services/behavior-length.service";
 import { isBehaviorInOpportunityPool } from "@cadence/core/resolvers/opportunity.resolver";
 
 import {
@@ -29,6 +29,7 @@ import {
   ADVISOR_MOVE_SOURCES,
   type AdvisorMoveDay,
   type AdvisorOccurrenceMove,
+  type AdvisorOccurrencePlanning,
   type AdvisorActivityConnector,
   type AdvisorCalendarConnector,
   type AdvisorCalendarConnectorV1_1,
@@ -40,7 +41,7 @@ import {
   type AdvisorSourceFailureCode,
 } from "@cadence/core/types/advisor-day-context";
 import type { BehaviorDurationHistoryOccurrence } from "@cadence/core/types/day-progress";
-import { resolveBehaviorDurationSources } from "@cadence/core/resolvers/timeline-context.resolver";
+import { resolveBehaviorDurationSources, selectBehaviorDuration } from "@cadence/core/resolvers/timeline-context.resolver";
 import { normalizeOccurrenceStatus } from "@cadence/core/services/occurrence.service";
 import {
   readAdvisorCadenceRevision,
@@ -63,6 +64,7 @@ import { getPersistedHevySnapshotV1 } from "@/lib/services/recorded-activity-syn
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { ConnectorError } from "@/lib/types/connectors";
+import { readBehaviorPlanningFacts, type BehaviorPlanningFacts } from "@/lib/services/brief-move-day.service";
 
 /** Ticket 239: each connector read stops at 25 s or the brief's remaining source budget, whichever is sooner. */
 export const ADVISOR_CONNECTOR_READ_DEADLINE_MS = 25_000;
@@ -274,6 +276,11 @@ async function assembleDayContexts(
   const durationHistoryCapped = occurrenceHistoryCapped || cadenceSnapshot.historySessions.length > ADVISOR_DAY_CONTEXT_LIMITS.historySessions;
   const history = durationHistoryCapped ? [] : durationHistory(cadenceSnapshot, authorization.userId);
   const behaviorById = new Map(cadenceSnapshot.behaviors.map((behavior) => [behavior.id, behavior]));
+  // Ticket 359: each Behavior's effective alongside value and Where, only while
+  // CADENCE_ALONGSIDE is on (an empty map, and no read, while it is off).
+  const planningFacts = await readBehaviorPlanningFacts(input.caller.client, authorization.userId,
+    [...new Set(cadenceSnapshot.occurrences.map((occurrence) => occurrence.behaviorId))], localDate);
+  assertNotAborted(signal);
   const durationSources = new Map(cadenceSnapshot.behaviors.map((behavior) => {
     const sources = resolveBehaviorDurationSources({
       behaviorId: behavior.id,
@@ -312,10 +319,11 @@ async function assembleDayContexts(
         by: (ADVISOR_MOVE_SOURCES as readonly string[]).includes(occurrence.movedBy ?? "") ? occurrence.movedBy as AdvisorOccurrenceMove["by"] : null,
       } } : {}),
       ...routineFor(behavior, behaviorById),
+      ...occurrencePlanning(planningFacts.get(occurrence.behaviorId)),
       scheduleKind: scheduleKind as "exact" | "range",
       scheduleStartTime: occurrence.scheduleStartTime,
       scheduleEndTime: occurrence.scheduleEndTime,
-      duration: sources.configuredDefault ?? sources.historicalAverage,
+      duration: selectBehaviorDuration(sources) ?? sources.historicalAverage,
       durationCandidates: {
         configuredDefault: sources.configuredDefault ? {
           kind: "known" as const,
@@ -645,6 +653,16 @@ function connectorFailure(error: unknown): { code: AdvisorSourceFailureCode; ret
   return { code: "provider_unavailable", retryable: true, retryAfterSeconds: null };
 }
 
+/** Ticket 359: the day context's planning field. A place key travels only for a `place` Where. */
+function occurrencePlanning(facts: BehaviorPlanningFacts | undefined): Readonly<{ planning?: AdvisorOccurrencePlanning }> {
+  if (!facts) return {};
+  const { kind, source, placeKey } = facts.where;
+  return { planning: {
+    alongside: facts.alongside.value, alongsideSource: facts.alongside.source,
+    where: { kind, source, ...(kind === "place" && placeKey ? { placeKey } : {}) },
+  } };
+}
+
 /**
  * A routine step's grouping, so the brief treats the routine's steps as one block.
  * Left out when the routine itself is not in the snapshot (its title would be unknown).
@@ -756,7 +774,6 @@ function assertNotAborted(signal: AbortSignal): void {
 }
 
 const OPPORTUNITY_POOL_LIMIT = 40;
-const OPPORTUNITY_SESSION_SAMPLE = 20;
 
 /**
  * Behaviors of Opportunity (Task 7): today's opportunity pool for the Daily Brief, read
@@ -777,33 +794,30 @@ export async function readAdvisorOpportunityPool(supabase: AppSupabaseClient, in
   const pool = (behaviors.data ?? []).filter((row) => isBehaviorInOpportunityPool({ ...runFieldsFromStored(row), isOpportunity: row.is_opportunity === true }, input.now));
   if (!pool.length) return [];
   const ids = pool.map((row) => row.id);
-  const [today, completed, sessions] = await Promise.all([
+  const [today, completed, tracked] = await Promise.all([
     supabase.from("occurrences").select("behavior_id").eq("user_id", input.userId).eq("local_date", input.localDate).in("behavior_id", ids),
     supabase.from("occurrences").select("behavior_id, local_date").eq("user_id", input.userId).eq("status", "completed")
       .in("behavior_id", ids).lte("local_date", input.localDate).order("local_date", { ascending: false }).limit(ids.length * 10),
-    supabase.from("occurrence_time_sessions").select("behavior_id, started_at, stopped_at").eq("user_id", input.userId)
-      .in("behavior_id", ids).not("stopped_at", "is", null).order("started_at", { ascending: false }).limit(OPPORTUNITY_SESSION_SAMPLE * ids.length),
+    // The tracked figure alone (Ticket 366): no intended duration is passed, so each result is the measurement or unknown.
+    readBehaviorLengths(supabase, { userId: input.userId, now: input.now, behaviors: ids.map((id) => ({ id, defaultDurationMinutes: null })) }),
   ]);
-  for (const result of [today, completed, sessions]) if (result.error) throw result.error;
+  for (const result of [today, completed]) if (result.error) throw result.error;
   const onToday = new Set((today.data ?? []).map((row) => row.behavior_id));
   const lastCompleted = new Map<string, string>();
   for (const row of completed.data ?? []) if (!lastCompleted.has(row.behavior_id)) lastCompleted.set(row.behavior_id, row.local_date);
-  const sessionsBy = new Map<string, Array<{ started_at: string; stopped_at: string | null }>>();
-  for (const row of sessions.data ?? []) {
-    const list = sessionsBy.get(row.behavior_id) ?? [];
-    if (list.length < OPPORTUNITY_SESSION_SAMPLE) list.push(row);
-    sessionsBy.set(row.behavior_id, list);
-  }
   const day = Temporal.PlainDate.from(input.localDate);
   return pool.map((row) => {
     const last = lastCompleted.get(row.id);
+    const measured = tracked.get(row.id);
+    const logged = measured?.kind === "known" ? measured : null;
     return {
       behaviorId: row.id,
       title: row.title,
       behaviorRevision: row.updated_at,
       timezone: row.timezone,
       defaultDurationMinutes: row.default_duration_minutes,
-      loggedAverageSeconds: loggedAverageSeconds(sessionsBy.get(row.id) ?? []),
+      loggedAverageSeconds: logged?.seconds ?? null,
+      loggedSampleCount: logged?.sampleCount ?? 0,
       whereKind: row.where_kind === "anywhere" || row.where_kind === "home" || row.where_kind === "place" ? row.where_kind : null,
       daysSinceLastCompleted: last ? Math.max(0, Temporal.PlainDate.from(last).until(day, { largestUnit: "days" }).days) : null,
       onToday: onToday.has(row.id),

@@ -4,6 +4,7 @@ import type { DepartureTrip } from "../types/departure";
 import type { TravelEvidenceResult } from "../types/travel";
 import { resolveTravelCollisions, travelUnreliableSegments } from "./travel.resolver";
 import { RETURN_TIME_UNKNOWN, departureOverlapPhrase, departurePhraseContext } from "../services/departure-phrases";
+import { alongsideMayOverlap, type OverlapPlace } from "./alongside.resolver";
 
 import type {
   BehaviorDurationEstimate,
@@ -15,7 +16,9 @@ import type {
 } from "../types/day-progress";
 import {
   formatRecordedDuration,
+  recentMedianSeconds,
   resolveOccurrenceTimeTracking,
+  trackedDurationWins,
 } from "./time-tracking.resolver";
 
 export const DURATION_ESTIMATE_MIN_SAMPLES = 1;
@@ -73,6 +76,15 @@ export function resolveExternalEventFreshness(input: Readonly<{
       };
 }
 
+/**
+ * The length Cadence plans with (Ticket 366, D34), in this order:
+ * 1. the tracked figure, once the Behavior has 3 tracked completions;
+ * 2. the intended duration the person set (`default_duration_minutes`);
+ * 3. the tracked figure from 1 or 2 tracked completions;
+ * 4. a description estimate.
+ * When the tracked figure wins over an intended duration, the result carries
+ * `intendedSeconds` so callers can show or compare the two.
+ */
 export function resolveBehaviorDurationEstimate(input: Readonly<{
   behaviorId: string;
   defaultDurationMinutes?: number | null;
@@ -84,18 +96,9 @@ export function resolveBehaviorDurationEstimate(input: Readonly<{
   lookbackDays?: number | null;
 }>): BehaviorDurationEstimate {
   const lookbackDays = input.lookbackDays ?? null;
-  if (input.defaultDurationMinutes != null) {
-    if (!Number.isInteger(input.defaultDurationMinutes) || input.defaultDurationMinutes < 1 || input.defaultDurationMinutes > 1440) {
-      throw new Error("Default duration must be a whole number from 1 to 1,440 minutes.");
-    }
-    return { kind: "known", seconds: input.defaultDurationMinutes * 60,
-      durationLabel: formatRecordedDuration(input.defaultDurationMinutes * 60),
-      sampleCount: 0, lookbackDays, provenance: "behavior_default" };
-  }
   const sources = resolveBehaviorDurationSources(input);
-  if (sources.historicalAverage.kind === "known") {
-    return sources.historicalAverage;
-  }
+  const selected = selectBehaviorDuration(sources);
+  if (selected) return selected;
   if (input.descriptionEstimateMinutes != null) {
     if (
       Number.isInteger(input.descriptionEstimateMinutes) &&
@@ -113,6 +116,26 @@ export function resolveBehaviorDurationEstimate(input: Readonly<{
     }
   }
   return sources.historicalAverage;
+}
+
+type KnownBehaviorDuration = Extract<BehaviorDurationEstimate, { kind: "known" }>;
+
+/** Steps 1 to 3 of the length order; null when neither source is known. */
+export function selectBehaviorDuration(sources: Readonly<{
+  configuredDefault: KnownBehaviorDuration | null;
+  historicalAverage: KnownBehaviorDuration | Readonly<{ kind: "unknown" }>;
+}>): KnownBehaviorDuration | null {
+  const tracked = sources.historicalAverage.kind === "known" ? sources.historicalAverage : null;
+  if (tracked && trackedDurationWins(tracked.sampleCount)) {
+    return sources.configuredDefault ? { ...tracked, intendedSeconds: sources.configuredDefault.seconds } : tracked;
+  }
+  return sources.configuredDefault ?? tracked;
+}
+
+/** True when the tracked figure decides the length, so an intended duration no longer changes it. */
+export function behaviorDurationIsTracked(estimate: BehaviorDurationEstimate): boolean {
+  return estimate.kind === "known" && estimate.provenance === "completed_stopped_occurrence_mean"
+    && trackedDurationWins(estimate.sampleCount);
 }
 
 export function resolveBehaviorDurationSources(input: Readonly<{
@@ -201,14 +224,19 @@ export function resolveBehaviorDurationSources(input: Readonly<{
     };
   }
 
-  const seconds = samples.reduce((total, sample) => total + sample.seconds, 0) / samples.length;
+  // The median of the 10 most recent tracked completions, so one long session
+  // (a timer left running) cannot move the figure.
+  const recent = recentMedianSeconds([...samples]
+    .sort((left, right) => right.localDate.localeCompare(left.localDate))
+    .map((sample) => sample.seconds));
+  if (!recent) throw new Error("Duration samples cannot be empty here.");
   return {
     configuredDefault,
     historicalAverage: {
       kind: "known",
-      seconds,
-      durationLabel: formatRecordedDuration(seconds),
-      sampleCount: samples.length,
+      seconds: recent.seconds,
+      durationLabel: formatRecordedDuration(recent.seconds),
+      sampleCount: recent.sampleCount,
       lookbackDays,
       provenance: "completed_stopped_occurrence_mean",
     },
@@ -234,6 +262,11 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
   travelLabels?: ReadonlyMap<string, string>;
   /** The account timezone for the trip's times. Defaults to America/New_York. */
   timezone?: string;
+  /**
+   * Ticket 358 (D33): set only for an alongside item, with its effective Where. A Calendar
+   * event `alongsideMayOverlap` allows is not an overlap; travel still is.
+   */
+  alongside?: Readonly<{ where?: OverlapPlace }> | null;
   now: Temporal.Instant;
 }>): TimelineOccurrenceContext {
   const scheduledFor = parseInstant(input.scheduledFor, "Occurrence scheduled_for");
@@ -276,6 +309,8 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     eventIds.add(event.id);
     const interval = "interval" in event ? event.interval : event;
     if (interval.kind === "all_day" || event.state === "cancelled" || event.availability === "free" || event.currentUserResponse === "declined") continue;
+    // Calendar events carry no place yet, so the rule reads their place as unknown.
+    if (input.alongside && alongsideMayOverlap(input.alongside, { kind: "calendar" })) continue;
 
     const eventStart = parseInstant(interval.startAt, "External event start");
     const eventEnd = parseInstant(interval.endAt, "External event end");

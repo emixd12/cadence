@@ -3,6 +3,7 @@ import {
   listIntegrationToolDescriptors, type IntegrationOperationName, type JsonSchemaObject,
 } from "@cadence/core/integration";
 import type { ChatOutcomeKind, ChatToolSubject } from "@cadence/core/types/chat";
+import { integrationContractOptions } from "@/lib/services/integration-contract-options";
 
 /**
  * Advisor plan Phase 5 (5A). Chat's tools: every Cadence operation from the MCP
@@ -20,13 +21,16 @@ export const CHAT_ADVICE_TOOL = "search_advice" as const;
 export const CHAT_TRAVEL_HORIZON_TOOL = "plan_travel_horizon" as const;
 export const CHAT_LONGITUDINAL_PATTERNS_TOOL = "get_longitudinal_patterns" as const;
 export const CHAT_CROSS_DAY_MOVE_TOOL = "move_occurrence_to_date" as const;
+/** Ticket 361 (D33): offered only while `CADENCE_ALONGSIDE` is on. */
+export const CHAT_PAIRING_TOOL = "plan_alongside_pairings" as const;
 export type ChatToolName =
   | IntegrationOperationName
   | ChatConnectorToolName
   | typeof CHAT_ADVICE_TOOL
   | typeof CHAT_TRAVEL_HORIZON_TOOL
   | typeof CHAT_LONGITUDINAL_PATTERNS_TOOL
-  | typeof CHAT_CROSS_DAY_MOVE_TOOL;
+  | typeof CHAT_CROSS_DAY_MOVE_TOOL
+  | typeof CHAT_PAIRING_TOOL;
 
 /** Writes that run at once when they are the first write of a question (T12). */
 export const CHAT_IMMEDIATE_WRITES = [
@@ -60,6 +64,7 @@ export const CHAT_TOOL_SUBJECT: Readonly<Record<string, ChatToolSubject>> = {
   get_timeline: "timeline", list_occurrences: "occurrences", get_occurrence: "occurrences", list_day_notes: "notes",
   get_adherence_summary: "adherence", search: "search", fetch: "search", list_calendar_events: "calendar", list_calendar_load: "calendar", list_workouts: "workouts",
   search_advice: "advice", plan_travel_horizon: "travel", get_longitudinal_patterns: "patterns",
+  plan_alongside_pairings: "timeline",
 };
 
 const SUBJECT_TEXT: Readonly<Record<ChatToolSubject, string>> = {
@@ -167,14 +172,25 @@ const CROSS_DAY_MOVE_TOOL_SPEC: Readonly<{ description: string; inputSchema: Jso
   } as JsonSchemaObject,
 };
 
+const PAIRING_TOOL_SPEC: Readonly<{ description: string; inputSchema: JsonSchemaObject }> = {
+  description: "Finds where an alongside item (one that can be done during other things at the same place) could be done during another of today's items. Cadence picks the other item and the time; nothing changes. Each pairing gives the item, the other item it goes with, and the move to apply on the person's Yes (move_occurrence_for_day with its occurrence_id, start_time and expected_revision). Without occurrence_id it returns only pairings that help today; with one, Cadence pairs that item if any other item fits.",
+  inputSchema: {
+    type: "object", additionalProperties: false,
+    properties: {
+      occurrence_id: { type: "string", minLength: 1, description: "Optional: today's alongside item the person asked about." },
+    },
+  } as JsonSchemaObject,
+};
+
 export type ChatToolDefinition = Readonly<{ name: ChatToolName; description: string; inputSchema: JsonSchemaObject }>;
 
 /**
  * The tool list a turn offers. Notes off removes note tools; with every calendar off,
  * or Hevy off, its tool is left out so the model never asks for it.
  */
-export function buildChatToolDefinitions(sources: ChatSourceFlags): ChatToolDefinition[] {
-  const cadence = listIntegrationToolDescriptors()
+export function buildChatToolDefinitions(sources: ChatSourceFlags, options: Readonly<{ alongside?: boolean }> = {}): ChatToolDefinition[] {
+  // The same contract edition the MCP endpoint validates against (Ticket 364).
+  const cadence = listIntegrationToolDescriptors(integrationContractOptions())
     .filter((descriptor) => sources.notes || !NOTE_TOOLS.has(descriptor.name))
     .map((descriptor) => ({ name: descriptor.name, description: descriptor.description, inputSchema: withoutServerKeys(descriptor.inputSchema) }));
   const anyCalendar = sources.googleCalendar || sources.outlookCalendar || sources.icloudCalendar;
@@ -188,6 +204,8 @@ export function buildChatToolDefinitions(sources: ChatSourceFlags): ChatToolDefi
     { name: CHAT_LONGITUDINAL_PATTERNS_TOOL, ...LONGITUDINAL_PATTERNS_TOOL_SPEC },
     { name: CHAT_CROSS_DAY_MOVE_TOOL, ...CROSS_DAY_MOVE_TOOL_SPEC },
     { name: CHAT_ADVICE_TOOL, ...ADVICE_TOOL_SPEC },
+    // Ticket 361: last, so the tool list with the flag off is unchanged.
+    ...(options.alongside ? [{ name: CHAT_PAIRING_TOOL, ...PAIRING_TOOL_SPEC }] : []),
   ];
 }
 

@@ -99,9 +99,10 @@ export async function runScenario(scenario: ChatScenario, candidate: ChatEvalCan
   };
 
   const sources = worldSources(world);
-  const tools = buildChatToolDefinitions(sources);
+  // Ticket 361: a world read with CADENCE_ALONGSIDE on also offers the pairing tool.
+  const tools = buildChatToolDefinitions(sources, { alongside: world.alongside === true });
   const instructions = buildChatSystemPrompt({ timezone: world.timezone, today: world.today, localTime: world.now,
-    weekday: weekdayName(world.today), sourcesOff: chatSourcesOff(sources) }) + (candidate.instructionsNote ? `\n\n${candidate.instructionsNote}` : "");
+    weekday: weekdayName(world.today), sourcesOff: chatSourcesOff(sources), alongside: world.alongside === true }) + (candidate.instructionsNote ? `\n\n${candidate.instructionsNote}` : "");
   const timelineRead = await executor("get_timeline", { days: 1, include_needs_decision: true }, { idempotencyKey: null });
   const timelineJson = timelineRead.ok ? trimToolResult(compactTimeline(timelineRead.result)) : null;
   const live = executor as unknown as LiveExecutor;

@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 import {
   DURATION_ESTIMATE_LOOKBACK_DAYS,
   DURATION_ESTIMATE_MIN_SAMPLES,
+  behaviorDurationIsTracked,
   resolveBehaviorDurationEstimate,
   resolveBehaviorDurationSources,
+  selectBehaviorDuration,
   resolveExternalEventFreshness,
   resolveTimelineOccurrenceContext,
 } from "../packages/core/src/resolvers/timeline-context.resolver";
@@ -25,7 +27,7 @@ const CURRENT = resolveExternalEventFreshness({
 });
 
 describe("resolveBehaviorDurationEstimate", () => {
-  it("means positive stopped totals from distinct Completed occurrences across all-time history before today", () => {
+  it("takes the median of positive stopped totals from distinct Completed occurrences across all-time history before today", () => {
     const estimate = resolveBehaviorDurationEstimate({
       behaviorId: "behavior-1",
       now: NOW,
@@ -42,7 +44,7 @@ describe("resolveBehaviorDurationEstimate", () => {
     expect(DURATION_ESTIMATE_LOOKBACK_DAYS).toBe(90);
     expect(estimate).toEqual({
       kind: "known",
-      seconds: 181 / 3,
+      seconds: 60,
       durationLabel: "1m 0s",
       sampleCount: 3,
       lookbackDays: null,
@@ -86,7 +88,7 @@ describe("resolveBehaviorDurationEstimate", () => {
     });
   });
 
-  it("follows default > tracked history > cached description estimate > unknown hierarchy", () => {
+  it("follows intended duration > 1 or 2 tracked completions > cached description estimate > unknown below the floor of 3", () => {
     const fromDescription = resolveBehaviorDurationEstimate({
       behaviorId: "behavior-1",
       descriptionEstimateMinutes: 25,
@@ -129,6 +131,47 @@ describe("resolveBehaviorDurationEstimate", () => {
       seconds: 900,
       provenance: "behavior_default",
     });
+    expect(behaviorDurationIsTracked(defaultBeatsAll)).toBe(false);
+    expect(behaviorDurationIsTracked(trackedBeatsDescription)).toBe(false);
+  });
+
+  it("lets the tracked figure decide from 3 tracked completions and keeps the intended duration beside it (Ticket 366)", () => {
+    const three = [
+      history("one", "2026-09-15", [session("one", "a", 1200)]),
+      history("two", "2026-09-14", [session("two", "b", 1500)]),
+      history("three", "2026-09-13", [session("three", "c", 1320)]),
+    ];
+    const input = { behaviorId: "behavior-1", descriptionEstimateMinutes: 25, now: NOW, timezone: "America/New_York" };
+
+    const two = resolveBehaviorDurationEstimate({ ...input, defaultDurationMinutes: 30, occurrences: three.slice(0, 2) });
+    expect(two).toMatchObject({ seconds: 1800, provenance: "behavior_default" });
+    expect(two).not.toHaveProperty("intendedSeconds");
+
+    const tracked = resolveBehaviorDurationEstimate({ ...input, defaultDurationMinutes: 30, occurrences: three });
+    expect(tracked).toEqual({
+      kind: "known", seconds: 1320, durationLabel: "22m 0s", sampleCount: 3, lookbackDays: null,
+      provenance: "completed_stopped_occurrence_mean", intendedSeconds: 1800,
+    });
+    expect(behaviorDurationIsTracked(tracked)).toBe(true);
+
+    const noIntent = resolveBehaviorDurationEstimate({ ...input, occurrences: three });
+    expect(noIntent).toMatchObject({ seconds: 1320, sampleCount: 3 });
+    expect(noIntent).not.toHaveProperty("intendedSeconds");
+    expect(behaviorDurationIsTracked(noIntent)).toBe(true);
+  });
+
+  it("uses the median of the 10 most recent tracked completions, so one long session does not move the figure", () => {
+    const occurrences = [
+      // The two oldest fall outside the 10 most recent.
+      history("old-1", "2026-08-01", [session("old-1", "o1", 60)]),
+      history("old-2", "2026-08-02", [session("old-2", "o2", 60)]),
+      ...Array.from({ length: 9 }, (_, index) => history(`r-${index}`, `2026-09-0${index + 1}`, [session(`r-${index}`, `s-${index}`, 1200)])),
+      history("left-running", "2026-09-10", [session("left-running", "long", 36_000)]),
+    ];
+    const sources = resolveBehaviorDurationSources({ behaviorId: "behavior-1", now: NOW, timezone: "America/New_York", occurrences });
+    expect(sources.historicalAverage).toMatchObject({ kind: "known", seconds: 1200, sampleCount: 10 });
+    expect(sources.recordedElapsedDurations).toHaveLength(12);
+    expect(selectBehaviorDuration(sources)).toBe(sources.historicalAverage);
   });
 
   it("excludes running, non-Completed, zero, and future-stopped occurrences", () => {
@@ -480,4 +523,39 @@ it("treats Outlook and iCloud scheduled events exactly like Google events with d
   expect(merged.overlappingEventIds).toEqual([google.id, outlook.id, icloud.id].sort());
   expect(merged.overlapAssessment).toBe("possible");
   expect(resolveTimelineOccurrenceContext({ ...input, events: [outlook] }).overlappingEventIds).toEqual([outlook.id]);
+});
+
+// Ticket 358 (D33): an alongside item's overlap cues skip what alongsideMayOverlap allows.
+describe("resolveTimelineOccurrenceContext with an alongside item", () => {
+  const known: BehaviorDurationEstimate = { kind: "known", seconds: 1800, durationLabel: "30m", sampleCount: 0, lookbackDays: null, provenance: "behavior_default" };
+  const base = {
+    occurrenceId: "occurrence-1", scheduledFor: "2026-09-16T16:00:00Z", runningStartedAt: null,
+    estimate: known, now: NOW, freshness: CURRENT,
+    events: [timedEvent("meeting", "2026-09-16T16:10:00Z", "2026-09-16T17:00:00Z")],
+  };
+
+  it("keeps the Calendar overlap for an item that is not alongside", () => {
+    const context = resolveTimelineOccurrenceContext({ ...base, alongside: null });
+    expect(context.overlappingEventIds).toEqual(["meeting"]);
+    expect(context.overlapAssessment).toBe("possible");
+  });
+
+  it("drops a Calendar overlap the rule allows, whatever the item's Where", () => {
+    for (const where of [undefined, { kind: "home" as const }, { kind: "place" as const, placeKey: "k".repeat(43) }]) {
+      const context = resolveTimelineOccurrenceContext({ ...base, alongside: { where } });
+      expect(context.overlappingEventIds).toEqual([]);
+      expect(context.overlapAssessment).toBe("none");
+      expect(context.overlapLabel).not.toContain("Possible overlap");
+    }
+  });
+
+  it("still cues travel, which an alongside item never overlaps", () => {
+    const travel = {
+      segments: [{ id: "route:leg-1", kind: "route" as const, startAt: "2026-09-16T16:05:00Z", endAt: "2026-09-16T16:20:00Z", sourceRefs: ["dentist"], legId: "leg-1" }],
+      completeTrip: true,
+    } as unknown as NonNullable<Parameters<typeof resolveTimelineOccurrenceContext>[0]["travel"]>;
+    const context = resolveTimelineOccurrenceContext({ ...base, events: [], travel, alongside: { where: { kind: "home" } } });
+    expect(context.overlapAssessment).toBe("possible");
+    expect(context.travelOverlapLegIds).toEqual(["leg-1"]);
+  });
 });

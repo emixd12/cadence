@@ -3,6 +3,8 @@ import { BRIEF_EVAL_FIXTURE_IDS, briefEvalFixture, briefEvalFixtures } from "@/l
 import { runBriefEval, summarizeBriefEval, type BriefEvalRun } from "@/lib/services/advisor-eval/brief-harness";
 import { checkBriefLayerOne } from "@/lib/services/advisor-eval/brief-rules";
 import { planBriefMoveLinesFromInputs } from "@cadence/core/resolvers/brief-move.resolver";
+import { planBriefPairingLines } from "@cadence/core/resolvers/alongside-pairing.resolver";
+import { Temporal } from "@js-temporal/polyfill";
 
 // Advisor Phase 3 (3A2): the brief eval with no model. A scripted writer stands in for
 // the model, so these runs check the planner's lines against the layer 1 rules, the
@@ -55,6 +57,52 @@ describe("Phase 3 brief eval (no model)", () => {
     const [result] = await runBriefEval({ run: failing, fixtures: [briefEvalFixture("new_user")] });
     expect(result).toMatchObject({ source: "stock", failure: "words_unavailable:down", lines: [expect.objectContaining({ modelReason: false })] });
     expect(summarizeBriefEval([result!])).toMatchObject({ briefsWithFallback: 1, failures: 1 });
+  });
+
+  it("Ticket 359: keeps the pill and the helmet, and moves the Spanish class off the helmet at a different place", () => {
+    const fixture = briefEvalFixture("alongside_places");
+    const plan = planBriefMoveLinesFromInputs(fixture.plan);
+    const lines = new Map(plan.candidates.map((line) => [line.occurrenceId, line]));
+    expect(lines.has("occurrence_fixture_1")).toBe(false);
+    expect(lines.has("occurrence_fixture_5")).toBe(false);
+    const local = (at: string) => Temporal.Instant.from(at).toZonedDateTimeISO(fixture.context.timezone).toPlainTime().toString({ smallestUnit: "minute" });
+    expect(local(lines.get("occurrence_fixture_3")!.to.startAt)).toBe("13:30");
+    // The earlier rule (no Where on any item) put the class at 1:10 PM, during the helmet: the new rule names that.
+    const earlier = { ...fixture.plan, items: fixture.plan.items.map((item) => ({ ...item, where: undefined })) };
+    const before = planBriefMoveLinesFromInputs(earlier).candidates.find((line) => line.occurrenceId === "occurrence_fixture_3")!;
+    expect(local(before.to.startAt)).toBe("13:10");
+    // The Yes checks see it too, since they read the same places.
+    expect(checkBriefLayerOne(fixture.plan, [before]).map((item) => item.rule)).toEqual(["alongside_other_place", "yes_check_alone", "yes_check_all"]);
+    // The day context carries the same facts, and the brief's model facts never do.
+    expect(fixture.context.cadence.occurrences.find((item) => item.ref === "occurrence_fixture_5")!.planning)
+      .toEqual({ alongside: true, alongsideSource: "guess", where: { kind: "home", source: "guess" } });
+  });
+
+  it("Ticket 361: pairs the helmet with Read at 6 PM, keeps every rule, and no other flag-on fixture gets a pairing", () => {
+    for (const fixture of briefEvalFixtures()) {
+      if (!fixture.pairing) continue;
+      const moves = planBriefMoveLinesFromInputs(fixture.plan).candidates;
+      const lines = [...moves, ...planBriefPairingLines({ ...fixture.plan, evidence: fixture.pairing }, moves)];
+      expect({ fixture: fixture.id, violations: checkBriefLayerOne(fixture.plan, lines) }).toEqual({ fixture: fixture.id, violations: [] });
+      const pairings = lines.filter((line) => line.reasonCode === "alongside_pairing");
+      if (fixture.id !== "alongside_pairing") expect({ fixture: fixture.id, pairings }).toEqual({ fixture: fixture.id, pairings: [] });
+    }
+    const fixture = briefEvalFixture("alongside_pairing");
+    const moves = planBriefMoveLinesFromInputs(fixture.plan).candidates;
+    const [line, ...rest] = planBriefPairingLines({ ...fixture.plan, evidence: fixture.pairing! }, moves);
+    expect(rest).toEqual([]);
+    const local = (at: string) => Temporal.Instant.from(at).toZonedDateTimeISO(fixture.context.timezone).toPlainTime().toString({ smallestUnit: "minute" });
+    expect(line).toMatchObject({ occurrenceId: "occurrence_fixture_5", reasonCode: "alongside_pairing", anchor: { kind: "item", title: "Read" },
+      pairing: { hostOccurrenceId: "occurrence_fixture_10", needs: ["done_together"] } });
+    expect(local(line!.to.startAt)).toBe("18:00");
+    expect(line!.reason.replace(/\s/gu, " ")).toBe("Do Red light helmet during Read at 6:00 PM.");
+    // Without the coach's evidence nothing about the helmet helps, so it stays.
+    expect(planBriefPairingLines({ ...fixture.plan, evidence: { doneTogether: [], crowdedHours: [] } }, moves)).toEqual([]);
+    // A pairing line placed anywhere but its host's start breaks the pairing rule.
+    const off = { ...line!, to: { startAt: Temporal.Instant.from(line!.to.startAt).add({ minutes: 30 }).toString(), endAt: Temporal.Instant.from(line!.to.endAt).add({ minutes: 30 }).toString() } };
+    expect(checkBriefLayerOne(fixture.plan, [off]).map((item) => item.rule)).toEqual(["pairing_off_host"]);
+    // The same line as an ordinary move line is an alongside item offered against the rules.
+    expect(checkBriefLayerOne(fixture.plan, [{ ...line!, reasonCode: "item_overlap", pairing: undefined }]).map((item) => item.rule)).toEqual(["alongside_offered"]);
   });
 
   it("finds a line offered against the rules", () => {

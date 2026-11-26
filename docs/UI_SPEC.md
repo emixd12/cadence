@@ -629,6 +629,36 @@ activity) offers an underlined **Remove** at the end of its expanded details, on
 and in Needs decision. The result shows below it as `opportunity.removed` or an
 `opportunity.remove-refused.*` notice. Scheduled rows never show either.
 
+Alongside rows (Ticket 358, D33; behind `CADENCE_ALONGSIDE`): a row whose Behavior is
+alongside keeps its place in the list and shows one muted line under its title from
+`alongside.row-label`: "Alongside" for the person's answer, "Alongside · a guess" when
+the value is Cadence's guess. Its Possible overlap line and Calendar highlight stop for
+overlaps `alongsideMayOverlap` allows (every Calendar event, whose place is unknown);
+travel still shows. There is no parallel-lane layout. Bench: `composite.occurrence-row`.
+
+Alongside question on a row (Ticket 360, D33; behind `CADENCE_ALONGSIDE`): right after a
+Completed mark that shows no Done at line, a row whose Behavior's alongside question is
+open (not answered and Cadence guesses yes, `alongsideQuestionOpen`) may show the mark
+detail line "Done alongside other things? Yes · No", on the share of marks set in
+`MARK_DETAIL_PROMPTS.alongside` (0.5, fixed per item and day). Yes or No writes the
+Behavior's alongside setting and reads back as `alongside.answer-saved`; a refusal reads
+"Not changed." with an `alongside.answer-*` notice. One line per row at a time; Done at
+keeps priority. The row asks only when the page passes an `alongside` mark-detail action
+(web: `recordAlongsideAnswerAction`); the Mac passes none until Ticket 363. Bench:
+`module.occurrence-mark-details` (the Red light helmet row).
+
+Daily Brief alongside question (Ticket 360, D33; behind `CADENCE_ALONGSIDE`): under the
+brief's move and Add for today lines, one hairline-topped line asks
+`alongside.brief-question` ("Can Red light helmet be done alongside other things?") with
+Yes · No as text links and no typing. At most one question per brief: the earliest of
+today's items whose question is open (`pickBriefAlongsideQuestion`), saved with the
+brief so a reopen asks the same question while it is still open, or nothing. Yes or No
+writes the Behavior's alongside setting (`POST /api/advisor/brief/alongside`), reads back
+as `alongside.answer-saved` and redraws the Timeline; a refusal shows the inline Alert
+notice and keeps Yes · No. Only a client that sends `alongside_question_v1` (the web)
+gets the line; the Mac follows in Ticket 363. Advisor tips carry no alongside card (no
+reviewed source fits; `STATUS.md`).
+
 ### Routine rows and Semantic Zoom (Ticket 349)
 
 - A routine slot renders as one `ParentOccurrenceRow`: disclosure triangle, routine
@@ -798,6 +828,23 @@ any time). Add schedule brings a row back. Turning the flag off while no schedul
 left restores one default row, so the form stays valid. With no schedule the form
 shows the `opportunity.no-schedule` note and hides Reminder offset, which applies
 only to scheduled Occurrences; the stored offset is kept.
+
+Alongside (Ticket 358, D33; hosted web behind `CADENCE_ALONGSIDE`): below the Where
+hint the form shows one select, "Can be done alongside other things", with Not
+answered, Yes and No. While Not answered is chosen and a current model guess exists,
+one note line follows from `alongside.form-guess` ("Cadence guesses Yes. Planning uses
+the guess until you choose.") with a Use the guess button that fills the select; Save
+stores it like every other field. Ticket 360: the note also shows whenever the question is
+open (`alongsideQuestionOpen`: not answered, guessed yes), the same rule every other
+surface asks under. With the flag off, and on Cadence for Mac until
+Ticket 363, the form has no alongside field and saving keeps the stored answer. While
+the flag is on and Details and Settings is open, the Behavior record's one Where
+suggestion line moves below Where in the form; it returns to the record when Details
+and Settings closes. The same line also states a guessed Where for a Behavior with
+Where Not set (`alongside.where-guess`, for example "Cadence guesses this happens at
+Home. Planning uses the guess until Where is set.") with Review Where and Dismiss. It
+rides the Completion places state, so it shows only while labels are on. Bench:
+`composite.behavior-form` and `composite.behavior-place-assist`.
 
 Timezone is managed in Settings and should not be shown as a separate panel in
 the behavior creation form.
@@ -1455,7 +1502,7 @@ are not applicable; future mobile implementation remains deferred.
 
 ## Behavior planning inputs (Tickets 142–143)
 
-The shared create/edit form places optional Default duration (minutes) and End date inputs under Schedule. Use native number/date controls and the existing line-led styling. Explain that duration is separate from tracked averages and archiving starts at midnight on the chosen date. Timeline details label Default duration separately from measured Estimated duration. Timeline and Behaviors show an accessible persistent notification for automatically archived Behaviors, with history preserved. Restore clears an expired end date and the current notification.
+The shared create/edit form places optional Intended duration (minutes) and End date inputs under Schedule. Use native number/date controls and the existing line-led styling. Explain that Cadence plans with the intended duration until the Behavior has 3 tracked completions and with tracked time after that, and that archiving starts at midnight on the chosen date. Timeline details show one duration line (Ticket 366): "Intended: 30m" with Change; "Usually 5m · Based on 2 tracked completions" with Set intended duration; "About 20m · Estimated from description" with Set intended duration; and, from 3 tracked completions, "Usually 22m · Based on 10 tracked completions · Intended 30m" with no action. The intended part appears only when one is set. Timeline and Behaviors show an accessible persistent notification for automatically archived Behaviors, with history preserved. Restore clears an expired end date and the current notification.
 
 
 ### Daily Brief recipe workbench (Tickets 156–158)

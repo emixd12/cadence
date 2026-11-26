@@ -1039,6 +1039,7 @@ function resolveContexts(
     travelLabels,
     timezone,
     departure,
+    alongside: occurrence.alongside ?? null,
     // A timing mutation can arrive between minute ticks. Its timestamp is the
     // earliest instant at which the returned running state can be assessed.
     now: occurrence.timeTracking.runningStartedAt && Temporal.Instant.compare(Temporal.Instant.from(occurrence.timeTracking.runningStartedAt), instant) > 0

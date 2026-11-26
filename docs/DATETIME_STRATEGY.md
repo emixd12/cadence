@@ -179,8 +179,10 @@ from the Occurrence menu.
   revision. A Behavior timezone change clears effective time; the records stay.
 - **Service.** `lib/services/occurrence-move.service.ts` is the one path every
   caller takes (web actions, MCP tools, the advisor). It picks the length a moved
-  item keeps (`resolveMoveDuration`: the Behavior's duration, then the person's
-  logged average of at least two sessions, then 30 minutes; a second move keeps
+  item keeps (the tracked figure once it rests on 3 tracked completions, then the
+  Behavior's intended duration, then the tracked figure from fewer, then a cached
+  model estimate, then 30 minutes; the tracked figure is the Timeline's own, the
+  median of the 10 most recent tracked completions, Ticket 366; a second move keeps
   the length it already has), checks the slot against the day's other Unresolved
   items at their effective times and, when the caller holds them, today's calendar
   events (`slot_taken`, `calendar_busy`), offers up to three free starts on a
@@ -223,15 +225,38 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
 - **One free-slot rule.** Brief lines, Yes, Accept all, Other time, Re-plan and the
   Timeline's "Move for today" all ask the same resolver whether a time is free, so a
   time the brief offers is not refused at Yes on the same data.
-- **Every item has a length.** The Behavior's duration, then the logged average,
-  then a cached model estimate, then 30 minutes. The estimate is stored per Behavior
+- **Every item has a length.** The tracked figure once it rests on 3 tracked
+  completions, then the Behavior's intended duration, then the tracked figure from
+  fewer, then a cached model estimate, then 30 minutes (Ticket 366). A tracked
+  completion is a Completed Occurrence before today with its sessions added together,
+  as on the Timeline. The stored source name `logged_average` is unchanged; the figure
+  is a median. The estimate is stored per Behavior
   and asked again only when its title, description or kind of place changes. A Yes applies
   the length the line showed. A correction from the person becomes the Behavior's
   default length.
 - **Gaps.** Items and calendar events keep 10 minutes on each side. An exact-time
   item blocks its own length. A range item blocks its own length at the earliest
-  free point in its range. An item done alongside others (a pill, a device) blocks
-  nothing. Travel spans already carry their margins.
+  free point in its range. Whether an item is alongside (a pill, a device) comes from
+  `alongside.resolver.ts` (Ticket 356): the person's setting (behind `CADENCE_ALONGSIDE`),
+  then the cached model guess, then false. Travel spans already carry their margins.
+- **Same-place overlap (Ticket 357, D33).** With `CADENCE_ALONGSIDE` on, an alongside
+  item blocks only what `alongsideMayOverlap` refuses. It may share time with a Cadence
+  item or a calendar event at the same place, or where either place is unknown or
+  Anywhere. It may not share time with travel or with an item somewhere else; there it
+  blocks like any other item, with the 10-minute gaps. Each item's place is its effective
+  Where (`effective-where.resolver.ts`): the person's Where, else counted completion place
+  labels, else the cached model guess, else unknown. Calendar events carry no place on
+  the free-slot inputs, so their place is unknown. The brief's move lines never move an
+  alongside item; when one at another place collides with an item, that item moves. Only a
+  pairing line (below) moves an alongside item. A
+  moved alongside item (the Timeline's "Move for today") is checked the same way, and
+  calendar events do not block it. With the flag off, an alongside item blocks nothing
+  and a moved one is blocked like any other item, as before. The effective Where is for
+  planning only: routes, departure lines and leave reminders read `where_kind` alone.
+  Since Ticket 359 the same rule covers the Daily Brief consumer's overlap and tight-fit
+  findings with places from the day context's `planning` field, where the person's
+  alongside answer outranks the run's own estimate, and an exact-time opportunity add
+  (Chat and MCP), which checks the added Behavior's own side. Chat's moves already used it.
 - **Calendar and travel on each request.** The device sends today's busy calendar
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it
@@ -266,6 +291,44 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   Refresh, the earlier brief's lines (answered or not) are not shown again.
 - **Calendar text for one day.** A line may name the calendar event it avoids. When
   the day ends, the server replaces that title with a generic reason.
+- **Pairing (Ticket 361, D33).** With `CADENCE_ALONGSIDE` on, the brief may also offer
+  to do an alongside item during another of today's items, its host ("Do Red light
+  helmet during Reading at 8:00 PM."). The planner is
+  `packages/core/src/resolvers/alongside-pairing.resolver.ts`; the model only writes the
+  sentence, and the notice `brief-moves.pairing` is the stock text.
+  - Guest: an Unresolved, exact-time alongside item today with a known or guessed Where.
+    Host: an Unresolved, exact-time Cadence item today that is not alongside, at least as
+    long as the guest, starting now or later and by the latest start hour, with a known or
+    guessed Where that `alongsideMayOverlap` allows. Calendar events never host. A step that
+    follows its routine's time is neither on its own; a routine slot of two or more steps
+    may host as one item and is never a guest.
+  - Only when it helps: the guest's local hour holds 3 or more items (the coach's
+    `crowded_hour` threshold, alongside items not counted) or the coach's stored
+    `crowded_hour` signal names that hour; the guest runs into travel or an item somewhere
+    else; or the coach's `done_together` signal names the guest with one of today's hosts.
+    A guest already inside a compatible host's time is left alone.
+  - The host the `done_together` signal names comes first, then the nearest host. At most
+    one pairing per guest and per host. The new time is the host's start for the guest's
+    length, and it passes the same slot check Yes runs on the guest's side of the
+    same-place rule, so a pairing is not refused at Yes on the same data.
+  - Pairing lines come after the move lines, count toward `BRIEF_MOVE_MAX_LINES`, hold the
+    times the move lines offer, skip items a move line moves, and are not offered on a stale
+    calendar. No, Undo and "Don't suggest moving this" on the guest stop them as for any line.
+  - Yes · No · Other time behave as on every line: Yes is an ordinary move of the guest with
+    source `daily_brief` and reason `alongside_pairing`. Re-check on open keeps a line
+    whose time still fits and whose host is still Unresolved at the same start; otherwise
+    the planner pairs the guest again (the same host at its new time, or another host) with
+    the stock sentence, or the line closes as `withdrawn`. Re-plan pairs the guest with
+    another host, or offers nothing.
+  - No link between guest and host is stored. The proposal's `line.pairing` records which
+    host was offered, as history only. A later move of the host does not move the guest.
+  - Chat: the `plan_alongside_pairings` tool (flag on only) runs the same planner on today
+    with today's calendar; Chat offers what it returns and, after the person's yes, applies
+    that move with `move_occurrence_for_day` (source `chat`). When the person asks about one
+    item, the "helps" rule is skipped for it.
+  - The coach's signals are read through the coach agent's read-only channel
+    (`coach_read_signals`), today's or else yesterday's, ids and hours only. Without them
+    only a crowded hour or a conflict makes a pairing help.
 
 ### Brief opportunity lines
 

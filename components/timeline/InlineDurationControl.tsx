@@ -2,6 +2,7 @@
 
 import { useActionState, useId, useState } from "react";
 import { formatRecordedDuration } from "@cadence/core/resolvers/time-tracking.resolver";
+import { behaviorDurationIsTracked } from "@cadence/core/resolvers/timeline-context.resolver";
 import type { BehaviorDurationEstimate } from "@cadence/core/types/day-progress";
 import { Notice } from "@/components/feedback/Notice";
 import type {
@@ -70,6 +71,10 @@ export function InlineDurationControl({
         }
       : estimate;
 
+  // Ticket 366: once tracked time decides the length, an intended duration no longer
+  // changes it, so the row stops offering one. The Behavior form keeps the field.
+  const canSetIntended = Boolean(action) && !behaviorDurationIsTracked(effectiveEstimate);
+
   function openEditor() {
     const initialMinutes =
       effectiveEstimate.kind === "known"
@@ -85,7 +90,7 @@ export function InlineDurationControl({
         <p className="text-sm leading-6 text-muted-readable">
           {formatDurationSummary(effectiveEstimate)}
         </p>
-        {action && !editing ? (
+        {canSetIntended && !editing ? (
           <button
             type="button"
             onClick={openEditor}
@@ -94,19 +99,19 @@ export function InlineDurationControl({
             {effectiveEstimate.kind === "known" &&
             effectiveEstimate.provenance === "behavior_default"
               ? "Change"
-              : "Set default"}
+              : "Set intended duration"}
           </button>
         ) : null}
       </div>
 
-      {action && editing ? (
+      {canSetIntended && editing ? (
         <form
           action={submitAction}
           className="mt-1 flex flex-wrap items-center gap-2"
         >
           <input type="hidden" name="behavior_id" value={behaviorId} />
           <label htmlFor={inputId} className="sr-only">
-            Default duration in minutes
+            Intended duration in minutes
           </label>
           <input
             id={inputId}
@@ -119,7 +124,7 @@ export function InlineDurationControl({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Minutes"
-            aria-label="Default duration in minutes"
+            aria-label="Intended duration in minutes"
             data-surface="default"
             className="w-24 rounded-md border border-line bg-background px-2.5 py-1 text-sm text-foreground"
             autoFocus
@@ -151,14 +156,17 @@ export function InlineDurationControl({
 
 function formatDurationSummary(estimate: BehaviorDurationEstimate): string {
   if (estimate.kind === "unknown") {
-    return "No duration yet — track time below or set a default.";
+    return "No duration yet — track time below or set an intended duration.";
   }
   if (estimate.provenance === "behavior_default") {
-    return `Default: ${estimate.durationLabel}`;
+    return `Intended: ${estimate.durationLabel}`;
   }
   if (estimate.provenance === "description_estimate") {
     return `About ${estimate.durationLabel} · Estimated from description`;
   }
   const unit = estimate.sampleCount === 1 ? "tracked completion" : "tracked completions";
-  return `Usually ${estimate.durationLabel} · Based on ${estimate.sampleCount} ${unit}`;
+  const tracked = `Usually ${estimate.durationLabel} · Based on ${estimate.sampleCount} ${unit}`;
+  return estimate.intendedSeconds == null
+    ? tracked
+    : `${tracked} · Intended ${formatRecordedDuration(estimate.intendedSeconds)}`;
 }

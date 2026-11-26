@@ -5,11 +5,16 @@ import {
   BRIEF_MOVE_FALLBACK_MINUTES,
   type BriefMoveLength,
   type BriefMoveLengthSource,
+  type BriefMovePairing,
   type BriefMoveReasonCode,
   type BriefMoveRoutine,
   type BriefMoveTravel,
 } from "../types/brief-moves";
+import { alongsideMayOverlap, resolveRoutineBlockAlongside, type AlongsideSource } from "./alongside.resolver";
+import type { EffectiveWhere } from "./effective-where.resolver";
 import { localDateAt, localDayBounds } from "./time.resolver";
+import { trackedDurationWins } from "./time-tracking.resolver";
+import type { BehaviorDurationEstimate } from "../types/day-progress";
 
 /**
  * Advisor Phase 3A1: the one free-slot rule. The Daily Brief's lines, Other time,
@@ -20,7 +25,14 @@ import { localDateAt, localDayBounds } from "./time.resolver";
  *     cached model estimate, then 30 minutes.
  *   - An exact-time item blocks its own length; a range item blocks only its own
  *     length, placed at the earliest point in its range that is free.
- *   - An "alongside" item (a pill, a device) blocks nothing.
+ *   - An "alongside" item (a pill, a device) blocks only what `alongsideMayOverlap`
+ *     refuses (Ticket 357, D33): it may share time with an item or calendar event at the
+ *     same place, or where either place is unknown or Anywhere, never with travel or an
+ *     item somewhere else. Items carry their effective Where (`where`) only while
+ *     `CADENCE_ALONGSIDE` is on; an item without one keeps the earlier rule, where an
+ *     alongside item blocks nothing and a moved alongside item is blocked like any other.
+ *     Whether an item is alongside comes from alongside.resolver.ts (the person's
+ *     answer, the guess, false).
  *   - Items and calendar events keep a 10-minute gap on each side. Travel spans
  *     already include their own margins, so they keep none.
  *   - The moved item's own travel (when known) pads its interval before and after.
@@ -50,7 +62,15 @@ export type BriefMoveDayItem = Readonly<{
   /** Exact items: effective end (moved) or start + length. Range items: the range end. */
   end: Temporal.Instant;
   length: BriefMoveLength;
+  /** From `resolveAlongside` (alongside.resolver.ts). */
   alongside: boolean;
+  /** Where `alongside` came from. Absent on items built before Ticket 356 (fixtures). */
+  alongsideSource?: AlongsideSource;
+  /**
+   * Ticket 357: the Behavior's effective Where (effective-where.resolver.ts), for the
+   * same-place rule only. Set only while `CADENCE_ALONGSIDE` is on; never read by travel.
+   */
+  where?: EffectiveWhere;
   revision: string;
   behaviorRevision: string;
   /** Set for a sub-behavior's step (depth 1). */
@@ -117,13 +137,16 @@ export function collapseBriefMoveRoutines(items: readonly BriefMoveDayItem[]): B
     if (!block) { out.push(item); continue; }
     if (block.members[0]!.occurrenceId !== item.occurrenceId) continue;
     const timed = block.members.filter((member) => !member.alongside);
+    const alongside = resolveRoutineBlockAlongside(block.members);
     const minutes = Math.min(1440, Math.max(1, timed.reduce((sum, member) => sum + member.length.minutes, 0)));
     const end = item.start.add({ minutes });
     out.push({
       ...item,
       title: block.title,
       end,
-      alongside: timed.length === 0,
+      alongside: alongside.value,
+      ...(item.alongsideSource ? { alongsideSource: alongside.source } : {}),
+      ...(item.where ? { where: routineBlockWhere(block.members) } : {}),
       length: {
         minutes,
         source: timed.every((member) => member.length.source === item.length.source) ? item.length.source : timed[0]?.length.source ?? item.length.source,
@@ -144,32 +167,95 @@ export type BriefMoveSlotCheck =
   | Readonly<{ ok: true }>
   | Readonly<{ ok: false; reason: "slot_taken" | "too_close" | "calendar_busy" | "travel_busy"; ref: string }>;
 
-/** The length order. `minutes` values below one minute are ignored. */
+/**
+ * A move's length from the shared estimate (`resolveBehaviorDurationEstimate`), so a
+ * move plans with the figure the Timeline shows (Ticket 366). An unknown estimate
+ * falls back to 30 minutes.
+ */
+export function briefMoveLengthFromEstimate(estimate: BehaviorDurationEstimate | undefined): BriefMoveLength {
+  const made = (minutes: number, source: BriefMoveLengthSource): BriefMoveLength =>
+    ({ minutes: Math.min(Math.max(1, Math.round(minutes)), 1440), source, assumed: source === "model_estimate" || source === "fallback" });
+  if (!estimate || estimate.kind !== "known") return made(BRIEF_MOVE_FALLBACK_MINUTES, "fallback");
+  return made(estimate.seconds / 60, estimate.provenance === "behavior_default" ? "behavior_duration"
+    : estimate.provenance === "description_estimate" ? "model_estimate" : "logged_average");
+}
+
+/**
+ * The length order (Ticket 366, D34): the logged figure once it rests on 3 samples,
+ * then the intended duration the person set, then the logged figure from fewer
+ * samples, then a model estimate. `minutes` values below one minute are ignored.
+ */
 export function resolveBriefMoveLength(input: Readonly<{
   behaviorDefaultMinutes: number | null;
   loggedAverageSeconds: number | null;
+  /** How many samples the logged figure rests on. Omitted counts as fewer than 3. */
+  loggedSampleCount?: number | null;
   estimateMinutes: number | null;
 }>): BriefMoveLength {
   const made = (minutes: number, source: BriefMoveLengthSource): BriefMoveLength =>
     ({ minutes: Math.min(Math.max(1, Math.round(minutes)), 1440), source, assumed: source === "model_estimate" || source === "fallback" });
+  const logged = input.loggedAverageSeconds && input.loggedAverageSeconds >= 60 ? made(input.loggedAverageSeconds / 60, "logged_average") : null;
+  if (logged && trackedDurationWins(input.loggedSampleCount ?? 0)) return logged;
   if (input.behaviorDefaultMinutes && input.behaviorDefaultMinutes >= 1) return made(input.behaviorDefaultMinutes, "behavior_duration");
-  if (input.loggedAverageSeconds && input.loggedAverageSeconds >= 60) return made(input.loggedAverageSeconds / 60, "logged_average");
+  if (logged) return logged;
   if (input.estimateMinutes && input.estimateMinutes >= 1) return made(input.estimateMinutes, "model_estimate");
   return made(BRIEF_MOVE_FALLBACK_MINUTES, "fallback");
 }
 
+/** A routine block's place: its steps' shared Where, otherwise unknown. */
+function routineBlockWhere(members: readonly BriefMoveDayItem[]): EffectiveWhere {
+  const first = members[0]?.where;
+  const same = first && members.every((member) => member.where?.kind === first.kind && member.where?.placeKey === first.placeKey);
+  return same ? first : { kind: "unknown", source: "none" };
+}
+
+/** The moving item's side of an overlap: whether it is alongside, and its Where under the same-place rule. */
+export type BriefMoveOverlapSubject = Readonly<{ alongside: boolean; where?: EffectiveWhere }>;
+
+/** `occurrenceId`'s side, as its routine slot when it has one. Undefined when it is not among `items`. */
+export function briefMoveOverlapSubject(items: readonly BriefMoveDayItem[], occurrenceId: string): BriefMoveOverlapSubject | undefined {
+  const lead = briefMoveRoutineMembers(items, occurrenceId)[0]?.occurrenceId;
+  const item = lead ? collapseBriefMoveRoutines(items).find((candidate) => candidate.occurrenceId === lead) : undefined;
+  return item ? { alongside: item.alongside, ...(item.where ? { where: item.where } : {}) } : undefined;
+}
+
+/**
+ * Whether `other` leaves `subject`'s time free (Ticket 357). Without a Where on `other`
+ * the earlier rule holds: an alongside item blocks nothing. With one, an alongside side
+ * blocks only what `alongsideMayOverlap` refuses. With no subject, its place is unknown.
+ */
+export function briefMoveItemMayOverlap(other: BriefMoveDayItem, subject: BriefMoveOverlapSubject | undefined): boolean {
+  if (!other.where) return other.alongside;
+  if (other.alongside && alongsideMayOverlap(other, { kind: "item", where: subject?.where })) return true;
+  return Boolean(subject?.where && subject.alongside && alongsideMayOverlap(subject, { kind: "item", where: other.where }));
+}
+
+/**
+ * Calendar and travel blocks as an alongside subject sees them under the same-place
+ * rule: a calendar event's place is unknown, so it does not block; travel always does.
+ * Item blocks pass through (`briefMoveItemBlocks` already decided them). Without a
+ * subject Where (flag off) every block passes through.
+ */
+export function briefMoveBlocksForSubject(blocks: readonly BriefMoveBlock[], subject: BriefMoveOverlapSubject | undefined): BriefMoveBlock[] {
+  if (!subject?.where || !subject.alongside) return [...blocks];
+  return blocks.filter((block) => block.kind === "item" || !alongsideMayOverlap(subject, { kind: block.kind }));
+}
+
 /**
  * What the day's other items occupy, as seen by `excludeId`'s move. `positions`
- * overrides where an item sits (a line already chosen in the same brief).
+ * overrides where an item sits (a line already chosen in the same brief). `subject`
+ * overrides the moving side (default: `excludeId`'s item), for an item not in `items`.
  */
 export function briefMoveItemBlocks(
   items: readonly BriefMoveDayItem[],
   excludeId: string | null,
   positions: ReadonlyMap<string, BriefMoveInterval> = new Map(),
+  subject: BriefMoveOverlapSubject | undefined = excludeId ? briefMoveOverlapSubject(items, excludeId) : undefined,
 ): BriefMoveBlock[] {
   // A step's own routine never blocks it: the whole slot is left out with it.
   const excludedLead = excludeId ? briefMoveRoutineMembers(items, excludeId)[0]?.occurrenceId ?? excludeId : null;
-  const open = collapseBriefMoveRoutines(items).filter((item) => item.status === "unresolved" && item.occurrenceId !== excludedLead && !item.alongside);
+  const open = collapseBriefMoveRoutines(items).filter((item) => item.status === "unresolved" && item.occurrenceId !== excludedLead
+    && !briefMoveItemMayOverlap(item, subject));
   const exact: BriefMoveBlock[] = open.filter((item) => item.scheduleKind === "exact").map((item) => {
     const at = positions.get(item.occurrenceId) ?? { start: item.start, end: item.end };
     return { kind: "item", ref: item.occurrenceId, title: item.title, start: at.start, end: later(at.end, at.start) };
@@ -299,6 +385,8 @@ export type BriefMoveCandidate = Readonly<{
   calendarDerived: boolean;
   /** Set when the line moves a whole routine slot; `title` is then the routine's. */
   routine?: BriefMoveRoutine;
+  /** Ticket 361: set on a pairing line (alongside-pairing.resolver.ts). */
+  pairing?: BriefMovePairing;
 }>;
 
 export type BriefMovePlanInputs = Readonly<{
@@ -428,6 +516,9 @@ export function stockBriefMoveReason(code: BriefMoveReasonCode, title: string,
       return `${title}’s time has passed.`;
     case "conflict_after_schedule_edit":
       return `A schedule change now puts something else at ${title}’s moved time.`;
+    case "alongside_pairing":
+      // Pairing lines carry their own sentence with the time (alongside-pairing.resolver.ts).
+      return anchor ? `Do ${title} during ${anchor.title}.` : `${title} can happen during something else.`;
   }
 }
 

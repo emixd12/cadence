@@ -601,6 +601,32 @@ The Behaviors screen distinguishes two edit modes:
 Web and Cadence for Mac use the same shared components. Mac data and sync:
 `docs/DESKTOP_DATA_MODEL.md`.
 
+## Alongside Behaviors (Ticket 358, D33)
+
+Hosted web, behind `CADENCE_ALONGSIDE`; the Mac follows in Ticket 363.
+
+1. **Answer.** In Create behavior or a Behavior's Details and Settings, choose Yes, No or
+   Not answered under "Can be done alongside other things" and select Save behavior.
+2. **Use the guess.** While it is Not answered and Cadence has a guess, the form says
+   so. Use the guess fills the field; Save behavior stores it. Until then planning uses
+   the guess.
+3. **Guessed Where.** With Completion places on and Where Not set, the Where suggestion
+   line may state Cadence's guess of where the Behavior happens. Review Where fills
+   Where; Dismiss hides that guess and stores the existing dismissal. Planning keeps
+   using the guess.
+4. **Timeline.** An alongside row shows "Alongside", or "Alongside · a guess". It stops
+   warning about Calendar overlaps; travel overlaps still show.
+5. **Cadence asks (Ticket 360).** While a Behavior is Not answered and Cadence guesses
+   yes, Cadence may ask once on a surface the person is already using. One answer
+   anywhere stores the setting and closes the question everywhere:
+   - Timeline: right after marking the item Completed (when no "Done at" line shows),
+     "Done alongside other things? Yes · No".
+   - Daily Brief: one line, "Can Red light helmet be done alongside other things?
+     Yes · No", at most one per brief.
+   - Chat: only when the answer changes a plan the person is working out there; the
+     change waits for their Yes like every Behavior edit.
+   - Behavior form: the guess note above (step 2).
+
 ## Reminder flow
 
 Browser notifications are enabled by default for every behavior.
@@ -967,7 +993,7 @@ native update or recovery controls. Future mobile remains deferred.
 
 ## Set duration and scheduled archive (Tickets 142–143)
 
-Create or edit a Behavior, optionally enter Default duration (minutes) and Ends after, then Save behavior. Blank fields disable either option. Timeline uses the default ahead of its measured estimate. Ends after is the last local day the Behavior runs; after it the Behavior moves to Not running and generates no Occurrences. Nothing is archived automatically. Save refuses an end that is already in the past. Restoring an archived Behavior keeps its end. End now, Pause and Resume rules: `docs/RECURRENCE_RULES.md`, "Behavior end and pause".
+Create or edit a Behavior, optionally enter Intended duration (minutes) and Ends after, then Save behavior. Blank fields disable either option. Cadence plans with the intended duration until the Behavior has 3 tracked completions; after that it plans with the tracked figure, shows the intended duration beside it, and the Timeline row no longer offers Set intended duration (Ticket 366). Ends after is the last local day the Behavior runs; after it the Behavior moves to Not running and generates no Occurrences. Nothing is archived automatically. Save refuses an end that is already in the past. Restoring an archived Behavior keeps its end. End now, Pause and Resume rules: `docs/RECURRENCE_RULES.md`, "Behavior end and pause".
 
 ## Compare historical completion timing
 

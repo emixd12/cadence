@@ -15,6 +15,9 @@ import { BRIEF_OPENING_PROMPT_REVISION, prepareBriefOpening, stockBriefOpening, 
 import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBriefConflicts, saveBriefProposals } from "./brief-moves.service";
 import { briefOpportunitiesFor, planBriefOpportunityDay, readBriefOpportunities, saveBriefOpportunityProposals } from "./brief-opportunities.service";
 import { BRIEF_OPPORTUNITY_LINES_FEATURE } from "@cadence/core/types/brief-opportunities";
+import { BRIEF_ALONGSIDE_QUESTION_FEATURE, type BriefAlongsideQuestion } from "@cadence/core/types/brief-alongside";
+import { planBriefAlongsideQuestion, reopenBriefAlongsideQuestion } from "./brief-alongside.service";
+import { alongsideEnabled } from "./alongside-flag";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator, type DailyBriefModelUsage } from "./daily-brief-consumer";
 import { dailyBriefModelSetting, generateBriefOpeningWithModel, generateDurationEstimatesWithModel } from "./daily-brief-model";
@@ -297,6 +300,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   if (!options.generate && !agentModelConfigured()) throw new DailyBriefError("not_configured");
   const wantsMoves = attempt.features?.includes(BRIEF_MOVE_LINES_FEATURE) ?? false;
   const wantsOpportunities = attempt.features?.includes(BRIEF_OPPORTUNITY_LINES_FEATURE) ?? false;
+  // Ticket 360: the alongside question line, only for a client that renders it and only with CADENCE_ALONGSIDE on.
+  const wantsAlongside = (attempt.features?.includes(BRIEF_ALONGSIDE_QUESTION_FEATURE) ?? false) && alongsideEnabled();
   const setting = dailyBriefModelSetting();
   const configuration = activeBriefingConfig();
   const configurationRevision = briefingConfigurationRevision(configuration);
@@ -322,7 +327,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       installationId, retry: attempt.retry, expectedRevision: preferences.revision, refresh: attempt.refresh ?? false, moves: wantsMoves,
     }, signal));
     if (admission.state === "saved") {
-      return { state: "ready", briefing: await phase("reopen", () => reopenSavedBrief(caller, admission, { wantsMoves, wantsOpportunities, refresh: (used) => refreshState(agentClient, used), signal })) };
+      return { state: "ready", briefing: await phase("reopen", () => reopenSavedBrief(caller, admission, { wantsMoves, wantsOpportunities, wantsAlongside, refresh: (used) => refreshState(agentClient, used), signal })) };
     }
     if (admission.state === "refresh_limit_reached") throw new DailyBriefError("refresh_limit_reached");
     if (admission.state === "rate_limited") throw new DailyBriefError("rate_limited", admission.retryAfterSeconds);
@@ -400,12 +405,17 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         });
         return briefOpportunitiesFor({ localDate: context.localDate, timezone: context.timezone, runId: agentRun?.runId ?? null, lines: saved, calendar: planned.calendar });
       }) : null;
+      // Ticket 360: at most one alongside question per brief, saved with it. A failed read asks nothing.
+      const alongsideQuestion = wantsAlongside ? await phase("alongside_question", () => planBriefAlongsideQuestion(caller.client, caller.user.id, {
+        localDate: context.localDate, items: plan.day.items,
+      })).catch(() => null) : null;
       const notices = dailyBriefNotices({ calendar: plan.calendar, words, timezone: context.timezone, lines: lines.length });
       const saved: DailyBriefing = {
         text: words.opening, localDate: context.localDate, timezone: context.timezone,
         generatedAt: clock().toString(), expiresAt: context.dayEndAt, coverage: context.status, warnings: [],
         versions: { configuration: configurationRevision, references: "none", planner: "brief-moves", pipeline: BRIEF_PIPELINE_VERSION, recipe: `daily_brief@${BRIEF_RECIPE_VERSION}`, policy: DAILY_BRIEF_POLICY_VERSION },
         ...(notices.length ? { notices } : {}),
+        ...(alongsideQuestion ? { alongsideQuestion } : {}),
       };
       await assertCurrent();
       // Required (Emi, Nov 18): the shown brief is saved before it is returned, and the save completes the lease.
@@ -511,16 +521,22 @@ export function dailyBriefNotices(input: Readonly<{ calendar: "current" | "stale
 async function reopenSavedBrief(caller: CalendarCaller, saved: Extract<DailyBriefBeginResult, { state: "saved" }>, input: Readonly<{
   wantsMoves: boolean;
   wantsOpportunities: boolean;
+  /** Ticket 360: the client renders the alongside question and CADENCE_ALONGSIDE is on. */
+  wantsAlongside?: boolean;
   refresh: (used: number) => Promise<DailyBriefRefreshState>;
   signal: AbortSignal;
 }>): Promise<DailyBriefing> {
-  const briefing = saved.briefing as unknown as DailyBriefing;
-  const [moves, opportunities, refresh] = await Promise.all([
+  // Ticket 360: the saved question is shown again only to a client that asked for it, while it is still open.
+  const { alongsideQuestion: savedQuestion, ...briefing } = saved.briefing as unknown as DailyBriefing & { alongsideQuestion?: BriefAlongsideQuestion };
+  const [moves, opportunities, refresh, alongsideQuestion] = await Promise.all([
     input.wantsMoves && saved.withMoves ? readBriefMoves(caller.client, { localDate: saved.localDate, timezone: briefing.timezone, runId: saved.runId }) : null,
     input.wantsOpportunities ? readBriefOpportunities(caller.client, { userId: caller.user.id, localDate: saved.localDate, timezone: briefing.timezone, runId: saved.runId }) : null,
     input.refresh(saved.refreshesUsed).catch(() => ({ remaining: Math.max(0, DAILY_BRIEF_REFRESHES_PER_DAY - saved.refreshesUsed), available: false, retryAfterSeconds: undefined })),
+    input.wantsAlongside && savedQuestion
+      ? reopenBriefAlongsideQuestion(caller.client, caller.user.id, { localDate: saved.localDate, saved: savedQuestion }).catch(() => null) : null,
   ]);
-  return { ...briefing, ...(moves ? { moves } : {}), ...(opportunities ? { opportunities } : {}), refresh: publicRefreshState(refresh) };
+  return { ...briefing, ...(moves ? { moves } : {}), ...(opportunities ? { opportunities } : {}),
+    ...(alongsideQuestion ? { alongsideQuestion } : {}), refresh: publicRefreshState(refresh) };
 }
 
 type DailyBriefRefreshState = Readonly<{ remaining: number; available: boolean; retryAfterSeconds: number | undefined }>;

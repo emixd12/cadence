@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import type { AlongsidePairingEvidence } from "@cadence/core/resolvers/alongside-pairing.resolver";
 
 /**
  * Phase 5 (5D) chat eval: synthetic accounts. A world is a small, complete Cadence
@@ -8,9 +9,9 @@ import { Temporal } from "@js-temporal/polyfill";
  *
  * The base day is Wednesday 18 November 2026 in New York, 8:40 AM.
  */
-export const CHAT_EVAL_WORLD_VERSION = "chat-eval-2026-11-19.1";
+export const CHAT_EVAL_WORLD_VERSION = "chat-eval-2026-11-25.2";
 
-export const CHAT_EVAL_WORLD_IDS = ["everyday", "hostile", "calendar_off", "new_user", "long_history", "calendar_down"] as const;
+export const CHAT_EVAL_WORLD_IDS = ["everyday", "hostile", "calendar_off", "new_user", "long_history", "calendar_down", "alongside", "alongside_pairing"] as const;
 export type ChatEvalWorldId = typeof CHAT_EVAL_WORLD_IDS[number];
 
 export type WorldStatus = "unresolved" | "completed" | "not_completed";
@@ -33,7 +34,19 @@ export type WorldBehavior = {
   isOpportunity?: boolean;
   /** An opportunity Behavior with no fixed schedule. */
   unscheduled?: boolean;
+  /**
+   * Ticket 359: what Chat's reads carry as `planning` while CADENCE_ALONGSIDE is on (only
+   * in a world with `alongside`). Unset: not alongside, Where unknown.
+   */
+  planning?: WorldPlanning;
 };
+
+export type WorldPlanning = Readonly<{
+  alongside: boolean;
+  alongsideSource: "person" | "guess" | "default";
+  where: "home" | "anywhere" | "elsewhere" | "place" | "unknown";
+  whereSource: "person" | "evidence" | "guess" | "none";
+}>;
 
 export type WorldOccurrence = {
   id: string;
@@ -86,6 +99,10 @@ export type ChatWorld = {
   /** Sources the person turned off in Settings. Their tools return nothing. */
   sourcesOff: Set<"calendar" | "workouts">;
   adviceCards: AdviceCard[];
+  /** Ticket 359: CADENCE_ALONGSIDE is on: reads carry planning and the prompt is chat-1.8. */
+  alongside?: true;
+  /** Ticket 361: the coach's stored evidence the pairing tool reads (ids are Behavior ids). */
+  pairingEvidence?: AlongsidePairingEvidence;
 };
 
 let counter = 0;
@@ -207,6 +224,40 @@ const BUILDERS: Record<ChatEvalWorldId, () => ChatWorld> = {
           note: random() < 0.25 ? notes[Math.floor(random() * notes.length)] : null, markedAt: status === "unresolved" ? null : item.time, revision: 1 });
       }
     }
+    return world;
+  },
+
+  alongside: () => {
+    // Ticket 359 (D33): the helmet, pill and gym cases. The helmet (a guess: alongside, at
+    // Home) shares 9:30 PM with Read at Home; Vitamin D (the person's yes, Anywhere) falls
+    // inside lunch; the Gym session (a guess: not alongside, elsewhere) overlaps the Dentist.
+    const world = everyday();
+    world.id = "alongside";
+    world.description = "The everyday account with a red-light helmet, a vitamin and a gym session, read with CADENCE_ALONGSIDE on.";
+    world.alongside = true;
+    const add = (title: string, time: string, minutes: number, planning: WorldPlanning) => {
+      const item: WorldBehavior = { id: nextId(), title, description: null, category: null, state: "active", weekdays: null, time,
+        durationMinutes: minutes, revision: 1, archiveNote: null, planning };
+      world.behaviors.push(item);
+      world.occurrences.push({ id: nextId(), behaviorId: item.id, localDate: TODAY, time, status: "unresolved", moves: [], note: null, markedAt: null, revision: 1 });
+    };
+    add("Red light helmet", "21:30", 10, { alongside: true, alongsideSource: "guess", where: "home", whereSource: "guess" });
+    add("Vitamin D", "12:15", 1, { alongside: true, alongsideSource: "person", where: "anywhere", whereSource: "person" });
+    add("Gym session", "17:15", 60, { alongside: false, alongsideSource: "guess", where: "elsewhere", whereSource: "guess" });
+    behavior(world, "Read").planning = { alongside: false, alongsideSource: "person", where: "home", whereSource: "person" };
+    return world;
+  },
+
+  alongside_pairing: () => {
+    // Ticket 361 (D33): the helmet sits alone at 7:30 PM, and the coach found it done together
+    // with Read (Home, 9:30 PM). Chat's pairing tool offers it during Read.
+    const world = BUILDERS.alongside();
+    world.id = "alongside_pairing";
+    world.description = "The alongside account with the red-light helmet at 7:30 PM, which the coach sees done together with Read.";
+    const helmet = behavior(world, "Red light helmet");
+    helmet.time = "19:30";
+    occurrence(world, "Red light helmet", TODAY).time = "19:30";
+    world.pairingEvidence = { doneTogether: [{ behaviorId: helmet.id, otherBehaviorId: behavior(world, "Read").id }], crowdedHours: [] };
     return world;
   },
 

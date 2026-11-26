@@ -191,6 +191,11 @@ export type ResolveExportInput = ExportImportedHistory & {
   includeArchived?: boolean;
   includeNotes?: boolean;
   includeTimeTracking?: boolean;
+  /**
+   * Ticket 364 (D33): carry each Behavior's alongside answer in Full JSON, JSONL, CSV and
+   * BehaviorLog. Off (the default), every format is byte-for-byte what it was before.
+   */
+  includeAlongside?: boolean;
   timeSessions?: ExportTimeSessionInput[];
   dayNotes?: ExportDayNoteInput[];
 };
@@ -200,6 +205,7 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
   const includeArchived = input.includeArchived ?? false;
   const includeNotes = input.includeNotes ?? false;
   const includeTimeTracking = input.includeTimeTracking ?? false;
+  const includeAlongside = input.includeAlongside ?? false;
   const range = resolveExportDateRange({
     now: input.now,
     timezone,
@@ -214,7 +220,7 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     includedBehaviors.map((behavior) => [behavior.id, behavior]),
   );
   const behaviors = includedBehaviors.map((behavior) =>
-    toJsonBehavior(behavior, includeNotes),
+    toJsonBehavior(behavior, includeNotes, includeAlongside),
   );
   const behaviorDefinitionEvents = toJsonBehaviorDefinitionEvents({
     behaviorDefinitionEvents: input.behaviorDefinitionEvents ?? [],
@@ -338,6 +344,7 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
       legacySnapshotOccurrences,
       timeSessions,
       includeTimeTracking,
+      includeAlongside ? alongsideByBehaviorId(behaviors) : null,
     ),
     jsonBackup,
     json: JSON.stringify(jsonBackup, null, 2),
@@ -447,6 +454,7 @@ function exportWhereKind(input: {
 function toJsonBehavior(
   behavior: ExportBehaviorInput,
   includeNotes: boolean,
+  includeAlongside = false,
 ): ExportJsonBehavior {
   return {
     id: behavior.id,
@@ -459,6 +467,7 @@ function toJsonBehavior(
     recurrence_rule: behavior.recurrenceRule,
     scheduled_time: behavior.scheduledTime,
     ...(behavior.isOpportunity === undefined ? {} : { is_opportunity: behavior.isOpportunity }),
+    ...(includeAlongside ? { alongside: behavior.alongside ?? null } : {}),
     schedules: normalizeExportInputSchedules(behavior),
     schedule_slots: behavior.scheduleSlots,
     timezone: behavior.timezone,
@@ -818,6 +827,8 @@ function toJsonl(input: {
         recurrence_rule: behavior.recurrence_rule,
         scheduled_time: behavior.scheduled_time,
         is_opportunity: behavior.is_opportunity,
+        // Ticket 364: undefined unless the export includes alongside, so JSON.stringify drops it.
+        alongside: behavior.alongside,
         schedules: behavior.schedules,
         schedule_slots: behavior.schedule_slots,
         timezone: behavior.timezone,
@@ -866,10 +877,17 @@ function toJsonl(input: {
   return lines.join("\n");
 }
 
+/** Each included Behavior's alongside answer as a CSV cell: `true`, `false`, or empty when unanswered. */
+function alongsideByBehaviorId(behaviors: readonly ExportJsonBehavior[]): Map<string, string> {
+  return new Map(behaviors.map((behavior) => [behavior.id, typeof behavior.alongside === "boolean" ? String(behavior.alongside) : ""]));
+}
+
 function toCsv(
   occurrences: ExportJsonOccurrence[],
   timeSessions: ExportJsonTimeSession[],
   includeTimeTracking: boolean,
+  /** Ticket 364: the `alongside` column, appended last; null leaves the columns unchanged. */
+  alongside: ReadonlyMap<string, string> | null = null,
 ): string {
   const sessionsByOccurrenceId = new Map<string, ExportJsonTimeSession[]>();
 
@@ -878,7 +896,10 @@ function toCsv(
     sessions.push(session);
     sessionsByOccurrenceId.set(session.occurrence_id, sessions);
   }
-  const columns = includeTimeTracking ? TIME_TRACKING_CSV_COLUMNS : CSV_COLUMNS;
+  const columns: readonly string[] = [
+    ...(includeTimeTracking ? TIME_TRACKING_CSV_COLUMNS : CSV_COLUMNS),
+    ...(alongside ? ["alongside"] : []),
+  ];
   const rows = [
     columns.join(","),
     ...occurrences.map((occurrence) => {
@@ -892,6 +913,8 @@ function toCsv(
         status_marked_at: occurrence.status_marked_at ?? "",
         note: occurrence.note ?? "",
       };
+
+      if (alongside) record.alongside = alongside.get(occurrence.behavior_id) ?? "";
 
       if (includeTimeTracking) {
         const sessions = sessionsByOccurrenceId.get(occurrence.id) ?? [];
@@ -1429,6 +1452,10 @@ function toBehaviorLogBehavior(
           : {}),
         ...(behavior.is_opportunity !== undefined
           ? { is_opportunity: behavior.is_opportunity }
+          : {}),
+        // Ticket 364: BehaviorLog has no field for this, so it is a Cadence extension.
+        ...(behavior.alongside !== undefined
+          ? { alongside: behavior.alongside }
           : {}),
         ...(behavior.parent_behavior_id !== undefined ? {
           parent_behavior_id: behavior.parent_behavior_id,

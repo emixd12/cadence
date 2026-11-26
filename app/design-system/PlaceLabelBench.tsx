@@ -17,6 +17,9 @@ const state: PlaceLabelState = {
     { behaviorId: "bench-suggestion", suggestedPlaceText: null, markerPrompt: null,
       suggestion: { ruleVersion: "where-suggestion-rules@1", kind: "home", key: "home", placeKey: null, labelCount: 8, supportingCount: 7 } },
     { behaviorId: "bench-prompt", suggestion: null, suggestedPlaceText: null, markerPrompt: "home" },
+    // Ticket 358: a guessed Where on the same line (CADENCE_ALONGSIDE on).
+    { behaviorId: "bench-where-guess", suggestedPlaceText: null, markerPrompt: null,
+      suggestion: { ruleVersion: "where-suggestion-rules@1", kind: "home", key: "home", placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" } },
   ],
 };
 const unavailable = async () => { throw new Error("Bench previews make no requests."); };
@@ -53,5 +56,6 @@ export function BehaviorPlaceAssistBench() {
   return <PlaceLabelBench><div className="grid gap-4">
     <BehaviorPlaceAssist behaviorId="bench-suggestion" placeText={null} onReview={() => undefined} />
     <BehaviorPlaceAssist behaviorId="bench-prompt" placeText={null} onReview={() => undefined} />
+    <BehaviorPlaceAssist behaviorId="bench-where-guess" placeText={null} onReview={() => undefined} />
   </div></PlaceLabelBench>;
 }

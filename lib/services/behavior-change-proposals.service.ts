@@ -327,7 +327,7 @@ export async function answerScheduleProposal(caller: ScheduleProposalCaller, inp
   if (answer === "no" || answer === "keep") {
     const recorded = await call(() => answerBehaviorChangeProposal(caller.supabase, { proposalId: row.id, answer, today }));
     const kept = row.changeKind === "length" ? minutesLabel(row.toMinutes) : formatClockTimeLabel(row.toTime);
-    return { applied: false, replayed: recorded.replayed, view: await viewAfter(caller, today), message: answer === "no" ? "No change." : `${title} stays at ${kept}.` };
+    return { applied: false, replayed: recorded.replayed, view: await viewAfter(caller, today), message: answer === "no" ? "No change." : row.changeKind === "length" ? `${title}'s intended duration stays at ${kept}.` : `${title} stays at ${kept}.` };
   }
   const active = behavior && behavior.active ? behavior : null;
 
@@ -428,10 +428,10 @@ function backLine(row: BehaviorChangeProposalRow, title: string): string {
 /**
  * The outcome after a Yes, read after the edit: "Gym is at 6:30 PM every day, starting
  * today." when today's Occurrence moved (it was ahead, unmarked and not moved by hand),
- * otherwise the next day the change touches. A length has no day: "Gym is now 45 minutes."
+ * otherwise the next day the change touches. A length has no day: "Gym's intended duration is now 45 minutes."
  */
 async function appliedLine(caller: ScheduleProposalCaller, row: BehaviorChangeProposalRow, title: string, today: string): Promise<string> {
-  if (row.changeKind === "length") return `${title} is now ${minutesLabel(row.toMinutes)}.`;
+  if (row.changeKind === "length") return `${title}'s intended duration is now ${minutesLabel(row.toMinutes)}.`;
   const days = everyDaysOf(row.weekdays);
   const startsToday = row.weekdays.includes(weekdayOfDate(today)) && await todayAtNewTime(caller, row.behaviorId, today, row.toTime);
   const first = startsToday ? today : firstAffectedDate(today, row.weekdays, { afterToday: true });

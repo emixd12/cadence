@@ -27,6 +27,12 @@ import type {
  * - Routines (version 3): steps of one routine that follow its time are one item at
  *   that time, so they never make an hour look crowded, and steps of one routine are
  *   not reported as done together (they are meant to be).
+ * - Alongside (version 4, Ticket 359): when Behaviors carry `alongside`, an alongside
+ *   item never makes an hour look crowded (it happens during other things), and a
+ *   done-together pair says which side is alongside (`alongside`, `other_alongside`).
+ *   Ticket 360: `setup_gaps` also reports an open alongside question
+ *   (`alongside_unanswered`, `without_alongside_answer`).
+ *   Without the fields (flag off) these signals are exactly version 3.
  */
 
 export const COACH_SIGNAL_V2_THRESHOLDS = Object.freeze({
@@ -507,7 +513,8 @@ function doneTogether(ctx: Ctx): CoachSignal[] {
       const both = shared.filter((d) => aDays.get(d) && bDays.get(d)).length;
       const neither = shared.filter((d) => !aDays.get(d) && !bDays.get(d)).length;
       const either = shared.filter((d) => aDays.get(d) || bDays.get(d)).length;
-      const facts = { window_days: V.windowDays, other_behavior_id: b, together_days: both, either_days: either, shared_days: shared.length };
+      const facts = { window_days: V.windowDays, other_behavior_id: b, together_days: both, either_days: either, shared_days: shared.length,
+        ...alongsideFacts(ctx, a, b) };
       if (i < j) {
         const agreement = (both + neither) / shared.length;
         const missed = shared.length - both;
@@ -524,7 +531,7 @@ function doneTogether(ctx: Ctx): CoachSignal[] {
         if (bWhenMissed <= T.onlyWithMaxRate && bWhenDone >= T.onlyWithMinRate) {
           pairs.push({
             a: b, b: a, pattern: "only_with", strength: bWhenDone - bWhenMissed,
-            facts: { ...facts, other_behavior_id: a, pattern: "only_with", rate_with: round(bWhenDone), rate_without: round(bWhenMissed) },
+            facts: { ...facts, ...alongsideFacts(ctx, b, a), other_behavior_id: a, pattern: "only_with", rate_with: round(bWhenDone), rate_without: round(bWhenMissed) },
           });
         }
       }
@@ -542,7 +549,8 @@ function doneTogether(ctx: Ctx): CoachSignal[] {
 
 function crowdedHour(ctx: Ctx): CoachSignal[] {
   const T = V.crowdedHour;
-  const timed = ctx.recent.filter((row) => startMinute(row) !== null);
+  // Version 4: an alongside item happens during other things, so it never crowds an hour.
+  const timed = ctx.recent.filter((row) => startMinute(row) !== null && ctx.active.get(row.behaviorId)?.alongside !== true);
   const hourOf = (row: CoachSignalOccurrence) => Math.floor(startMinute(row)! / 60);
   let best: { hour: number; perDay: number; t: Tally; other: Tally; gap: number } | null = null;
   for (const [hour, list] of groupBy(timed, hourOf)) {
@@ -572,6 +580,16 @@ function crowdedHour(ctx: Ctx): CoachSignal[] {
   }];
 }
 
+/**
+ * Version 4: whether each side of a pair is alongside, from the signal's own Behavior's
+ * view. Empty when the values were not read (version 3), so the facts stay unchanged.
+ */
+function alongsideFacts(ctx: Ctx, self: string, other: string): Record<string, boolean> {
+  const mine = ctx.active.get(self)?.alongside, theirs = ctx.active.get(other)?.alongside;
+  if (mine === undefined && theirs === undefined) return {};
+  return { alongside: mine === true, other_alongside: theirs === true };
+}
+
 /** Both are steps of the same routine. */
 function sameRoutine(ctx: Ctx, a: string, b: string): boolean {
   const parent = ctx.active.get(a)?.parentBehaviorId;
@@ -586,25 +604,33 @@ function itemKey(ctx: Ctx, row: CoachSignalOccurrence, index: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Setup gaps: active Behaviors without a length or a place.
+// Setup gaps: active Behaviors without a length or a place. Version 4 (Ticket 360) also
+// reports an open alongside question: unanswered while Cadence guesses yes.
 
 function setupGaps(ctx: Ctx): CoachSignal[] {
   const behaviors = [...ctx.active.values()].filter((b) => b.hasLength !== undefined || b.hasPlace !== undefined);
+  // Only when the visit read the question (version 4); otherwise the facts stay version 3.
+  const asksAlongside = [...ctx.active.values()].some((b) => b.alongsideQuestionOpen !== undefined);
   const signals: CoachSignal[] = [];
   for (const behavior of behaviors) {
     const missingLength = behavior.hasLength === false;
     const missingPlace = behavior.hasPlace === false;
-    if (missingLength || missingPlace) {
-      signals.push({ kind: "setup_gaps", behaviorId: behavior.id, facts: { missing_length: missingLength, missing_place: missingPlace } });
+    const unanswered = behavior.alongsideQuestionOpen === true;
+    if (missingLength || missingPlace || unanswered) {
+      signals.push({ kind: "setup_gaps", behaviorId: behavior.id, facts: {
+        missing_length: missingLength, missing_place: missingPlace, ...(asksAlongside ? { alongside_unanswered: unanswered } : {}),
+      } });
     }
   }
   const withoutLength = behaviors.filter((b) => b.hasLength === false).length;
   const withoutPlace = behaviors.filter((b) => b.hasPlace === false).length;
-  if (withoutLength + withoutPlace > 0) {
+  const withoutAlongside = behaviors.filter((b) => b.alongsideQuestionOpen === true).length;
+  if (withoutLength + withoutPlace + withoutAlongside > 0) {
     signals.push({
       kind: "setup_gaps",
       behaviorId: null,
-      facts: { active_behaviors: behaviors.length, without_length: withoutLength, without_place: withoutPlace },
+      facts: { active_behaviors: behaviors.length, without_length: withoutLength, without_place: withoutPlace,
+        ...(asksAlongside ? { without_alongside_answer: withoutAlongside } : {}) },
     });
   }
   return signals;

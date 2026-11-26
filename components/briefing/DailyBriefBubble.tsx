@@ -18,6 +18,8 @@ import type { BriefMoveClient } from "@/lib/ui/daily-brief-moves";
 import { BriefMoveLines } from "./BriefMoveLines";
 import { BriefOpportunityLines } from "./BriefOpportunityLines";
 import type { BriefOpportunityClient } from "@/lib/ui/daily-brief-opportunities";
+import type { BriefAlongsideClient } from "@/lib/ui/daily-brief-alongside";
+import { BriefAlongsideQuestion } from "./BriefAlongsideQuestion";
 
 type DailyBriefBubbleProps = Readonly<{
   state: "loading" | "ready" | "error";
@@ -40,6 +42,8 @@ type DailyBriefBubbleProps = Readonly<{
   moves?: Readonly<{ client: BriefMoveClient; planningContext: () => BriefPlanningContext }> | null;
   /** Task 7: answers for the brief's "Add for today" lines. Without it, those lines are not shown. */
   opportunities?: Readonly<{ client: BriefOpportunityClient; planningContext: () => BriefPlanningContext }> | null;
+  /** Ticket 360: answers for the brief's alongside question. Without it, the question is not shown. */
+  alongside?: BriefAlongsideClient | null;
   /** Advisor Phase 3: Refresh replaces today's brief (up to two a day; the server decides). */
   refresh?: Readonly<{ onRefresh: () => void; pending: boolean; available: boolean; error: Extract<NoticeId, `brief.refresh.${string}`> | null }> | null;
   /**
@@ -63,6 +67,7 @@ export function DailyBriefBubble({
   plan = null,
   moves = null,
   opportunities = null,
+  alongside = null,
   refresh = null,
   embedded = false,
 }: DailyBriefBubbleProps) {
@@ -74,8 +79,9 @@ export function DailyBriefBubble({
   // Recipe 1.2 quiet day with no tip: nothing to say, so no bubble.
   const moveLines = ready && moves && briefing.moves ? briefing.moves : null;
   const opportunityLines = ready && opportunities && briefing.opportunities ? briefing.opportunities : null;
+  const alongsideQuestion = ready && alongside && briefing.alongsideQuestion ? briefing.alongsideQuestion : null;
   if (ready && isEmptyBriefing(briefing) && !travelToday?.items.length && !moveLines?.lines.length && !moveLines?.conflicts.length
-    && !opportunityLines?.lines.length) return null;
+    && !opportunityLines?.lines.length && !alongsideQuestion) return null;
   const lanes = ready && isLaneBriefing(briefing);
   const named = (text: string) => lanes ? <NamedText text={text} names={briefing?.behaviorNames} /> : text;
 
@@ -104,6 +110,7 @@ export function DailyBriefBubble({
             {moveLines ? <BriefMoveLines key={`${moveLines.runId ?? ""}:${briefing.generatedAt}`} moves={moveLines} client={moves!.client} planningContext={moves!.planningContext} /> : null}
             {opportunityLines ? <BriefOpportunityLines key={`opportunity:${opportunityLines.runId ?? ""}:${briefing.generatedAt}`} opportunities={opportunityLines}
               client={opportunities!.client} planningContext={opportunities!.planningContext} /> : null}
+            {alongsideQuestion ? <BriefAlongsideQuestion key={`alongside:${alongsideQuestion.behaviorId}:${briefing.generatedAt}`} question={alongsideQuestion} client={alongside!} /> : null}
             {!moveLines && lanes && briefing.suggestions?.length ? <div aria-label="Suggestions">
               {/* Recipe 1.2: one heading per advice type; each move is a bullet with its times only. */}
               {briefingSuggestionGroups(briefing.suggestions).map((group) => <div key={group.label} className="mt-2 border-t border-line pt-2 text-sm leading-6">

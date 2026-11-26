@@ -107,6 +107,8 @@ Footguns that cost a second commit most often:
 - Adding or removing a `<button>`, link, form control or `onClick`-style handler changes
   that file's `interaction_marker_count` in `interaction-registry.json`. Update the
   count and the interactions that cite the file.
+- A floor, window, order or threshold that decides something from a person's data has a
+  row in `docs/RULES_REGISTER.md`. Update the row when you add or change one.
 - A new environment variable needs a line in `.env.example`. A new core resolver needs
   an entry in `scripts/check-resolvers.mjs`, a paired test and `docs/AGENT_RESOLVERS.md`.
   A new token in `packages/ui/tokens.css` needs a description comment.
@@ -263,16 +265,20 @@ Product and implementation docs:
 
 ## iOS running plan
 
-`docs/IOS_PLAN.md` is a running plan for a future iPhone and Apple Watch app and a Mac App Store listing. It is
-not a source-of-truth document and it authorizes nothing: mobile stays out of scope
-until the owner activates the track (`docs/DECISIONS.md`, 2026-11-18).
+`docs/IOS_PLAN.md` (hub and decision inbox) and `docs/ios-plan/` (modular specs) form a
+running blueprint for a future iPhone app, Apple Watch app and Mac App Store listing.
+They are not source-of-truth documents and they authorize nothing: mobile and Mac App
+Store work stay out of scope until the owner activates the track (`docs/DECISIONS.md`,
+2026-11-18 and 2026-11-25).
 
-- The plan follows web development. It never blocks or changes a web ticket, a merge
+- The blueprint follows web development. It never blocks or changes a web ticket, a merge
   or a deployment. Web tickets owe it nothing beyond their "Future mobile" line.
-- A sync runs through the `ios-plan-sync` skill, in a docs-only pull request that
-  touches that file alone.
+- A refresh runs through the `ios-plan-sync` skill (on an every-other-day schedule), in a
+  docs-only pull request that touches `docs/IOS_PLAN.md` and `docs/ios-plan/` alone. It
+  auto-ports routine web additions using the standing port rules and logs an Open Question
+  in `docs/IOS_PLAN.md` only when a change touches an iOS-only surface or App Store rules.
 - An owner decision about the plan is the one other way it changes. That pull request
-  records the decision in `docs/DECISIONS.md` and updates the plan, and where needed
+  records the decision in `docs/DECISIONS.md` and updates the blueprint, and where needed
   this section and the skill, together. It stays docs-only.
 - Its `IOS-` step IDs are not ticket numbers. Do not cite them in tickets or code.
 

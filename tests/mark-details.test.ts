@@ -119,6 +119,12 @@ describe("mark details (advisor plan 4G)", () => {
     expect(shown).toBeLessThan(140);
     // The same item and day always gets the same answer.
     expect(markDetailPromptPicked("done_at", "occ-7", "2026-11-19", 0.5)).toBe(markDetailPromptPicked("done_at", "occ-7", "2026-11-19", 0.5));
+    // Ticket 360: the alongside line has its own share (half of eligible marks) and its own pick.
+    expect(MARK_DETAIL_PROMPTS.alongside.share).toBe(0.5);
+    const alongside = ids.filter((id) => markDetailPromptPicked("alongside", id, "2026-11-19", MARK_DETAIL_PROMPTS.alongside.share));
+    expect(alongside.length).toBeGreaterThan(150);
+    expect(alongside.length).toBeLessThan(250);
+    expect(alongside).not.toEqual(ids.filter((id) => markDetailPromptPicked("done_at", id, "2026-11-19", 0.5)));
     // A higher late threshold asks less often.
     const occurrence = { scheduledFor: sevenAm, scheduledTimeLabel: "7:00 AM", scheduleKind: "exact" as const, scheduleEndTime: null, localDate: "2026-11-19" };
     const threeHoursLate = Temporal.Instant.from(sevenAm).add({ hours: 3 }).toString();

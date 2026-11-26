@@ -8,6 +8,8 @@ import type { TimelineSourceEvidence } from "@cadence/core/types/timeline";
 import { listOccurrenceStatusEventsByOccurrenceIds } from "@/lib/db/occurrenceStatusEvents.repo";
 import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
 import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
+import { attachTimelineAlongside } from "@cadence/core/services/timeline-alongside";
+import { alongsideQuestionBehaviorIds, alongsideRowViews, readAlongsideBehaviorFacts } from "@/lib/services/alongside-view.service";
 
 import {
   listBehaviorAdvisorEstimates,
@@ -256,11 +258,38 @@ async function getTimelineViewForUser(input: {
   });
   const dayNoteRange = timelineDayNoteRange(view);
   const withNotes = attachTimelineDayNotes(view, dayNoteRange ? await listDayNotesInRange(supabase, userId, dayNoteRange) : []);
-  const [evidence, countable] = await Promise.all([
+  const [evidence, countable, alongside] = await Promise.all([
     readTimelineSourceEvidence(supabase, userId, occurrenceRows, timezone),
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
+    readTimelineAlongside(supabase, userId, occurrenceRows, now, timezone),
   ]);
-  return attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable);
+  return attachTimelineAlongside(attachTimelineSourceCountable(attachTimelineSourceEvidence(withNotes, evidence), countable), alongside.rows, alongside.questions);
+}
+
+/**
+ * Ticket 358 (D33): each alongside Behavior's row label and effective Where. Read only
+ * while `CADENCE_ALONGSIDE` is on, so the Timeline's reads are unchanged while it is
+ * off. A failed read shows no labels, asks nothing and keeps every overlap cue.
+ */
+async function readTimelineAlongside(
+  supabase: AppSupabaseClient,
+  userId: string,
+  occurrences: readonly Occurrence[],
+  now: Temporal.Instant,
+  timezone: string,
+): Promise<Readonly<{ rows: ReturnType<typeof alongsideRowViews>; questions: ReadonlySet<string> }>> {
+  const none = { rows: {}, questions: new Set<string>() };
+  if (occurrences.length === 0) return none;
+  try {
+    const facts = await readAlongsideBehaviorFacts(supabase, userId, {
+      behaviorIds: occurrences.map((occurrence) => occurrence.behavior_id),
+      localDate: now.toZonedDateTimeISO(timezone).toPlainDate().toString(),
+    });
+    // Ticket 360: the rows whose alongside question is open may ask after a Completed mark.
+    return { rows: alongsideRowViews(facts), questions: alongsideQuestionBehaviorIds(facts) };
+  } catch {
+    return none;
+  }
 }
 
 /**

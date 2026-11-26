@@ -2559,6 +2559,28 @@ cite has not changed.
 - **Update needed:** say that Cadence guesses whether a Behavior can be done alongside
   other things and what kind of place it happens in, that the person's own setting always
   wins, and that a guessed place never requests a route or a reminder. Document the
-  setting and pairing in the user guide and the new field in the MCP docs.
+  setting and pairing in the user guide and the new field in the MCP docs. Ticket 364:
+  with the flag on, MCP contract 1.8.0 and every export format (Full JSON, JSONL, CSV,
+  BehaviorLog as a Cadence extension) carry the person's answer, never the guess; the
+  public developer reference stays on 1.7.0 until the flag is on for good. Ticket 359:
+  the estimate call sends only each Behavior's title and description (not its Where), and
+  Chat's answers may say a value is Cadence's guess.
 - **Related:** P-066, P-067, P-082.
+- **Status:** logged.
+
+## P-094: Intended duration and tracked time (D34)
+
+- **Change:** November 25, 2026 (Ticket 366). The Behavior field "Default duration" is
+  now "Intended duration". From 3 tracked completions Cadence plans with the tracked
+  figure (the median of the 10 most recent) and the intended duration no longer changes
+  the length.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D34); Ticket 366.
+- **Surfaces:** user guide, MCP developer docs.
+- **Conflicting current text:** `docs/user-guide/behaviors-and-review.md`, "Default
+  duration and end date", says Timeline uses the value for planning and that tracked
+  time stays separate. The MCP developer reference describes `default_duration_minutes`
+  without the 3-completion rule.
+- **Update needed:** rename the section and field, state the 3-completion rule and the
+  median, and note the rule beside `default_duration_minutes` in the MCP docs.
+- **Related:** none.
 - **Status:** logged.

@@ -292,7 +292,8 @@ function actionForBehavior(
     normalizeNullableText(existing.category) ===
       normalizeNullableText(behavior.cadenceCategoryName ?? behavior.category) &&
     Boolean(existing.active ?? true) === importedActive &&
-    sameSubBehaviorLink(behavior, existing, context);
+    sameSubBehaviorLink(behavior, existing, context) &&
+    sameAlongside(behavior, existing);
 
   return action({
     recordType: "behavior",
@@ -308,6 +309,18 @@ function actionForBehavior(
       category: behavior.cadenceCategoryName ?? behavior.category,
     },
   });
+}
+
+/**
+ * Ticket 364: a different alongside answer makes the Behavior `replace`. A bundle without
+ * the key, or local records read without alongside, keeps the stored answer.
+ */
+function sameAlongside(
+  behavior: BehaviorLogImportBehaviorPlan,
+  existing: NonNullable<BehaviorLogExistingRecords["behaviors"]>[number],
+): boolean {
+  if (behavior.cadenceAlongside === undefined || existing.alongside === undefined) return true;
+  return behavior.cadenceAlongside === existing.alongside;
 }
 
 /** A bundle without link fields keeps the local link, as restore apply does. */

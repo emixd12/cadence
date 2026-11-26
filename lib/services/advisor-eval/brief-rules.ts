@@ -1,9 +1,10 @@
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  briefMoveItemBlocks, briefMoveStartAllowed, checkBriefMoveSlot,
+  briefMoveBlocksForSubject, briefMoveItemBlocks, briefMoveOverlapSubject, briefMoveStartAllowed, checkBriefMoveSlot,
   type BriefMoveBlock, type BriefMoveCandidate, type BriefMoveInterval, type BriefMovePlanInputs,
 } from "@cadence/core/resolvers/brief-move.resolver";
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brief-moves";
+import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
 
 /**
  * Advisor Phase 3 (3A2) eval, layer 1: rules every offered line must keep, checked with
@@ -13,11 +14,15 @@ import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brie
 export const BRIEF_LAYER_ONE_RULES = [
   "yes_check_alone", "yes_check_all", "declined_reoffered", "alongside_offered", "never_move_offered",
   "after_latest_hour", "lines_collide", "leaves_day", "starts_in_past", "offered_on_stale_calendar",
+  // Ticket 359 (D33): a line's new time overlaps an alongside item at a different place.
+  "alongside_other_place",
+  // Ticket 361 (D33): a pairing line not at its host's start, or with a host that may not host it.
+  "pairing_off_host",
 ] as const;
 export type BriefLayerOneRule = typeof BRIEF_LAYER_ONE_RULES[number];
 export type BriefLayerOneViolation = Readonly<{ rule: BriefLayerOneRule; occurrenceId: string; detail: string }>;
 
-type Line = Pick<BriefMoveCandidate, "occurrenceId" | "behaviorId" | "to" | "from">;
+type Line = Pick<BriefMoveCandidate, "occurrenceId" | "behaviorId" | "to" | "from"> & Partial<Pick<BriefMoveCandidate, "reasonCode" | "pairing">>;
 
 export function checkBriefLayerOne(input: BriefMovePlanInputs, lines: readonly Line[]): BriefLayerOneViolation[] {
   const violations: BriefLayerOneViolation[] = [];
@@ -34,17 +39,37 @@ export function checkBriefLayerOne(input: BriefMovePlanInputs, lines: readonly L
   for (const line of lines) {
     const to = interval(line.to);
     if (input.declinedToday.has(line.occurrenceId)) add("declined_reoffered", line, "answered No or undone today");
-    if (alongside.has(line.behaviorId)) add("alongside_offered", line, "happens alongside other things");
+    // Ticket 361: a pairing line is the one line that moves an alongside item.
+    const pairing = line.reasonCode === "alongside_pairing" ? line.pairing ?? null : null;
+    if (alongside.has(line.behaviorId) && !pairing) add("alongside_offered", line, "happens alongside other things");
+    if (pairing) {
+      const host = input.items.find((item) => item.occurrenceId === pairing.hostOccurrenceId);
+      const guest = input.items.find((item) => item.occurrenceId === line.occurrenceId);
+      if (!host || host.alongside || host.status !== "unresolved" || !host.start.equals(to.start) || !host.where || host.where.kind === "unknown"
+        || !guest?.where || guest.where.kind === "unknown" || !alongsideMayOverlap(guest, { kind: "item", where: host.where })) {
+        add("pairing_off_host", line, `host ${pairing.hostOccurrenceId}`);
+      }
+    }
     if (input.neverMoveBehaviorIds.has(line.behaviorId)) add("never_move_offered", line, "set to Don't suggest moving this");
+    // Items carry a Where only while CADENCE_ALONGSIDE is on; without one this rule cannot apply.
+    const moving = input.items.find((item) => item.occurrenceId === line.occurrenceId);
+    for (const item of input.items) {
+      if (!item.alongside || !item.where || !moving?.where || item.occurrenceId === line.occurrenceId || item.status !== "unresolved") continue;
+      if (overlaps(to, { start: item.start, end: item.end }) && !alongsideMayOverlap(item, { kind: "item", where: moving.where })) {
+        add("alongside_other_place", line, `overlaps ${item.occurrenceId} (${item.where.kind}) from ${moving.where.kind}`);
+      }
+    }
     if (!briefMoveStartAllowed(to.start, input.localDate, input.timezone, latest)) add("after_latest_hour", line, `starts ${line.to.startAt}`);
     if (Temporal.Instant.compare(to.end, dayEnd) > 0) add("leaves_day", line, `ends ${line.to.endAt}`);
     if (Temporal.Instant.compare(to.start, input.now) < 0) add("starts_in_past", line, `starts ${line.to.startAt}`);
-    // Yes on this line alone, with every other line still undecided.
-    const alone = checkBriefMoveSlot({ interval: to, blocks: [...briefMoveItemBlocks(input.items, line.occurrenceId), ...calendar] });
+    // Yes on this line alone, with every other line still undecided. An alongside subject sees
+    // calendar events under the same-place rule, as the Yes check does (items carry a Where only with the flag on).
+    const subject = briefMoveOverlapSubject(input.items, line.occurrenceId);
+    const alone = checkBriefMoveSlot({ interval: to, blocks: briefMoveBlocksForSubject([...briefMoveItemBlocks(input.items, line.occurrenceId), ...calendar], subject) });
     if (!alone.ok) add("yes_check_alone", line, `${alone.reason} ${alone.ref}`);
     // Accept all: every other line already at its new time.
     const others = new Map([...accepted].filter(([id]) => id !== line.occurrenceId));
-    const all = checkBriefMoveSlot({ interval: to, blocks: [...briefMoveItemBlocks(input.items, line.occurrenceId, others), ...calendar] });
+    const all = checkBriefMoveSlot({ interval: to, blocks: briefMoveBlocksForSubject([...briefMoveItemBlocks(input.items, line.occurrenceId, others), ...calendar], subject) });
     if (!all.ok) add("yes_check_all", line, `${all.reason} ${all.ref}`);
   }
   for (let left = 0; left < lines.length; left += 1) {
