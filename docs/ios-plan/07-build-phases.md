@@ -97,8 +97,8 @@ passes on the Mac (`.claude/skills/desktop-acceptance`).
 | `IOS-192` | Engine packaging (`npm run ios:prepare` builds the bundle, XCFramework, generated contracts and tokens outside Xcode; Xcode checks a stamp file); `ReadModelWriter` (atomic JSON in the App Group); offline store; foreground sync coordinator; restore detection; "Update Cadence" mode | P | L |
 | `IOS-193` | Five-tab SwiftUI shell (Timeline, Chat, Behaviors, Export & Import, Settings); generated `CadenceTokens.swift` from `packages/ui/tokens.css`; compact, standard and Pro Max widths; Dynamic Type | `IOS-192` | M |
 | `IOS-203` | Native Sign in with Apple (hashed nonce to Apple, raw nonce to `signInWithIdToken`), Google (PKCE in `ASWebAuthenticationSession`, `Callback.https` with an associated domain), email 6-digit code; Apple credential-state check and revocation observer; onboarding; first-launch sign-in required | `IOS-190f` | M |
-| `IOS-194a` | Timeline: statuses, Needs decision, collapsed auto-save Notes with inline shortcuts, Routines and Semantic Zoom, Opportunity Basket, Alongside | `IOS-193` | L |
-| `IOS-194b` | Time tracking, auto-stop on Completed, inline duration | `IOS-194a` | M |
+| `IOS-194a` | Timeline: statuses, Needs decision, collapsed auto-save Notes with inline shortcuts, Periods (chips, Add period, inline editor), Routines and Semantic Zoom, Opportunity Basket, Alongside (row label, mark question, brief question) | `IOS-193` | L |
+| `IOS-194b` | Time tracking, auto-stop on Completed, the D34 duration line (intended vs. tracked from 3 completions) | `IOS-194a` | M |
 | `IOS-195a` | Behavior create and edit, Routines, Opportunity, Alongside, Geoapify place autocomplete | `IOS-193`, `IOS-190b` | M |
 | `IOS-197` | Actionable notifications (Completed, Not Completed, Add Note); 64-pending horizon with reserve, readback and visible coverage; per-device "Reminders on this device" toggle | `IOS-192` | M |
 
@@ -127,11 +127,11 @@ behavior checked on hardware; App Intents Testing passes.
 | Step | Contents | Depends on | Size |
 |---|---|---|---|
 | `IOS-195b` | Archive, Ended and Paused Behaviors, category CRUD and drag-reorder | `IOS-195a` | M |
-| `IOS-195c` | Analytics and selected-day review | `IOS-193` | M |
-| `IOS-205` | Hosted connectors: Google, Outlook and iCloud Calendar; Hevy source links and connector-completion labels; Travel advisory with When In Use location and leave reminders; Calendar identity and Google verification gates | M2 | L |
-| `IOS-206` | Advisor: animated 60 pt horse and speech pill; Daily Brief moves, recheck and Undo; Coach tips and schedule proposals; Chat tab; unified AI consent sheet | M2 | L |
+| `IOS-195c` | Analytics and selected-day review; Periods section and the in/out-of-period line | `IOS-193` | M |
+| `IOS-205` | Hosted connectors: Google (Timeline & Travel grant and the separate AI Calendar MCP grant, one Settings row), Outlook and iCloud Calendar; Hevy source links and connector-completion labels; Travel advisory with When In Use location and leave reminders; Calendar identity and Google verification gates | M2 | L |
+| `IOS-206` | Advisor: animated 60 pt horse and speech pill; Daily Brief moves, recheck and Undo; Coach tips and schedule proposals; Chat tab with travel cards and Period writes; longitudinal calendar-load review opt-in; unified AI consent sheet | M2 | L |
 | `IOS-196` | Four-group auto-save Settings; Connected apps (MCP) view; Sign-in methods; in-app account deletion | `IOS-203`, `IOS-190f` | M |
-| `IOS-208` | Export in five formats and BehaviorLog import and restore in the portability engine, with progress, cancel and `BGContinuedProcessingTask` | `IOS-192` | M |
+| `IOS-208` | Export in five formats (with Periods) and BehaviorLog import and restore in the portability engine, with progress, cancel and `BGContinuedProcessingTask` | `IOS-192` | M |
 
 Exit: every deferred mobile intent in `interaction-registry.json` for v1.0 has
 evidence (`--mobile-release v1.0`); milestone release check passes.
