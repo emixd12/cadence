@@ -4,7 +4,7 @@
 > implementation. No iOS code, real ticket or ticket number exists. Mobile work stays out
 > of scope in `AGENTS.md` until the owner activates the track.
 >
-> **Synced through:** `64b78b80` (`origin/main`, November 25, 2026).
+> **Synced through:** `19d73443` (`origin/main`, November 27, 2026).
 >
 > **Not a source of truth.** Product behavior is owned by `docs/UI_SPEC.md`,
 > `docs/USER_FLOWS.md`, `docs/ROUTE_MAP.md`, `interaction-registry.json` and
@@ -25,7 +25,7 @@
    Onboarding sit in front of them.
 3. **Explicit sizing** across three iPhone width tiers and Dynamic Type through AX5
    (Section 4).
-4. **Every web feature shipped or decided through `64b78b80`** is mapped (Sections 5–10).
+4. **Every web feature shipped or decided through `19d73443`** is mapped (Sections 5–10).
    Features behind a production-off flag on web (for example `CADENCE_ALONGSIDE`) port
    behind the same server flag; iPhone never turns on a feature that web has off.
 5. **Standing port rules** let the every-other-day refresh fold routine web changes in
@@ -215,6 +215,38 @@ Rules for every tier:
   matching uses full history with a floor of 2 distinct Occurrences or day notes. AI
   pattern chips appear only when Settings → AI features → Notes is on. No shortcut
   management screen in Settings or Behavior settings.
+- Day notes now reach the Daily Brief model (D35, Ticket 367). This is a hosted change;
+  the app sends nothing new.
+
+### 6.3a Periods (D35, Tickets 368–373)
+
+A Period labels a range of local dates for the whole account ("Sick", November 3–9). It
+is annotation only: it never changes a status, adherence, a reminder or a schedule, and
+no copy makes it read as a pause. Reference: `components/periods/PeriodControl.tsx`.
+
+- **Chips.** Under the date of every Timeline day a Period covers, Needs decision day
+  sections included, each Period shows as a small square chip with its label. A chip is
+  a `Button` with the accessible name "Edit period {label}, {dates}". Tapping it opens
+  that Period's editor inline under the chips; tapping again closes it.
+- **Add period.** Only today's header has the quiet "Add period" disclosure, beside "Add
+  day note". An open disclosure takes the full width.
+- **Editor (inline, no sheet).** Label is a `TextField` with the person's past labels as
+  suggestions (web `datalist`). First day and Last day are two `.compact` `DatePicker`s
+  side by side on Standard and Pro Max widths and stacked on Compact and at accessibility
+  sizes. An empty Last day reads "Still going. Set a last day when it ends."; a set one
+  has **Clear**, and its picker starts at the First day. Note is the shared note editor
+  with its own chips for lines that repeat across Period notes (derived on read, not
+  stored or dismissable; off with the account's Note shortcuts switch).
+- **Saving.** An existing Period's note auto-saves like an Occurrence note; **Save**
+  stores label and days, **Close** closes. A new Period sends all four fields on
+  **Save**; its second action is **Cancel**. **End today** shows only when the Period
+  resolver allows it. **Remove** swaps in place to "Remove this period" and **Keep**; no
+  `.confirmationDialog`, no undo wording.
+- **Outcomes.** "Period saved.", "Period ended today." and "Period removed." as notices
+  beside the control; a rule break shows the resolver's sentence and keeps the draft; a
+  stale write shows `period.conflict` and reloads the latest version.
+- Offline: Periods follow the sync shape Ticket 374 defines for the Mac
+  (`04-accounts-sync-offline.md`, Section 2.1).
 
 ### 6.4 Time tracking and durations
 
@@ -226,9 +258,12 @@ Rules for every tier:
   marks from Siri, widgets, notifications and Live Activities. Not Completed and
   Unresolved leave it running. Stopping a timer never changes status.
 - Starting a timer also starts the **Active Timer Live Activity** (`02-iphone-native.md`).
-- **Inline duration controls and estimates:** the Behavior's default length, measured
-  estimates and model estimates ("estimate" label) show as on web; possible-overlap cues
-  stay separate from running timers and from status.
+- **One duration line** in expanded rows (D34, Ticket 366): "Intended: 30m" with
+  **Change**; "Usually 5m · Based on 2 tracked completions" or "About 20m · Estimated
+  from description" with **Set intended duration**; from 3 tracked completions "Usually
+  22m · Based on 10 tracked completions · Intended 30m" with no action. The tracked figure
+  is the median of the 10 most recent tracked completions, from the shared resolver.
+  Possible-overlap cues stay separate from running timers and from status.
 
 ### 6.5 Places and travel
 
@@ -289,13 +324,18 @@ Rules for every tier:
 
 ### 6.9 Alongside Behaviors (D33, behind `CADENCE_ALONGSIDE`)
 
-- An alongside item keeps its row and shows a small "alongside" label; a guessed value is
-  labelled as a guess.
-- Allowed same-place overlaps show no conflict cue; disallowed overlaps (travel, another
-  place) cue as any other.
-- After a row is marked Completed and the answer is missing and the guess is yes, the row
-  may ask "Can this be done alongside other things?" in the "Done at · Just now · Other
-  time" pattern. One answer anywhere closes the question everywhere.
+- An alongside item keeps its row (no parallel lane) and shows one muted line under its
+  title: "Alongside", or "Alongside · a guess" for Cadence's guess (`alongside.row-label`).
+- Allowed same-place overlaps show no Possible overlap line or Calendar highlight;
+  travel still shows.
+- Right after a Completed mark with no Done at line, when the question is open (not
+  answered, guessed yes), the row may show "Done alongside other things? Yes · No" on the
+  fixed share in `MARK_DETAIL_PROMPTS.alongside` (0.5 per item and day). Done at keeps
+  priority. One answer anywhere closes the question everywhere (`INT-TIMELINE-028`).
+- The Daily Brief may carry one alongside question under its move lines ("Can Red light
+  helmet be done alongside other things?" with Yes · No), at most one per brief, through
+  `POST /api/advisor/brief/alongside` (`INT-BRIEF-011`). The app sends
+  `alongside_question_v1`, as web does.
 - Pairing moves ("Do Red light helmet during Reading at 8:00 PM") arrive as ordinary
   Daily Brief or Chat moves.
 
@@ -315,6 +355,8 @@ Rules for every tier:
     moving this** after No or Undo on four different days. Moves change today only.
   - **Coach:** daily tips, past tips drilldown, and schedule proposals ("Try for two
     weeks") that the person confirms.
+  - The brief and tips also read day notes and Period labels and dates (D35). Hosted;
+    no client change.
 - The banner never blocks tracking or steals focus.
 
 ---
@@ -329,7 +371,15 @@ Rules for every tier:
 - **Starter prompts** (up to three, `/api/advisor/chat/starters`) on an empty
   conversation; conversation list and view.
 - Bounded **past calendar drill-down** (≤31 days per call) and workout reads come from
-  hosted rollups, as on web.
+  hosted rollups, as on web. Google spans past 30 days are computed per turn and not kept
+  (Calendar MCP migration, 2026-11-25).
+- **Travel cards** (2026-11-25, `L-001`): Chat's travel tool looks at today plus up to 7
+  days; the reply text holds only fit and conflict conclusions, and Cadence draws exact
+  leave-by and duration cards inline beside it (`components/chat/ChatMessages.tsx`,
+  `travel_card`). Cross-day moves and recurring schedule changes need the person's
+  confirmation.
+- Chat reads and writes **Periods** (create, edit, end; no removal), as MCP clients do
+  (Ticket 370, PR #423).
 - Follows **Settings → AI features**: when chat is off the server returns `chat_off` and
   the tab shows the catalog notice with a link to Settings.
 - **Requires network.** Offline, the composer is disabled with one notice line; past
@@ -359,6 +409,12 @@ Rules for every tier:
   shows a muted "Opportunity" word.
 - **Routines:** "Sub-behaviors (n)" nested under the parent with rolled-up Adherence,
   Completed, Not Completed and "Full routines x of y".
+- **Periods** section (Ticket 369) below Category counts and above the archived
+  disclosure, hidden when there is none: every Period newest first with label, dates,
+  the note's first line and an **Edit** text action that opens the same inline editor.
+- When a Period covers a day in the range, one muted line under the status counts:
+  "Outside periods: 85% (17 of 20). In periods: 20% (1 of 5)." from the analytics
+  resolver. No other number changes.
 
 ### 8.1 Behavior editor (sheet)
 
@@ -367,14 +423,18 @@ Field order follows `components/behaviors/BehaviorForm.tsx`:
 - Title, Description, **Where** (Not set, Anywhere, Home, A place + Place text) with its
   hint, Category, schedule (Daily, Every N days, Weekly on weekdays, Every N weeks on
   weekdays, Monthly on day N with last-day fallback; times or preset ranges; no raw cron,
-  no natural language), Default duration, Ends after, reminders (browser reminders on by
+  no natural language), **Intended duration** (D34; the stored column stays
+  `default_duration_minutes`), Ends after, reminders (browser reminders on by
   default become **device reminders**; email reminders off by default with offsets).
 - **Part of** and **Follow parent schedule**; **Add sub-behavior** drafts with Up, Down,
   Remove; a saved routine's manager with Up / Down, Detach, New sub-behavior, Add an
   existing behavior.
 - **Available as an opportunity** and **No fixed schedule**.
-- **Alongside** setting ("Can this be done alongside other things?"), showing the guess
-  and its source; guessed Where shown as a guess (behind `CADENCE_ALONGSIDE`).
+- **Alongside** select "Can be done alongside other things" (Not answered, Yes, No). While
+  Not answered and a guess exists: "Cadence guesses Yes. Planning uses the guess until you
+  choose." with **Use the guess** (`INT-BEHAVIOR-046`, `INT-BEHAVIOR-047`). A guessed Where
+  for Where Not set shows with Review Where and Dismiss (behind `CADENCE_ALONGSIDE`). D37
+  (Ticket 383, not started) will show the guessed Where even with Completion places off.
 - **Place autocomplete:** instant local saved-place matches first, then Geoapify results
   through the hosted route (never a direct provider call from the app); the safe
   auto-marker with **Undo**.
@@ -391,7 +451,8 @@ Field order follows `components/behaviors/BehaviorForm.tsx`:
   notes (off), Include time tracking (off, with the factual pattern-exposure copy), and
   the selected-range scope counts.
 - Outputs: **JSONL**, **CSV**, **full JSON snapshot**, **BehaviorLog bundle**, **Copy AI
-  summary**. Files are built locally from SQLite with the shared export resolver and
+  summary**. Exports carry Periods; BehaviorLog import and restore match a Period by
+  label, first day and last day, not by id (Ticket 373). Files are built locally from SQLite with the shared export resolver and
   offered through `ShareLink` / `.fileExporter`. Share popovers anchor to their button
   for iPad compatibility.
 - **Import / restore:** `.fileImporter` for supported files, then the same restore
@@ -411,8 +472,8 @@ Same four groups, order and state rows as web (Ticket 301), auto-save everywhere
 | Group | Contents on iPhone |
 |---|---|
 | **General** | Profile, Timezone, Notifications (device permission state, **Reminders on this device**, **Lock Screen privacy**, **Reminders scheduled through {date}**), Categories drawer ("Edit N categories", drag to reorder, edit/delete with affected count). |
-| **Connections** | Connected sources rows (Google Calendar, Outlook, iCloud, Hevy) with icon, kind and state; opening shows the source panel. **Connected apps** (MCP grants): view and revoke only. OAuth **consent** screens stay web-only (`not_applicable`). |
-| **Planning** | **Travel** (usual travel, Travel estimates toggle with Google Maps disclosure, Home with Geoapify autocomplete and **Use my current location**, remembered places, How you travel, Completion places, **leave reminders** opt-in), **Daily Brief** (one choice for every connected source, per-source exclusions under Advanced). |
+| **Connections** | Connected sources rows (Google Calendar, Outlook, iCloud, Hevy) with icon, kind and state; opening shows the source panel. Google Calendar has one row with a state pill (Not connected, Timeline only, AI only, Timeline & AI) and two parts with separate disconnects: **Timeline & Travel** and **AI features (Daily Brief & Chat)**, the second on Google's Calendar MCP grant. AI connect chains right after Timeline connect when AI features are on, both in `ASWebAuthenticationSession`. The AI calendar picker starts collapsed as pills with checkboxes, seeded once from Timeline's selection; Timeline's picker shows the drift hint with **Sync to AI**. **Connected apps** (MCP grants): view and revoke only. OAuth **consent** screens stay web-only (`not_applicable`). |
+| **Planning** | **Travel** (usual travel, Travel estimates toggle with Google Maps disclosure, Home with Geoapify autocomplete and **Use my current location**, remembered places, How you travel, Completion places, **leave reminders** opt-in), **Daily Brief** (one choice for every connected source, per-source exclusions under Advanced; **Connect Google Calendar for AI** shortcut when only Timeline is connected; the separate opt-in, off by default, for the weekly or monthly longitudinal calendar-load review). |
 | **Account and data** | **Sign-in methods** (list, add Google / Apple, change email, remove while another way in remains, 15-minute recent sign-in rule), **AI features** (one approval covering Notes, Daily Brief, Coach and Chat, with the "not medical advice" line), Open Export, Privacy / Terms / Trust links, Sign out, **Delete account** (typed address or `DELETE`; in-app deletion required by App Store rules; Apple token revocation). |
 | **This iPhone** (new, like Mac's "This Mac") | **Live Activities** (global switch, default on; timer Live Activity on/off), **Spotlight** (index Behaviors; off clears the index at once), **Siri & Shortcuts** link to system settings, storage and sync status. |
 
@@ -431,6 +492,7 @@ iPhone parity; desktop storage and updater controls; the Mac's local-mode contro
 | Daily Brief on ChatGPT plan (D27) | Mac-only by decision. |
 | `/design-system` bench, development login | Not shipped. |
 | Desktop updater, local-only mode | App Store updates; sign-in required. |
+| "Cadence day" MCP Apps view (D36, `INT-DAYVIEW-001`–`004`) | Claude and ChatGPT mobile apps render it from Cadence's MCP server; the Cadence iPhone app has no counterpart. The registry lists these intents as mobile `deferred`; settle that wording at activation (`IOS-188`). |
 
 ---
 

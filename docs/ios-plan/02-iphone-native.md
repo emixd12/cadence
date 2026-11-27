@@ -4,7 +4,7 @@
 > implementation. No iOS code, real ticket or ticket number exists. Mobile work stays out
 > of scope in `AGENTS.md` until the owner activates the track.
 >
-> **Synced through:** `64b78b80` (`origin/main`, November 25, 2026).
+> **Synced through:** `19d73443` (`origin/main`, November 27, 2026).
 >
 > **Scope of this file:** surfaces that exist only on iPhone. Everything that mirrors web
 > lives in `01-port-map.md`. Product choices here were made by the owner on November 25,
@@ -214,6 +214,10 @@ Rules: every write intent shows a result snippet with the catalog wording, works
 (local write, sync later) except the Daily Brief summary, and never runs a hosted AI call
 except reading an already-built brief.
 
+Periods (D35) have no intent yet. Whether v1.0 adds "Start a period" and "End a period"
+App Shortcuts is open (`docs/IOS_PLAN.md`, Open Questions inbox, Q3). Until answered,
+Periods stay in the app.
+
 ### 2.3 Spotlight
 
 - Index running **Behaviors** (title and category; never notes, descriptions or places)
@@ -224,6 +228,8 @@ except reading an already-built brief.
 - With Lock Screen privacy on, Spotlight still indexes (Spotlight results need an unlocked
   phone) unless the person turns indexing off.
 - Archived and ended Behaviors are removed from the index.
+- Periods are not indexed (labels such as "Sick" can be sensitive); Q3 in
+  `docs/IOS_PLAN.md` asks the owner to confirm.
 
 ---
 
