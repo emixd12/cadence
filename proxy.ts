@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { CONSENT_REFERRER_POLICY } from "@/lib/types/oauth-ui";
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -8,7 +9,7 @@ export async function proxy(request: NextRequest) {
   const response = await updateSession(request);
   if (path === "/oauth/consent") {
     response.headers.set("Cache-Control", "no-store");
-    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("Referrer-Policy", CONSENT_REFERRER_POLICY);
     response.headers.set("X-Frame-Options", "DENY");
   }
   return response;

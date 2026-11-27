@@ -1,5 +1,7 @@
 import type { Temporal } from "@js-temporal/polyfill";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "../resolvers/day-note.resolver";
+import { resolvePeriodNoteShortcuts } from "../resolvers/period.resolver";
+import type { PeriodRecord } from "../resolvers/period.resolver";
 import { currentNoteShortcuts, isDayNoteShortcutPool, noteShortcutRevision, noteShortcutsEnabled, rankInlineNoteShortcuts, resolveNoteShortcutCommand, validateNoteShortcutState } from "../resolvers/note-suggestion.resolver";
 import type { NoteShortcut, NoteShortcutCommand, NoteShortcutStore, NoteShortcutView } from "../types/note-shortcut";
 
@@ -99,6 +101,28 @@ export async function listInlineNoteShortcuts(
     return Object.fromEntries(resolved.filter(([, entries]) => entries.length > 0));
   } catch {
     return {};
+  }
+}
+
+/**
+ * Note shortcuts for the Period note field, or none when the account's Note shortcuts
+ * switch is off. They are worked out from the Periods given; no pool is stored.
+ */
+export async function listPeriodNoteShortcuts(
+  store: Pick<NoteShortcutStore, "userId" | "readStates">,
+  periods: readonly Pick<PeriodRecord, "id" | "start_on" | "note">[],
+  now: Temporal.Instant,
+): Promise<NoteShortcut[]> {
+  try {
+    if (!periods.some((period) => period.note)) return [];
+    const switchState = (await store.readStates()).find((state) => state.id === "global");
+    if (switchState) {
+      validateNoteShortcutState(switchState);
+      if (switchState.user_id !== store.userId) throw new Error("Shortcut state belongs to another owner.");
+    }
+    return noteShortcutsEnabled(switchState) ? resolvePeriodNoteShortcuts({ periods, now }) : [];
+  } catch {
+    return [];
   }
 }
 

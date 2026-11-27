@@ -20,6 +20,30 @@ export type ExportJsonDayNote = {
   updated_at: string;
 };
 
+/** One Period of the account (Ticket 373): a labeled range of local dates. */
+export type ExportPeriodInput = {
+  id: string;
+  label: string;
+  startOn: string;
+  /** Null means the Period is ongoing. */
+  endOn: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ExportJsonPeriod = {
+  id: string;
+  label: string;
+  start_on: string;
+  /** Null means the Period is ongoing. */
+  end_on: string | null;
+  /** Present only when notes are included. Null when the Period has no note. */
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ExportImportedHistory = {
   importedNotes?: PortabilityNoteRow[];
   importedInterventions?: PortabilityInterventionRow[];
@@ -335,6 +359,8 @@ export type ExportJsonBackup = {
   time_sessions?: ExportJsonTimeSession[];
   /** Present when notes are included (Ticket 292). */
   day_notes?: ExportJsonDayNote[];
+  /** Present only when at least one Period overlaps the export range (Ticket 373). */
+  periods?: ExportJsonPeriod[];
 };
 
 export type ExportJsonCategory = {

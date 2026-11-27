@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { ConsentForm } from "@/components/oauth/ConsentForm";
 import { buildLoginPath } from "@/lib/auth/redirects";
 import { getConsentPageData } from "@/lib/services/oauth-ui.service";
+import { CONSENT_REFERRER_POLICY } from "@/lib/types/oauth-ui";
 import { consentAction } from "./actions";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Connect an app", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Connect an app", robots: { index: false, follow: false }, referrer: CONSENT_REFERRER_POLICY };
 
 export default async function ConsentPage({ searchParams }: { searchParams: Promise<{ request?: string | string[] }> }) {
   const params = await searchParams;

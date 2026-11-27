@@ -36,11 +36,14 @@ import type {
   ExportImportedHistory,
   ExportDayNoteInput,
   ExportJsonDayNote,
+  ExportJsonPeriod,
+  ExportPeriodInput,
 } from "../types/export";
 import { DEFAULT_TIMEZONE, type RecurrenceRule } from "../types/recurrence";
 import type { BehaviorWhereKind } from "../types/behavior";
 import { BEHAVIOR_CONFIGURATION_CHANGED_FIELDS } from "../types/behavior-configuration-event";
 import { isBehaviorLogScheduleBoundary } from "./behavior-configuration.resolver";
+import { periodsOverlappingRange } from "./period.resolver";
 import {
   formatRecordedDuration,
   resolveOccurrenceTimeTracking,
@@ -198,6 +201,11 @@ export type ResolveExportInput = ExportImportedHistory & {
   includeAlongside?: boolean;
   timeSessions?: ExportTimeSessionInput[];
   dayNotes?: ExportDayNoteInput[];
+  /**
+   * Ticket 373: every Period of the account. The export keeps those with a day in
+   * the range. The label is always exported; the note follows `includeNotes`.
+   */
+  periods?: ExportPeriodInput[];
 };
 
 export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
@@ -283,6 +291,7 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     occurrences,
   });
   const dayNotes = includeNotes ? toJsonDayNotes(input.dayNotes ?? [], range) : [];
+  const periods = toJsonPeriods(input.periods ?? [], range, includeNotes);
   const fileBaseName = [
     "cadence-export",
     range.key === "all" ? "all-time" : `${range.key}-days`,
@@ -303,9 +312,12 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     behaviorConfigurationEvents,
     timeSessions: includeTimeTracking ? timeSessions : undefined,
     dayNotes: includeNotes ? dayNotes : undefined,
+    periods,
   });
   const behaviorLog = toBehaviorLogBundle({
     dayNotes,
+    periods,
+    exportEndLocalDate: range.endLocalDate,
     timezone,
     categories,
     exportedAtInstant: input.now,
@@ -713,6 +725,7 @@ function toJsonBackup(input: {
   behaviorConfigurationEvents: ExportJsonBehaviorConfigurationEvent[];
   timeSessions?: ExportJsonTimeSession[];
   dayNotes?: ExportJsonDayNote[];
+  periods: ExportJsonPeriod[];
 }): ExportJsonBackup {
   return {
     exported_at: input.exportedAt,
@@ -727,7 +740,72 @@ function toJsonBackup(input: {
     behavior_configuration_events: input.behaviorConfigurationEvents,
     ...(input.timeSessions ? { time_sessions: input.timeSessions } : {}),
     ...(input.dayNotes ? { day_notes: input.dayNotes } : {}),
+    // Only when a Period is exported, so an account without Periods keeps its bytes.
+    ...(input.periods.length > 0 ? { periods: input.periods } : {}),
   };
+}
+
+/**
+ * Periods with at least one day inside the export range, in display order (Ticket
+ * 373). An all-time export keeps every Period, including one that starts in the
+ * future. The note is exported only with the notes option; the label always is.
+ */
+function toJsonPeriods(periods: readonly ExportPeriodInput[], range: ExportDateRange, includeNotes: boolean): ExportJsonPeriod[] {
+  const rows = periods.map((period) => ({
+    id: period.id,
+    label: period.label,
+    start_on: period.startOn,
+    end_on: period.endOn,
+    ...(includeNotes ? { note: period.note } : {}),
+    created_at: formatUtc(period.createdAt),
+    updated_at: formatUtc(period.updatedAt),
+  }));
+  return periodsOverlappingRange<ExportJsonPeriod>(rows, range.startLocalDate ?? "0001-01-01", exportReadEndLocalDate(range));
+}
+
+/**
+ * A Period is a user review over its dates, marked by the Cadence extension
+ * `period: true`. BehaviorLog requires an end date, so an ongoing Period ends on
+ * the later of the export's last date and its own first day, with `ongoing: true`.
+ */
+function toBehaviorLogPeriodReviews(input: {
+  periods: readonly ExportJsonPeriod[];
+  exportEndLocalDate: string;
+  timezone: string;
+  profile: ExportProfileInput;
+}): Record<string, unknown>[] {
+  return input.periods.map((period) => ({
+    record_type: "review",
+    review_id: period.id,
+    period_start_local_date: period.start_on,
+    period_end_local_date: period.end_on ?? (input.exportEndLocalDate > period.start_on ? input.exportEndLocalDate : period.start_on),
+    timezone: input.timezone,
+    created_at_utc: period.created_at,
+    review_role: "user",
+    summary_markdown: period.label,
+    barriers_markdown: null,
+    adjustments_markdown: null,
+    source: createBehaviorLogSource({ profile: input.profile, originalId: period.id, captureMethod: "manual_text", confidence: "high" }),
+    extensions: {
+      [BEHAVIORLOG_EXTENSION_NAMESPACE]: {
+        period: true,
+        label: period.label,
+        ongoing: period.end_on === null,
+        ...(period.note !== undefined ? { note: period.note } : {}),
+        updated_at_utc: period.updated_at,
+      },
+    },
+  }));
+}
+
+/**
+ * One order for `data/reviews.jsonl`: by first day; on the same day, day notes
+ * before Periods. Day notes keep their order and Periods keep display order.
+ */
+function orderBehaviorLogReviews(dayNoteReviews: Record<string, unknown>[], periodReviews: Record<string, unknown>[]): Record<string, unknown>[] {
+  const start = (review: Record<string, unknown>) => String(review.period_start_local_date);
+  // Array.prototype.sort is stable, so entries with the same first day keep this order.
+  return [...dayNoteReviews, ...periodReviews].sort((left, right) => (start(left) < start(right) ? -1 : start(left) > start(right) ? 1 : 0));
 }
 
 /** Non-empty day notes inside the export range, oldest date first (Ticket 292). */
@@ -999,6 +1077,9 @@ function neutralizeSpreadsheetFormula(value: string): string {
 
 function toBehaviorLogBundle(input: ExportImportedHistory & {
   dayNotes: readonly ExportJsonDayNote[];
+  periods: readonly ExportJsonPeriod[];
+  /** The export range's last local date; an ongoing Period's review ends here. */
+  exportEndLocalDate: string;
   timezone: string;
   exportedAtInstant: Temporal.Instant;
   fileBaseName: string;
@@ -1177,7 +1258,10 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
     });
   }
 
-  const reviewRecords = toBehaviorLogDayNoteReviews({ dayNotes: input.dayNotes, timezone: input.timezone, profile: input.profile });
+  const reviewRecords = orderBehaviorLogReviews(
+    toBehaviorLogDayNoteReviews({ dayNotes: input.dayNotes, timezone: input.timezone, profile: input.profile }),
+    toBehaviorLogPeriodReviews({ periods: input.periods, exportEndLocalDate: input.exportEndLocalDate, timezone: input.timezone, profile: input.profile }),
+  );
   if (reviewRecords.length > 0) {
     filesWithoutManifest.push({
       path: BEHAVIORLOG_REVIEWS_PATH,

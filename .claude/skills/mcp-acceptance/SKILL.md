@@ -473,8 +473,9 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
   then reads back again. It stops with `behavior-reminders-on` if a reminder is still
   on, or if the scenario already revoked the grant. The creation stays checkpointed, so
   report the Behavior for a manual reminders-off update before cleanup.
-- **Consent before hydration:** clicking Allow or Deny before the page hydrates
-  returns 500 (`Origin: null`). The drivers wait for hydration; a slow human may hit it.
+- **Consent before hydration:** fixed by Ticket 379 (November 26, 2026). Allow and Deny
+  work as a plain form post, so the drivers no longer wait for hydration. A deployment
+  older than the fix returns 500 (`Origin: null`) on an early click.
 - **Claude Code CIMD grant:** a grant made with Claude Code's public metadata shows
   as verified "Claude Code"; do not count it as a real Claude Code client.
 

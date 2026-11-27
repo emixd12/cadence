@@ -9,7 +9,10 @@ import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import { ParentOccurrenceRow } from "@/components/timeline/ParentOccurrenceRow";
 import { DayNoteControl } from "@/components/timeline/DayNoteControl";
+import { PeriodDayControls } from "@/components/periods/PeriodControl";
+import type { PeriodActions, PeriodView } from "@/lib/types/period";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { PERIOD_NOTE_SHORTCUT_KEY } from "@cadence/core/resolvers/period.resolver";
 
 type TimelineGroupProps = Readonly<{
   section: TimelineDaySection;
@@ -22,6 +25,13 @@ type TimelineGroupProps = Readonly<{
   variant?: "feed" | "needsDecisionDialog";
   dayNoteAction?: OccurrenceFormAction;
   dayNote?: string;
+  /** Ticket 369: Period writes. Without them the header shows no Period control. */
+  periodActions?: PeriodActions;
+  /** The Periods that cover this day. */
+  periods?: readonly PeriodView[];
+  periodLabelSuggestions?: readonly string[];
+  /** Today in the account's timezone: "Add period" shows on that day only. */
+  todayLocalDate?: string;
   removeOpportunityAction?: OpportunityFormAction;
   /** Marks every sub-behavior in a routine's slot. Without it routines offer no bulk marking. */
   parentSlotStatusAction?: OccurrenceFormAction;
@@ -44,10 +54,14 @@ export function TimelineGroup({
   variant = "feed",
   dayNoteAction,
   dayNote = "",
+  periodActions,
+  periods,
+  periodLabelSuggestions,
+  todayLocalDate,
   removeOpportunityAction,
   parentSlotStatusAction,
 }: TimelineGroupProps) {
-  const dayNoteControl = dayNoteAction ? (
+  const dayNoteOnly = dayNoteAction ? (
     <DayNoteControl
       localDate={section.localDate}
       dayLabel={section.label}
@@ -56,6 +70,20 @@ export function TimelineGroup({
       shortcuts={shortcutsByBehavior[DAY_NOTE_SHORTCUT_POOL_ID]}
     />
   ) : null;
+  // Period chips sit under the date; on today "Add period" sits beside the day note.
+  const dayNoteControl = periodActions && todayLocalDate ? (
+    <PeriodDayControls
+      localDate={section.localDate}
+      dayLabel={section.label}
+      periods={periods}
+      today={todayLocalDate}
+      labelSuggestions={periodLabelSuggestions}
+      noteShortcuts={shortcutsByBehavior[PERIOD_NOTE_SHORTCUT_KEY]}
+      actions={periodActions}
+    >
+      {dayNoteOnly}
+    </PeriodDayControls>
+  ) : dayNoteOnly;
   const isEmpty = section.occurrenceGroups.length === 0 && section.parentGroups.length === 0;
   // Older views without `rows` keep their standalone stacks.
   const rows: TimelineDaySection["rows"] = section.rows.length > 0 ? section.rows

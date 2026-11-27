@@ -36,7 +36,10 @@ import type {
 import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
 import { travelWeatherStateText } from "./TravelWeather";
 import { DayNoteControl } from "@/components/timeline/DayNoteControl";
+import { PeriodDayControls } from "@/components/periods/PeriodControl";
+import type { PeriodActions, PeriodView } from "@/lib/types/period";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
+import { PERIOD_NOTE_SHORTCUT_KEY } from "@cadence/core/resolvers/period.resolver";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
@@ -132,6 +135,12 @@ type DayProgressTimelineProps = Readonly<{
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
   /** Saves the one note for a whole day; omitted where day notes are unavailable. */
   dayNoteAction?: OccurrenceFormAction;
+  /**
+   * Ticket 369: save, End today and Remove for Periods. With them, day headers show
+   * `timeline.periodsByDate` as chips and today offers "Add period". Omitted where
+   * Periods are unavailable; then no Period control renders.
+   */
+  periodActions?: PeriodActions;
   onDayChange?: () => void;
   onOpenExternal?: (url: string) => void | Promise<void>;
   liveCalendar?: boolean;
@@ -201,6 +210,7 @@ export function DayProgressTimeline({
   resetTimeTrackingAction,
   shortcutsByBehavior = {},
   dayNoteAction,
+  periodActions,
   onDayChange,
   onOpenExternal,
   liveCalendar = false,
@@ -604,6 +614,10 @@ export function DayProgressTimeline({
         shortcutsByBehavior={shortcutsByBehavior}
         dayNoteAction={dayNoteAction}
         dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
+        periodActions={periodActions}
+        periods={timeline.periodsByDate?.[section.localDate]}
+        periodLabelSuggestions={timeline.periodLabelSuggestions}
+        todayLocalDate={timeline.todayLocalDate}
         onMeasure={measureDays}
         registerMeasurement={registerMeasurement}
         onPreview={openPreview}
@@ -687,6 +701,9 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   onPreview: (ids: string[], launcher: HTMLElement) => void;
   onRestoreAllDay: () => void;
   dayNote: string;
+  periods?: readonly PeriodView[];
+  periodLabelSuggestions?: readonly string[];
+  todayLocalDate: string;
   nextTrip: DayProgressNextTripInput | null;
   opportunityBasket?: React.ReactNode;
   parentSlotStatusAction?: OccurrenceFormAction;
@@ -747,6 +764,10 @@ function DayProgressDay({
   shortcutsByBehavior,
   dayNoteAction,
   dayNote,
+  periodActions,
+  periods,
+  periodLabelSuggestions,
+  todayLocalDate,
   removeOpportunityAction,
   opportunityBasket = null,
   parentSlotStatusAction,
@@ -891,13 +912,23 @@ function DayProgressDay({
               {visibleAllDay.length && visibleAllDay.length < allDay.length ? <button type="button" className="min-h-11 text-xs underline" onClick={onRestoreAllDay}>Restore ({allDay.length - visibleAllDay.length})</button> : null}
             </aside> : null}
           </div>
-          {dayNoteAction ? <DayNoteControl
+          <PeriodDayControls
             localDate={section.localDate}
             dayLabel={section.label}
-            note={dayNote}
-            action={dayNoteAction}
-            shortcuts={shortcutsByBehavior?.[DAY_NOTE_SHORTCUT_POOL_ID]}
-          /> : null}
+            periods={periods}
+            today={todayLocalDate}
+            labelSuggestions={periodLabelSuggestions}
+            noteShortcuts={shortcutsByBehavior?.[PERIOD_NOTE_SHORTCUT_KEY]}
+            actions={periodActions}
+          >
+            {dayNoteAction ? <DayNoteControl
+              localDate={section.localDate}
+              dayLabel={section.label}
+              note={dayNote}
+              action={dayNoteAction}
+              shortcuts={shortcutsByBehavior?.[DAY_NOTE_SHORTCUT_POOL_ID]}
+            /> : null}
+          </PeriodDayControls>
           {opportunityBasket}
         </div>
       </header>

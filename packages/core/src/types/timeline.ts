@@ -4,6 +4,7 @@ import type { BehaviorDurationEstimate } from "./day-progress";
 import type { NoticeId } from "../notices";
 import type { ParentSlotRollup } from "./sub-behavior";
 import type { AlongsideRowView, PlanningPlaceCatalog } from "../resolvers/alongside.resolver";
+import type { PeriodView } from "./period";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
 
@@ -274,6 +275,12 @@ export type TimelineView = {
    * Keys only, never place text or coordinates.
    */
   planningPlaces?: PlanningPlaceCatalog;
+  /** Ticket 369: the Periods that cover at least one shown day, in display order. Absent where Periods are unavailable. */
+  periods?: PeriodView[];
+  /** Ticket 369: for each shown local date a Period covers, its Periods in display order. */
+  periodsByDate?: Record<string, PeriodView[]>;
+  /** Ticket 369: the person's past Period labels, newest first, offered when adding one. */
+  periodLabelSuggestions?: string[];
 };
 
 export type OccurrenceActionField = "occurrence_id" | "status" | "note";

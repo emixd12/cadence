@@ -80,9 +80,9 @@ describe("Supabase RLS smoke script helpers", () => {
       "occurrence_time_sessions",
       "periods",
     ]);
-    expect(smokeScript.PUBLIC_AUTHENTICATED_FUNCTIONS).toHaveLength(15);
+    expect(smokeScript.PUBLIC_AUTHENTICATED_FUNCTIONS).toHaveLength(17);
     expect(smokeScript.PUBLIC_AUTHENTICATED_FUNCTIONS).toEqual(
-      expect.arrayContaining(["create_period", "update_period", "delete_period"]),
+      expect.arrayContaining(["create_period", "create_period_if_absent", "update_period", "delete_period", "integration_apply_period_write"]),
     );
   });
 

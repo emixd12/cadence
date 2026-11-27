@@ -597,6 +597,46 @@ quiet "Saved" indicator that fades after ~2.5s. A conflict or error keeps the ed
 open with the draft preserved, shows the factual message, and offers Try again. No
 modal and no status controls.
 
+### Periods (Ticket 369)
+
+A Period is a labeled range of local dates for the whole account. It is annotation
+only. `components/periods/PeriodControl.tsx` draws it on web; Cadence for Mac passes no
+Period actions until Ticket 374, so nothing renders there.
+
+- **Chips.** Under the date of every Timeline day a Period covers, including Needs
+  decision day sections, each covering Period shows as a small square chip with its
+  label. A chip is a button named "Edit period {label}, {dates}". Choosing it opens
+  that Period's editor in place, under the chips; choosing it again closes the editor.
+- **Add period.** Only today's header has a quiet "Add period" disclosure, beside "Add
+  day note" and styled like it. An open disclosure takes the full width, so the other
+  wraps to its own line.
+- **Editor.** Label is the standard underlined text field, with a `datalist` of past
+  labels. First day and Last day are compact native date inputs side by side; they
+  stack on a narrow phone. An empty Last day reads "Still going. Set a last day when it
+  ends." beside it; a set one gets a "Clear" action, and its picker starts at the First
+  day. Note is the shared note field (`components/notes/NoteEditor.tsx`): the same
+  text area, and chips for lines that repeat across Period notes. For an existing
+  Period the note saves on its own, like an Occurrence note or a day note, and shows
+  the same saving and saved notices; Save stores the label and days, and Close closes
+  the editor. A new Period has nothing to save into yet, so Save sends all four fields
+  and the second action is Cancel. An existing Period also gets "End today", only when
+  the Period resolver allows it, and "Remove". Remove swaps to "Remove this period" and
+  "Keep" in place; the second choice removes. No modal, no date picker of our own, and
+  no wording that suggests an undo. Period note chips are worked out on each read and
+  not stored, so they cannot be kept, edited or dismissed, and Settings does not list
+  them; the account's Note shortcuts switch turns them off with the rest.
+- **Outcomes.** "Period saved.", "Period ended today." and "Period removed." show as
+  outcome notices beside the control after the form closes. A broken rule shows the
+  resolver's sentence under the form and keeps the draft. A stale write shows the
+  `period.conflict` notice and reloads the form with the latest version.
+- **Copy.** Nothing here names a status, a streak or a reason. A Period never reads as
+  a pause.
+
+On Behaviors, a "Periods" section sits below Category counts and above the archived
+disclosure. It lists every Period, newest first: label, dates, the first line of the
+note and an "Edit" text action that opens the same editor in the row. The section is
+hidden when there is no Period.
+
 ### Opportunity Basket (Behaviors of Opportunity)
 
 Under today's date, after the day note control, a quiet underlined text action reads
@@ -973,6 +1013,12 @@ Overall adherence appears near the top of the Behaviors screen with compact
 7 / 30 / 90 day underlined text-action range controls directly above the
 overall calendar inside that same area. The overall calendar remains passive;
 selecting days for correction starts from an individual behavior row.
+
+When a Period covers a day in the selected range, one muted line under the status
+counts reads, for example, "Outside periods: 85% (17 of 20). In periods: 20% (1 of
+5)." (Ticket 369). Each rate is Completed over Completed plus Not Completed; a side
+with nothing resolved reads "nothing marked". The analytics resolver writes the line.
+No other number changes, and the line is absent when no Period overlaps the range.
 
 Show active behaviors first as compact unboxed rows.
 
@@ -1612,6 +1658,76 @@ Disconnect has an app-specific accessible name and announces success or failure.
 A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
+
+## Cadence day view in an AI client (Ticket 377)
+
+The "Cadence day" view is one HTML file that Cadence's MCP server serves at
+`ui://cadence/day/v1.html` and an AI client draws in a sandboxed frame (MCP Apps, D36).
+Source: `packages/mcp-views`. The server reads the built file from the generated module
+`lib/mcp/apps/day-view-html.ts`. It is behind `CADENCE_MCP_APPS`, off in production.
+Contract: `docs/qa/2026-11-26-mcp-apps-spike.md`, "Frozen `show_day` contract".
+
+What it shows, top to bottom:
+
+- "Today" with the date under it, or the date alone for another day. The date comes from
+  the server's `local_date`.
+- The day note, read-only, under the label "Day note". Absent when there is none.
+- Needs decision as one line of text: "4 earlier items need a decision", "1 earlier item
+  needs a decision", or "More than 100 earlier items need a decision" when the server says
+  more exist. No line at zero. It never expands and has no control.
+- "Reconnect to allow changes" when the grant has no write scope.
+- One alert line when a change was refused.
+- The day's rows in the server's order, or "Nothing is scheduled for this day."
+
+A row shows the time, the Behavior title and, below them in small grey text, what applies
+of: the status when the row is Completed or Not Completed; "From Hevy" for a connector
+completion; "Added", "Added from Daily Brief", "Added in Chat" or "Added by a connected app"
+for a row whose origin is opportunity; and "Alongside" only when `alongside` is `true`.
+A moved item shows the time it sits at today. A saved note shows as text under the row.
+
+Each row has Completed, Not Completed and Note. The current status is a filled button with
+`aria-pressed`. Clicking it again returns the row to Unresolved. A connector completion
+uses the same buttons; the view never presents it as the person's mark.
+
+A parent Behavior slot is one row: a disclosure triangle, the time, the title and the
+server's progress ("1/3"), or the status once every step shares it. It starts closed.
+Completed and Not Completed mark the whole slot. Open, it lists each step once as an
+ordinary row, indented. A step never appears outside its slot.
+
+Note opens one inline editor under the row. Opening another closes the first. The field
+grows with its text. Save note and Cancel sit below it. There is no modal and nothing
+scrolls inside the view.
+
+Rules the view keeps:
+
+- It computes nothing. Order, grouping, progress, statuses and the count come from
+  `show_day`. Times are formatted from the server's values in the server's timezone.
+- A click is the person's confirmation. Each write carries the displayed precondition and
+  an idempotency key. After a write the view reads the day again.
+- Conflict: the view reads the day again and shows "Not changed. This changed somewhere
+  else. Check it and try again." It sends nothing again without a new click. After a
+  refused note save the draft stays open and the note saved now shows above it.
+- A note save sends the revision read when the editor opened. If the day was re-read since
+  and the saved note still reads the same, it sends the newer revision. If the saved note
+  changed, the save is refused as a conflict. The field is read-only while a save is sent.
+- Rate limit: "Not changed. Too many changes for now. Try again in 8 seconds." The controls
+  stay off for that time.
+- No write scope, or a write refused for scope: the reconnect line replaces every write
+  control. Reading and opening slots still work.
+- After a successful write the AI client's model receives one line, such as "Morning walk:
+  Completed (set by the person in the Cadence day view)". A note save sends "note saved"
+  and never the note's text.
+- Titles, notes and the day note are drawn as text. The view makes no network request,
+  loads no file and stores nothing in the browser.
+- No Periods, tracked time, move controls, Calendar or travel data, and no day-note
+  editing (Ticket 382).
+
+Layout: phone width first. Controls sit under the row's text. From 36rem of container
+width they sit beside it. Every control is at least 44px high and wide. Colors, type and
+radius follow the AI client's style variables and its light or dark theme, with Cadence's
+tokens as fallbacks (`DESIGN.md`, "Cadence day view").
+
+Bench: `/design-system?preview=mcp-day-view&state=normal|empty|read-only|conflict|rate-limit|rejected|connector|parent|opportunity|alongside|hostile|many-earlier|loading|unavailable&theme=light|dark&host=cadence|claude&layout=phone|desktop`.
 
 ## Daily Brief source choice (Ticket 306)
 

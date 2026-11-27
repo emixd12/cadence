@@ -14,8 +14,9 @@ import fixture from "./fixtures/advisor-day-context.valid.json";
 // prompt (brief-opening.ts) in place of the ~38 KB layered prompt. The layered prompt still
 // serves the workbench and the paused device path; its hash below changed once more because
 // "Suggestions never change the record." left briefing-references.json (Emi, Phase 3).
-const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), prepare: vi.fn(), current: vi.fn(), config: vi.fn(), plan: vi.fn(), proposals: vi.fn(), dayNotes: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), begin: vi.fn(), finish: vi.fn(), saveBrief: vi.fn(), prepare: vi.fn(), current: vi.fn(), config: vi.fn(), plan: vi.fn(), proposals: vi.fn(), dayNotes: vi.fn(), periods: vi.fn() }));
 vi.mock("@/lib/db/dayNotes.repo", () => ({ listDayNotesInRange: mocks.dayNotes }));
+vi.mock("@/lib/db/periods.repo", () => ({ listPeriodsOrNone: mocks.periods }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: vi.fn(), beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
   saveDailyBrief: mocks.saveBrief }));
 vi.mock("@/lib/services/brief-moves.service", () => ({ planBriefMoveLines: mocks.plan, saveBriefProposals: mocks.proposals, readBriefMoves: vi.fn(), readOpenBriefConflicts: vi.fn(async () => []), ensureBehaviorEstimates: vi.fn() }));
@@ -36,6 +37,7 @@ import { generateDailyBrief } from "@/lib/services/daily-brief-consumer";
 import { DAILY_BRIEF_MODEL } from "@/lib/services/daily-brief-model";
 import {
   BRIEF_OPENING_DAY_NOTES_INSTRUCTIONS, BRIEF_OPENING_INSTRUCTIONS, BRIEF_OPENING_PAIRING_INSTRUCTIONS, BRIEF_OPENING_PAIRING_PROMPT_REVISION,
+  BRIEF_OPENING_PERIODS_INSTRUCTIONS,
   BRIEF_OPENING_PROMPT_REVISION, BRIEF_OPENING_SCHEMA, BRIEF_OPENING_SCHEMA_NAME, briefOpeningInstructions, briefOpeningPromptRevision,
 } from "@/lib/services/brief-opening";
 import { responsesReply } from "./helpers/model-responses";
@@ -64,7 +66,12 @@ beforeEach(() => {
   mocks.plan.mockResolvedValue({ candidates: [candidate], calendar: "current" });
   mocks.proposals.mockImplementation(async (_client, value) => value.lines.map(({ key: _key, ...line }: typeof candidate) => ({ ...line, proposalId: "p-1", status: "proposed", moveId: null })));
   mocks.dayNotes.mockResolvedValue([]);
+  mocks.periods.mockResolvedValue([]);
 });
+
+/** A saved Period that covers today, as the repository returns it. Its note is never sent. */
+const sickPeriod = { id: "period-1", user_id: "owner", label: "Sick", start_on: "2026-10-30", end_on: null, note: "Flu, day three.", revision: 1,
+  created_at: "2026-10-30T12:00:00Z", updated_at: "2026-10-30T12:00:00Z" };
 
 /** A saved day note on today's local date, as the repository returns it. */
 const todayNote = { local_date: fixture.localDate, note: "Head cold, slept four hours." };
@@ -112,6 +119,10 @@ describe("pinned production generation", () => {
     mocks.dayNotes.mockResolvedValue([todayNote]);
     expect(await productionBodies()).toHaveLength(0);
     expect(mocks.dayNotes).not.toHaveBeenCalled();
+    // Ticket 371: nor with a Period covering today; a quiet day reads no Periods.
+    mocks.periods.mockResolvedValue([sickPeriod]);
+    expect(await productionBodies()).toHaveLength(0);
+    expect(mocks.periods).not.toHaveBeenCalled();
   });
 
   // Ticket 367 (D35). The hash is the request the service sent before day notes existed
@@ -122,6 +133,12 @@ describe("pinned production generation", () => {
     expect(off).toHaveLength(1);
     expect(sha(off[0]!)).toBe(pinned);
     expect(mocks.dayNotes).not.toHaveBeenCalled();
+    // Ticket 371: Periods are read for every brief that calls the model; none saved, or a failed read, leaves these bytes.
+    expect(mocks.periods).toHaveBeenCalledWith(caller.client, "owner", { from: "2026-10-25", to: "2026-11-01" });
+    mocks.periods.mockRejectedValueOnce(new Error("Periods could not be loaded."));
+    expect((await productionBodies())[0]).toBe(off[0]);
+    mocks.periods.mockResolvedValueOnce([{ ...sickPeriod, start_on: "2026-11-02" }, { ...sickPeriod, id: "period-2", start_on: "2026-10-01", end_on: "2026-10-24" }]);
+    expect((await productionBodies())[0]).toBe(off[0]);
     // Notes on with nothing written on the three days: the same request, byte for byte.
     mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, includeNotes: true }));
     const on = await productionBodies();
@@ -161,6 +178,56 @@ describe("pinned production generation", () => {
     const { dayNotes: _dayNotes, ...rest } = facts;
     expect(rest).toEqual(userFacts(without));
     expect({ ...body, input: null }).toEqual({ ...without, input: null });
+  });
+
+  // Ticket 371 (D35). Periods are the third optional block, after pairing and day notes, so every earlier pin holds.
+  it("pins the Period variant and its combinations: instructions, revisions and where the Periods go", async () => {
+    expect(briefOpeningInstructions(["periods"])).toBe(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_PERIODS_INSTRUCTIONS}`);
+    expect(sha(BRIEF_OPENING_PERIODS_INSTRUCTIONS)).toBe("98c13f5ca5fc47f06b9bf4c1ee847b47a208d0a9463aba19e345f171b2cf34c3");
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["periods"]))).toBe("ea754762965beb29");
+    expect(briefOpeningInstructions(["periods", "dayNotes"])).toBe(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_DAY_NOTES_INSTRUCTIONS}\n${BRIEF_OPENING_PERIODS_INSTRUCTIONS}`);
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["dayNotes", "periods"]))).toBe("d1b85ea6ba52bca1");
+    expect(briefOpeningInstructions(["periods", "pairing"])).toBe(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_PAIRING_INSTRUCTIONS}\n${BRIEF_OPENING_PERIODS_INSTRUCTIONS}`);
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["pairing", "periods"]))).toBe("8b2e3e4ef7db5238");
+    expect(briefOpeningInstructions(["periods", "dayNotes", "pairing"]))
+      .toBe(`${BRIEF_OPENING_INSTRUCTIONS}\n${BRIEF_OPENING_PAIRING_INSTRUCTIONS}\n${BRIEF_OPENING_DAY_NOTES_INSTRUCTIONS}\n${BRIEF_OPENING_PERIODS_INSTRUCTIONS}`);
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["pairing", "dayNotes", "periods"]))).toBe("33fc8edf0678f381");
+    // The earlier variants keep their revisions.
+    expect(briefOpeningPromptRevision(briefOpeningInstructions())).toBe("682cac22099e71e0");
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["dayNotes"]))).toBe("c95ee3847b059ff8");
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["pairing", "dayNotes"]))).toBe("8b106a8dc5ea83bb");
+    expect(briefOpeningPromptRevision(briefOpeningInstructions(["pairing"]))).toBe("6f3ca1a4796ef317");
+
+    const without = JSON.parse((await productionBodies())[0]!);
+    mocks.periods.mockResolvedValue([sickPeriod, { ...sickPeriod, id: "period-2", label: "Work trip", start_on: "2026-10-20", end_on: "2026-10-28" }]);
+    const bodies = await productionBodies();
+    expect(bodies).toHaveLength(1);
+    expect(sha(bodies[0]!)).toBe("d475e131d87723d2fc34bb7f4f33cb2e136d3f1e828bd54adaae2846a4494590");
+    const body = JSON.parse(bodies[0]!);
+    const role = (value: typeof body, name: string) => value.input.find((item: { role: string }) => item.role === name).content;
+    expect(role(body, "developer")).toBe(briefOpeningInstructions(["periods"]));
+    const userFacts = (value: typeof body) => JSON.parse(role(value, "user")[0].text as string);
+    const facts = userFacts(body);
+    expect(Object.keys(facts)).toEqual(["today", "now", "lines", "conflicts", "day", "periods", "recentPeriods"]);
+    expect(facts.periods).toEqual([{ label: "Sick", since: "Friday, October 30", until: null }]);
+    expect(facts.recentPeriods).toEqual([{ label: "Work trip", since: "Tuesday, October 20", until: "Wednesday, October 28" }]);
+    expect(bodies[0]).not.toContain("Flu, day three.");
+    // Nothing else in the request changes.
+    const { periods: _periods, recentPeriods: _recentPeriods, ...rest } = facts;
+    expect(rest).toEqual(userFacts(without));
+    expect({ ...body, input: null }).toEqual({ ...without, input: null });
+
+    // With day notes too: day notes first, then Periods, and the day-note-only request keeps its bytes.
+    mocks.read.mockResolvedValue(dailyBriefPreferences({ revision: 1, includeNotes: true }));
+    mocks.dayNotes.mockResolvedValue([todayNote]);
+    const both = JSON.parse((await productionBodies())[0]!);
+    expect(role(both, "developer")).toBe(briefOpeningInstructions(["dayNotes", "periods"]));
+    expect(Object.keys(userFacts(both))).toEqual(["today", "now", "lines", "conflicts", "day", "dayNotes", "periods", "recentPeriods"]);
+    mocks.periods.mockResolvedValue([]);
+    // Pinned at Ticket 371 with no Period in the facts: the day-note request of Ticket 367.
+    const notesOnly = await productionBodies();
+    expect(sha(notesOnly[0]!)).toBe("1cb37b83b58af564a62741770ad9d6b75f3dbd13af5fa8273f8b6a3bf82a2d2b");
+    expect(JSON.parse(notesOnly[0]!).input.find((item: { role: string }) => item.role === "developer").content).toBe(briefOpeningInstructions(["dayNotes"]));
   });
 
   it("builds the same instructions in the consumer for every recipe, fixture and flag", async () => {

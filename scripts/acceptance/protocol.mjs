@@ -35,20 +35,30 @@ import { qaPublishableKey } from './qa-config.mjs';
 // Mirrors INTEGRATION_OPERATIONS in packages/core/src/integration/operations.ts
 // (tools/list order); tests/acceptance-protocol.test.mjs keeps them equal.
 /** The contract that adds the person's alongside setting (Ticket 364). */
-export const ALONGSIDE_CONTRACT_VERSION = '1.8.0';
+export const ALONGSIDE_CONTRACT_VERSION = '1.9.0';
 export const REGISTRY_TOOLS = Object.freeze([
   'get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences',
-  'get_occurrence', 'list_day_notes', 'get_adherence_summary', 'search', 'fetch',
+  'get_occurrence', 'list_day_notes', 'list_periods', 'get_adherence_summary', 'search', 'fetch',
   'set_occurrence_status', 'set_parent_occurrence_status', 'update_occurrence_note', 'move_occurrence_for_day',
-  'revert_occurrence_move', 'update_day_note', 'add_opportunity_occurrence', 'remove_opportunity_occurrence',
+  'revert_occurrence_move', 'update_day_note', 'create_period', 'update_period', 'end_period',
+  'add_opportunity_occurrence', 'remove_opportunity_occurrence',
   'create_behavior', 'update_behavior', 'archive_behavior', 'restore_behavior',
   'end_behavior', 'pause_behavior', 'resume_behavior',
 ]);
+// Ticket 376: tools the MCP transport lists after the registry while CADENCE_MCP_APPS is
+// on. They are outside the contract registry. A server reports the flag by declaring the
+// MCP Apps extension in its capabilities; tests/acceptance-protocol.test.mjs keeps these
+// names equal to lib/mcp.
+export const MCP_APPS_EXTENSION = 'io.modelcontextprotocol/ui';
+export const TRANSPORT_TOOLS = Object.freeze(['show_day']);
+/** The exact tools/list inventory: the registry, plus the transport tools only when the server reports MCP Apps. */
+export const expectedTools = (reportsApps) => (reportsApps === true ? [...REGISTRY_TOOLS, ...TRANSPORT_TOOLS] : [...REGISTRY_TOOLS]);
 export const WRITE_SCOPE = Object.freeze({
   set_occurrence_status: 'cadence.occurrences.write', set_parent_occurrence_status: 'cadence.occurrences.write',
   update_occurrence_note: 'cadence.occurrences.write',
   move_occurrence_for_day: 'cadence.occurrences.write', revert_occurrence_move: 'cadence.occurrences.write',
   update_day_note: 'cadence.occurrences.write',
+  create_period: 'cadence.occurrences.write', update_period: 'cadence.occurrences.write', end_period: 'cadence.occurrences.write',
   add_opportunity_occurrence: 'cadence.occurrences.write', remove_opportunity_occurrence: 'cadence.occurrences.write',
   create_behavior: 'cadence.behaviors.write', update_behavior: 'cadence.behaviors.write',
   archive_behavior: 'cadence.behaviors.write', restore_behavior: 'cadence.behaviors.write',
@@ -92,6 +102,8 @@ export async function createLiveProtocol({ issuer, fetchImpl = fetch }) {
     }));
     return {
       listTools: async () => (await client.listTools()).tools.map((tool) => tool.name),
+      // True only when the server declares the MCP Apps extension (CADENCE_MCP_APPS on, Ticket 376).
+      reportsApps: () => Boolean(client.getServerCapabilities()?.extensions?.[MCP_APPS_EXTENSION]),
       call: async (name, args = {}) => {
         try {
           const result = await client.callTool({ name, arguments: args });
@@ -277,7 +289,7 @@ export async function runProtocolSuite({
       behavior_id: created.id, expected_revision: created.revision, title: `${behaviorTitle} updated`, idempotency_key: key('update'),
     });
     check('update-applied', updated?.changed === true && updated?.behavior?.title === `${behaviorTitle} updated`);
-    // Contract 1.8.0 (Ticket 364) is served only while CADENCE_ALONGSIDE is on; 1.7.0 never names the field.
+    // Contract 1.9.0 (Ticket 364) is served only while CADENCE_ALONGSIDE is on; 1.8.0 never names the field.
     if (context?.contract_version === ALONGSIDE_CONTRACT_VERSION) {
       check('alongside-unanswered-on-create', created.alongside === null, String(created.alongside));
       const answered = await expectOk(session, check, 'update_behavior', {
@@ -287,7 +299,7 @@ export async function runProtocolSuite({
       const read = await expectOk(session, check, 'get_behavior', { behavior_id: created.id }, 'get-alongside');
       check('alongside-read-back', read?.behavior?.alongside === true);
     } else {
-      check('alongside-absent-before-1.8.0', created && !Object.hasOwn(created, 'alongside'));
+      check('alongside-absent-before-1.9.0', created && !Object.hasOwn(created, 'alongside'));
     }
     const archived = await expectOk(session, check, 'archive_behavior', { behavior_id: created.id, idempotency_key: key('archive-1') });
     check('archive-applied', archived?.behavior?.state === 'archived');
@@ -315,7 +327,9 @@ export async function runProtocolSuite({
   const read = ready ? await scenario('read-a', async (ctx) => withGrant(ctx, { label: 'read-a', slot: 'A', grant: 'read' }, async ({ session, tokens }) => {
     const { check } = ctx;
     const names = await session.listTools();
-    check('tools-list-equals-registry', JSON.stringify(names) === JSON.stringify(REGISTRY_TOOLS), `count=${names.length}`);
+    // Strict either way: with MCP Apps off any extra tool fails; with it on, exactly the transport tools follow the registry.
+    const apps = session.reportsApps?.() === true;
+    check('tools-list-equals-registry', JSON.stringify(names) === JSON.stringify(expectedTools(apps)), `count=${names.length} apps=${apps ? 'on' : 'off'}`);
     const context = await expectOk(session, check, 'get_account_context', {});
     check('granted-scopes', sameSet(context?.granted_scopes ?? [], [READ_SCOPE]));
     const list = await expectOk(session, check, 'list_behaviors', {});
@@ -328,6 +342,8 @@ export async function runProtocolSuite({
     check('occurrences-have-occurrence', (occurrences?.occurrences ?? []).some((o) => o.id === occurrenceId));
     await expectOk(session, check, 'get_occurrence', { occurrence_id: occurrenceId });
     await expectOk(session, check, 'list_day_notes', { start_local_date: today, end_local_date: today });
+    // Periods are read only: no tool removes one, so this suite never creates a Period in the test account.
+    await expectOk(session, check, 'list_periods', { start_local_date: today, end_local_date: today });
     await expectOk(session, check, 'get_adherence_summary', { start_local_date: today, end_local_date: today });
     const found = await expectOk(session, check, 'search', { query: behaviorTitle });
     check('search-finds-behavior', (found?.results ?? []).some((r) => r.id === `behavior:${behaviorId}`));
@@ -339,6 +355,9 @@ export async function runProtocolSuite({
       move_occurrence_for_day: { occurrence_id: occurrenceId, start_time: '23:55', expected_revision: 'r1' },
       revert_occurrence_move: { occurrence_id: occurrenceId, expected_revision: 'r1' },
       update_day_note: { local_date: today, note: SAMPLE_NOTE },
+      create_period: { label: 'Review sample period', start_local_date: today },
+      update_period: { period_id: behaviorId, expected_revision: 'r1', label: 'Review sample period' },
+      end_period: { period_id: behaviorId, expected_revision: 'r1' },
       add_opportunity_occurrence: { behavior_id: behaviorId, start_time: '23:50' },
       remove_opportunity_occurrence: { occurrence_id: occurrenceId },
       create_behavior: { title: `${behaviorTitle} denied`, schedules },

@@ -3,7 +3,7 @@
   "schema_version": "1.4.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-11-25",
+  "updated": "2026-11-26",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -133,6 +133,14 @@
       "kind": "authenticated",
       "routes": [
         "/oauth/consent"
+      ]
+    },
+    {
+      "id": "mcp_day_view",
+      "label": "Cadence day view in an AI client",
+      "kind": "authenticated",
+      "routes": [
+        "ui://cadence/day/v1.html"
       ]
     }
   ],
@@ -1375,11 +1383,13 @@
     {
       "path": "components/notes/NoteEditor.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 18,
+      "interaction_marker_count": 19,
       "interaction_ids": [
         "INT-TIMELINE-008",
         "INT-TIMELINE-011",
-        "INT-TIMELINE-012"
+        "INT-TIMELINE-012",
+        "INT-PERIOD-001",
+        "INT-PERIOD-002"
       ]
     },
     {
@@ -1388,6 +1398,28 @@
       "interaction_marker_count": 3,
       "interaction_ids": [
         "INT-TIMELINE-012"
+      ]
+    },
+    {
+      "path": "components/periods/PeriodControl.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-PERIOD-001",
+        "INT-PERIOD-002",
+        "INT-PERIOD-003",
+        "INT-PERIOD-004"
+      ]
+    },
+    {
+      "path": "components/periods/PeriodEditor.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 26,
+      "interaction_ids": [
+        "INT-PERIOD-001",
+        "INT-PERIOD-002",
+        "INT-PERIOD-003",
+        "INT-PERIOD-004"
       ]
     },
     {
@@ -1555,6 +1587,24 @@
       "interaction_ids": [
         "INT-TIMELINE-027"
       ]
+    },
+    {
+      "path": "app/design-system/McpDayViewBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 10,
+      "interaction_ids": [],
+      "reason": "Ticket 377 development-only bench for the Cadence day view: the shipped bundle in a sandboxed frame with a mock host and fixture days. Its links and buttons pick a fixture, theme and width. No account or provider access."
+    },
+    {
+      "path": "packages/mcp-views/src/DayView.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 13,
+      "interaction_ids": [
+        "INT-DAYVIEW-001",
+        "INT-DAYVIEW-002",
+        "INT-DAYVIEW-003",
+        "INT-DAYVIEW-004"
+      ]
     }
   ],
   "features": [
@@ -1659,6 +1709,12 @@
       "name": "Alongside Behaviors",
       "meaning": "A Behavior setting for things done during other things at the same place, with Cadence's guess shown as a guess until the person answers (D33).",
       "spec": "docs/DECISIONS.md#2026-11-25-alongside-behaviors-and-the-guessed-where-d33"
+    },
+    {
+      "id": "periods",
+      "name": "Periods",
+      "meaning": "Labeled ranges of days the person declares for the whole account, shown as chips on Timeline days and listed on Behaviors. Annotation only: a Period never changes a status, adherence, a reminder or a schedule (D35).",
+      "spec": "docs/PRODUCT_SPEC.md#periods-planned-tickets-368374"
     },
     {
       "id": "review-and-adherence",
@@ -1779,6 +1835,12 @@
       "name": "Mac updates",
       "meaning": "Reviewing, downloading, installing and restarting into a Cadence for Mac update.",
       "spec": "docs/DESKTOP_RELEASE.md"
+    },
+    {
+      "id": "cadence-day-view",
+      "name": "Cadence day view",
+      "meaning": "One day of Occurrences shown inside an AI client that renders MCP Apps views, with Completed, Not Completed and Note on each row.",
+      "spec": "docs/UI_SPEC.md#cadence-day-view-in-an-ai-client-ticket-377"
     }
   ],
   "interactions": [
@@ -23014,7 +23076,7 @@
       "journeys": [
         "J29"
       ],
-      "intent": "Approve or decline every pending change of one question at once (Behavior changes and any second write).",
+      "intent": "Approve or decline every pending change of one question at once: Behavior changes, any second write, and every Period write (add, edit or end), which asks even as the first write.",
       "triggers": [
         {
           "kind": "activate",
@@ -23026,8 +23088,8 @@
         }
       ],
       "availability": "Chat page on web and on a linked Cadence for Mac (Phase 5C); live in production since November 20, 2026 (CHAT_PAGE_LIVE in lib/navigation.ts). Shown while a confirm is pending.",
-      "success_result": "Yes runs the listed changes and shows their outcome lines and any refusals under the question; No shows Not changed.",
-      "failure_result": "An expired confirm or a changed record changes nothing and says so. A failed request shows one red sentence.",
+      "success_result": "Yes runs the listed changes and shows their outcome lines and any refusals under the question; No shows Not changed. A Period line names the label and dates and never quotes the note. A Period write offers no Undo afterwards: chat has no tool that removes a Period, and an edit or an end keeps no earlier values.",
+      "failure_result": "An expired confirm or a changed record, including a Period whose revision moved after it was read, changes nothing and says so. A failed request shows one red sentence.",
       "effects": [
         "database_write",
         "network_request"
@@ -23036,14 +23098,18 @@
       "confirmation": "acknowledgement",
       "implementation": [
         "components/chat/ChatMessages.tsx",
-        "components/chat/ChatPage.tsx"
+        "components/chat/ChatPage.tsx",
+        "lib/services/chat/chat-tools.ts",
+        "lib/services/chat/chat-writes.ts",
+        "lib/services/chat/chat-confirm.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/chat-page.dom.test.tsx"
+          "tests/chat-page.dom.test.tsx",
+          "tests/chat-periods.test.ts"
         ],
-        "notes": "DOM check covers Yes listing what ran."
+        "notes": "DOM check covers Yes listing what ran. The Period test covers the Yes before a first Period write, the confirm lines, the expired Yes after the Period changed, the refusal after a Yes and the absent Undo."
       },
       "platforms": {
         "web": {
@@ -23264,6 +23330,838 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-001",
+      "name": "Add a Period",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Declare a labeled range of days for the whole account, with a first day, an optional last day and an optional note. A Period is annotation only and changes no status, adherence, reminder or schedule.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Add period disclosure under today's date, beside Add day note"
+        },
+        {
+          "kind": "input",
+          "control": "Label (with past labels offered), First day, Last day (with Clear) and the shared Note field with its shortcut chips"
+        },
+        {
+          "kind": "submit",
+          "control": "Save"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel (or Escape)"
+        }
+      ],
+      "availability": "Under today's date on the web Timeline. Other days have no add control. Hidden where no Period actions are passed.",
+      "success_result": "Stores the Period, closes the form, shows period.saved beside the control and refreshes the page; each covered Timeline day then shows the label as a chip.",
+      "failure_result": "A broken rule (no label, a label over 60 characters, an invalid day, a last day before the first day, a note over 2,000 characters, or 500 Periods already) shows its sentence under the form, keeps the draft and writes nothing.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/periods/PeriodControl.tsx#PeriodDayControls",
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "components/notes/NoteEditor.tsx#NoteField",
+        "app/(app)/timeline/actions.ts#savePeriodAction",
+        "lib/services/period.service.ts#createPeriodFromFormData",
+        "packages/core/src/services/period.service.ts#createPeriod",
+        "packages/core/src/resolvers/period.resolver.ts#resolvePeriodCreate",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_write",
+          "handler": "app/(app)/timeline/actions.ts#savePeriodAction",
+          "evidence": [
+            "createPeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts"
+        ],
+        "notes": "The DOM test covers the add form on today only, its default first day, past-label options, the note shortcut chips, Clear on the last day, the submitted fields, the saved notice and inline rule sentences; the action test covers the write, the notice and both revalidated paths."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#savePeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-002",
+      "name": "Edit a Period",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period",
+          "docs/user-guide/behaviors-and-review.md#review-periods-and-adherence-around-them"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline",
+        "behaviors"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07",
+        "J10"
+      ],
+      "intent": "Open a Period from its chip on a Timeline day, or from the Periods list on Behaviors, and change its label, days or note. The note saves on its own, as every note does; the label and days save with Save.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Period chip under a Timeline date, or Edit in the Periods list on Behaviors"
+        },
+        {
+          "kind": "input",
+          "control": "Label, First day and Last day (with Clear) fields; the shared auto-saving Note field with its shortcut chips"
+        },
+        {
+          "kind": "submit",
+          "control": "Save"
+        },
+        {
+          "kind": "activate",
+          "control": "Close (or Escape, or the chip or Edit again)"
+        }
+      ],
+      "availability": "On every Timeline day a Period covers, including Needs decision days, and for every Period in the Periods list on Behaviors. The list is hidden when there is no Period.",
+      "success_result": "Save stores the label and days against the revision the form read, closes the form, shows period.saved and refreshes the page. The note saves shortly after typing stops, when the field loses focus, or when a shortcut chip is used, shows the note-saved notice and keeps the form open with any label or day being edited.",
+      "failure_result": "A broken rule shows its sentence under the form and keeps the draft. A Period that changed elsewhere, or is gone, shows period.conflict, refreshes and fills the form with the latest version; nothing is overwritten. A note that changed elsewhere, or is too long, shows its sentence beside Try again under the note and keeps the text.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/periods/PeriodControl.tsx#PeriodDayControls",
+        "components/periods/PeriodControl.tsx#PeriodList",
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "components/behaviors/BehaviorList.tsx#BehaviorList",
+        "components/notes/NoteEditor.tsx#NoteEditor",
+        "app/(app)/timeline/actions.ts#savePeriodAction",
+        "app/(app)/timeline/actions.ts#savePeriodNoteAction",
+        "lib/services/period.service.ts#updatePeriodFromFormData",
+        "lib/services/period.service.ts#savePeriodNoteFromFormData",
+        "packages/core/src/services/period.service.ts#updatePeriod",
+        "packages/core/src/services/period.service.ts#savePeriodNote",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_write",
+          "handler": "app/(app)/timeline/actions.ts#savePeriodAction",
+          "evidence": [
+            "updatePeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts",
+          "tests/period-behaviors.dom.test.tsx"
+        ],
+        "notes": "The DOM test covers one chip per covering Period, the editor opening in place with the stored values, the submitted id and revision, the conflict notice and the reloaded form, the note saving on its own and the revision the next write names; the action test covers the compare-and-set update, the stale save and the note save."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#savePeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts",
+            "tests/period-behaviors.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-003",
+      "name": "End a Period today",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period",
+          "docs/user-guide/behaviors-and-review.md#review-periods-and-adherence-around-them"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline",
+        "behaviors"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07",
+        "J10"
+      ],
+      "intent": "Set an ongoing or still-running Period's last day to today in the account timezone.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "End today in a Period's editor"
+        }
+      ],
+      "availability": "In the editor of a Period whose first day is today or earlier and that is ongoing or ends after today. Absent for a Period that has not started or has already ended.",
+      "success_result": "Sets the last day to today, read on the server from the profile timezone, closes the form, shows period.ended and refreshes the page.",
+      "failure_result": "A Period that has not started, has already ended, or changed elsewhere is refused with its sentence or period.conflict under the form; nothing changes.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "app/(app)/timeline/actions.ts#endPeriodAction",
+        "lib/services/period.service.ts#endPeriodFromFormData",
+        "packages/core/src/services/period.service.ts#endPeriod",
+        "packages/core/src/resolvers/period.resolver.ts#resolvePeriodEndState",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_write",
+          "handler": "app/(app)/timeline/actions.ts#endPeriodAction",
+          "evidence": [
+            "endPeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts",
+          "tests/period-behaviors.dom.test.tsx"
+        ],
+        "notes": "The DOM test shows End today only where resolvePeriodEndState allows it and checks the submitted id and revision; the action test ends a Period on the account's local date and refuses an ended one."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#endPeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts",
+            "tests/period-behaviors.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-PERIOD-004",
+      "name": "Remove a Period",
+      "feature": "periods",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#add-edit-end-or-remove-a-period",
+          "docs/user-guide/behaviors-and-review.md#review-periods-and-adherence-around-them"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline",
+        "behaviors"
+      ],
+      "routes": [
+        "/timeline",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J07",
+        "J10"
+      ],
+      "intent": "Delete a Period and its note for good. Occurrences, statuses and Notes are untouched.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Remove in a Period's editor"
+        },
+        {
+          "kind": "submit",
+          "control": "Remove this period (the inline second step)"
+        },
+        {
+          "kind": "activate",
+          "control": "Keep"
+        }
+      ],
+      "availability": "In the editor of any Period, from a Timeline chip or the Periods list on Behaviors.",
+      "success_result": "Deletes the Period after the second choice, closes the form, shows period.removed and refreshes the page; its chips and list row go.",
+      "failure_result": "Keep backs out with nothing written. A Period that changed elsewhere, or is already gone, shows period.conflict and stays as it is.",
+      "effects": [
+        "database_delete",
+        "confirmation_gate",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/periods/PeriodEditor.tsx#PeriodEditor",
+        "app/(app)/timeline/actions.ts#deletePeriodAction",
+        "lib/services/period.service.ts#deletePeriodFromFormData",
+        "packages/core/src/services/period.service.ts#deletePeriod",
+        "lib/db/periods.repo.ts"
+      ],
+      "effect_checks": [
+        {
+          "effect": "database_delete",
+          "handler": "app/(app)/timeline/actions.ts#deletePeriodAction",
+          "evidence": [
+            "deletePeriodFromFormData(formData)"
+          ]
+        },
+        {
+          "effect": "confirmation_gate",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "setConfirmingRemove(true)",
+            "Remove this period"
+          ]
+        },
+        {
+          "effect": "ui_state",
+          "handler": "components/periods/PeriodEditor.tsx#PeriodEditor",
+          "evidence": [
+            "useActionState(run",
+            "useRefresh()",
+            "refresh()"
+          ]
+        }
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/period-control.dom.test.tsx",
+          "tests/period-actions.test.ts",
+          "tests/period.resolver.test.ts",
+          "tests/period-web.service.test.ts"
+        ],
+        "notes": "The DOM test checks that Remove alone sends nothing, that Keep backs out, that the second choice sends the id and revision, and that no modal or undo wording appears; the action test covers the delete and the stale refusal."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/periods/PeriodControl.tsx#PeriodDayControls",
+            "components/periods/PeriodEditor.tsx#PeriodEditor",
+            "app/(app)/timeline/actions.ts#deletePeriodAction"
+          ],
+          "evidence": [
+            "tests/period-control.dom.test.tsx",
+            "tests/period-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "planned",
+          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
+          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not render authenticated Timeline or Behaviors controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile remains deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-001",
+      "name": "Mark an Occurrence from the Cadence day view",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Mark one of the day's Occurrences Completed or Not Completed, or return it to Unresolved, without leaving the AI client.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Completed"
+        },
+        {
+          "kind": "activate",
+          "control": "Not Completed"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36). The grant includes cadence.occurrences.write.",
+      "success_result": "Calls set_occurrence_status with the displayed status as expected_status and a new idempotency key. Clicking the status a row already has returns it to Unresolved. The view then reads the day again and sends the AI client one line naming the Behavior and the new status.",
+      "failure_result": "A conflict reloads the day and shows \"Not changed. This changed somewhere else. Check it and try again.\"; nothing is sent again without a new click. A rate limit shows the wait and holds the controls until it ends. A rejected call reloads the day and applies its scopes. Other failures show \"Not changed. Cadence could not save that. Try again.\"",
+      "effects": [
+        "occurrence_mutation",
+        "network_request",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-002",
+      "name": "Mark a parent Behavior slot from the Cadence day view",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Mark every step of one routine slot Completed or Not Completed in one change, or open the slot to see its steps.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Completed (slot)"
+        },
+        {
+          "kind": "activate",
+          "control": "Not Completed (slot)"
+        },
+        {
+          "kind": "activate",
+          "control": "Show steps / Hide steps"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36). The grant includes cadence.occurrences.write.",
+      "success_result": "Calls set_parent_occurrence_status with the slot's Occurrence ids and each displayed step's status as expected_statuses. The slot then shows the server's derived progress. Opening the slot shows each step once, with its own controls.",
+      "failure_result": "A conflict reloads the day and shows \"Not changed. This changed somewhere else. Check it and try again.\"; nothing is sent again without a new click. A rate limit shows the wait and holds the controls until it ends. A rejected call reloads the day and applies its scopes. Other failures show \"Not changed. Cadence could not save that. Try again.\"",
+      "effects": [
+        "occurrence_mutation",
+        "network_request",
+        "disclosure",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-003",
+      "name": "Save an Occurrence note from the Cadence day view",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Add, change or clear the note on one of the day's Occurrences.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Note"
+        },
+        {
+          "kind": "input",
+          "control": "Note text"
+        },
+        {
+          "kind": "activate",
+          "control": "Save note"
+        },
+        {
+          "kind": "activate",
+          "control": "Cancel"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36). The grant includes cadence.occurrences.write.",
+      "success_result": "Note opens one inline editor; opening another closes the first. Save note calls update_occurrence_note with the displayed revision as expected_revision. The view reads the day again and tells the AI client only that a note was saved, never its text.",
+      "failure_result": "A conflict keeps the draft open and shows the note that is saved now above it, so a second Save note is the person's decision. Other failures match marking an Occurrence.",
+      "effects": [
+        "occurrence_mutation",
+        "network_request",
+        "form_draft",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
+        }
+      }
+    },
+    {
+      "id": "INT-DAYVIEW-004",
+      "name": "See that the AI client must reconnect to change the day",
+      "feature": "cadence-day-view",
+      "status": "implemented",
+      "surfaces": [
+        "mcp_day_view"
+      ],
+      "routes": [
+        "ui://cadence/day/v1.html"
+      ],
+      "journeys": [
+        "J28"
+      ],
+      "intent": "Understand why the Cadence day view shows no Completed, Not Completed or Note controls.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Reconnect to allow changes (text, no control)"
+        }
+      ],
+      "availability": "An AI client that renders MCP Apps views has called show_day for a connected account. Behind CADENCE_MCP_APPS, off in production (D36).",
+      "success_result": "When the grant lacks cadence.occurrences.write, or a write returns insufficient_scope, the line \"Reconnect to allow changes\" replaces every write control. The day stays readable and routine slots still open.",
+      "failure_result": "The view starts no sign-in itself. The person reconnects Cadence in the AI client, then asks for the day again.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "packages/mcp-views/src/DayView.tsx",
+        "packages/mcp-views/src/model.ts",
+        "packages/mcp-views/src/bridge.ts",
+        "lib/mcp/apps/day-view-html.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/mcp-day-view.dom.test.ts"
+        ],
+        "notes": "The tests drive the shipped bundle in jsdom through a mock MCP Apps host. Acceptance on real hosts is Ticket 378."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "packages/mcp-views/src/DayView.tsx",
+            "packages/mcp-views/src/model.ts",
+            "packages/mcp-views/src/bridge.ts",
+            "lib/mcp/apps/day-view-html.ts"
+          ],
+          "evidence": [
+            "tests/mcp-day-view.dom.test.ts"
+          ],
+          "reason": "Served by the hosted MCP server and drawn by the AI client. Host acceptance is Ticket 378."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Cadence for Mac renders no MCP view. A linked Mac receives the change through account sync."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not operate tracking data. Screenshots and copy wait for the marketing overhaul (P-097)."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "No Cadence mobile app exists. Host mobile apps draw the same view, built phone width first; Ticket 378 tests Claude mobile."
         }
       }
     }

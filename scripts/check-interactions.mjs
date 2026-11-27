@@ -324,6 +324,8 @@ function walk(directory) {
 function interactiveSourceFiles() {
   const roots = ["app", "components", "apps/marketing/src", "public"];
   if (exists("apps/desktop/src")) roots.push("apps/desktop/src");
+  // MCP Apps views (Ticket 377): drawn by an AI client, but still Cadence's controls.
+  if (exists("packages/mcp-views/src")) roots.push("packages/mcp-views/src");
 
   return roots
     .flatMap(walk)

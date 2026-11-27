@@ -24,6 +24,7 @@ touches an area you have not worked in.
 | `lib/auth/`, `lib/supabase/`, `lib/security/`, `lib/cache/`, `lib/ui/` | Sign-in, Supabase clients, rate limits and kill switches, read cache, client helpers |
 | `packages/core/` | `@cadence/core`: pure resolvers, portable services, types, MCP contract, notices. No I/O |
 | `packages/ui/` | `@cadence/ui`: `runtime.tsx`, `tokens.css`, `fonts.css`. No components |
+| `packages/mcp-views/` | `@cadence/mcp-views`: the "Cadence day" MCP Apps view (Preact, Vite, one HTML file). `npm run mcp-views:build` writes it into `lib/mcp/apps/day-view-html.ts`; `npm run test` fails when that file is stale. Holds `ext-apps`, `preact` and `zod`, which stay out of the root manifest |
 | `apps/desktop/` | Cadence for Mac: Tauri v2, Vite, React, SQLite, Rust and Objective-C |
 | `apps/marketing/` | Astro 7 static marketing and developer site |
 | `supabase/` | `config.toml` and 157 migrations. `seed.sql` is empty by design |
@@ -118,6 +119,13 @@ one on differs:
 - Create a Behavior: `components/behaviors/BehaviorForm.tsx` → `createBehaviorAction`
   → `lib/services/behavior.service.ts` → core `createBehavior` → occurrence sync →
   `revalidatePath("/timeline")`.
+- Add, edit, end or remove a Period (Ticket 369): `components/periods/PeriodControl.tsx`
+  and `PeriodEditor.tsx` → `savePeriodAction`, `endPeriodAction` or `deletePeriodAction`
+  (`app/(app)/timeline/actions.ts`, also passed by `/behaviors`) →
+  `lib/services/period.service.ts` → core `services/period.service.ts` → RPC
+  `create_period`, `update_period` or `delete_period` → `revalidatePath` for
+  `/timeline` and `/behaviors`. The Timeline view carries `periodsByDate`; the
+  analytics view carries `periodAdherence`.
 - Caching: every `(app)` page is `force-dynamic`. The only Next cache API in use is
   `revalidatePath`. `lib/cache` is a per-process read cache (60 s, 250 entries); its
   invalidators are in `lib/cache/stable-user-data.cache.ts`.
@@ -406,6 +414,7 @@ Dagger checks (`.dagger/modules/cadence/main.dang`): `agents`, `interactions`,
 | When you add or change | Also change |
 |---|---|
 | A `<button>`, `<a>`, `<Link>`, `<form>`, `<input>`, `<select>`, `<textarea>`, `<summary>` or an `onClick`-style handler in `app`, `components`, `apps/desktop/src`, `apps/marketing/src` or `public` | `source_inventory[].interaction_marker_count` for that file in `interaction-registry.json`, and the text of the interactions that cite it |
+| A file in `packages/mcp-views` that the view imports, or `packages/core/src/notices/catalog/day-view.json` | Run `npm run mcp-views:build` and commit `lib/mcp/apps/day-view-html.ts`. `tests/mcp-day-view-build.test.ts` fails on a stale file |
 | A user-facing interaction | An `INT-<DOMAIN>-NNN` entry with feature, journey, implementation references, a `docs/user-guide` anchor, test coverage and platform records |
 | A file in `packages/core/src/resolvers` | The `resolverRegistry` array in `scripts/check-resolvers.mjs`, a paired test, and `docs/AGENT_RESOLVERS.md` |
 | A registered `lib/resolvers/*.ts` file | Nothing. It must stay exactly `export * from "@cadence/core/resolvers/<name>";` |
@@ -418,6 +427,7 @@ Dagger checks (`.dagger/modules/cadence/main.dang`): `agents`, `interactions`,
 | A desktop SQLite migration | The file, the `MIGRATIONS` entry in `db.rs`, and `schema_version` in `local_store/tests.rs` |
 | An MCP tool | `operations.ts`, a handler in `read/index.ts` or `write/index.ts`, `tests/fixtures/integration/operations/<name>.json`, the name list in `tests/integration-contract.test.ts`, `REGISTRY_TOOLS` in `scripts/acceptance/protocol.mjs`, `OPERATION_ACCESS` in `scripts/acceptance/watch.mjs`, `INTEGRATION_CONTRACT_VERSION`, then regenerate the two files below |
 | The MCP contract | `UPDATE_MCP_CONTRACT_DOC=1 npm run test -- tests/integration-contract.test.ts` and `npm run developers:check -- --write` |
+| An MCP transport tool or its activity label (MCP Apps trial, outside the registry) | `lib/mcp/apps/`, `TRANSPORT_TOOLS` in `scripts/acceptance/protocol.mjs`, `TRANSPORT_OPERATION_ACCESS` in `scripts/acceptance/watch.mjs`, the frozen schema in `docs/qa/2026-11-26-mcp-apps-spike.md`, and `docs/MCP_CONTRACT.md`, "MCP Apps trial" |
 | A plugin skill | Edit `integrations/skills/`, then copy the file to both plugin folders |
 | A protected page | The `proxy.ts` matcher and `lib/navigation.ts` |
 | `STATUS.md` | Stay under 40,000 bytes. Archive only on branch `chore/status-archive`, as its own docs-only PR |

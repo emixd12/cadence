@@ -12,6 +12,7 @@ import { HorseAvatarTrialBench } from "./HorseAvatarTrial";
 import { AdvisorAvatarBench } from "./AdvisorAvatarBench";
 import { AdvisorPlacementBench, type PlacementOption, type PlacementView } from "./AdvisorPlacementBench";
 import { AdvisorBench, type AdvisorBenchState } from "./AdvisorBench";
+import { McpDayViewBench } from "./McpDayViewBench";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -100,6 +101,7 @@ import { NoticeBench } from "@/app/design-system/NoticeBench";
 import { OccurrenceMoveBench } from "@/app/design-system/OccurrenceMoveBench";
 import { MarkDetailsBench } from "@/app/design-system/MarkDetailsBench";
 import { OpportunityBasketBench } from "@/app/design-system/OpportunityBasketBench";
+import { PeriodBench } from "@/app/design-system/PeriodBench";
 import { TimelineSubBehaviorsBench } from "@/app/design-system/TimelineSubBehaviorsBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
@@ -410,6 +412,8 @@ type DesignSystemPageProps = Readonly<{
     option?: string | string[];
     view?: string | string[];
     shot?: string | string[];
+    theme?: string | string[];
+    host?: string | string[];
   }>;
 }>;
 
@@ -427,6 +431,16 @@ export default async function DesignSystemPage({
   if (selectedPreviewId === "briefing-workbench") return <DailyBriefWorkbench repositoryRoot={process.cwd()} />;
 
   if (selectedPreviewId === "horse-avatar") return <HorseAvatarTrialBench />;
+
+  // Ticket 377: the "Cadence day" MCP Apps view, the shipped bundle in a sandboxed frame with a mock host.
+  // ?state=normal|empty|read-only|conflict|rate-limit|rejected|connector|parent|opportunity|alongside|hostile|many-earlier|loading|unavailable
+  // &theme=light|dark&host=cadence|claude&layout=phone|desktop
+  if (selectedPreviewId === "mcp-day-view") {
+    const theme = firstSearchParam(params?.theme);
+    const host = firstSearchParam(params?.host);
+    const layout = firstSearchParam(params?.layout);
+    return <McpDayViewBench key={`${selectedFixtureState}/${theme}/${host}/${layout}`} state={selectedFixtureState ?? undefined} theme={theme ?? undefined} host={host ?? undefined} layout={layout ?? undefined} />;
+  }
 
   // Tickets 343 to 346: the advisor avatar on the approved drawing, every state and gesture.
   if (selectedPreviewId === "advisor-avatar") return <AdvisorAvatarBench />;
@@ -591,6 +605,7 @@ function BenchNav() {
       <BenchAnchor href="#bench-canonical-inventory">Canonical inventory</BenchAnchor>
       <BenchAnchor href="#bench-traces">Trace cards</BenchAnchor>
       <BenchAnchor href="?preview=departure-states">Travel timing states</BenchAnchor>
+      <BenchAnchor href="?preview=mcp-day-view">Cadence day view (MCP Apps)</BenchAnchor>
       <BenchAnchor href="?preview=settings-regroup">Settings regroup proposal</BenchAnchor>
       <BenchAnchor href="?preview=ai-features">AI features question and Settings (advisor 4F)</BenchAnchor>
     </nav>
@@ -2258,6 +2273,7 @@ const previewFactories: Record<
   "module.occurrence-move": () => <ProductPreview maxHeight="48rem"><OccurrenceMoveBench /></ProductPreview>,
   "module.occurrence-mark-details": () => <ProductPreview maxHeight="32rem"><MarkDetailsBench /></ProductPreview>,
   "module.opportunity-basket": () => <ProductPreview maxHeight="40rem"><OpportunityBasketBench /></ProductPreview>,
+  "module.period-control": () => <ProductPreview maxHeight="60rem"><PeriodBench /></ProductPreview>,
   "module.daily-brief-moves": () => <ProductPreview maxHeight="72rem"><DailyBriefMovesBench /></ProductPreview>,
   "module.chat-page": () => <ProductPreview maxHeight="48rem"><ChatBench state="today" /></ProductPreview>,
   "module.trust-and-legal-panel": () => (

@@ -20373,7 +20373,7 @@ Messaging impact: `P-094`.
 
 ## Ticket 367: The Daily Brief reads day notes
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: `docs/plans/2026-11-25-periods.md`, section 6.
 
@@ -20407,7 +20407,7 @@ Messaging impact: `P-095`.
 
 ## Ticket 368: Period foundation: table, resolver and services
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: sections 1 to 3.
 
@@ -20438,7 +20438,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 369: Periods on the web Timeline and Behaviors
 
-Status: not_started
+Status: complete
+
+Editor polish, November 26, 2026 (owner's request): Label is the standard underlined text field; First day and Last day are compact and side by side, with "Still going" beside an empty Last day and Clear beside a set one; Note is the shared note field. The note of an existing Period saves on its own through `NoteEditor` and `savePeriodNote`, so Save stores the label and days and the second action reads Close. Lines that repeat across Period notes are offered as chips by the rule the other notes use (`repeatedNoteLineProposals`); nothing is stored for them (`docs/FUTURE_UPDATES.md`, "Stored Period note shortcuts"). Web only; the Mac gets the same editor with Ticket 374. Messaging impact: none.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 4.
 
@@ -20466,7 +20468,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 370: Periods in the MCP contract and Chat
 
-Status: not_started
+Status: complete
+
+Follow-up done November 26, 2026 (PR #423): Chat creates, edits and ends Periods after a Yes. The owner approved migration `20261126150000_chat_period_actions.sql`, which drops and re-adds `chat_actions_kind_check`; it is on the hosted project and the constraint was read back with `period` in its list.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 5.
 
@@ -20497,7 +20501,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 371: The Daily Brief and advisor tips read Periods
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 7.
 
@@ -20526,7 +20530,7 @@ Messaging impact: `P-096`.
 
 ## Ticket 372: Period days in coach signals
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 8.
 
@@ -20554,7 +20558,7 @@ Messaging impact: none.
 
 ## Ticket 373: Periods in export, BehaviorLog import and restore
 
-Status: not_started
+Status: complete
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 9.
 
@@ -20582,7 +20586,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 374: Periods on Cadence for Mac
 
-Status: not_started
+Status: blocked
+
+Blocked November 26, 2026: Ticket 363 (account sync contract 10, SQLite 0029) is in draft PR #407, which conflicts with `main`. This ticket takes the next contract and SQLite numbers after it. An hourly scheduled check ("Start Ticket 374 (Periods on Mac) when #407 lands") starts this ticket once Ticket 363 is on `main`. The Mac's Period actions include `saveNote`, the note's own save.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
 
@@ -20646,7 +20652,7 @@ Messaging impact: none.
 
 ## Ticket 376: MCP Apps server: `show_day`, view resources and the flag
 
-Status: not_started
+Status: complete. November 26, 2026: implemented behind `CADENCE_MCP_APPS` (exact value `true`), off in production. `show_day` is a transport tool in `lib/mcp/apps/`, over `getIntegrationDay` in the new `lib/services/integration-day.service.ts`, which adapts `getIntegrationTimeline` from `lib/services/integration-read.service.ts`; `get_timeline`, the registry and `editions.ts` are unchanged. `resources/list` and `resources/read` serve the one view URI with an explicit empty CSP and a 1,048,576-byte cap. The three reads check `cadence.read`, count against the per-grant read limit and write an activity row through `lib/integrations/transport-read.ts`; no migration was needed, because the activity table accepts any label matching `^[a-z][a-z0-9_]{0,63}$` (`show_day`, `list_view_resources`, `read_view_resource`). The view HTML is a static placeholder in `lib/mcp/apps/day-view-html.ts` until Ticket 377 replaces that file. The protocol suite expects `show_day` only when the server declares the MCP Apps extension. `app/mcp/route.ts` did not need a change. Not verified on a host: that is Ticket 378. Details: `docs/MCP_INTEGRATION.md`, section 17.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.2 and 3.4, package C.
 
@@ -20690,7 +20696,9 @@ Messaging impact: `P-098`, `P-099`.
 
 ## Ticket 377: MCP Apps view: "Cadence day"
 
-Status: not_started
+Status: complete (November 26, 2026; behind `CADENCE_MCP_APPS`, off in production; real-host acceptance is Ticket 378)
+
+Built: `packages/mcp-views` (Preact 10.27.2, as Ticket 375 recommended, not React), the generated `lib/mcp/apps/day-view-html.ts` (271,236 bytes raw, 72,598 gzip), notices in `packages/core/src/notices/catalog/day-view.json`, the bench `/design-system?preview=mcp-day-view`, and `tests/mcp-day-view.dom.test.ts` and `tests/mcp-day-view-build.test.ts`. Evidence: `docs/qa/2026-11-25-mcp-day-view.md`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: sections 3.1, 3.3 and 3.4, package D.
 
@@ -20774,7 +20782,9 @@ Messaging impact: none.
 
 ## Ticket 379: Consent Allow or Deny before hydration returns 500
 
-Status: not_started
+Status: complete (November 26, 2026)
+
+Result: the cause was the consent page's `no-referrer` referrer policy, set as a header in `proxy.ts` and as a meta tag in `app/oauth/consent/page.tsx`. Under it a browser sends `Origin: null` on a plain form post, even to its own site, and the Server Action origin check answered 500. The policy is now `same-origin` (`CONSENT_REFERRER_POLICY` in `lib/types/oauth-ui.ts`): the Origin header stays on the form post and no referrer reaches another origin. The same-origin check, the pending-request cookie and the atomic consume did not change. Reproduced and verified on the local stack in Chrome with JavaScript off: before, Allow and Deny answered 500 with no grant; after, both answer 303 to the client, the grant equals the switches left on, and the same post sent twice grants once (the second answers 200 with "Connection request unavailable"). `scripts/acceptance/consent-page.mjs` no longer waits for hydration. Tests: `tests/oauth-proxy.test.ts`, `tests/oauth-server.test.ts`, `tests/oauth-ui-actions.test.ts`, `tests/oauth-ui.dom.test.tsx`, `tests/acceptance-web-client/consent-scopes.test.mjs`. Known limit: with JavaScript off, a person who presses twice lands on "Connection request unavailable" although the first press granted; the hydrated form disables both buttons after one press. Not verified on production.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package F. Source of the finding: `STATUS.md`, "MCP acceptance tooling, Tickets 247–258" row.
 
@@ -20811,7 +20821,7 @@ Messaging impact: none.
 
 ## Ticket 380: MCP Apps listing preparation, nothing published
 
-Status: not_started
+Status: in_progress. November 26, 2026: every part that does not need a real AI client is done, and all four acceptance criteria hold. Nothing was submitted, listed or published; no provider form was opened; no credential or reviewer account is in the repository; no Privacy, Terms, Trust or marketing text changed. Done: (1) unpublished drafts in `docs/qa/mcp-directory-submission.md`: five screenshot prompts, the CSP statement with the test behind each claim, reviewer cases V1 to V5, the Google form facts, and the Google-only sign-in text corrected in five places; (2) `scripts/acceptance/listing-capture.mjs`, which writes a PNG of the view frame, 1000 pixels or wider, and a sidecar with the paired prompt into the git-ignored `.local/listing-captures/`; its bench mode ran against the design-system bench (five captures, 1436 pixels wide) and its `host` mode and `captureHostView()` hook are tested against a stub page only; (3) the skill draft `integrations/drafts/skills/daily-check-in/SKILL.md` with rule tests and the acceptance scenario `skill-check-in-view-unconfirmed`; the published copies are byte-identical to before and `node scripts/check-plugins.mjs` passes; (4) the checklist "Deferred owner steps for MCP Apps" in the same file, with each step's input file and messaging entry. Remaining, all after Ticket 378 has a host that renders the view: (a) capture the five shots in `host` mode from a Claude web run on a test account, which first needs the view frame's selector in that client; (b) change a prompt here and in the script if Ticket 378 shows it does not make the client call `show_day`; (c) the owner looks at each host capture. Not run with a real client: the five prompts, cases V1 to V5 and the draft skill scenario. Found while reading Google's OAuth guide, not tested: Google recommends returning the same refresh token on refresh, and Cadence rotates it; Google asks for an SVG logo, and the repository has PNG only.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package G.
 
@@ -21040,3 +21050,52 @@ Platform impact:
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
 
 Messaging impact: none.
+
+## Ticket 387: The advisor compares tracked time with the intended duration
+
+Status: not_started
+
+Owner decision: `docs/DECISIONS.md`, 2026-11-25 (D34): the intended duration stays as a marker the advisor can compare tracked time against. The choices under "Open decisions" are not made.
+
+Dependencies: Ticket 366. The Daily Brief part follows Ticket 184's promotion rules.
+
+Goal: Let the advisor say when a Behavior takes longer or shorter than the person intended, with both numbers ("Gym usually takes 45 minutes; you intended 30").
+
+Current state, read from code on November 26, 2026:
+
+- Coach tips already compare the two. The `session_length` signal (`packages/core/src/resolvers/coach-signals-v2.resolver.ts`) carries `planned_minutes`, `median_minutes` and a `longer`, `shorter` or `on_target` pattern. The advice card `set-the-length-it-takes` applies to `longer` and offers to update the intended duration. No card applies to `shorter`.
+- The signal and the Timeline measure differently (`docs/RULES_REGISTER.md`, TIP-01, TIP-02, LEN-02, LEN-03): 4 sessions in 28 days against the 10 most recent completions with a floor of 3.
+- The Daily Brief model receives one selected duration per item. `selectDuration` in `packages/core/src/services/briefing-config.ts` drops the other candidate, and `tests/briefing-workbench.test.ts` asserts `durationCandidates` never reaches the model.
+- `resolveBehaviorDurationEstimate` returns `intendedSeconds` beside the tracked figure when tracked time decides. Only the Timeline row reads it.
+- Chat was not checked.
+
+Recommended scope:
+
+1. Make the `session_length` signal read the same tracked figure and floor as the Timeline (LEN-01 to LEN-04), so the tip and the row never give different numbers. Keep the 0.8 and 1.2 ratios (TIP-03).
+2. Add a `shorter` advice card, or record that Cadence stays silent when a Behavior takes less time than intended.
+3. Daily Brief: add `intendedSeconds` to an item's duration only when tracked time decides and the ratio passes TIP-03. This is a new recipe candidate, reviewed in the workbench, never a change to the pinned recipe.
+4. Rename `completed_stopped_occurrence_mean` in the same context version as step 3.
+
+Open decisions (owner):
+
+- Whether the Daily Brief should mention length at all, or leave it to coach tips.
+- Whether Cadence speaks when a Behavior takes less time than intended.
+- Whether the tip's 28-day window gives way to the 10 most recent completions.
+
+Requirements:
+
+- Wording states the two numbers plainly, with no guilt, in the `PRODUCT.md` voice.
+- Each new or changed threshold gets a row in `docs/RULES_REGISTER.md`.
+- A change to what the model receives logs a `docs/MESSAGING_CHANGES.md` entry.
+- Resolver tests cover the signal at 2, 3 and 10 tracked completions and at the 0.8 and 1.2 ratios.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `coach-signals-v2.resolver.ts`, `advice-library.json`, and for step 3 `briefing-config.ts` behind a recipe candidate. |
+| Desktop | Coach tips and the Daily Brief are hosted; the Mac shows the same text with no Mac change. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
+
+Messaging impact: none until step 3; step 3 logs an entry.

@@ -49,7 +49,9 @@ Cadence-owned OAuth server, and Claude and ChatGPT plugins; the MCP server is
 live on production since October 29, 2026 (Ticket 232). See
 `docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 375–382 plan MCP Apps:
 views that the MCP server serves and an AI client renders (`docs/DECISIONS.md`,
-2026-11-25, D36); none has started. Tickets 233–240 implement
+2026-11-25, D36). The server (Ticket 376) and the "Cadence day" view (Ticket 377,
+`packages/mcp-views`) are implemented behind `CADENCE_MCP_APPS`, off in production; host
+acceptance (Ticket 378) is not. Tickets 233–240 implement
 read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
 web and linked desktop; the hosted connectors run on production since October 23,
 2026. Ticket 241 owns final disclosure/evidence review; connector release steps 6–7

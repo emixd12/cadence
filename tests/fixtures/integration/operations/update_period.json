@@ -1,0 +1,126 @@
+{
+  "operation": "update_period",
+  "valid_inputs": [
+    {
+      "name": "new last day",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "expected_revision": "2026-03-08T07:30:00Z",
+        "end_local_date": "2026-03-10",
+        "idempotency_key": "period-0002"
+      }
+    },
+    {
+      "name": "make ongoing and clear the note",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "expected_revision": "2026-03-08T07:30:00Z",
+        "end_local_date": null,
+        "note": null
+      }
+    },
+    {
+      "name": "rename",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "expected_revision": "2026-03-08T07:30:00Z",
+        "label": "Flu"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "nothing to change",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "expected_revision": "2026-03-08T07:30:00Z"
+      },
+      "code": "invalid_input",
+      "path": "$"
+    },
+    {
+      "name": "missing revision",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "label": "Flu"
+      },
+      "code": "invalid_input",
+      "path": "$.expected_revision"
+    },
+    {
+      "name": "end before start",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "expected_revision": "2026-03-08T07:30:00Z",
+        "start_local_date": "2026-03-10",
+        "end_local_date": "2026-03-09"
+      },
+      "code": "invalid_input",
+      "semantic": true,
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "null label",
+      "value": {
+        "period_id": "00000007-1111-4111-8111-000000000007",
+        "expected_revision": "2026-03-08T07:30:00Z",
+        "label": null
+      },
+      "code": "invalid_input",
+      "path": "$.label"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "changed",
+      "value": {
+        "period": {
+          "id": "00000007-1111-4111-8111-000000000007",
+          "label": "Sick",
+          "start_local_date": "2026-03-06",
+          "end_local_date": "2026-03-10",
+          "ongoing": false,
+          "note": "Flu. Stayed home.",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        },
+        "changed": true
+      }
+    },
+    {
+      "name": "same values",
+      "value": {
+        "period": {
+          "id": "00000007-1111-4111-8111-000000000007",
+          "label": "Sick",
+          "start_local_date": "2026-03-06",
+          "end_local_date": "2026-03-09",
+          "ongoing": false,
+          "note": "Flu. Stayed home.",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        },
+        "changed": false
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing changed",
+      "value": {
+        "period": {
+          "id": "00000007-1111-4111-8111-000000000007",
+          "label": "Sick",
+          "start_local_date": "2026-03-06",
+          "end_local_date": "2026-03-09",
+          "ongoing": false,
+          "note": "Flu. Stayed home.",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.changed"
+    }
+  ]
+}

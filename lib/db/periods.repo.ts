@@ -1,5 +1,6 @@
 import type {
   PeriodCreateCommit,
+  PeriodCreateIfAbsentResult,
   PeriodDataStore,
   PeriodDeleteCommit,
   PeriodUpdateCommit,
@@ -22,6 +23,7 @@ export function createPeriodStore(
     listPeriods: (range) => listPeriods(supabase, userId, range),
     getPeriod: (id) => getPeriod(supabase, userId, id),
     createPeriod: (input) => createPeriod(supabase, input),
+    createPeriodIfAbsent: (input) => createPeriodIfAbsent(supabase, input),
     updatePeriod: (input) => updatePeriodIfExpected(supabase, input),
     deletePeriod: (input) => deletePeriodIfExpected(supabase, input),
   };
@@ -48,6 +50,25 @@ export async function listPeriods(
         .order("id", { ascending: true });
     },
   });
+}
+
+/**
+ * For readers that annotate other work (the Daily Brief, advisor tips) and must keep
+ * working when a deploy reaches production before the `periods` migration: a missing
+ * table (PostgREST `PGRST205`, Postgres `42P01`) reads as no Periods. Any other error throws.
+ */
+export async function listPeriodsOrNone(
+  supabase: AppSupabaseClient,
+  userId: string,
+  range?: { from: string; to: string },
+): Promise<PeriodRecord[]> {
+  try {
+    return await listPeriods(supabase, userId, range);
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    if (code === "PGRST205" || code === "42P01") return [];
+    throw error;
+  }
 }
 
 export async function getPeriod(
@@ -83,6 +104,33 @@ export async function createPeriod(
   }
   if (!data) throw new Error("The period was not saved.");
   return data as Period;
+}
+
+/**
+ * Ticket 373: adds the Period unless the account already has one with the same label,
+ * first day and last day. `create_period_if_absent` looks and inserts under the cap
+ * trigger's per-user lock, so two overlapping calls store one Period. An existing
+ * Period comes back unchanged with `created: false`.
+ */
+export async function createPeriodIfAbsent(
+  supabase: AppSupabaseClient,
+  input: PeriodCreateCommit,
+): Promise<PeriodCreateIfAbsentResult> {
+  const { data, error } = await supabase
+    .rpc("create_period_if_absent", {
+      p_label: input.label,
+      p_start_on: input.startOn,
+      p_end_on: input.endOn as unknown as string,
+      p_note: input.note as unknown as string,
+    })
+    .maybeSingle();
+  if (error) {
+    if (error.code === PERIOD_CAP_SQLSTATE) throw new Error(PERIOD_LIMIT_MESSAGE);
+    throw error;
+  }
+  if (!data || typeof data.created !== "boolean") throw new Error("The period was not saved.");
+  const { created, ...period } = data;
+  return { period: period as Period, created };
 }
 
 /** Returns null when the Period is gone or its revision differs from the expected one. */

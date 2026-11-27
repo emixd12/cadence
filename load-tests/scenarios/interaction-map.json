@@ -1947,6 +1947,46 @@
       "id": "INT-CHAT-005",
       "classification": "not_load_bearing",
       "reason": "Opens a list already on the page; no request."
+    },
+    {
+      "id": "INT-PERIOD-001",
+      "classification": "not_load_bearing",
+      "reason": "A person adds a Period a few times a month through the same guarded Timeline Server Action pattern as INT-TIMELINE-012; an account holds at most 500, and Timeline and Behaviors loads add one indexed periods read."
+    },
+    {
+      "id": "INT-PERIOD-002",
+      "classification": "not_load_bearing",
+      "reason": "Editing a Period is a rare single-row compare-and-set write through the same Server Action as INT-PERIOD-001."
+    },
+    {
+      "id": "INT-PERIOD-003",
+      "classification": "not_load_bearing",
+      "reason": "End today is a rare single-row compare-and-set write plus one profile timezone read."
+    },
+    {
+      "id": "INT-PERIOD-004",
+      "classification": "destructive_serial_only",
+      "reason": "Remove deletes a seeded Period for good; run serially on a synthetic account."
+    },
+    {
+      "id": "INT-DAYVIEW-001",
+      "classification": "not_load_bearing",
+      "reason": "Sent from an AI client's frame through MCP tools, outside the web app's routes; the existing MCP write tools carry the load. Host acceptance is Ticket 378."
+    },
+    {
+      "id": "INT-DAYVIEW-002",
+      "classification": "not_load_bearing",
+      "reason": "Sent from an AI client's frame through MCP tools, outside the web app's routes; the existing MCP write tools carry the load. Host acceptance is Ticket 378."
+    },
+    {
+      "id": "INT-DAYVIEW-003",
+      "classification": "not_load_bearing",
+      "reason": "Sent from an AI client's frame through MCP tools, outside the web app's routes; the existing MCP write tools carry the load. Host acceptance is Ticket 378."
+    },
+    {
+      "id": "INT-DAYVIEW-004",
+      "classification": "browser_only",
+      "reason": "The reconnect line is drawn from scopes already in the show_day result; it sends no request."
     }
   ]
 }

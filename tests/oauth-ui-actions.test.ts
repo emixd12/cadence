@@ -83,6 +83,59 @@ describe("consent actions", () => {
   });
 });
 
+// Ticket 379: Allow or Deny pressed before the page hydrates is a plain form post.
+describe("consent before hydration (Ticket 379)", () => {
+  /** The fields a browser sends for the server-rendered form, with the framework's own fields. */
+  function plainPost(decision: "allow" | "deny", scopes: string[]) {
+    const f = new FormData();
+    f.set("$ACTION_REF_1", ""); f.set("$ACTION_1:0", '{"id":"fixture","bound":"$@1"}'); f.set("$ACTION_1:1", "[{\"status\":\"idle\",\"message\":\"\"}]"); f.set("$ACTION_KEY", "k1");
+    f.set("request_id", id); f.set("account_id", m.user.id);
+    scopes.forEach((scope) => f.append("scope", scope)); f.set("decision", decision);
+    return f;
+  }
+  it("the page's referrer policy keeps the Origin header on a plain form post and sends nothing to another origin", async () => {
+    const { metadata } = await import("@/app/oauth/consent/page");
+    const { CONSENT_REFERRER_POLICY } = await import("@/lib/types/oauth-ui");
+    expect(CONSENT_REFERRER_POLICY).toBe("same-origin");
+    expect(metadata.referrer).toBe(CONSENT_REFERRER_POLICY);
+  });
+  it("Allow as a plain form post grants exactly the scopes left on and redirects to the client", async () => {
+    await expect(consentAction(idle, plainPost("allow", ["cadence.read", "cadence.behaviors.write"]))).rejects.toThrow("REDIRECT:https://client.example/callback?code=fixture&iss=" + issuer);
+    const [request, requestId, scopes] = m.finishConsent.mock.calls[0];
+    expect(requestId).toBe(id); expect(scopes).toEqual(["cadence.read", "cadence.behaviors.write"]);
+    expect(request.method).toBe("POST"); expect(request.headers.get("origin")).toBe(issuer); expect(request.headers.get("cookie")).toBe("browser-bound-secret");
+    expect(m.setCookie).toHaveBeenCalledOnce();
+  });
+  it("Deny as a plain form post returns access_denied with the issuer, whatever the switches say", async () => {
+    m.finishConsent.mockResolvedValue(new Response(null, { headers: { Location: `https://client.example/callback?error=access_denied&iss=${issuer}` } }));
+    await expect(consentAction(idle, plainPost("deny", ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"]))).rejects.toThrow(`error=access_denied&iss=${issuer}`);
+    expect(m.finishConsent.mock.calls[0][2]).toBeNull();
+  });
+  it("hands the browser's real Origin to the same-origin check, so Origin null is still refused", async () => {
+    const { completeOAuthConsent } = await vi.importActual<typeof import("@/lib/services/oauth/consent")>("@/lib/services/oauth/consent");
+    m.finishConsent.mockImplementation(completeOAuthConsent);
+    for (const origin of ["null", "https://evil.example", ""]) {
+      m.headers = new Headers({ ...(origin ? { origin } : {}), cookie: `cadence_oauth_${id}=${"a".repeat(43)}` });
+      const result = await consentAction(idle, plainPost("allow", ["cadence.read"]));
+      expect(result.status).toBe("error");
+    }
+    expect(m.client.rpc).not.toHaveBeenCalled(); expect(m.setCookie).not.toHaveBeenCalled();
+  });
+  it("a double submit redirects once; the second post gets a message, not an exception", async () => {
+    let consumed = false;
+    m.finishConsent.mockImplementation(async () => {
+      if (consumed) throw new Error("invalid_request");
+      consumed = true;
+      return new Response(null, { headers: { Location: `https://client.example/callback?code=fixture&iss=${issuer}` } });
+    });
+    const results = await Promise.allSettled([consentAction(idle, plainPost("allow", ["cadence.read"])), consentAction(idle, plainPost("allow", ["cadence.read"]))]);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({ reason: { message: expect.stringContaining("REDIRECT:https://client.example/callback?code=") } });
+    expect(results.find((result) => result.status === "fulfilled")).toMatchObject({ value: { status: "error" } });
+    expect(m.setCookie).toHaveBeenCalledOnce();
+  });
+});
+
 describe("Connected apps actions", () => {
   it("uses the authenticated grant-revocation RPC and revalidates Settings only after success", async () => {
     const f = new FormData(); f.set("grant_id", id);

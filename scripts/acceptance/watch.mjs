@@ -34,15 +34,22 @@ export const TEST_ACCOUNTS = Object.freeze({
 // Mirrors packages/core/src/integration/operations.ts; a test keeps them equal.
 export const OPERATION_ACCESS = Object.freeze({
   get_account_context: 'read', list_behaviors: 'read', get_behavior: 'read', list_categories: 'read',
-  get_timeline: 'read', list_occurrences: 'read', get_occurrence: 'read', list_day_notes: 'read', get_adherence_summary: 'read',
+  get_timeline: 'read', list_occurrences: 'read', get_occurrence: 'read', list_day_notes: 'read', list_periods: 'read',
+  get_adherence_summary: 'read',
   search: 'read', fetch: 'read',
   set_occurrence_status: 'write', set_parent_occurrence_status: 'write', update_occurrence_note: 'write',
   move_occurrence_for_day: 'write', revert_occurrence_move: 'write', update_day_note: 'write',
+  create_period: 'write', update_period: 'write', end_period: 'write',
   add_opportunity_occurrence: 'write', remove_opportunity_occurrence: 'write',
   create_behavior: 'write',
   update_behavior: 'write', archive_behavior: 'write', restore_behavior: 'write',
   end_behavior: 'write', pause_behavior: 'write', resume_behavior: 'write',
 });
+
+// Ticket 376: activity labels of the MCP Apps transport reads (lib/mcp/apps/config.ts).
+// They are outside the registry; tests/mcp-apps-server.test.ts keeps them equal to the server's.
+export const TRANSPORT_OPERATION_ACCESS = Object.freeze({ show_day: 'read', list_view_resources: 'read', read_view_resource: 'read' });
+const accessOf = (operation) => OPERATION_ACCESS[operation] ?? TRANSPORT_OPERATION_ACCESS[operation];
 
 export const KINDS = Object.freeze([
   'client.registered', 'grant.created', 'grant.reconsented', 'grant.used', 'grant.revoked',
@@ -77,7 +84,7 @@ const stepMatches = (step, event, bound) => {
   if (step.sameGrant && bound.grant && event.grantId !== bound.grant) return false;
   if (step.sameClient && bound.client && event.clientId !== bound.client) return false;
   if (step.bindsGrant && bound.presetGrant && event.grantId !== bound.presetGrant) return false;
-  if (step.access && OPERATION_ACCESS[event.operation] !== step.access) return false;
+  if (step.access && accessOf(event.operation) !== step.access) return false;
   return Object.entries(step.where ?? {}).every(([key, value]) => (event[key] ?? null) === value);
 };
 
@@ -120,7 +127,7 @@ export function matchScenario(scenario, events, { kinds = KINDS, grantId = null 
   const step = all[index];
   // Nearest same-kind evidence shows why, for example a denied write.
   const near = sorted.filter((e) => e.kind === step.kind && (!step.sameGrant || !bound.grant || e.grantId === bound.grant)
-    && (!step.access || OPERATION_ACCESS[e.operation] === step.access)).slice(-3);
+    && (!step.access || accessOf(e.operation) === step.access)).slice(-3);
   const steps = [...path, { id: step.id, status: 'missing', step, near }];
   // Order matters, so every later step is missing too.
   for (const rest of all.slice(index + 1)) {
@@ -433,7 +440,7 @@ export function createDiffer({ sinceIso, sourceName }) {
     }
     for (const a of snapshot.activity) {
       emit({ key: `tool.call:${a.activityId}`, kind: 'tool.call', at: a.occurredAt, account: a.account, grantId: a.grantId, clientName: a.clientName,
-        operation: a.operation, access: OPERATION_ACCESS[a.operation] ?? 'unknown', outcome: a.outcome, errorCode: a.errorCode,
+        operation: a.operation, access: accessOf(a.operation) ?? 'unknown', outcome: a.outcome, errorCode: a.errorCode,
         ...(a.targetCount === null ? {} : { targetCount: a.targetCount }) });
     }
     return sortEvents(out);

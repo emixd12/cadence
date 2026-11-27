@@ -1,10 +1,17 @@
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 
 import { resolveAdherenceCounts } from "@cadence/core/resolvers/analytics.resolver";
 import {
+  BRIEF_PERIOD_LIMITS,
   PERIOD_LIMITS,
   PERIOD_MESSAGES,
+  TIP_PERIOD_LIMITS,
   activePeriods,
+  briefPeriodRange,
+  resolveBriefPeriods,
+  resolveTipPeriods,
+  tipPeriodRange,
   comparePeriods,
   normalizePeriodLabel,
   normalizePeriodNote,
@@ -19,6 +26,7 @@ import {
   resolvePeriodCreate,
   resolvePeriodEnd,
   resolvePeriodEndState,
+  resolvePeriodNoteShortcuts,
   resolvePeriodRange,
   resolvePeriodRevision,
   resolvePeriodUpdate,
@@ -464,5 +472,101 @@ describe("periodNaturalKey", () => {
       { label: "Sick 2026-11-03", start_on: "2026-11-03", end_on: null },
     ].map(periodNaturalKey);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+// Ticket 371 (D35): what the Daily Brief's opening and the advisor tips prompt read.
+describe("Periods for the Daily Brief", () => {
+  const TODAY = "2026-11-10";
+  const one = (label: string, start_on: string, end_on: string | null, extra: Partial<PeriodRecord> = {}) =>
+    ({ id: label, label, start_on, end_on, note: "private note", created_at: "2026-11-01T00:00:00Z", ...extra });
+
+  it("reads the 7 days before today and today", () => {
+    expect(BRIEF_PERIOD_LIMITS).toEqual({ active: 5, recent: 3, recentDays: 7 });
+    expect(briefPeriodRange(TODAY)).toEqual({ from: "2026-11-03", to: TODAY });
+    expect(briefPeriodRange("2027-01-03")).toEqual({ from: "2026-12-27", to: "2027-01-03" });
+    expect(() => briefPeriodRange("2026-02-30")).toThrow(PERIOD_MESSAGES.dateInvalid);
+  });
+
+  it("splits Periods covering today from those that ended in the last 7 days, with labels and dates only", () => {
+    const result = resolveBriefPeriods({ localDate: TODAY, records: [
+      one("Ended yesterday", "2026-11-05", "2026-11-09"),
+      one("Sick", "2026-11-08", null),
+      one("Ends today", "2026-11-01", TODAY),
+      one("Ended 7 days ago", "2026-10-30", "2026-11-03"),
+      one("Ended 8 days ago", "2026-10-30", "2026-11-02"),
+      one("Starts tomorrow", "2026-11-11", null),
+      one("Trip", "2026-11-10", "2026-11-14"),
+    ] });
+    expect(result).toEqual({
+      periods: [
+        { label: "Ends today", since: "2026-11-01", until: TODAY },
+        { label: "Sick", since: "2026-11-08", until: null },
+        { label: "Trip", since: "2026-11-10", until: "2026-11-14" },
+      ],
+      recentPeriods: [
+        { label: "Ended yesterday", since: "2026-11-05", until: "2026-11-09" },
+        { label: "Ended 7 days ago", since: "2026-10-30", until: "2026-11-03" },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain("private note");
+    expect(resolveBriefPeriods({ localDate: TODAY, records: [] })).toEqual({ periods: [], recentPeriods: [] });
+  });
+
+  it("keeps at most 5 covering today in display order, and the 3 most recently ended", () => {
+    const active = Array.from({ length: 7 }, (_, index) => one(`A${index}`, `2026-11-0${7 - index}`, null));
+    const ended = [
+      one("E-3rd", "2026-11-01", "2026-11-05"), one("E-1st", "2026-11-02", "2026-11-09"), one("E-4th", "2026-11-01", "2026-11-04"),
+      one("E-2nd-b", "2026-11-03", "2026-11-07"), one("E-2nd-a", "2026-11-02", "2026-11-07"),
+    ];
+    const result = resolveBriefPeriods({ localDate: TODAY, records: [...active, ...ended] });
+    expect(result.periods.map((item) => item.label)).toEqual(["A6", "A5", "A4", "A3", "A2"]);
+    expect(result.periods.map((item) => item.label)).toEqual(activePeriods(active, TODAY).slice(0, 5).map((item) => item.label));
+    // The same last day: display order breaks the tie.
+    expect(result.recentPeriods.map((item) => item.label)).toEqual(["E-1st", "E-2nd-a", "E-2nd-b"]);
+  });
+});
+
+describe("Periods for advisor tips", () => {
+  const TODAY = "2026-11-19";
+
+  it("reads Periods with a day in the 7 days before today or on today, at most 5, with labels and dates only", () => {
+    expect(TIP_PERIOD_LIMITS).toEqual({ periods: 5, days: 7 });
+    expect(tipPeriodRange(TODAY)).toEqual({ from: "2026-11-12", to: TODAY });
+    const records = [
+      { id: "1", label: "Sick", start_on: "2026-11-17", end_on: null, note: "private note" },
+      { id: "2", label: "Work trip", start_on: "2026-11-05", end_on: "2026-11-12", note: null },
+      { id: "3", label: "Too old", start_on: "2026-11-01", end_on: "2026-11-11", note: null },
+      { id: "4", label: "Later", start_on: "2026-11-20", end_on: null, note: null },
+    ];
+    expect(resolveTipPeriods({ localDate: TODAY, records })).toEqual([
+      { label: "Work trip", start: "2026-11-05", end: "2026-11-12" },
+      { label: "Sick", start: "2026-11-17", end: null },
+    ]);
+    const many = Array.from({ length: 8 }, (_, index) => ({ id: `${index}`, label: `P${index}`, start_on: `2026-11-1${index}`, end_on: null }));
+    expect(resolveTipPeriods({ localDate: TODAY, records: many }).map((item) => item.label)).toEqual(["P0", "P1", "P2", "P3", "P4"]);
+  });
+});
+
+describe("resolvePeriodNoteShortcuts", () => {
+  const now = Temporal.Instant.from("2026-11-26T15:00:00Z");
+
+  it("offers lines that repeat across Period notes, by the rule the other notes use", () => {
+    const shortcuts = resolvePeriodNoteShortcuts({ now, periods: [
+      period({ start_on: "2026-06-01", note: "No training\nFever" }),
+      period({ start_on: "2026-09-01", note: "no training." }),
+      period({ start_on: "2026-10-01", note: "Fever\nFever" }),
+      period({ start_on: "2026-11-01", note: "Only here" }),
+      period({ start_on: "2026-11-02", note: null }),
+    ] });
+    expect(shortcuts.map((entry) => [entry.text, entry.status, entry.source, entry.evidence.length])).toEqual([
+      ["Fever", "proposed", "repeated_text", 2],
+      ["no training.", "proposed", "repeated_text", 2],
+    ]);
+  });
+
+  it("needs two Periods, and offers nothing without notes", () => {
+    expect(resolvePeriodNoteShortcuts({ now, periods: [period({ note: "Rest\nRest" })] })).toEqual([]);
+    expect(resolvePeriodNoteShortcuts({ now, periods: [period(), period()] })).toEqual([]);
   });
 });

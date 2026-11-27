@@ -33,6 +33,11 @@ import { integrationContractOptions } from "./integration-contract-options";
 import { listAllDayNotes, listDayNotesInRange } from "@/lib/db/dayNotes.repo";
 import { listDayNotes } from "@cadence/core/services/day-note.service";
 import { dayNotesByDate } from "@cadence/core/resolvers/day-note.resolver";
+import {
+  activePeriods, periodCoveredDates, periodsByDate, splitByPeriods, type PeriodRecord,
+} from "@cadence/core/resolvers/period.resolver";
+import { getPeriod } from "@/lib/db/periods.repo";
+import { listPeriodsForUser } from "./period.service";
 
 export class IntegrationReadError extends Error {
   readonly error: IntegrationError;
@@ -71,7 +76,9 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
 const changedSince = (updatedAt: string, since?: string) => !since || Temporal.Instant.compare(Temporal.Instant.from(updatedAt), Temporal.Instant.from(since)) >= 0;
 const occurrenceKey = (row: Occurrence) => `${row.local_date}/${Temporal.Instant.from(row.scheduled_for).toString({ fractionalSecondDigits: 9 })}/${row.id}`;
 
-function page<T>(context: IntegrationContext, rows: T[], input: { cursor?: string; page_size?: number }, binding: unknown, key: (row: T) => string) {
+function page<T>(context: IntegrationContext, rows: T[], input: { cursor?: string; page_size?: number }, binding: unknown, key: (row: T) => string,
+  /** How many of the remaining rows, in order, this page takes. Defaults to the page size. */
+  take?: (remaining: T[]) => number) {
   const scope = digest([context.userId, context.actor.clientId, binding]);
   let after = "";
   if (input.cursor) {
@@ -85,7 +92,7 @@ function page<T>(context: IntegrationContext, rows: T[], input: { cursor?: strin
   }
   const sorted = rows.map((row) => ({ row, key: key(row) })).sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
   const remaining = sorted.filter((entry) => entry.key > after);
-  const selected = remaining.slice(0, input.page_size ?? L.defaultPageSize);
+  const selected = remaining.slice(0, take ? take(remaining.map((entry) => entry.row)) : input.page_size ?? L.defaultPageSize);
   const last = selected.at(-1);
   return {
     rows: selected.map((entry) => entry.row),
@@ -149,12 +156,15 @@ async function occurrenceDetail(context: IntegrationContext, account: Account, i
 
 export async function getIntegrationAccountContext(context: IntegrationContext): Promise<IntegrationOperationOutput<"get_account_context">> {
   const account = await readAccount(context, true);
+  const active = embeddedPeriods(activePeriods(
+    await listPeriodsForUser(context.supabase, context.userId, { from: account.today, to: account.today }), account.today));
   return {
     account_ref: digest(["cadence-account-v1", context.actor.clientId, context.userId]),
     timezone: account.timezone, today_local_date: account.today, local_time: account.localTime,
     now: account.now.toString(), granted_scopes: context.actor.grantedScopes.filter(isIntegrationScope),
-    // 1.8.0 while CADENCE_ALONGSIDE is on (Ticket 364); the output schema follows the same edition.
+    // 1.9.0 while CADENCE_ALONGSIDE is on (Ticket 364); the output schema follows the same edition.
     contract_version: integrationContractVersion(integrationContractOptions()) as IntegrationOperationOutput<"get_account_context">["contract_version"],
+    active_periods: active.periods, more_active_periods: active.more,
     freshness: account.freshness,
   };
 }
@@ -209,12 +219,13 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
   const end = Temporal.PlainDate.from(start).add({ days: days - 1 }).toString();
   const lookback = Temporal.PlainDate.from(account.today).subtract({ days: L.needsDecisionLookbackDays }).toString();
   const includeNeedsDecision = input.include_needs_decision !== false;
-  const [range, backlog, dayNoteRows] = await Promise.all([
+  const [range, backlog, dayNoteRows, periodRows] = await Promise.all([
     readIntegrationOccurrences(context.supabase, context.userId, { startLocalDate: start, endLocalDate: end }),
     includeNeedsDecision ? readIntegrationOccurrences(context.supabase, context.userId, {
       startLocalDate: lookback, endLocalDate: Temporal.PlainDate.from(account.today).subtract({ days: 1 }).toString(),
     }) : Promise.resolve([]),
     listDayNotesInRange(context.supabase, context.userId, { from: start, to: end }),
+    listPeriodsForUser(context.supabase, context.userId, { from: start, to: end }),
   ]);
   const dayNotes = dayNotesByDate(dayNoteRows);
   const rows = [...new Map([...range, ...backlog].map((row) => [row.id, row])).values()];
@@ -223,6 +234,7 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
     timezone: account.timezone, startLocalDate: start, futureDays: days - 1,
   });
   const serialized = new Map(serializeOccurrences(account, rows).map((row) => [row.id, row]));
+  const dayPeriods = periodsByDate(periodRows, timeline.daySections.map((day) => day.localDate));
   const needsDays = timeline.needsDecision.daySections.filter((day) => day.localDate >= lookback);
   const needs = needsDays.flatMap((day) => day.occurrences).filter((row) => row.localDate >= lookback).map((row) => serialized.get(row.id)!);
   if (includeNeedsDecision && needs.length > L.maxNeedsDecisionItems) {
@@ -234,12 +246,16 @@ export async function getIntegrationTimeline(context: IntegrationContext, input:
       occurrences: needs, total_count: needs.length, truncated: false, lookback_start_local_date: lookback,
       parent_groups: needsDays.flatMap((day) => day.parentGroups).map(serializeIntegrationParentGroup),
     } : null,
-    days: timeline.daySections.map((day) => ({
-      local_date: day.localDate, is_today: day.localDate === account.today,
-      day_note: dayNotes[day.localDate] ?? null,
-      occurrences: day.occurrences.map((row) => serialized.get(row.id)!),
-      parent_groups: day.parentGroups.map(serializeIntegrationParentGroup),
-    })), freshness: account.freshness,
+    days: timeline.daySections.map((day) => {
+      const covering = embeddedPeriods(dayPeriods[day.localDate] ?? [], L.maxTimelineDayPeriods);
+      return {
+        local_date: day.localDate, is_today: day.localDate === account.today,
+        day_note: dayNotes[day.localDate] ?? null,
+        occurrences: day.occurrences.map((row) => serialized.get(row.id)!),
+        parent_groups: day.parentGroups.map(serializeIntegrationParentGroup),
+        periods: covering.periods, more_periods: covering.more,
+      };
+    }), freshness: account.freshness,
   };
 }
 
@@ -256,6 +272,49 @@ export async function listIntegrationDayNotes(context: IntegrationContext, input
     timezone: account.timezone,
     day_notes: rows.filter((row) => row.note !== null).map(serializeDayNote),
   };
+}
+
+/** The summary the embedded lists return: no note and no revision. */
+function serializePeriodSummary(row: PeriodRecord) {
+  return { id: row.id, label: row.label, start_local_date: row.start_on, end_local_date: row.end_on, ongoing: row.end_on === null };
+}
+
+/** A full Period. Only `list_periods` returns it from a read; its note never enters `search` or `fetch`. */
+function serializePeriod(row: PeriodRecord) {
+  return { ...serializePeriodSummary(row), note: row.note,
+    revision: integrationInstant(row.updated_at), updated_at: integrationInstant(row.updated_at) };
+}
+
+/** The first summaries (20, or 10 on a Timeline day) from Periods already in display order, and whether more exist. */
+function embeddedPeriods(rows: readonly PeriodRecord[], limit: number = L.maxEmbeddedPeriods) {
+  return { periods: rows.slice(0, limit).map(serializePeriodSummary), more: rows.length > limit };
+}
+
+/** Display order as one sortable key: first day, last day with ongoing last, creation time, id. */
+const periodKey = (row: PeriodRecord) =>
+  `${row.start_on}/${row.end_on ?? "9999-12-31~"}/${Temporal.Instant.from(row.created_at).toString({ fractionalSecondDigits: 9 })}/${row.id}`;
+
+/** Room one `list_periods` page leaves for its Periods, under the 100,000-byte result cap. */
+const PERIOD_PAGE_BYTES = 90_000;
+
+/** A page holds at most 40 Periods, and fewer when long notes would pass the result cap. Never less than one. */
+function periodPageSize(rows: readonly PeriodRecord[]): number {
+  let bytes = 0;
+  let count = 0;
+  for (const row of rows.slice(0, L.maxPeriodsPerPage)) {
+    bytes += Buffer.byteLength(JSON.stringify(serializePeriod(row)), "utf8") + 1;
+    if (count > 0 && bytes > PERIOD_PAGE_BYTES) break;
+    count += 1;
+  }
+  return count;
+}
+
+export async function listIntegrationPeriods(context: IntegrationContext, input: IntegrationOperationInput<"list_periods">): Promise<IntegrationOperationOutput<"list_periods">> {
+  const account = await readAccount(context);
+  const rows = await listPeriodsForUser(context.supabase, context.userId, { from: input.start_local_date, to: input.end_local_date });
+  const selected = page(context, rows, input, ["periods", input.start_local_date, input.end_local_date], periodKey, periodPageSize);
+  return { timezone: account.timezone, today_local_date: account.today,
+    periods: selected.rows.map(serializePeriod), next_cursor: selected.next_cursor };
 }
 
 export async function listIntegrationOccurrences(context: IntegrationContext, input: IntegrationOperationInput<"list_occurrences">): Promise<IntegrationOperationOutput<"list_occurrences">> {
@@ -279,6 +338,7 @@ export async function getIntegrationAdherenceSummary(context: IntegrationContext
   const account = await readAccount(context, true);
   const rows = (await readIntegrationOccurrences(context.supabase, context.userId, { startLocalDate: input.start_local_date, endLocalDate: input.end_local_date }))
     .filter((row) => !input.behavior_ids || input.behavior_ids.includes(row.behavior_id));
+  const periodRows = await listPeriodsForUser(context.supabase, context.userId, { from: input.start_local_date, to: input.end_local_date });
   const counts = (occurrences: Occurrence[]) => {
     const summary = resolveAdherenceCounts({ todayLocalDate: account.today,
       occurrences: occurrences.map((row) => ({ status: normalizeOccurrenceStatus(row.status), localDate: row.local_date,
@@ -288,6 +348,11 @@ export async function getIntegrationAdherenceSummary(context: IntegrationContext
       unresolved: summary.unresolvedCount, needs_decision: summary.needsDecisionCount, adherence_rate: summary.rate,
       opportunity_completed_count: summary.opportunityCompletedCount ?? 0 };
   };
+  // The same rows and the same counting as `overall`, split by the union of covered dates.
+  const split = splitByPeriods(rows, periodCoveredDates(periodRows, input.start_local_date, input.end_local_date), (row) => row.local_date);
+  const listed = embeddedPeriods(periodRows);
+  const periodSplit = periodRows.length === 0 ? null
+    : { periods: listed.periods, more_periods: listed.more, inside: counts(split.inside), outside: counts(split.outside) };
   return {
     start_local_date: input.start_local_date, end_local_date: input.end_local_date,
     timezone: account.timezone, adherence_definition: ADHERENCE_DEFINITION, overall: counts(rows),
@@ -295,6 +360,7 @@ export async function getIntegrationAdherenceSummary(context: IntegrationContext
       behavior_id: behavior.id, behavior_title: behavior.title, state: behavior.active ? "active" : "archived",
       ...counts(rows.filter((row) => row.behavior_id === behavior.id)),
     })),
+    period_split: periodSplit,
   };
 }
 
@@ -302,6 +368,10 @@ const behaviorUrl = (id: string) => `https://app.cadence-me.com/behaviors?behavi
 const occurrenceUrl = (row: { behavior_id: string; local_date: string }) => `https://app.cadence-me.com/behaviors?behavior=${row.behavior_id}&day=${row.local_date}&range=90`;
 const dayNoteUrl = "https://app.cadence-me.com/timeline";
 const dayNoteTitle = (localDate: string) => `Day note for ${localDate}`;
+const periodUrl = "https://app.cadence-me.com/behaviors";
+/** Label and dates only. A Period's note is never part of a search or fetch result. */
+const periodTitle = (row: Pick<PeriodRecord, "label" | "start_on" | "end_on">) =>
+  `Period: ${row.label} (${row.end_on === null ? `from ${row.start_on}, ongoing` : `${row.start_on} to ${row.end_on}`})`;
 
 export async function searchIntegrationRecords(context: IntegrationContext, input: IntegrationOperationInput<"search">): Promise<IntegrationOperationOutput<"search">> {
   const account = await readAccount(context, true);
@@ -309,17 +379,21 @@ export async function searchIntegrationRecords(context: IntegrationContext, inpu
   const matches = (text: string | null) => text?.toLocaleLowerCase("en-US").includes(query) ?? false;
   const behaviors = account.behaviors.filter((row) => matches(row.title) || matches(row.description) ||
     serializeIntegrationBehavior(row, null).archive_notes.some((note) => matches(note.note)));
-  const [occurrenceRows, dayNoteRows] = await Promise.all([
+  const [occurrenceRows, dayNoteRows, periodRows] = await Promise.all([
     readIntegrationOccurrences(context.supabase, context.userId),
     listAllDayNotes(context.supabase, context.userId),
+    listPeriodsForUser(context.supabase, context.userId),
   ]);
   const occurrences = occurrenceRows.filter((row) => matches(row.note));
   const dayNotes = dayNoteRows.filter((row) => matches(row.note));
-  if (behaviors.length + occurrences.length + dayNotes.length > L.maxSearchResults) throw new IntegrationReadError("limit_exceeded", "More than 20 records match. Use more specific search text.");
+  // Label only: a Period note is returned by list_periods and the Period writes, nowhere else.
+  const periods = periodRows.filter((row) => matches(row.label));
+  if (behaviors.length + occurrences.length + dayNotes.length + periods.length > L.maxSearchResults) throw new IntegrationReadError("limit_exceeded", "More than 20 records match. Use more specific search text.");
   return { results: [
     ...behaviors.map((row) => ({ id: `behavior:${row.id}`, title: row.title, url: behaviorUrl(row.id) })),
     ...occurrences.map((row) => ({ id: `occurrence:${row.id}`, title: `${findBehavior(account, row.behavior_id).title} — ${row.local_date}`, url: occurrenceUrl(row) })),
     ...dayNotes.map((row) => ({ id: `day_note:${row.id}`, title: dayNoteTitle(row.local_date), url: dayNoteUrl })),
+    ...periods.map((row) => ({ id: `period:${row.id}`, title: periodTitle(row), url: periodUrl })),
   ].sort((a, b) => a.id.localeCompare(b.id)) };
 }
 
@@ -331,6 +405,13 @@ export async function fetchIntegrationRecord(context: IntegrationContext, input:
     const dayNote = serializeDayNote(row);
     return { id: input.id, title: dayNoteTitle(dayNote.local_date), text: JSON.stringify(dayNote, null, 2), url: dayNoteUrl,
       metadata: { kind: "day_note", local_date: dayNote.local_date } };
+  }
+  if (kind === "period") {
+    const row = await getPeriod(context.supabase, context.userId, id);
+    if (!row) throw new IntegrationReadError("not_found", "No Period with that id exists for this account.");
+    // The fetched text leaves the note out on purpose; `revision` is what update_period and end_period take.
+    const period = { ...serializePeriodSummary(row), revision: integrationInstant(row.updated_at), updated_at: integrationInstant(row.updated_at) };
+    return { id: input.id, title: periodTitle(row), text: JSON.stringify(period, null, 2), url: periodUrl, metadata: { kind: "period" } };
   }
   const account = await readAccount(context, kind === "occurrence");
   if (kind === "behavior") {

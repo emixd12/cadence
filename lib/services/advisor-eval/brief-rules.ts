@@ -6,6 +6,7 @@ import {
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brief-moves";
 import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
 import { textQuotesDayNote, type BriefDayNote } from "@cadence/core/resolvers/day-note.resolver";
+import type { BriefPeriods } from "@cadence/core/resolvers/period.resolver";
 
 /**
  * Advisor Phase 3 (3A2) eval, layer 1: rules every offered line must keep, checked with
@@ -107,4 +108,34 @@ export function checkBriefDayNoteNotQuoted(input: Readonly<{
   if (replaced.length) return { passed: false, detail: replaced.join(",") };
   const notes = input.dayNotes.map((item) => item.note);
   return input.texts.some((text) => textQuotesDayNote(text, notes)) ? { passed: false, detail: "shown" } : { passed: true };
+}
+
+/**
+ * Ticket 371 (D35): a rule on the brief's words when the facts carry Periods. The opening
+ * and the reasons may name a Period's label. They may not suggest marking anything because
+ * of it, and may not say anything about the person's health beyond the label itself. The
+ * rule reads the shown text with the labels taken out, so a label such as "Sick" passes and
+ * the same word added by the model does not. "These days are marked Sick" names a label;
+ * "mark them done" suggests a mark.
+ */
+export const BRIEF_PERIOD_RULE = "period_named_not_judged";
+
+const PERIOD_MARKING = /\b(mark(s|ed|ing)? (it|them|this|that|these|those|anything|everything|the rest)|mark(s|ed|ing)?\b[^.]{0,40}\b(done|completed?|missed)|count(s|ed|ing)? (it|them|this|that|these|those|today) as|skip(s|ped|ping)?|excus(e|es|ed|ing)|write (it|them|these|those|today) off|let (it|them|these|those) (go|slide)|as (done|completed)|not (done|completed))\b/i;
+const PERIOD_HEALTH = /\b(sick|ill|illness|unwell|symptoms?|fever|recover(y|s|ed|ing)?|heal(s|ed|ing)?|rest up|get well|feel(ing)? better|take care of yourself|doctors?|medic(ine|ation|al)|health|diagnos\w+)\b/i;
+
+export function checkBriefPeriodNamedNotJudged(input: Readonly<{
+  periods: BriefPeriods;
+  /** The opening and every reason, as shown. */
+  texts: readonly string[];
+}>): Readonly<{ passed: boolean; detail?: string }> {
+  const labels = [...input.periods.periods, ...input.periods.recentPeriods].map((item) => item.label).sort((a, b) => b.length - a.length);
+  for (const shown of input.texts) {
+    let text = shown;
+    for (const label of labels) text = text.replace(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu"), " ");
+    const marking = text.match(PERIOD_MARKING);
+    if (marking) return { passed: false, detail: `marking: ${marking[0]}` };
+    const health = text.match(PERIOD_HEALTH);
+    if (health) return { passed: false, detail: `health: ${health[0]}` };
+  }
+  return { passed: true };
 }

@@ -4,6 +4,7 @@ import {
   getNoteShortcutView,
   listAcceptedNoteShortcuts,
   listInlineNoteShortcuts,
+  listPeriodNoteShortcuts,
   manageNoteShortcuts,
   matchRepeatedNoteShortcuts,
 } from "@cadence/core/services/note-shortcut.service";
@@ -17,6 +18,8 @@ import type {
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { createNoteShortcutStore } from "@/lib/db/noteShortcuts.repo";
+import { listPeriodsOrNone } from "@/lib/db/periods.repo";
+import { PERIOD_NOTE_SHORTCUT_KEY } from "@cadence/core/resolvers/period.resolver";
 import { analyzeModelNoteShortcutsAfterNoteSave } from "@/lib/services/note-shortcut-ai.service";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,8 +57,19 @@ export async function listAcceptedNoteShortcutsForCurrentUser(): Promise<
 export async function listInlineNoteShortcutsForCurrentUser(): Promise<
   Record<string, NoteShortcut[]>
 > {
-  const store = await currentUserStore();
-  return listInlineNoteShortcuts(store, Temporal.Now.instant());
+  const userId = await requireCurrentUserId("Sign in again before managing Note shortcuts.");
+  const supabase = await createClient();
+  const base = createNoteShortcutStore(supabase, userId);
+  // One read of the shortcut states serves both lists.
+  let states: ReturnType<typeof base.readStates> | undefined;
+  const store = { ...base, readStates: () => (states ??= base.readStates()) };
+  const now = Temporal.Now.instant();
+  const [inline, periodNotes] = await Promise.all([
+    listInlineNoteShortcuts(store, now),
+    listPeriodsOrNone(supabase, userId).then((periods) => listPeriodNoteShortcuts(store, periods, now), () => []),
+  ]);
+  // Period note shortcuts ride in the same record under their own key (Ticket 369).
+  return periodNotes.length > 0 ? { ...inline, [PERIOD_NOTE_SHORTCUT_KEY]: periodNotes } : inline;
 }
 
 export async function dismissNoteShortcutForCurrentUser(

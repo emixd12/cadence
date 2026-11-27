@@ -20,6 +20,7 @@ import type {
   ExportCategoryInput,
   ExportDayNoteInput,
   ExportOccurrenceInput,
+  ExportPeriodInput,
   ExportStatusEventInput,
   ExportTimeSessionInput,
 } from "../lib/types/export";
@@ -30,6 +31,12 @@ const DAY_NOTE: ExportDayNoteInput = {
   id: "60000000-0000-4000-8000-000000000001", localDate: "2026-06-07", note: "Sick",
   createdAt: "2026-06-07T12:00:00Z", updatedAt: "2026-06-07T12:00:00Z",
 };
+const PERIODS: ExportPeriodInput[] = [
+  { id: "70000000-0000-4000-8000-000000000001", label: "Sick", startOn: "2026-06-01", endOn: "2026-06-03", note: "Flu",
+    createdAt: "2026-06-01T12:00:00Z", updatedAt: "2026-06-01T12:00:00Z" },
+  { id: "70000000-0000-4000-8000-000000000002", label: "Travel", startOn: "2026-06-05", endOn: null, note: null,
+    createdAt: "2026-06-05T12:00:00Z", updatedAt: "2026-06-05T12:00:00Z" },
+];
 const NOW = Temporal.Instant.from("2026-06-08T16:00:00Z");
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -129,6 +136,13 @@ const mocks = vi.hoisted(() => ({
   repairUserOccurrenceReminderGraphBestEffort: vi.fn(),
   listDayNotes: vi.fn(),
   saveDayNote: vi.fn(),
+  listPeriods: vi.fn(),
+  createPeriod: vi.fn(),
+  updatePeriod: vi.fn(),
+}));
+
+vi.mock("@/lib/db/periods.repo", () => ({
+  createPeriodStore: () => ({ listPeriods: mocks.listPeriods, createPeriod: mocks.createPeriod, updatePeriod: mocks.updatePeriod }),
 }));
 
 vi.mock("@/lib/db/dayNotes.repo", () => ({
@@ -206,6 +220,43 @@ describe("BehaviorLog restore apply service", () => {
       id: "day-note-1", user_id: USER_ID, local_date: input.localDate, note: input.note, revision: 1,
       created_at: NOW.toString(), updated_at: NOW.toString(),
     }));
+    mocks.listPeriods.mockResolvedValue([]);
+    mocks.createPeriod.mockImplementation(async (input: { label: string }) => ({ id: "new-period", label: input.label }));
+  });
+
+  it("adds missing Periods and keeps stored notes when a retried restore was already applied (Ticket 373)", async () => {
+    const zip = createStoredZip(bundleFiles({ periods: PERIODS }));
+    const preview = previewBehaviorLogRestoreFromZip({ zip, existing: emptyExisting() });
+    mocks.getBehaviorLogImportRunById.mockResolvedValue(restorePreviewRun(preview, zip));
+    mocks.getAppliedBehaviorLogRestoreRunByAcceptedPreview.mockResolvedValue(restoreAppliedRun(preview));
+    // The first run saved "Sick"; the person has edited its note since.
+    mocks.listPeriods.mockResolvedValue([{
+      id: "stored-sick", user_id: USER_ID, label: "Sick", start_on: "2026-06-01", end_on: "2026-06-03", note: "Edited after restore",
+      revision: 2, created_at: NOW.toString(), updated_at: NOW.toString(),
+    }]);
+
+    const result = await applyBehaviorLogRestoreUploadFromFormData(restoreApplyFormData(zip, preview));
+
+    expect(result.status).toBe("applied");
+    expect(result.message).toBe("This accepted BehaviorLog restore was already applied. Periods: 1 added, 1 already saved.");
+    expect(mocks.createPeriod).toHaveBeenCalledExactlyOnceWith({ label: "Travel", startOn: "2026-06-05", endOn: null, note: null });
+    expect(mocks.updatePeriod).not.toHaveBeenCalled();
+  });
+
+  it("reports the committed restore as applied when saved Periods cannot be read (Ticket 373)", async () => {
+    const zip = createStoredZip(bundleFiles({ periods: PERIODS }));
+    const preview = previewBehaviorLogRestoreFromZip({ zip, existing: emptyExisting() });
+    mocks.getBehaviorLogImportRunById.mockResolvedValue(restorePreviewRun(preview, zip));
+    mocks.getAppliedBehaviorLogRestoreRunByAcceptedPreview.mockResolvedValue(restoreAppliedRun(preview));
+    mocks.listPeriods.mockRejectedValue(new Error("network down"));
+
+    const result = await applyBehaviorLogRestoreUploadFromFormData(restoreApplyFormData(zip, preview));
+
+    expect(result.status).toBe("applied");
+    expect(result.message).toBe(
+      "This accepted BehaviorLog restore was already applied. Periods could not be restored. Your other data was restored. Apply this restore again to add the periods.",
+    );
+    expect(mocks.createPeriod).not.toHaveBeenCalled();
   });
 
   it("fills missing day notes when a retried restore was already applied", async () => {
@@ -1538,7 +1589,7 @@ function existingRecordsFromRestorePayload(payload: RestorePayloadForTest) {
 }
 
 function bundleFiles(
-  input: { timeSessions?: ExportTimeSessionInput[]; nativeReminders?: boolean; dayNotes?: ExportDayNoteInput[] } = {},
+  input: { timeSessions?: ExportTimeSessionInput[]; nativeReminders?: boolean; dayNotes?: ExportDayNoteInput[]; periods?: ExportPeriodInput[] } = {},
 ) {
   const categories: ExportCategoryInput[] = [
     {
@@ -1632,6 +1683,7 @@ function bundleFiles(
     range: "30",
     includeTimeTracking: Boolean(input.timeSessions),
     ...(input.dayNotes ? { includeNotes: true, dayNotes: input.dayNotes } : {}),
+    ...(input.periods ? { includeNotes: true, periods: input.periods } : {}),
   }).behaviorLog.files;
 }
 

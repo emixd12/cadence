@@ -3,6 +3,7 @@ import {
   PERIOD_LIMITS,
   PERIOD_MESSAGES,
   comparePeriods,
+  normalizePeriodNote,
   parsePeriodLocalDate,
   periodsOverlappingRange,
   resolvePeriodCreate,
@@ -14,6 +15,7 @@ import {
   type PeriodCreateInput,
   type PeriodRecord,
 } from "../resolvers/period.resolver";
+import { resolveNoteUpdate } from "../resolvers/status.resolver";
 
 export const PERIOD_CONFLICT_MESSAGE =
   "This period changed elsewhere. Review the latest version before saving again.";
@@ -80,6 +82,25 @@ export async function updatePeriod(
   const plan = resolvePeriodUpdate({ period: current, expectedRevision, changes });
   if (!plan.changed) return { period: current, changed: false };
   return commitUpdate(store, plan);
+}
+
+/**
+ * Saves only a Period's note, for the auto-saving note field. The caller names the
+ * note it last read instead of a revision, as a day note does. Throws the conflict
+ * message when the Period is gone or its note is neither the one read nor the one
+ * being saved. A repeat of a save that already landed changes nothing.
+ */
+export async function savePeriodNote(
+  store: Pick<PeriodDataStore, "getPeriod" | "updatePeriod">,
+  input: Readonly<{ id: unknown; expectedNote: unknown; note: unknown }>,
+): Promise<PeriodWriteResult> {
+  const note = normalizePeriodNote(input.note);
+  const expectedNote = typeof input.expectedNote === "string" ? resolveNoteUpdate({ note: input.expectedNote }).note : null;
+  const current = await store.getPeriod(requireId(input.id));
+  if (!current) throw new Error(PERIOD_CONFLICT_MESSAGE);
+  if (current.note === note) return { period: current, changed: false };
+  if (current.note !== expectedNote) throw new Error(PERIOD_CONFLICT_MESSAGE);
+  return commitUpdate(store, resolvePeriodUpdate({ period: current, expectedRevision: current.revision, changes: { note } }));
 }
 
 /**

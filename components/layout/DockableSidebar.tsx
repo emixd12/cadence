@@ -117,6 +117,9 @@ export function useDockableSidebar({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasStoredPreferenceRef = useRef(false);
+  // True once the person docks or collapses the sidebar in this mount. The stored
+  // preference is applied a frame after mount, and must not undo that choice.
+  const hasChosenPreferenceRef = useRef(false);
   const isPointerInsideRef = useRef(false);
   const lastPointerTypeRef = useRef<string | null>(null);
   const stateRef = useRef(state);
@@ -172,6 +175,7 @@ export function useDockableSidebar({
     (preference: SidebarDockPreference) => {
       cancelDismissTimer();
       hasStoredPreferenceRef.current = true;
+      hasChosenPreferenceRef.current = true;
       writeStoredSidebarPreference(preference, undefined, storageKey);
       dispatch({ type: "set_preference", preference, suppressHover: false });
     },
@@ -183,6 +187,7 @@ export function useDockableSidebar({
     const nextPreference: SidebarDockPreference =
       stateRef.current.preference === "docked" ? "collapsed" : "docked";
     hasStoredPreferenceRef.current = true;
+    hasChosenPreferenceRef.current = true;
     writeStoredSidebarPreference(nextPreference, undefined, storageKey);
     dispatch({ type: "toggle_dock", suppressHover: false });
   }, [cancelDismissTimer, storageKey]);
@@ -256,6 +261,7 @@ export function useDockableSidebar({
     };
 
     const frameId = window.requestAnimationFrame(() => {
+      if (hasChosenPreferenceRef.current) return;
       if (stored !== null) {
         hasStoredPreferenceRef.current = true;
         if (stored !== stateRef.current.preference) {

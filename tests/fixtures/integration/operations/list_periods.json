@@ -1,0 +1,538 @@
+{
+  "operation": "list_periods",
+  "valid_inputs": [
+    {
+      "name": "one month",
+      "value": {
+        "start_local_date": "2026-03-01",
+        "end_local_date": "2026-03-31"
+      }
+    },
+    {
+      "name": "a full year, next page",
+      "value": {
+        "start_local_date": "2026-01-01",
+        "end_local_date": "2027-01-01",
+        "cursor": "WyJzY29wZSIsImtleSJd"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "range over the cap",
+      "value": {
+        "start_local_date": "2026-01-01",
+        "end_local_date": "2027-01-02"
+      },
+      "code": "limit_exceeded",
+      "semantic": true,
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "end before start",
+      "value": {
+        "start_local_date": "2026-03-10",
+        "end_local_date": "2026-03-01"
+      },
+      "code": "invalid_input",
+      "semantic": true,
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "page size is not an input",
+      "value": {
+        "start_local_date": "2026-03-01",
+        "end_local_date": "2026-03-31",
+        "page_size": 100
+      },
+      "code": "invalid_input",
+      "path": "$.page_size"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "an ended and an ongoing Period",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-03-08",
+        "periods": [
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000008-1111-4111-8111-000000000008",
+            "label": "Travel",
+            "start_local_date": "2026-03-08",
+            "end_local_date": null,
+            "ongoing": true,
+            "note": null,
+            "revision": "2026-03-08T07:45:00Z",
+            "updated_at": "2026-03-08T07:45:00Z"
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "name": "no Periods",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-03-08",
+        "periods": [],
+        "next_cursor": null
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing revision",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-03-08",
+        "periods": [
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "updated_at": "2026-03-08T07:30:00Z"
+          }
+        ],
+        "next_cursor": null
+      },
+      "code": "internal_error",
+      "path": "$.periods[0].revision"
+    },
+    {
+      "name": "more than one page of Periods",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-03-08",
+        "periods": [
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          },
+          {
+            "id": "00000007-1111-4111-8111-000000000007",
+            "label": "Sick",
+            "start_local_date": "2026-03-06",
+            "end_local_date": "2026-03-09",
+            "ongoing": false,
+            "note": "Flu. Stayed home.",
+            "revision": "2026-03-08T07:30:00Z",
+            "updated_at": "2026-03-08T07:30:00Z"
+          }
+        ],
+        "next_cursor": null
+      },
+      "code": "internal_error",
+      "path": "$.periods"
+    }
+  ]
+}

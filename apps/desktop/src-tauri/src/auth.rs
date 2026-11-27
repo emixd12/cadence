@@ -8,6 +8,7 @@ const ALLOWED_KEYS: &[&str] = &[
     "supabase-pkce",
     "pending-state",
     "pending-calendar-state",
+    "pending-ai-calendar-state",
     "pending-calendar-agent-state",
     "pending-outlook-calendar-attempt",
 ];
@@ -566,6 +567,12 @@ mod tests {
         for name in ALLOWED_KEYS {
             assert!(native_key(name).is_err());
         }
+    }
+
+    #[test]
+    fn allows_pending_ai_calendar_state_key() {
+        assert!(ALLOWED_KEYS.contains(&"pending-ai-calendar-state"));
+        assert!(key("pending-ai-calendar-state").is_ok());
     }
 
     #[test]

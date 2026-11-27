@@ -2506,6 +2506,30 @@
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
+    },
+    {
+      "componentId": "module.period-control",
+      "file": "components/timeline/DayProgressTimeline.tsx",
+      "line": 908,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.period-control",
+      "file": "components/timeline/TimelineGroup.tsx",
+      "line": 74,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.period-control",
+      "file": "components/behaviors/BehaviorList.tsx",
+      "line": 509,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
     }
   ],
   "summary": {

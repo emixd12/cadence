@@ -14,6 +14,8 @@ import { modelPrice } from "./agent-model-pricing";
 import { BRIEF_OPENING_PROMPT_REVISION, briefOpeningInstructions, briefOpeningPromptRevision, prepareBriefOpening, stockBriefOpening, validateBriefOpening, type BriefOpeningLine, type BriefOpeningRequest, type BriefOpeningText } from "./brief-opening";
 import { briefDayNoteRange, resolveBriefDayNotes, type BriefDayNote } from "@cadence/core/resolvers/day-note.resolver";
 import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
+import { briefPeriodRange, resolveBriefPeriods, type BriefPeriods } from "@cadence/core/resolvers/period.resolver";
+import { listPeriodsOrNone } from "@/lib/db/periods.repo";
 import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBriefConflicts, saveBriefProposals } from "./brief-moves.service";
 import { briefOpportunitiesFor, planBriefOpportunityDay, readBriefOpportunities, saveBriefOpportunityProposals } from "./brief-opportunities.service";
 import { BRIEF_OPPORTUNITY_LINES_FEATURE } from "@cadence/core/types/brief-opportunities";
@@ -301,11 +303,16 @@ export type DailyBriefServiceOptions = Readonly<{
  * notes of today and the two days before it. They change the words only: the planner,
  * Re-check and Re-plan never see them, and a quiet day reads none.
  *
+ * Ticket 371 (D35): the same call reads the labels and dates of the Periods that cover
+ * today or ended in the 7 days before it, whatever the Notes source says. They follow the
+ * day-note rules above: words only, none on a quiet day, and a saved brief is not remade
+ * when a Period changes.
+ *
  * The run log's prompt revision is the revision of the instructions that are sent, so the
  * run starts once they are known: after the lines are planned. One case starts it earlier:
  * a length estimate that needs a model call, which must reserve spend against the run
  * before the lines exist. That run records the revision known then (with or without day
- * notes); a pairing line planned afterwards (`CADENCE_ALONGSIDE`) is not in it.
+ * notes and Periods); a pairing line planned afterwards (`CADENCE_ALONGSIDE`) is not in it.
  */
 export async function requestInAppDailyBrief(caller: CalendarCaller, value: unknown, options: DailyBriefServiceOptions = {}): Promise<DailyBriefResponse> {
   const attempt = readDailyBriefAttemptInput(value);
@@ -382,9 +389,17 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       let dayNotesRead: Promise<BriefDayNote[]> | null = null;
       const readDayNotes = (): Promise<BriefDayNote[]> => dayNotesRead ??= !preferences.includeNotes ? Promise.resolve([])
         : phase("day_notes", () => readBriefDayNotes(caller.client, caller.user.id, context.localDate)).catch(() => []);
+      // Ticket 371: Periods, under the same rule. Not gated by the Notes source. A failed read leaves the brief without them.
+      let periodsRead: Promise<BriefPeriods> | null = null;
+      const readPeriods = (): Promise<BriefPeriods> => periodsRead ??=
+        phase("periods", () => readBriefPeriods(caller.client, caller.user.id, context.localDate)).catch(() => NO_BRIEF_PERIODS);
       // A length estimate that calls the model starts the run before the lines exist (see above).
       const estimateGenerator: DailyBriefGenerator = async (input) => {
-        const known = briefOpeningPromptRevision(briefOpeningInstructions((await readDayNotes()).length ? ["dayNotes"] : []));
+        const [notes, periods] = await Promise.all([readDayNotes(), readPeriods()]);
+        const known = briefOpeningPromptRevision(briefOpeningInstructions([
+          ...(notes.length ? ["dayNotes" as const] : []),
+          ...(periods.periods.length || periods.recentPeriods.length ? ["periods" as const] : []),
+        ]));
         return withAgentRun(await startRun(known), (request) => generateDurationEstimatesWithModel(request))(input);
       };
       // Usage reaches only the performance log and the run log, never the response.
@@ -408,7 +423,8 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       signal.throwIfAborted();
       // The words' request, or null on a quiet day. Day notes go into the words only; `plan` is already made.
       const quiet = !plan.candidates.length && !conflicts.length;
-      const request = quiet ? null : briefWordsRequest({ context, candidates: plan.candidates, conflicts, calendar: plan.calendar, now, dayNotes: await readDayNotes() });
+      const [dayNotes, periods] = quiet ? [[], NO_BRIEF_PERIODS] as const : await Promise.all([readDayNotes(), readPeriods()]);
+      const request = quiet ? null : briefWordsRequest({ context, candidates: plan.candidates, conflicts, calendar: plan.calendar, now, dayNotes, periods });
       const agentRun = await startRun(request?.revision ?? BRIEF_OPENING_PROMPT_REVISION);
       signal.throwIfAborted();
       const words = await measurePerformanceSpan({ span: "daily_brief.model", counts: () => dailyBriefUsageCounts(usage), errorCounts: () => dailyBriefUsageCounts(usage) },
@@ -519,6 +535,8 @@ export async function writeBriefWords(input: Readonly<{
   onUsage?: (usage: DailyBriefModelUsage) => void;
   /** Ticket 367: the person's recent day notes, for the words only. Ignored when `request` is given. */
   dayNotes?: readonly BriefDayNote[];
+  /** Ticket 371: the Periods covering today and the recently ended ones, for the words only. Ignored when `request` is given. */
+  periods?: BriefPeriods;
   /** The request `briefWordsRequest` built from the same input, when the caller needed its revision first. */
   request?: BriefOpeningRequest | null;
 }>): Promise<DailyBriefWords> {
@@ -527,7 +545,7 @@ export async function writeBriefWords(input: Readonly<{
   try {
     const output = await raceAbort(input.generate({ instructions: request.instructions, facts: request.facts, signal: input.signal,
       ...(input.onUsage ? { onUsage: input.onUsage } : {}) }), input.signal);
-    return { ...validateBriefOpening(output, { lines: input.candidates, conflicts: input.conflicts, labels: request.labels, dayNotes: request.dayNotes }), failure: null };
+    return { ...validateBriefOpening(output, { lines: input.candidates, conflicts: input.conflicts, labels: request.labels, dayNotes: request.dayNotes, periodLabels: request.periodLabels }), failure: null };
   } catch (error) {
     if (input.requestSignal.aborted) throw error;
     // The run log records why the words fell back, though the brief itself is shown.
@@ -548,10 +566,12 @@ export function briefWordsRequest(input: Readonly<{
   calendar: "current" | "stale" | "none";
   now: string;
   dayNotes?: readonly BriefDayNote[];
+  periods?: BriefPeriods;
 }>): BriefOpeningRequest | null {
   if (!input.candidates.length && !input.conflicts.length) return null;
   return prepareBriefOpening({ context: input.context, lines: input.candidates, conflicts: input.conflicts, calendar: input.calendar, now: input.now,
-    ...(input.dayNotes?.length ? { dayNotes: input.dayNotes } : {}) });
+    ...(input.dayNotes?.length ? { dayNotes: input.dayNotes } : {}),
+    ...(input.periods && (input.periods.periods.length || input.periods.recentPeriods.length) ? { periods: input.periods } : {}) });
 }
 
 /**
@@ -561,6 +581,18 @@ export function briefWordsRequest(input: Readonly<{
  */
 export async function readBriefDayNotes(client: AppSupabaseClient, userId: string, localDate: string): Promise<BriefDayNote[]> {
   return resolveBriefDayNotes({ localDate, records: await listDayNotesInRange(client, userId, briefDayNoteRange(localDate)) });
+}
+
+const NO_BRIEF_PERIODS: BriefPeriods = { periods: [], recentPeriods: [] };
+
+/**
+ * Ticket 371: the Periods covering `localDate` and those that ended in the 7 days before
+ * it, as the brief's opening reads them: labels and dates, never a Period's note. Not gated
+ * by the AI Notes source. A missing `periods` table reads as none. Labels go to the model
+ * request and the run-content store only, never to a log.
+ */
+export async function readBriefPeriods(client: AppSupabaseClient, userId: string, localDate: string): Promise<BriefPeriods> {
+  return resolveBriefPeriods({ localDate, records: await listPeriodsOrNone(client, userId, briefPeriodRange(localDate)) });
 }
 
 export type DailyBriefWords = BriefOpeningText & Readonly<{

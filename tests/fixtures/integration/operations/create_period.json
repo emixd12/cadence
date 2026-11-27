@@ -1,0 +1,139 @@
+{
+  "operation": "create_period",
+  "valid_inputs": [
+    {
+      "name": "a week with a note",
+      "value": {
+        "label": "Sick",
+        "start_local_date": "2026-03-06",
+        "end_local_date": "2026-03-09",
+        "note": "Flu. Stayed home.",
+        "idempotency_key": "period-0001"
+      }
+    },
+    {
+      "name": "ongoing",
+      "value": {
+        "label": "Travel",
+        "start_local_date": "2026-03-08"
+      }
+    },
+    {
+      "name": "future, explicit ongoing and no note",
+      "value": {
+        "label": "Exam week",
+        "start_local_date": "2027-01-11",
+        "end_local_date": null,
+        "note": null
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "blank label",
+      "value": {
+        "label": "   ",
+        "start_local_date": "2026-03-06"
+      },
+      "code": "invalid_input",
+      "path": "$.label"
+    },
+    {
+      "name": "label too long",
+      "value": {
+        "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "start_local_date": "2026-03-06"
+      },
+      "code": "invalid_input",
+      "path": "$.label"
+    },
+    {
+      "name": "label with a line break",
+      "value": {
+        "label": "Sick\nweek",
+        "start_local_date": "2026-03-06"
+      },
+      "code": "invalid_input",
+      "path": "$.label"
+    },
+    {
+      "name": "end before start",
+      "value": {
+        "label": "Sick",
+        "start_local_date": "2026-03-06",
+        "end_local_date": "2026-03-05"
+      },
+      "code": "invalid_input",
+      "semantic": true,
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "missing start",
+      "value": {
+        "label": "Sick"
+      },
+      "code": "invalid_input",
+      "path": "$.start_local_date"
+    },
+    {
+      "name": "a status is not a Period field",
+      "value": {
+        "label": "Sick",
+        "start_local_date": "2026-03-06",
+        "status": "not_completed"
+      },
+      "code": "invalid_input",
+      "path": "$.status"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "created",
+      "value": {
+        "period": {
+          "id": "00000007-1111-4111-8111-000000000007",
+          "label": "Sick",
+          "start_local_date": "2026-03-06",
+          "end_local_date": "2026-03-09",
+          "ongoing": false,
+          "note": "Flu. Stayed home.",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        }
+      }
+    },
+    {
+      "name": "created ongoing",
+      "value": {
+        "period": {
+          "id": "00000008-1111-4111-8111-000000000008",
+          "label": "Travel",
+          "start_local_date": "2026-03-08",
+          "end_local_date": null,
+          "ongoing": true,
+          "note": null,
+          "revision": "2026-03-08T07:45:00Z",
+          "updated_at": "2026-03-08T07:45:00Z"
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing ongoing",
+      "value": {
+        "period": {
+          "id": "00000007-1111-4111-8111-000000000007",
+          "label": "Sick",
+          "start_local_date": "2026-03-06",
+          "end_local_date": "2026-03-09",
+          "note": "Flu. Stayed home.",
+          "revision": "2026-03-08T07:30:00Z",
+          "updated_at": "2026-03-08T07:30:00Z"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.period.ongoing"
+    }
+  ]
+}

@@ -10,6 +10,9 @@ import {
 } from "@/components/layout/ScreenFrame";
 import { getAnalyticsPageData } from "@/lib/services/analytics.service";
 import { getBehaviorPageData } from "@/lib/services/behavior.service";
+import { getPeriodListForCurrentUser } from "@/lib/services/period.service";
+import type { PeriodActions } from "@/lib/types/period";
+import { deletePeriodAction, endPeriodAction, savePeriodAction, savePeriodNoteAction } from "../timeline/actions";
 import { getAlongsideFormViewsForCurrentUser } from "@/lib/services/alongside-view.service";
 import { parentChoices } from "@/components/behaviors/behavior-list-state";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
@@ -36,6 +39,14 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+
+// Ticket 369: the Periods list uses the same writes as the Timeline's day headers.
+const PERIOD_ACTIONS: PeriodActions = {
+  save: savePeriodAction,
+  end: endPeriodAction,
+  remove: deletePeriodAction,
+  saveNote: savePeriodNoteAction,
+};
 
 type BehaviorsPageProps = Readonly<{
   searchParams?: Promise<{
@@ -82,7 +93,7 @@ async function BehaviorsContent({
   selectedDayLocalDate?: string;
   editTarget: BehaviorEditTarget | null;
 }>) {
-  const [data, analytics] = await withPerformanceRoute(
+  const [data, analytics, periodList] = await withPerformanceRoute(
     "/behaviors",
     "page.data_load",
     () =>
@@ -93,6 +104,7 @@ async function BehaviorsContent({
           selectedBehaviorId,
           selectedDayLocalDate,
         }),
+        getPeriodListForCurrentUser(),
       ]),
     {
       counts: ([pageData, analyticsView]) => ({
@@ -150,6 +162,10 @@ async function BehaviorsContent({
         reorderAction={reorderSubBehaviorsAction}
         createAction={createBehaviorAction}
         alongsideViews={alongsideViews}
+        periods={periodList.periods}
+        periodLabelSuggestions={periodList.labelSuggestions}
+        periodNoteShortcuts={periodList.noteShortcuts}
+        periodActions={PERIOD_ACTIONS}
       />
       </NoteShortcutDismissProvider>
     </>

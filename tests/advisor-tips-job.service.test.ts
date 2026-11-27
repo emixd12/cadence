@@ -37,12 +37,13 @@ type FakeState = {
   suppressed: string[];
   reserveAllowed: boolean;
   generate: TipVisitPort["generate"];
+  periods?: NonNullable<TipVisitPort["periods"]>;
   runs: { runId: string; outcome?: string; errorCode?: string | null; modelCalls?: number }[];
   storedSignals: number;
 };
 
-function fakePort(state: FakeState): TipVisitPort & { calls: { generate: number; notes: number; write: TipToWrite[][] } } {
-  const calls = { generate: 0, notes: 0, write: [] as TipToWrite[][] };
+function fakePort(state: FakeState): TipVisitPort & { calls: { generate: number; notes: number; periods: string[]; write: TipToWrite[][] } } {
+  const calls = { generate: 0, notes: 0, periods: [] as string[], write: [] as TipToWrite[][] };
   return {
     calls,
     async startRun() {
@@ -62,6 +63,7 @@ function fakePort(state: FakeState): TipVisitPort & { calls: { generate: number;
     }),
     history: async (since) => ({ tips: state.tips.filter((tip) => tip.localDate >= since), suppressedCardIds: state.suppressed }) satisfies TipHistory,
     notes: async () => { calls.notes += 1; return []; },
+    periods: async (localDate) => { calls.periods.push(localDate); return state.periods ? state.periods(localDate) : []; },
     reserve: async () => state.reserveAllowed ? { allowed: true, reservationId: "res-1" } : { allowed: false },
     settle: async () => undefined,
     generate: async (input) => { calls.generate += 1; return state.generate(input); },
@@ -110,6 +112,40 @@ describe("visitAdvisorTips", () => {
     const port = fakePort(state({ settings: { tipsOn: true, notesAllowed: true, reminderHistoryAllowed: true } }));
     await run(port);
     expect(port.calls.notes).toBe(1);
+  });
+
+  it("Ticket 371: sends Period labels and dates under the tips switch, with the notes choice off", async () => {
+    const prompts: string[] = [];
+    const s = state({ periods: async () => [{ label: "Sick", start: "2026-11-17", end: null }] });
+    const answer = s.generate;
+    s.generate = async (input) => { prompts.push(input.prompt); return answer(input); };
+    const port = fakePort(s);
+    expect(await run(port)).toMatchObject({ written: 2, modelCalls: 1 });
+    expect(port.calls.periods).toEqual(["2026-11-19"]);
+    expect(port.calls.notes).toBe(0);
+    const body = JSON.parse(prompts[0]!) as Record<string, unknown>;
+    expect(body.periods).toEqual([{ label: "Sick", start: "2026-11-17", end: null }]);
+    expect(body).not.toHaveProperty("recent_day_notes");
+  });
+
+  it("Ticket 371: writes the tips without Periods when they cannot be read, or when the port reads none", async () => {
+    const prompts: string[] = [];
+    const s = state({ periods: async () => { throw new Error("Periods could not be loaded."); } });
+    const answer = s.generate;
+    s.generate = async (input) => { prompts.push(input.prompt); return answer(input); };
+    expect(await run(fakePort(s))).toMatchObject({ written: 2, modelCalls: 1, modelFailed: false });
+    expect(s.runs[0]).toMatchObject({ outcome: "success" });
+    const { periods: _periods, ...without } = fakePort(s);
+    expect(await run(without)).toBeDefined();
+    for (const prompt of prompts) expect(JSON.parse(prompt)).not.toHaveProperty("periods");
+  });
+
+  it("Ticket 371: reads no Periods with tips off or with no tip to write", async () => {
+    const off = fakePort(state({ settings: { tipsOn: false, notesAllowed: true, reminderHistoryAllowed: true } }));
+    await run(off);
+    const none = fakePort(state({ signals: [] }));
+    await run(none);
+    expect([off.calls.periods, none.calls.periods]).toEqual([[], []]);
   });
 
   it("with tips off: zero model calls, nothing written, stored tips stay", async () => {

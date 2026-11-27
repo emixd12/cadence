@@ -18,6 +18,7 @@ import {
   INTEGRATION_SCOPES,
   INTEGRATION_SCOPE_LIST,
   JSON_SCHEMA_DIALECT,
+  PERIOD_MEANING,
   assertSupportedSchema,
   checkOperationScope,
   createIntegrationError,
@@ -34,6 +35,7 @@ import {
   type IntegrationOperationOutput,
   type JsonSchemaObject,
 } from "@cadence/core/integration";
+import { PERIOD_LIMITS } from "@cadence/core/resolvers/period.resolver";
 
 const root = path.resolve(__dirname, "..");
 const fixtureDir = path.join(root, "tests/fixtures/integration");
@@ -114,6 +116,7 @@ describe("integration operation registry", () => {
       "list_occurrences",
       "get_occurrence",
       "list_day_notes",
+      "list_periods",
       "get_adherence_summary",
       "search",
       "fetch",
@@ -123,6 +126,9 @@ describe("integration operation registry", () => {
       "move_occurrence_for_day",
       "revert_occurrence_move",
       "update_day_note",
+      "create_period",
+      "update_period",
+      "end_period",
       "add_opportunity_occurrence",
       "remove_opportunity_occurrence",
       "create_behavior",
@@ -135,14 +141,15 @@ describe("integration operation registry", () => {
     ]);
   });
 
-  it("uses contract version 1.7.0 and records when each tool arrived", () => {
-    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.7.0");
+  it("uses contract version 1.8.0 and records when each tool arrived", () => {
+    expect(INTEGRATION_CONTRACT_VERSION).toBe("1.8.0");
     for (const [name, operation] of operations) {
       const since = name === "list_day_notes" || name === "update_day_note" ? "1.1.0"
         : name === "move_occurrence_for_day" || name === "revert_occurrence_move" ? "1.3.0"
           : name === "end_behavior" || name === "pause_behavior" || name === "resume_behavior" ? "1.4.0"
             : name === "add_opportunity_occurrence" || name === "remove_opportunity_occurrence" ? "1.6.0"
-              : name === "set_parent_occurrence_status" ? "1.7.0" : "1.0.0";
+              : name === "set_parent_occurrence_status" ? "1.7.0"
+                : name === "list_periods" || name === "create_period" || name === "update_period" || name === "end_period" ? "1.8.0" : "1.0.0";
       expect(operation.since, name).toBe(since);
     }
   });
@@ -152,7 +159,8 @@ describe("integration operation registry", () => {
     const byScope = (scope: string) => operations.filter(([, operation]) => operation.scope === scope).map(([name]) => name);
     expect(byScope(INTEGRATION_SCOPES.occurrencesWrite)).toEqual([
       "set_occurrence_status", "set_parent_occurrence_status", "update_occurrence_note", "move_occurrence_for_day",
-      "revert_occurrence_move", "update_day_note", "add_opportunity_occurrence", "remove_opportunity_occurrence",
+      "revert_occurrence_move", "update_day_note", "create_period", "update_period", "end_period",
+      "add_opportunity_occurrence", "remove_opportunity_occurrence",
     ]);
     expect(byScope(INTEGRATION_SCOPES.behaviorsWrite)).toEqual([
       "create_behavior", "update_behavior", "archive_behavior", "restore_behavior", "end_behavior", "pause_behavior", "resume_behavior",
@@ -186,7 +194,7 @@ describe("integration operation registry", () => {
     const destructive = operations.filter(([, operation]) => operation.annotations.destructiveHint).map(([name]) => name);
     expect(destructive).toEqual([
       "set_occurrence_status", "set_parent_occurrence_status", "update_occurrence_note", "move_occurrence_for_day",
-      "revert_occurrence_move", "update_day_note", "remove_opportunity_occurrence", "update_behavior", "archive_behavior",
+      "revert_occurrence_move", "update_day_note", "update_period", "end_period", "remove_opportunity_occurrence", "update_behavior", "archive_behavior",
       "restore_behavior",
       "end_behavior", "pause_behavior", "resume_behavior",
     ]);
@@ -242,6 +250,96 @@ describe("integration operation registry", () => {
   });
 });
 
+describe("Periods in the contract (Ticket 370)", () => {
+  const periodTools = ["list_periods", "create_period", "update_period", "end_period"] as const;
+  const propertiesOf = (schema: JsonSchemaObject) => Object.keys((schema.properties ?? {}) as object);
+  const summaryKeys = ["id", "label", "start_local_date", "end_local_date", "ongoing"];
+
+  it("says in every Period tool what a Period is, and that no tool removes one", () => {
+    expect(PERIOD_MEANING).toBe("A Period is a date range the user labeled to say something affected those days, such as illness or travel. It never changes a status, adherence, a reminder or a schedule, and it is not a reason to mark an Occurrence Not Completed. Pausing a Behavior is pause_behavior. A Period is created or changed only when the user states it.");
+    for (const name of periodTools) {
+      const description = INTEGRATION_OPERATIONS[name].description;
+      expect(description, name).toContain(PERIOD_MEANING);
+      expect(description, name).toContain("No tool removes a Period");
+      expect(description.length, name).toBeLessThanOrEqual(600);
+    }
+  });
+
+  it("has no tool that removes a Period, and writes under cadence.occurrences.write", () => {
+    expect(INTEGRATION_OPERATION_NAMES.filter((name) => name.includes("period"))).toEqual([...periodTools]);
+    for (const name of INTEGRATION_OPERATION_NAMES) expect(name).not.toMatch(/^(delete|remove)_period/);
+    expect(INTEGRATION_OPERATIONS.list_periods.scope).toBe(INTEGRATION_SCOPES.read);
+    for (const name of ["create_period", "update_period", "end_period"] as const) {
+      expect(INTEGRATION_OPERATIONS[name].scope, name).toBe(INTEGRATION_SCOPES.occurrencesWrite);
+    }
+    expect(checkOperationScope("create_period", ["cadence.read", "cadence.behaviors.write"])?.required_scopes).toEqual(["cadence.occurrences.write"]);
+  });
+
+  it("marks every Period write that changes an existing record destructive", () => {
+    const hints = (name: (typeof periodTools)[number]) => {
+      const { destructiveHint, idempotentHint } = INTEGRATION_OPERATIONS[name].annotations;
+      return { destructiveHint, idempotentHint };
+    };
+    expect(hints("create_period")).toEqual({ destructiveHint: false, idempotentHint: false });
+    expect(hints("update_period")).toEqual({ destructiveHint: true, idempotentHint: true });
+    expect(hints("end_period")).toEqual({ destructiveHint: true, idempotentHint: true });
+    expect(INTEGRATION_OPERATIONS.create_period.errors).toContain("limit_exceeded");
+    expect(INTEGRATION_OPERATIONS.end_period.errors).toContain("invalid_state");
+  });
+
+  it("returns the note only from list_periods and the writes; embedded lists are capped summaries", () => {
+    for (const name of periodTools) {
+      const output = INTEGRATION_OPERATIONS[name].output.schema.properties as Record<string, JsonSchemaObject>;
+      const period = name === "list_periods" ? output.periods.items as JsonSchemaObject : output.period;
+      expect(propertiesOf(period), name).toEqual([...summaryKeys, "note", "revision", "updated_at"]);
+    }
+    const context = INTEGRATION_OPERATIONS.get_account_context.output.schema.properties as Record<string, JsonSchemaObject>;
+    const day = ((INTEGRATION_OPERATIONS.get_timeline.output.schema.properties as Record<string, JsonSchemaObject>).days.items as JsonSchemaObject).properties as Record<string, JsonSchemaObject>;
+    const split = (INTEGRATION_OPERATIONS.get_adherence_summary.output.schema.properties as Record<string, JsonSchemaObject>).period_split;
+    const [splitObject, splitNull] = split.anyOf as JsonSchemaObject[];
+    const splitProperties = splitObject.properties as Record<string, JsonSchemaObject>;
+    for (const [label, list, cap] of [["active_periods", context.active_periods, 20], ["days[].periods", day.periods, 10], ["period_split.periods", splitProperties.periods, 20]] as const) {
+      expect(list.maxItems, label).toBe(cap);
+      expect(propertiesOf(list.items as JsonSchemaObject), label).toEqual(summaryKeys);
+    }
+    expect(context.more_active_periods.type).toBe("boolean");
+    expect(day.more_periods.type).toBe("boolean");
+    expect(splitProperties.more_periods.type).toBe("boolean");
+    expect(splitNull).toEqual({ type: "null" });
+    // inside and outside reuse the counts shape `overall` has.
+    const overall = (INTEGRATION_OPERATIONS.get_adherence_summary.output.schema.properties as Record<string, JsonSchemaObject>).overall;
+    expect(propertiesOf(splitProperties.inside)).toEqual(propertiesOf(overall));
+    expect(propertiesOf(splitProperties.outside)).toEqual(propertiesOf(overall));
+    expect((INTEGRATION_OPERATIONS.list_periods.output.schema.properties as Record<string, JsonSchemaObject>).periods.maxItems).toBe(40);
+  });
+
+  it("takes no date on end_period, no page size on list_periods, and requires the revision on edits", () => {
+    expect(propertiesOf(INTEGRATION_OPERATIONS.end_period.input.schema)).toEqual(["period_id", "expected_revision", "idempotency_key"]);
+    expect(propertiesOf(INTEGRATION_OPERATIONS.list_periods.input.schema)).toEqual(["start_local_date", "end_local_date", "cursor"]);
+    for (const name of ["update_period", "end_period"] as const) {
+      expect(INTEGRATION_OPERATIONS[name].input.schema.required, name).toEqual(["period_id", "expected_revision"]);
+    }
+    expect(INTEGRATION_OPERATIONS.create_period.input.schema.required).toEqual(["label", "start_local_date"]);
+    expect(validateOperationInput("list_periods", { start_local_date: "2026-01-01", end_local_date: "2027-01-01" }).ok).toBe(true);
+    expect(validateOperationInput("list_periods", { start_local_date: "2026-01-01", end_local_date: "2027-01-02" }))
+      .toMatchObject({ ok: false, error: { code: "limit_exceeded" } });
+  });
+
+  it("keeps the contract limits equal to the Period resolver's", () => {
+    expect([INTEGRATION_LIMITS.maxPeriodLabelLength, INTEGRATION_LIMITS.maxPeriodNoteLength, INTEGRATION_LIMITS.maxPeriodRangeDays, INTEGRATION_LIMITS.maxPeriodsPerAccount])
+      .toEqual([PERIOD_LIMITS.labelCharacters, PERIOD_LIMITS.noteCharacters, PERIOD_LIMITS.rangeDays, PERIOD_LIMITS.perAccount]);
+    expect([INTEGRATION_LIMITS.maxEmbeddedPeriods, INTEGRATION_LIMITS.maxTimelineDayPeriods, INTEGRATION_LIMITS.maxPeriodsPerPage]).toEqual([20, 10, 40]);
+  });
+
+  it("extends search and fetch with the period record kind", () => {
+    const id = "period:00000007-1111-4111-8111-000000000007";
+    expect(validateOperationInput("fetch", { id }).ok).toBe(true);
+    const kinds = ((INTEGRATION_OPERATIONS.fetch.output.schema.properties as Record<string, JsonSchemaObject>).metadata.properties as Record<string, JsonSchemaObject>).kind.enum;
+    expect(kinds).toEqual(["behavior", "occurrence", "day_note", "period"]);
+    expect(INTEGRATION_OPERATIONS.search.description).toContain("A Period's note is not searched");
+  });
+});
+
 describe("integration schemas", () => {
   for (const [name, operation] of operations) {
     for (const [kind, schema] of [["input", operation.input.schema], ["output", operation.output.schema]] as const) {
@@ -290,7 +388,7 @@ describe("integration schemas", () => {
       expect(properties.idempotency_key, name).toBeDefined();
       expect(required, name).not.toContain("idempotency_key");
       // Adds create a new record, so there is nothing to have read first.
-      if (name !== "create_behavior" && name !== "add_opportunity_occurrence") expect(properties.expected_status ?? properties.expected_revision ?? properties.expected_statuses, name).toBeDefined();
+      if (name !== "create_behavior" && name !== "add_opportunity_occurrence" && name !== "create_period") expect(properties.expected_status ?? properties.expected_revision ?? properties.expected_statuses, name).toBeDefined();
     }
     expect(INTEGRATION_OPERATIONS.update_behavior.input.schema.required).toContain("expected_revision");
     expect(Object.keys(INTEGRATION_OPERATIONS.create_behavior.input.schema.properties as object)).toContain("external_ref");
@@ -386,7 +484,7 @@ describe("integration errors", () => {
     for (const code of INTEGRATION_ERROR_CODES) {
       const error = createIntegrationError(code, `Example ${code}.`, { retryAfterSeconds: code === "rate_limited" ? 30 : undefined });
       expect(validateAgainstSchema(integrationErrorSchema.schema, error).ok, code).toBe(true);
-      expect(error.contract_version).toBe("1.7.0");
+      expect(error.contract_version).toBe("1.8.0");
     }
   });
 

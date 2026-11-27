@@ -2668,7 +2668,7 @@ be done alongside other things?". Null means unanswered. Migration:
   and BehaviorLog (`extensions.app.cadence.alongside`) carry the column, configuration
   history carries the answer in every snapshot of an event that carries or names it
   (Ticket 363, defect D1), BehaviorLog
-  import and restore write it, and MCP contract 1.8.0 returns and accepts it. Migration
+  import and restore write it, and MCP contract 1.9.0 returns and accepts it. Migration
   `20261125180000_alongside_mcp_and_portability.sql` (additive function patches) keeps
   it in MCP write receipts, `cadence_private.apply_behaviorlog_import` (from the plan
   row's `cadenceAlongside`) and `apply_behaviorlog_restore_product_writes` (changed only
@@ -2862,6 +2862,10 @@ notes already are. `agent_runs.prompt_version` records the revision of the instr
 that were sent, so a brief with day notes carries a different revision from one without.
 Day-note text is never written to application logs.
 
+Ticket 371 (D35) adds a second reader and no schema: the same Daily Brief call reads
+`periods` (below) for today and the 7 local days before it, whatever the Notes source
+says. See "Periods", "Readers".
+
 ### Day-note shortcut pool (Ticket 292)
 
 Migration `20261111120000_day_note_shortcut_pool.sql` lets `note_shortcut_states`
@@ -2934,10 +2938,11 @@ Constraints: `periods_user_id_key` unique `(user_id, id)`; `periods_label_valid`
 uniqueness rule on label or dates. Index: `periods_user_start_idx (user_id, start_on)`.
 
 RLS allows the owner to select rows. Direct writes are revoked from every Data API
-role, and `service_role` has no grant. Three `security definer` functions with an empty
+role, and `service_role` has no grant. Four `security definer` functions with an empty
 `search_path` bind ownership to `auth.uid()` and are executable by `authenticated` only:
 
 - `public.create_period(p_label, p_start_on, p_end_on, p_note)` returns the new row.
+- `public.create_period_if_absent(p_label, p_start_on, p_end_on, p_note)` (Ticket 373, migration `20261126135000_create_period_if_absent.sql`) takes the cap trigger's per-user lock, then returns the owner's oldest Period with exactly that label, `start_on` and `end_on` (null matches null) unchanged, or inserts one; the extra `created` column says which. BehaviorLog import and restore use it so two overlapping applies store one Period. Check: `tests/sql/periods-if-absent.sql`.
 - `public.update_period(p_id, p_expected_revision, p_label, p_start_on, p_end_on, p_note)`
   compares the stored `revision` with `p_expected_revision`. It returns no row when they
   differ, when the Period is gone, or when it belongs to another account. A write that
@@ -2966,10 +2971,76 @@ with a new id. There is no soft-delete column and no tombstone: account sync pla
 delete as "in the saved baseline, absent on one side", which needs no deleted row on the
 server. Account deletion removes Periods through the `profiles` cascade.
 
-Ticket 368 adds no entry point: no Server Action, MCP tool, export field or Mac code
-reads or writes Periods yet. Migration: `20261126130000_periods.sql`; local check
+Ticket 368 added no entry point. Migration: `20261126130000_periods.sql`; local check
 `tests/sql/periods.sql`. `periods` and the three functions are in the RLS smoke lists
 (`scripts/supabase-rls-smoke.mjs`).
+
+### Readers: Daily Brief and advisor tips (Ticket 371)
+
+Ticket 371 (D35) adds two readers and no schema. Both read `label`, `start_on` and
+`end_on` through `listPeriodsOrNone` in `lib/db/periods.repo.ts`, as the user under RLS.
+Neither reads or sends `note`. A missing `periods` table (PostgREST `PGRST205`, Postgres
+`42P01`) reads as no Periods, so the code may deploy before the migration.
+
+- **Daily Brief.** A brief that calls the model reads the Periods with a day in today or
+  the 7 local days before it, through the signed-in user's client. It is not gated by the
+  AI Notes source (`include_notes`). `resolveBriefPeriods` sends the opening request
+  `periods` (covering today, at most 5, display order) and `recentPeriods` (ended in the 7
+  days before today, at most 3, most recently ended first), each as
+  `{ label, since, until }` with dates written like `today` ("Friday, October 30"; a date
+  in another year carries its year) and a null `until` for an ongoing Period. Each key is
+  absent when empty. A quiet day reads none. A failed read leaves the brief without
+  Periods. Periods never reach the move planner, Re-check or Re-plan, and a changed
+  Period does not change a saved brief.
+- **Advisor tips.** With tips on, a run that has a tip to word reads the Periods with a
+  day in today or the 7 local days before it, through the coach agent's client as the
+  user. It is under the tips switch, not the notes choice. `resolveTipPeriods` sends the
+  tip prompt `periods: [{ label, start, end }]` (at most 5, display order, ISO local
+  dates). A failed read leaves the prompt without Periods.
+
+The facts of each model call, Period labels included, are kept in `agent_run_contents`
+until that row expires, as Behavior titles and day notes are.
+`agent_runs.prompt_version` records the revision of the brief instructions that were
+sent, so a brief with Periods carries a different revision from one without; tip runs
+record `coach-tips-4`. Period labels are never written to application logs.
+
+### Period integration writes (Ticket 370)
+
+Migration `20261126140000_period_integration_writes.sql` lets an MCP grant, and Cadence
+Chat's own grant, create, edit and end a Period. It adds no table and no column, and drops nothing.
+There is no integration operation that removes a Period.
+
+- `public.integration_lock_write` is patched by text to allow `create_period`,
+  `update_period` and `end_period` under `cadence.occurrences.write`. Every operation it
+  allowed before keeps its scope. The patch raises when its anchor line is missing.
+- `public.integration_apply_period_write(p_key, p_hash, p_operation, p_period_id,
+  p_expected_revision, p_label, p_start_on, p_end_on, p_note)` is `security invoker` with
+  an empty `search_path`, executable by `authenticated` only. In one transaction it
+  locks or replays by idempotency key, writes as the grant's user through
+  `create_period` or `update_period`, stores a version-2 receipt of at most 100,000
+  bytes and records the activity with the Period id.
+- **Revision.** The contract's revision is the row's `updated_at` as a UTC instant, the
+  form day notes use. The function refuses a write whose `p_expected_revision` differs
+  from the stored row (`integration_conflict`), then passes the row's integer
+  `revision` to `update_period`, which compares and sets it. A missing Period, or
+  another account's, is `integration_not_found`.
+- **End.** The service sends the full planned row. For `end_period` the function
+  accepts only a change of `end_on`, to a day on or after `start_on` and earlier than
+  the stored `end_on` (or any such day when the Period is ongoing). Anything else is
+  `integration_period_end_refused`. "Today" comes from the profile timezone in
+  `lib/services/integration-write.service.ts`, never from the caller.
+- **Cap.** The insert passes the cap trigger. Its SQLSTATE `54000` becomes the contract
+  error `limit_exceeded`.
+- `chat_actions.kind` accepts `period` for Chat's Period writes. A separate migration,
+  `20261126150000_chat_period_actions.sql`, holds only that change: it drops
+  `chat_actions_kind_check` and adds it again with the new value in one transaction.
+  Because it contains a `drop`, it is outside the standing approval for hosted pushes
+  and needs the owner's yes. Local check: `tests/sql/chat-period-actions.sql`.
+
+Local check: `tests/sql/period-integration-write.sql`, which also re-checks
+`update_day_note` through `integration_lock_write`. The function is in the RLS smoke
+function list. Period labels and notes are never written to logs or to the activity
+record, which holds the operation name and the Period id.
 
 ## Google Calendar connector (Ticket 134)
 
@@ -3938,7 +4009,8 @@ them; nothing else expires them.
   next safe point, keeps what it already did and drops changes waiting for a Yes).
 - `chat_actions`: one row per change chat made. `kind` is `status`,
   `occurrence_note`, `day_note`, `move`, `create_behavior`, `update_behavior`,
-  `archive_behavior`, `restore_behavior` or `opportunity`. `id` is the outcome id the
+  `archive_behavior`, `restore_behavior`, `opportunity` or `period` (a Period write,
+  which has no Undo). `id` is the outcome id the
   client sends to Undo. `undo_plan` holds the exact write that reverses it;
   `undo_state` is `available`, `undoing`, `done` or `unavailable`.
 - `chat_confirms`: the writes waiting for one Yes. `state` is `pending`,

@@ -3472,6 +3472,26 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      create_period_if_absent: {
+        Args: {
+          p_end_on: string
+          p_label: string
+          p_note: string
+          p_start_on: string
+        }
+        Returns: {
+          created: boolean
+          created_at: string
+          end_on: string | null
+          id: string
+          label: string
+          note: string | null
+          revision: number
+          start_on: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       delete_period: {
         Args: { p_expected_revision: number; p_id: string }
         Returns: string[]
@@ -3553,6 +3573,20 @@ export type Database = {
           p_key: string
           p_local_date: string
           p_note: string
+        }
+        Returns: Json
+      }
+      integration_apply_period_write: {
+        Args: {
+          p_end_on: string
+          p_expected_revision: string
+          p_hash: string
+          p_key: string
+          p_label: string
+          p_note: string
+          p_operation: string
+          p_period_id: string
+          p_start_on: string
         }
         Returns: Json
       }

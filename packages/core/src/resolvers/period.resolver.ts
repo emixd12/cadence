@@ -1,5 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 
+import type { PeriodView } from "../types/period";
+import type { NoteShortcut } from "../types/note-shortcut";
+import { NOTE_SHORTCUT_LIMITS, repeatedNoteLineProposals } from "./note-suggestion.resolver";
 import { resolveNoteUpdate } from "./status.resolver";
 
 /**
@@ -351,6 +354,31 @@ export function splitByPeriods<T>(
 }
 
 /**
+ * The key Period note shortcuts take in the record of inline Note shortcuts, beside
+ * Behavior IDs and the day-note pool. It names no stored pool: Period note shortcuts
+ * are worked out from the Periods on each read.
+ */
+export const PERIOD_NOTE_SHORTCUT_KEY = "period_notes";
+
+/**
+ * Note shortcuts for the Period note field: lines that repeat across the account's
+ * Period notes, by the rule Occurrence notes and day notes use
+ * (`repeatedNoteLineProposals`). Nothing is stored, so a shortcut here can be used
+ * but not kept or dismissed. Newest Periods are read first.
+ */
+export function resolvePeriodNoteShortcuts(input: Readonly<{
+  periods: readonly Pick<PeriodRecord, "id" | "start_on" | "note">[];
+  now: Temporal.Instant;
+}>): NoteShortcut[] {
+  const notes = [...input.periods]
+    .filter((period) => Boolean(period.note?.trim()) && [...period.note!].length <= NOTE_SHORTCUT_LIMITS.sourceCharacters)
+    .sort((a, b) => compareText(b.start_on, a.start_on) || compareText(a.id, b.id))
+    .slice(0, NOTE_SHORTCUT_LIMITS.notes)
+    .map((period) => ({ id: period.id, note: period.note, local_date: period.start_on }));
+  return repeatedNoteLineProposals({ notes, now: input.now });
+}
+
+/**
  * Past labels to offer when adding a Period: distinct without regard to case,
  * newest first by creation time. The most recent spelling of a label wins.
  */
@@ -370,6 +398,115 @@ export function periodLabelSuggestions(
     labels.push(period.label);
   }
   return labels;
+}
+
+/**
+ * Ticket 371 (D35): the Periods the Daily Brief's opening reads. `periods` covers today, at
+ * most 5. `recentPeriods` ended in the 7 local days before today, at most 3. Labels and
+ * dates only: a Period's note is never part of either list.
+ */
+export const BRIEF_PERIOD_LIMITS = { active: 5, recent: 3, recentDays: 7 } as const;
+
+/** One Period as the brief reads it. `since` and `until` are local dates; a null `until` means ongoing. */
+export type BriefPeriod = Readonly<{ label: string; since: string; until: string | null }>;
+export type BriefPeriods = Readonly<{ periods: readonly BriefPeriod[]; recentPeriods: readonly BriefPeriod[] }>;
+
+type LabeledPeriod = OrderedPeriod & Readonly<Pick<PeriodRecord, "label">>;
+
+/** The inclusive local dates the Daily Brief reads Periods for; `localDate` is today in the account's timezone. */
+export function briefPeriodRange(localDate: string): PeriodRange {
+  const to = parsePeriodLocalDate(localDate);
+  return { from: Temporal.PlainDate.from(to).subtract({ days: BRIEF_PERIOD_LIMITS.recentDays }).toString(), to };
+}
+
+/**
+ * Chooses the brief's Periods. Those covering today come in display order, the first 5.
+ * Those that ended in the 7 days before today come most recently ended first, the first 3.
+ * A Period that starts after today is in neither list.
+ */
+export function resolveBriefPeriods(input: Readonly<{ localDate: string; records: readonly LabeledPeriod[] }>): BriefPeriods {
+  const { from, to: today } = briefPeriodRange(input.localDate);
+  const shape = (period: LabeledPeriod): BriefPeriod => ({ label: period.label, since: period.start_on, until: period.end_on });
+  const ended = input.records
+    .filter((period) => period.end_on !== null && period.end_on >= from && period.end_on < today)
+    .sort((a, b) => compareText(b.end_on ?? "", a.end_on ?? "") || comparePeriods(a, b));
+  return {
+    periods: activePeriods(input.records, today).slice(0, BRIEF_PERIOD_LIMITS.active).map(shape),
+    recentPeriods: ended.slice(0, BRIEF_PERIOD_LIMITS.recent).map(shape),
+  };
+}
+
+/**
+ * Ticket 371 (D35): the Periods the advisor tips prompt reads: those with a day in the 7
+ * local days before today or on today, in display order, at most 5. Labels and dates only.
+ */
+export const TIP_PERIOD_LIMITS = { periods: 5, days: 7 } as const;
+
+/** One Period as the tips prompt reads it. `start` and `end` are local dates; a null `end` means ongoing. */
+export type TipPeriod = Readonly<{ label: string; start: string; end: string | null }>;
+
+/** The inclusive local dates the tips prompt reads Periods for. */
+export function tipPeriodRange(localDate: string): PeriodRange {
+  const to = parsePeriodLocalDate(localDate);
+  return { from: Temporal.PlainDate.from(to).subtract({ days: TIP_PERIOD_LIMITS.days }).toString(), to };
+}
+
+export function resolveTipPeriods(input: Readonly<{ localDate: string; records: readonly LabeledPeriod[] }>): TipPeriod[] {
+  const { from, to } = tipPeriodRange(input.localDate);
+  return periodsOverlappingRange(input.records, from, to).slice(0, TIP_PERIOD_LIMITS.periods)
+    .map((period) => ({ label: period.label, start: period.start_on, end: period.end_on }));
+}
+
+/** The fields a screen reads. Ownership and timestamps stay on the server. */
+export function toPeriodView(period: Pick<PeriodRecord, keyof PeriodView>): PeriodView {
+  return {
+    id: period.id,
+    label: period.label,
+    start_on: period.start_on,
+    end_on: period.end_on,
+    note: period.note,
+    revision: period.revision,
+  };
+}
+
+/** Newest first for the all-Periods list: the reverse of the display order. */
+export function periodsNewestFirst<T extends OrderedPeriod>(periods: readonly T[]): T[] {
+  return [...periods].sort((a, b) => comparePeriods(b, a));
+}
+
+type TimelineShownDates = Readonly<{
+  daySections: readonly Readonly<{ localDate: string }>[];
+  needsDecision: Readonly<{ daySections: readonly Readonly<{ localDate: string }>[] }>;
+}>;
+
+/**
+ * Returns the Timeline view with its Periods (Ticket 369): for each shown local date,
+ * Needs decision days included, the Periods that cover it; the Periods that cover at
+ * least one shown date; and label suggestions from every Period of the account.
+ * `periods` is the whole account's list. A Period changes nothing else in the view.
+ */
+export function attachTimelinePeriods<T extends TimelineShownDates>(
+  view: T,
+  periods: readonly PeriodRecord[],
+): T & { periods: PeriodView[]; periodsByDate: Record<string, PeriodView[]>; periodLabelSuggestions: string[] } {
+  const dates = [...new Set([...view.daySections, ...view.needsDecision.daySections].map((section) => section.localDate))];
+  const covering = periodsByDate(periods, dates);
+  const views = new Map<string, PeriodView>();
+  const byDate: Record<string, PeriodView[]> = {};
+  for (const [date, records] of Object.entries(covering)) {
+    byDate[date] = records.map((record) => {
+      const known = views.get(record.id) ?? toPeriodView(record);
+      views.set(record.id, known);
+      return known;
+    });
+  }
+  const shown = periods.filter((period) => views.has(period.id)).sort(comparePeriods);
+  return {
+    ...view,
+    periods: shown.map((period) => views.get(period.id)!),
+    periodsByDate: byDate,
+    periodLabelSuggestions: periodLabelSuggestions(periods),
+  };
 }
 
 function dayLabel(localDate: string, withYear: boolean): string {

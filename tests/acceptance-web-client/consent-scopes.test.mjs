@@ -30,6 +30,17 @@ describe('Ticket 259 consent offers every advertised scope', () => {
   }, 120_000);
 });
 
+describe('Ticket 379 consent page that has not hydrated', () => {
+  it('partial-consent: the runner clicks without waiting for scripts, and the plain form post grants what the run left on', async () => {
+    resetState({ requestScopes: ['cadence.read'], offerAllScopes: true, consentNotHydrated: true, connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
+    const out = await scenario('claude-web', 'partial-consent');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(state.consentCount).toBe(1);
+    expect(parsed(out.lines).find((e) => e.step === 'connect').grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.read']);
+    expect(state.grants.map((grant) => [...grant.scopes].sort())).toEqual([['cadence.behaviors.write', 'cadence.read']]);
+  }, 120_000);
+});
+
 describe('consent evidence recorded before Allow (Ticket 259 live check)', () => {
   const events = (out) => readFileSync(join(out.run.dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   it('records the requested scope parameter and each switch starting on, before the grant exists', async () => {

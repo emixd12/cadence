@@ -412,7 +412,7 @@ URLs or logs. Protocol responses use `Cache-Control: no-store`.
 
 | Route | Methods | Owner ticket | Purpose |
 |---|---|---:|---|
-| `/mcp` | POST, OPTIONS; authenticated GET/DELETE return 405 | 228 | Remote MCP endpoint. Requires a Cadence-issued opaque Bearer token for this resource. Missing or invalid tokens get 401 with `resource_metadata`; a missing write scope gets 403 `insufficient_scope`. Calls integration operations only. |
+| `/mcp` | POST, OPTIONS; authenticated GET/DELETE return 405 | 228, 376 | Remote MCP endpoint. Requires a Cadence-issued opaque Bearer token for this resource. Missing or invalid tokens get 401 with `resource_metadata`; a missing write scope gets 403 `insufficient_scope`. Calls integration operations only, except the MCP Apps trial reads while `CADENCE_MCP_APPS` is `true` (Ticket 376): the transport tool `show_day` and the methods `resources/list` and `resources/read` for the one view `ui://cadence/day/v1.html`. No new route. |
 | `/.well-known/oauth-protected-resource` | GET | 226 | RFC 9728 protected-resource metadata. |
 | `/.well-known/oauth-protected-resource/mcp` | GET | 226 | RFC 9728 metadata for the `/mcp` resource; `resource` equals the exact MCP URL. |
 | `/.well-known/oauth-authorization-server` | GET | 226 | RFC 8414 authorization-server metadata (PKCE S256, public clients, CIMD, `iss` in responses). |
@@ -459,7 +459,11 @@ binding; completion additionally requires a same-origin POST. Ticket 228 calls
 `app/mcp/route.ts` calls `lib/mcp/server.ts` on the Node runtime with a 60-second
 Vercel maximum. The official SDK handles stateless Streamable HTTP, discovery,
 version negotiation and JSON-RPC. No MCP session, subscriptions, prompts or
-resources persist. `OPTIONS` is credential-free browser preflight; every other
+resources persist. While `CADENCE_MCP_APPS` is `true` (off in production), the same
+route also serves the MCP Apps trial: `show_day` in `tools/list` and `tools/call`, and
+`resources/list` and `resources/read` for view HTML only, each with the read scope, the
+per-grant read limit, an activity row and the fixed log label
+(`docs/MCP_INTEGRATION.md`, section 17; Ticket 376). `OPTIONS` is credential-free browser preflight; every other
 request verifies a Cadence Bearer token before protocol handling. Cookie sessions
 never authorize MCP. Scope/rate admission calls the shared integration operation
 layer; user data remains RLS-scoped. Transport limits and verified protocol versions

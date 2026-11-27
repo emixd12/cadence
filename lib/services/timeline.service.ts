@@ -1,10 +1,12 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
+import { attachTimelinePeriods } from "@cadence/core/resolvers/period.resolver";
 import { listDayNotesInRange } from "@/lib/db/dayNotes.repo";
-import { attachTimelineSourceCountable, attachTimelineSourceEvidence, resolveTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
+import { listPeriodsOrNone } from "@/lib/db/periods.repo";
+import { attachTimelineSourceCountable, attachTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
+import { readTimelineSourceEvidence } from "@/lib/services/timeline-source-evidence.service";
 import { readConnectorConnection } from "@/lib/db/connectors.repo";
 import { listSourceLinks } from "@/lib/db/sourceLinks.repo";
-import type { TimelineSourceEvidence } from "@cadence/core/types/timeline";
 import { listOccurrenceStatusEventsByOccurrenceIds } from "@/lib/db/occurrenceStatusEvents.repo";
 import { listSourceMatchesForOccurrences } from "@/lib/db/sourceMatches.repo";
 import { connectorCompletionEnabled } from "@/lib/services/connector-completion.service";
@@ -260,7 +262,12 @@ async function getTimelineViewForUser(input: {
     now, timezone, futureDays: input.futureDays,
   });
   const dayNoteRange = timelineDayNoteRange(view);
-  const withNotes = attachTimelineDayNotes(view, dayNoteRange ? await listDayNotesInRange(supabase, userId, dayNoteRange) : []);
+  const [dayNotes, periods] = await Promise.all([
+    dayNoteRange ? listDayNotesInRange(supabase, userId, dayNoteRange) : [],
+    // Ticket 369: the whole account's Periods (500 at most), for day chips and label suggestions.
+    listPeriodsOrNone(supabase, userId),
+  ]);
+  const withNotes = attachTimelinePeriods(attachTimelineDayNotes(view, dayNotes), periods);
   const [evidence, countable, alongside] = await Promise.all([
     readTimelineSourceEvidence(supabase, userId, occurrenceRows, timezone),
     readTimelineSourceCountable(supabase, userId, occurrenceRows, now, timezone),
@@ -407,50 +414,6 @@ async function readTimelineSourceCountable(
   } catch {
     return {};
   }
-}
-
-/**
- * Tickets 317 and 322: connector labels and attached workout times for the rows in
- * view. Read only while `CADENCE_CONNECTOR_COMPLETION` is on, so the Timeline's reads
- * are unchanged while the feature is off. A failed read shows no labels.
- */
-async function readTimelineSourceEvidence(
-  supabase: AppSupabaseClient,
-  userId: string,
-  occurrences: readonly Occurrence[],
-  timezone: string,
-): Promise<Record<string, TimelineSourceEvidence>> {
-  if (!connectorCompletionEnabled() || occurrences.length === 0) return {};
-  try {
-    const ids = occurrences.map((occurrence) => occurrence.id);
-    const completedIds = occurrences.filter((occurrence) => occurrence.status === "completed").map((occurrence) => occurrence.id);
-    const [matches, events] = await Promise.all([
-      listSourceMatchesForOccurrences(supabase, userId, ids),
-      completedIds.length ? listOccurrenceStatusEventsByOccurrenceIds(supabase, userId, completedIds) : Promise.resolve([]),
-    ]);
-    const latestEvents = new Map<string, { statusSemantics: string; sourceCaptureMethod: string; reasonCode: string | null; recordedAt: string; createdAt: string; id: string }>();
-    for (const event of events) {
-      const previous = latestEvents.get(event.occurrence_id);
-      const candidate = { statusSemantics: event.status_semantics, sourceCaptureMethod: event.source_capture_method, reasonCode: event.reason_code,
-        recordedAt: event.recorded_at, createdAt: event.created_at, id: event.id };
-      if (!previous || compareLatest(candidate, previous) > 0) latestEvents.set(event.occurrence_id, candidate);
-    }
-    return resolveTimelineSourceEvidence({
-      timezone,
-      occurrences,
-      latestEvents,
-      matches: matches.map((match) => ({ occurrenceId: match.occurrence_id, source: match.source, state: match.state,
-        activityStartAt: match.activity_start_at, activityEndAt: match.activity_end_at })),
-    });
-  } catch {
-    return {};
-  }
-}
-
-function compareLatest(left: { recordedAt: string; createdAt: string; id: string }, right: { recordedAt: string; createdAt: string; id: string }): number {
-  return Date.parse(left.recordedAt) - Date.parse(right.recordedAt)
-    || Date.parse(left.createdAt) - Date.parse(right.createdAt)
-    || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 }
 
 async function requireUserId(supabase: AppSupabaseClient): Promise<string> {

@@ -14,6 +14,15 @@ import {
 import { noticeText } from "@cadence/core/notices";
 import { revalidatePath } from "next/cache";
 import { saveDayNoteFromFormData } from "@/lib/services/day-note.service";
+import {
+  createPeriodFromFormData,
+  deletePeriodFromFormData,
+  endPeriodFromFormData,
+  periodErrorToActionState,
+  savePeriodNoteFromFormData,
+  updatePeriodFromFormData,
+} from "@/lib/services/period.service";
+import type { PeriodActionState, PeriodNoteActionState, PeriodNoticeId } from "@cadence/core/types/period";
 import { setBehaviorDefaultDurationForCurrentUser } from "@/lib/services/timeline.service";
 import type {
   DefaultDurationActionState,
@@ -76,6 +85,71 @@ export async function saveDayNoteAction(
   } catch (error) {
     return occurrenceErrorToActionState(error);
   }
+}
+
+/**
+ * Ticket 369: adds a Period, or edits one when the form names `period_id`. A Period
+ * is annotation only, so nothing else is written. Used by Timeline and Behaviors.
+ */
+export async function savePeriodAction(
+  _previousState: PeriodActionState,
+  formData: FormData,
+): Promise<PeriodActionState> {
+  try {
+    if (formData.get("period_id")) await updatePeriodFromFormData(formData);
+    else await createPeriodFromFormData(formData);
+    return periodSuccess("period.saved");
+  } catch (error) {
+    return periodErrorToActionState(error, "Unable to save this period.");
+  }
+}
+
+/** "End today": the last day becomes today in the account's timezone. */
+export async function endPeriodAction(
+  _previousState: PeriodActionState,
+  formData: FormData,
+): Promise<PeriodActionState> {
+  try {
+    await endPeriodFromFormData(formData);
+    return periodSuccess("period.ended");
+  } catch (error) {
+    return periodErrorToActionState(error, "Unable to end this period.");
+  }
+}
+
+/** Removes a Period for good. The control asks for a second tap first. */
+export async function deletePeriodAction(
+  _previousState: PeriodActionState,
+  formData: FormData,
+): Promise<PeriodActionState> {
+  try {
+    await deletePeriodFromFormData(formData);
+    return periodSuccess("period.removed");
+  } catch (error) {
+    return periodErrorToActionState(error, "Unable to remove this period.");
+  }
+}
+
+/** The Period note field saves on its own, like every note field. */
+export async function savePeriodNoteAction(
+  _previousState: PeriodNoteActionState,
+  formData: FormData,
+): Promise<PeriodNoteActionState> {
+  try {
+    const { period } = await savePeriodNoteFromFormData(formData);
+    revalidatePath("/timeline");
+    revalidatePath("/behaviors");
+    return { status: "success", message: "", revision: period.revision };
+  } catch (error) {
+    const { message } = periodErrorToActionState(error, "Unable to save this note.");
+    return { status: "error", message };
+  }
+}
+
+function periodSuccess(noticeId: PeriodNoticeId): PeriodActionState {
+  revalidatePath("/timeline");
+  revalidatePath("/behaviors");
+  return { status: "success", noticeId, message: noticeText(noticeId) };
 }
 
 export async function updateOccurrenceNoteAction(

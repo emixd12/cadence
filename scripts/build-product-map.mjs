@@ -27,7 +27,7 @@ const MEANING_REQUIRED = new Set(["journey", "feature", "interaction", "componen
 /** Token meanings are required only in the canonical token file; other token files warn. */
 const CANONICAL_TOKEN_FILE = "packages/ui/tokens.css";
 
-const SCAN_ROOTS = ["app", "components", "lib", "apps/desktop/src", "packages/core/src", "packages/ui"];
+const SCAN_ROOTS = ["app", "components", "lib", "apps/desktop/src", "packages/core/src", "packages/ui", "packages/mcp-views/src"];
 const SCAN_EXCLUDE = [/(^|\/)node_modules\//, /\.test\.tsx?$/, /\.d\.ts$/, /(^|\/)__fixtures__\//, /^apps\/desktop\/src-tauri\//];
 
 const read = path => readFileSync(join(root, path), "utf8");

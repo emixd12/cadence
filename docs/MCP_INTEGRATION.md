@@ -123,7 +123,8 @@ adapter over one contract. It is not a connector SDK or provider registry.
 | Marketing | Planned: `/developers` docs section in `apps/marketing` (Ticket 229), plugin listing links, and disclosures after owner approval (231). No public claim before deployed evidence. |
 | Future mobile | Not applicable. A future client can reuse `docs/MCP_CONTRACT.md`. |
 
-MCP Apps (D36, planned, section 17): web in Tickets 375–381; desktop not applicable,
+MCP Apps (D36, section 17; the server half is implemented behind a flag under Ticket
+376): web in Tickets 375–381; desktop not applicable,
 because Cadence for Mac renders no MCP view; marketing and listings wait for the
 marketing site overhaul (Ticket 246; Ticket 380 prepares unpublished drafts); future
 mobile has no Cadence code, and host mobile apps render the view.
@@ -347,7 +348,10 @@ and validate every redirect target. No metadata-driven user-data request exists.
 secret. The HttpOnly cookie carries the secret; the consent URL carries only a
 request UUID. Ticket 227 uses `getOAuthConsent(request, id, userClient)` for
 display and `completeOAuthConsent(request, id, scopesOrNull, userClient)` on an
-explicit same-origin Allow/Deny POST. The database atomically consumes the
+explicit same-origin Allow/Deny POST. The consent page's referrer policy is
+`same-origin`, never `no-referrer`: under `no-referrer` a browser sends
+`Origin: null` on the plain form post that Allow or Deny sends before the page
+hydrates, and the origin check refuses it (Ticket 379). The database atomically consumes the
 request and creates its grant/code under the authenticated user. The user may
 approve any valid advertised scope set, whatever the client requested; the grant
 holds exactly what the user left on (Ticket 259). Render client text as text, identify unverified clients, and show
@@ -396,6 +400,8 @@ legacy responses use SSE without sessions. GET and DELETE return authenticated
 405 responses. No resumption or unsolicited server messages are supported.
 
 `server/discover` exposes tool-only capabilities and bounded cross-tool guidance.
+While `CADENCE_MCP_APPS` is `true` it also declares view resources and the MCP Apps
+extension, and `tools/list` ends with the transport tool `show_day` (section 17).
 `tools/list` follows the contract registry order, with private `ttlMs: 300000`
 cache hints. Every descriptor includes its title, description, annotations,
 input/output schema and OAuth scopes in both `securitySchemes` and `_meta` for
@@ -523,6 +529,13 @@ such as `get_account_context()`, so tests can check every named tool against
 `INTEGRATION_OPERATION_NAMES`. The structured routine example also validates
 against the live contract schema.
 
+`integrations/drafts/` holds unpublished skill drafts (Ticket 380). It is outside
+both packages: `packageFiles` in `scripts/check-plugins.mjs` lists files inside a
+plugin folder only, and `tests/plugin-skill-drafts.test.ts` fails if a draft
+reaches a package. A draft may name the transport tool `show_day`; the published
+skills may not until it joins the registry. `integrations/drafts/README.md` has
+the publishing steps.
+
 Daily check-in reads today and Needs decision, then marks only confirmed
 changes using current status checks and retry keys. Weekly review makes no
 writes and excludes Unresolved from adherence. Routine setup previews a
@@ -603,11 +616,11 @@ appear. Both descriptions repeat that a day note is separate from Occurrence not
 and statuses. The minor bump follows the versioning table: a relaxed id pattern and
 a new `metadata.kind` value.
 
-## 16. Alongside (Ticket 364, contract 1.8.0 behind a flag)
+## 16. Alongside (Ticket 364, contract 1.9.0 behind a flag)
 
 `CADENCE_ALONGSIDE` selects the contract edition the endpoint serves (`docs/MCP_CONTRACT.md`,
 "Alongside"). There was no earlier flag-gated contract change, so the registry stays
-1.7.0 and the 1.8.0 edition is derived from it in `editions.ts`. The flag is read per
+1.8.0 and the 1.9.0 edition is derived from it in `editions.ts`. The flag is read per
 request in `lib/services/integration-contract-options.ts` by `lib/mcp/server.ts`
 (`tools/list`, server version, errors), the read handlers, the write, move and
 opportunity services, and Cadence chat's tool list, so chat and MCP stay on one
@@ -616,15 +629,22 @@ person's answer only with the flag on, although `select *` may return the column
 it off. Write receipts carry the answer through `cadence_private.integration_write_source`
 (migration `20261125180000`). Evidence: `tests/integration-alongside-contract.test.ts`,
 `tests/integration-alongside-write.test.ts` and the protocol suite's
-`alongside-*` checks, which run when a server reports 1.8.0. Live client acceptance
+`alongside-*` checks, which run when a server reports 1.9.0. Live client acceptance
 for the field is Ticket 365.
 
-## 17. MCP Apps (planned, D36, Tickets 375–382)
+Ticket 370 renumbered this edition from 1.8.0 to 1.9.0, because Periods took 1.8.0 in
+the published registry (section 18). The flag was off in Production throughout, so only
+preview and local test clients saw the edition as 1.8.0. The plugin skills detect the
+field by the `alongside` input that `create_behavior` lists, not by a version number.
 
-Nothing in this section is implemented. The owner moved MCP Apps into scope on
-November 25, 2026 (`docs/DECISIONS.md`, D36). The plan is
-`docs/plans/2026-11-25-mcp-apps-expansion.md`. Ticket 375 is a spike that freezes the
-schema and the view contract, so the details below can change.
+## 17. MCP Apps (D36, Tickets 375–382)
+
+The owner moved MCP Apps into scope on November 25, 2026 (`docs/DECISIONS.md`, D36).
+The plan is `docs/plans/2026-11-25-mcp-apps-expansion.md`. Ticket 375 froze the
+`show_day` schema and the view contract in `docs/qa/2026-11-26-mcp-apps-spike.md`.
+**Implemented: the server half (Ticket 376), behind `CADENCE_MCP_APPS`, off in
+production.** The view (Ticket 377), host acceptance (Ticket 378) and everything public
+are not done.
 
 - **Standard.** MCP Apps (extension `io.modelcontextprotocol/ui`). A tool links to a
   view with `_meta.ui.resourceUri`. The host reads the HTML with `resources/read` and
@@ -632,29 +652,154 @@ schema and the view contract, so the details below can change.
   text result.
 - **First view.** "Cadence day" shows today only: each Occurrence with Completed, Not
   Completed and Note, and Needs decision as one count line.
-- **Tool.** A new read tool, `show_day` (name tentative), scope `cadence.read`. It is a
-  one-day adapter over the Timeline service and adds one field per Occurrence: whether a
-  Completed status came from a connected service. `get_timeline` does not change.
 - **Writes.** The view calls the existing tools `set_occurrence_status`,
   `set_parent_occurrence_status` and `update_occurrence_note` through the host, under the
   user's existing grant, with the displayed precondition and an idempotency key. A click
   is the user's confirmation. No new scope.
-- **Server.** `lib/mcp/server.ts` gains the resources capability for view HTML only.
-  Resource methods need a valid grant with `cadence.read`, count against the per-grant
-  read limit, log a fixed label and have a byte cap. The view resource declares an empty
-  CSP.
-- **Flag.** `CADENCE_MCP_APPS` (working name), off in production. Off removes the tool
-  and the resources. The production flag waits for the marketing site overhaul
-  (Ticket 246), the consent fix (Ticket 379) and the contract fold.
-- **Contract.** During the trial `show_day` lives in `lib/mcp/`, outside the contract
-  registry, so Cadence Chat never lists or runs it. For general release it joins the
-  registry as the next minor version after the alongside edition folds in (Ticket 365).
 - **Rules.** A view makes no network request, loads no external asset and receives no
   credential. User text renders as text. The data exclusions in section 1 apply.
 - **Hosts required before release.** Claude web, ChatGPT web, Claude Desktop, Claude
   mobile, VS Code Copilot and Gemini Apps Developer Mode (Ticket 378). Ticket 381 covers
-  an OAuth change only if the spike shows a required host cannot sign in. Gemini
-  Enterprise is out of scope.
+  an OAuth change only if a required host cannot sign in. Gemini Enterprise is out of
+  scope.
 - **Listings.** Every submission, listing and public copy change waits for the marketing
-  site overhaul and the owner's instruction. Ticket 380 prepares unpublished drafts.
+  site overhaul and the owner's instruction. Ticket 380 prepared unpublished drafts
+  on November 26, 2026: `docs/qa/mcp-directory-submission.md` ("Unpublished MCP
+  Apps listing drafts" and "Deferred owner steps for MCP Apps"), the screenshot
+  script `scripts/acceptance/listing-capture.mjs`, and a skill draft in
+  `integrations/drafts/`.
   Messaging entries: P-097 to P-101.
+
+### Server implementation (Ticket 376)
+
+Code: `lib/mcp/apps/` (`config.ts`, `show-day.ts`, `view-resources.ts`,
+`day-view-html.ts`), wired in `lib/mcp/server.ts`. Admission and the activity row are
+`lib/integrations/transport-read.ts`. The day projection is
+`lib/services/integration-day.service.ts`.
+
+**Flag.** `CADENCE_MCP_APPS`, server-only, read on every request. Only the exact value
+`true` enables the trial. Any other value, or none, is off.
+
+| | Flag off (production) | Flag on |
+|---|---|---|
+| Capabilities | `tools: {}` | `tools: {}`, `resources: {}`, `extensions: { "io.modelcontextprotocol/ui": {} }` |
+| `tools/list` | The registry, byte-identical to before the trial | The registry, then `show_day` |
+| `tools/call` `show_day` | Tool error `invalid_input`, "Unknown Cadence tool name." | The day |
+| `resources/list`, `resources/read` | JSON-RPC `-32601` | Served |
+| `resources/templates/list`, `resources/subscribe`, prompts | JSON-RPC `-32601` | JSON-RPC `-32601` |
+
+- **`show_day`.** A transport tool outside the contract registry. Its descriptor, output
+  and rules are in `docs/MCP_CONTRACT.md`, "MCP Apps trial". It is always listed with the
+  flag on: a legacy request carries no client capabilities on `tools/list`, and the text
+  result serves a host without views.
+- **`resources/list`.** One descriptor and no HTML: `uri` `ui://cadence/day/v1.html`,
+  `name` `cadence-day`, `title` "Cadence day", `mimeType` `text/html;profile=mcp-app`,
+  and `_meta.ui`.
+- **`resources/read`.** The exact URI only. One `contents` entry with the HTML as
+  `text`, the same `mimeType`, and
+  `_meta.ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }`.
+  The CSP is explicit and empty. `_meta.ui.domain` is not set. Any other URI, including
+  a different case, a query string or a trailing slash, fails with the protocol's
+  resource-not-found error (`-32602` with `data.uri`).
+- **Byte cap.** 1,048,576 UTF-8 bytes (`MCP_APP_RESOURCE_BYTE_CAP`). A larger view is
+  refused with `internal_error`, never truncated.
+- **Admission.** Every request to `/mcp` already needs a valid grant with
+  `cadence.read`: no token, an unknown token and a grant without read get 401 or 403
+  before any handler runs. `show_day`, `resources/list` and `resources/read` then each
+  check the scope again, consume one read from the per-grant limit (120 a minute, shared
+  with the registry read tools) and write one activity row. An unknown URI still costs
+  one read. Past the limit the response is HTTP 429 with `Retry-After`. A resource
+  request has no tool-error shape, so a refusal is a JSON-RPC error `-32000` whose
+  `data` is the usual tool-error object.
+- **Never fails open.** When the limit counter or the activity write fails, the call
+  returns `service_unavailable` and no data, as `executeMcpOperation` does for registry
+  reads.
+- **Activity rows.** Operation labels `show_day`, `list_view_resources` and
+  `read_view_resource`. The activity table accepts only `^[a-z][a-z0-9_]{0,63}$`, so the
+  method name `resources/read` cannot be a label. No schema change was needed: the
+  table has no list of allowed operations. Rows hold the label, the outcome and an error
+  code. Connected apps shows them as "show day", "list view resources" and "read view
+  resource".
+- **Log line.** The existing `cadence_mcp` line, with the same labels as `operation`.
+  Never the URI, the HTML, a token, arguments or note text.
+- **View HTML seam.** `lib/mcp/apps/day-view-html.ts` exports
+  `DAY_VIEW_HTML: string`. Since Ticket 377 it is generated: `npm run mcp-views:build`
+  builds `packages/mcp-views` to one HTML file and writes it there, and
+  `tests/mcp-day-view-build.test.ts` fails when the file differs from a fresh build. The
+  view makes no request; `docs/UI_SPEC.md`, "Cadence day view in an AI client".
+- **Rollback.** Set the flag to anything but `true`. No migration and no stored state
+  belong to the trial. Clients may hold `tools/list` for five minutes; a call to
+  `show_day` in that window gets the stable tool error above.
+- **Protocol suite.** `scripts/acceptance/protocol.mjs` expects the registry plus
+  `show_day` when the server declares the `io.modelcontextprotocol/ui` extension, and
+  exactly the registry otherwise.
+- **Not done here.** `resources/templates/list` stays unimplemented; MCP Inspector calls
+  it and continues on `-32601`. Host behavior (approval prompts, the 403 step-up on a
+  view call, view caching) is Ticket 375's open part and Ticket 378.
+
+Evidence: `tests/mcp-apps-server.test.ts` (both protocol paths, flag on and off, no
+grant, the read limit, a stale descriptor, logs), `tests/mcp-apps-show-day.test.ts`
+(frozen schema, excluded data, admission, activity labels, byte cap),
+`tests/integration-day.service.test.ts`, `tests/mcp-apps-chat.test.ts`,
+`tests/acceptance-protocol.test.mjs` and `tests/sql/ticket-222-oauth-persistence-smoke.sql`
+(the activity table takes the three labels and refuses a method name).
+
+Platform impact: web only. Desktop is not applicable: the MCP server is hosted, and a
+linked Mac receives view-made changes through existing account sync. Marketing: the
+developer reference and `/developers` change at general release (`P-099`). Future
+mobile: not applicable; host mobile apps render the view. Messaging impact: `P-098`,
+`P-099`.
+
+## 18. Periods (Ticket 370, contract 1.8.0)
+
+Contract 1.8.0 adds Periods (`docs/DECISIONS.md`, 2026-11-25, D35) to the published
+registry: `list_periods` (`cadence.read`), and `create_period`, `update_period` and
+`end_period` under `cadence.occurrences.write`, the scope the owner chose. There is no
+remove tool; removing a Period stays in the app. Existing tools gain
+`get_account_context.active_periods` with `more_active_periods`, `periods` with
+`more_periods` on each `get_timeline` day, `get_adherence_summary.period_split`, and the
+record kind `period` in `search` and `fetch`. `docs/MCP_CONTRACT.md`, "Periods", holds
+the shapes.
+
+What keeps an outside agent from misusing a Period:
+
+- Every Period tool description carries one sentence, `PERIOD_MEANING`: a Period changes
+  no status, adherence, reminder or schedule; it is not a reason to mark an Occurrence
+  Not Completed; pausing a Behavior is `pause_behavior`; a Period is created or changed
+  only when the user states it. The descriptions also say that no tool removes one.
+- A Period note leaves Cadence only in the structured `note` field of `list_periods` and
+  the three write results. Search matches the label only, and fetched text holds the
+  label, dates and revision. The embedded lists return summaries without the note, at
+  most 20, and at most 10 on a Timeline day, so every result stays under the 100,000-byte
+  cap with 500 overlapping Periods, even with the longest labels over 14 days.
+- `period_split` adds counts and changes none: the adherence definition and every
+  existing number stay as they were.
+- `end_period` takes no date, and the database refuses an end that would extend a Period.
+
+The writes run as the grant's user through `public.integration_apply_period_write`
+(migration `20261126140000_period_integration_writes.sql`), on the day-note pattern:
+`integration_lock_write` checks the scope and the idempotency key, the function compares
+the opaque revision with the stored row, writes through `create_period` or
+`update_period`, stores a version-2 receipt and records the activity. The same migration
+adds the three operations to `integration_lock_write` by a text patch that raises when
+its anchor is missing. It drops nothing. The service plans
+each write with the Period resolver, so the app and MCP follow the same rules, and reads
+"today" for `end_period` from the profile timezone. The cap trigger's SQLSTATE `54000`
+maps to `limit_exceeded`.
+
+Cadence Chat reads the tools from the registry. The three writes always wait for a Yes
+and have no Undo. With the Notes source off, the Period tools stay (a label is not a
+note), `create_period` and `update_period` offer no `note`, and `withoutNotes` removes
+the note from every result. Chat records each write in `chat_actions` with the kind
+`period`, which migration `20261126150000_chat_period_actions.sql` adds. That migration
+drops and re-adds the kind check, so it needs the owner's yes before a hosted push;
+until it is on the database, a Period write from Chat cannot be recorded.
+
+Evidence: `tests/integration-contract.test.ts`, `tests/integration-read.test.ts`
+(including 500 overlapping Periods), `tests/integration-write.test.ts`,
+`tests/chat-periods.test.ts` and `tests/sql/period-integration-write.sql`, run inside
+one rolled-back transaction on the local stack (November 25, 2026). Not run: the
+`*.local-integration` suites and a live protocol run. The protocol suite reads
+`list_periods` and checks that a read-only grant cannot call the three writes; it
+creates no Period, because no tool could remove it from the test account. The consent
+screen text in `lib/types/oauth-ui.ts` does not name Periods yet (messaging entry P-096).

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listTimeSessionsByOccurrenceIds: vi.fn(),
   listAppliedBehaviorLogImportRuns: vi.fn(), listBehaviorLogImportRecordMappings: vi.fn(),
   listImportedNotes: vi.fn(), listImportedInterventions: vi.fn(),
+  listPeriods: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -46,6 +47,8 @@ vi.mock("@/lib/db/exportPageRead.repo", () => ({
   readExportPageSummary: mocks.readExportPageSummary,
 }));
 
+vi.mock("@/lib/db/periods.repo", () => ({ listPeriods: mocks.listPeriods }));
+vi.mock("@/lib/db/dayNotes.repo", () => ({ listAllDayNotes: async () => [] }));
 vi.mock("@/lib/db/occurrenceMoves.repo", () => ({ listOccurrenceMovesForExport: async () => [] }));
 vi.mock("@/lib/services/occurrence.service", () => ({
   ensureUserOccurrencesFresh: mocks.ensureUserOccurrencesFresh,
@@ -67,6 +70,7 @@ describe("getUserExportBundle", () => {
     mocks.consumeExportDownloadRateLimit.mockResolvedValue({ allowed: true });
     mocks.listAppliedBehaviorLogImportRuns.mockResolvedValue([]); mocks.listBehaviorLogImportRecordMappings.mockResolvedValue([]);
     mocks.listImportedNotes.mockResolvedValue([]); mocks.listImportedInterventions.mockResolvedValue([]);
+    mocks.listPeriods.mockResolvedValue([]);
     mocks.createClient.mockResolvedValue({});
     mocks.requireCurrentUserId.mockResolvedValue(USER_ID);
     mocks.readCachedProfileTimezone.mockResolvedValue("America/New_York");
@@ -164,6 +168,28 @@ describe("getUserExportBundle", () => {
         (file) => file.path === "data/behavior_definition_events.jsonl",
       )?.content,
     ).toContain('"event_id":"definition-1"');
+  });
+
+  it("reads the account's Periods and exports those in range; the note follows the notes option (Ticket 373)", async () => {
+    mocks.listPeriods.mockResolvedValue([
+      { id: "period-1", user_id: USER_ID, label: "Sick", start_on: "2026-06-01", end_on: null, note: "Flu", revision: 1,
+        created_at: "2026-06-01T12:00:00Z", updated_at: "2026-06-01T12:00:00Z" },
+      { id: "period-2", user_id: USER_ID, label: "Old", start_on: "2026-01-01", end_on: "2026-01-02", note: null, revision: 1,
+        created_at: "2026-01-01T12:00:00Z", updated_at: "2026-01-01T12:00:00Z" },
+    ]);
+    const { getUserExportBundle } = await import("../lib/services/export.service");
+    const now = Temporal.Instant.from("2026-06-08T16:00:00Z");
+
+    const withoutNotes = await getUserExportBundle({ now, range: 7 });
+    expect(mocks.listPeriods).toHaveBeenCalledWith(expect.anything(), USER_ID);
+    expect(withoutNotes.jsonBackup.periods).toEqual([{
+      id: "period-1", label: "Sick", start_on: "2026-06-01", end_on: null,
+      created_at: "2026-06-01T12:00:00Z", updated_at: "2026-06-01T12:00:00Z",
+    }]);
+    expect(withoutNotes.json).not.toContain("Flu");
+    const withNotes = await getUserExportBundle({ now, range: "all", includeNotes: true });
+    expect(withNotes.jsonBackup.periods?.map((period) => [period.label, period.note])).toEqual([["Old", null], ["Sick", "Flu"]]);
+    expect(withNotes.behaviorLog.files.find((file) => file.path === "data/reviews.jsonl")?.content).toContain('"period":true');
   });
 
   it("uses complete materialized standard histories above the Data API cap", async () => {
