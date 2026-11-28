@@ -631,3 +631,84 @@ describe("vercel ignore scripts: dependency boundary", () => {
     expect(outside.filter((file) => !covered(file, paths)).sort()).toEqual([]);
   });
 });
+
+// .vercelignore uses .gitignore syntax, so git check-ignore is the reference matcher.
+describe(".vercelignore keeps build inputs", () => {
+  const PROTECTED: readonly string[] = [
+    "apps/marketing",
+    "docs/ontology/briefing-workbench.json",
+    "design-system.manifest.json",
+    "design-system.surfaces.json",
+    "design-system.usage.json",
+    "tests/fixtures",
+    "apps/marketing/src/data/vocabulary.ts",
+    APP_SCRIPT,
+    MARKETING_SCRIPT,
+    "vercel.json",
+    "apps/marketing/vercel.json",
+    // Same directory names as excluded root folders, one level down.
+    "lib/supabase/server.ts",
+    "lib/integrations/agent-caller.ts",
+    // npm ci needs every apps/* and packages/* workspace manifest the lockfile names.
+    "apps/desktop/package.json",
+    "packages/core/package.json",
+    "packages/ui/package.json",
+    "packages/mcp-views/package.json",
+  ];
+  const SKIPPED_DIRS = new Set(["node_modules", "dist", ".astro"]);
+
+  function filesUnder(path: string): string[] {
+    const absolute = join(SOURCE_ROOT, path);
+    if (!existsSync(absolute)) throw new Error(`${path} does not exist`);
+    if (statSync(absolute).isFile()) return [path];
+    const files: string[] = [];
+    for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+      if (entry.isDirectory() && SKIPPED_DIRS.has(entry.name)) continue;
+      const child = `${path}/${entry.name}`;
+      if (entry.isDirectory()) files.push(...filesUnder(child));
+      else files.push(child);
+    }
+    return files;
+  }
+
+  function ignoredBy(paths: readonly string[]): string[] {
+    const matcher = mkdtempSync(join(tmpdir(), "cadence-vercelignore-"));
+    clones.push(matcher);
+    gitIn(matcher, "init", "-q");
+    copyFileSync(join(SOURCE_ROOT, ".vercelignore"), join(matcher, ".gitignore"));
+    const result = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], {
+      cwd: matcher,
+      env: cleanEnv() as NodeJS.ProcessEnv,
+      input: paths.join("\n"),
+      encoding: "utf8",
+    });
+    // Exit 1 means no path matched.
+    if (result.status !== 0 && result.status !== 1) throw new Error(`git check-ignore failed: ${result.stderr}`);
+    return result.stdout.split("\n").filter((line) => line.length > 0).sort();
+  }
+
+  it("ignores no protected file or file an ignore script lists as a build input", () => {
+    const inputs = [...PROTECTED, ...readPaths(APP_SCRIPT), ...readPaths(MARKETING_SCRIPT)];
+    const files = [...new Set(inputs.flatMap((path) => filesUnder(path)))];
+    expect(files).toContain("tests/fixtures/advisor-day-context.valid.json");
+    expect(ignoredBy(files)).toEqual([]);
+  });
+
+  it("drops the large non-runtime folders", () => {
+    const dropped = [
+      "apps/desktop/src/main.tsx",
+      "load-tests/k6.js",
+      "integrations/claude/plugin.json",
+      "supabase/migrations/0001_init.sql",
+      "assets/logo.png",
+      ".github/workflows/ci.yml",
+      "docs/status/archive/2026-10.md",
+      "docs/ios-plan/README.md",
+      "tests/sql/smoke.sql",
+      "tests/acceptance-web-client/runner.test.ts",
+      "tests/vercel-ignore.test.ts",
+      "tests/setup.mjs",
+    ];
+    expect(ignoredBy(dropped)).toEqual([...dropped].sort());
+  });
+});

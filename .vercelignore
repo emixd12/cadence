@@ -13,3 +13,38 @@ exports/
 *.tsbuildinfo
 .env*
 !.env.example
+
+# Non-runtime source that neither the app nor the marketing build reads.
+# Every pattern below starts with "/" so it matches at the repository root only:
+# a bare "supabase/" or "integrations/" would also drop lib/supabase/ and
+# lib/integrations/. tests/vercel-ignore.test.ts fails if a pattern here
+# ignores a file that scripts/vercel-ignore-*.sh lists as a build input.
+#
+# Never ignore: apps/marketing/, docs/ontology/briefing-workbench.json,
+# design-system.{manifest,surfaces,usage}.json, tests/fixtures/ and
+# scripts/vercel-ignore-*.sh.
+
+# apps/* is an npm workspace: keep the desktop manifest so npm ci matches the lockfile.
+/apps/desktop/*
+!/apps/desktop/package.json
+/load-tests/
+/integrations/
+/supabase/
+/assets/
+/.dagger/
+/.github/
+/.codex/
+/.agentic/
+/.agents/
+/.claude-plugin/
+/.impeccable/
+/.githooks/
+/docs/design-exploration/
+/docs/qa/
+/docs/status/
+/docs/plans/
+/docs/ios-plan/
+/tests/sql/
+/tests/acceptance-web-client/
+/tests/*.test.*
+/tests/*.mjs
