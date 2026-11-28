@@ -60,3 +60,17 @@ harness work is still open.
 Claude showed the connector as connected while Cadence had no active grant for it. The
 agent disconnected it, connected it again and allowed consent as test account A. The
 `mcp-clients` and `mcp-web` preflight then reported no owner steps.
+
+## Later the same day: Claude Desktop, VS Code and Gemini
+
+Same local stack and tunnel, a new test-login user with the same three Behaviors.
+
+| Host | Result |
+|---|---|
+| Claude Desktop 7.37095.0 (macOS), chat mode | The tunnel connector added on the web appeared in the app. Two new chats each called `show_day` (`success`, no approval prompt). **Neither rendered the view**: the app showed a collapsed "Used Cadence QA tunnel: Show day" tool block and Cadence recorded no `read_view_resource`. Claude web rendered the view for the same account earlier that day. Driven with macOS UI scripting; the app refused a debugging port. |
+| VS Code 1.148.0 | Installed for this run, isolated profile, server set in `.vscode/mcp.json`. The server stays at "Starting": VS Code's agent host reports "Not authenticated" until GitHub Copilot is signed in. Cadence saw one unauthenticated `POST /mcp` (401) and no discovery or registration. Blocked on the owner's GitHub sign-in. |
+| Gemini against production | Pass for sign-in: with PR #442 deployed, Gemini reached consent (as "Google", unverified client), exchanged the token and listed 30 tools. Chat checks did not run: the free test account hit Gemini's usage limit ("Resets 5:37 AM") and answered every prompt as blank. |
+| Claude mobile | Not run. No tool in this session drives a physical phone. |
+
+By mistake the first Claude Desktop prompt went to a Code-mode session, which read test
+account A's production data through the "Cadence QA" connector. It wrote nothing.
