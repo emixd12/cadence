@@ -20306,7 +20306,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 365: Alongside acceptance and release
 
-Status: in_progress. November 26, 2026: local-stack acceptance passed (9 of 10 cases clean, defect D1 fixed on `feat/alongside-history-fix` with `20261126260000`; evidence in `docs/qa/2026-11-26-alongside-local-acceptance.md`). Remaining: hosted Preview acceptance as test account A, installed Mac dev-signed acceptance, MCP Tier 1 acceptance, and the user guide section.
+Status: complete November 28, 2026 (`CADENCE_ALONGSIDE=on` live in Production web; PR #407 merged `f9ad52a8`; hosted migrations `20261126200000`–`20261126260000` applied). Local-stack acceptance (`docs/qa/2026-11-26-alongside-local-acceptance.md`, defect D1 fixed), Production web, `test-mac` dev-signed `0.1.19-dev.1` (schema 28 → 30, contract 11 sync, live UI), Production MCP Tier 0 (`prod-20261128-t0`) and Tier 1 (`prod-20261128-t1`: `claude-code`, `anthropic-api`, `openai-api` 3/3 pass), and the user guide additions (`docs/user-guide/behaviors-and-review.md`, `docs/user-guide/timeline.md`) are recorded in `docs/qa/2026-11-28-alongside-production-acceptance.md`. Published notarized Mac release (`0.1.19`) remains an owner decision.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 

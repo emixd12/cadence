@@ -48,12 +48,12 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 (web + Mac, SQLite schema 30, account sync contract 11), 384, 385 (`do-it-during-something-else` reviewed and active, 2026-11-28) and 386 complete in PR #407; hosted migrations `20261126200000`–`20261126260000` pushed November 28, 2026 | Merge PR #407 and finish Ticket 365 acceptance | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | **Complete and live on Production web** (PR #407 merged `f9ad52a8`, hosted migrations `20261126200000`–`20261126260000` pushed, Ticket 385 card `do-it-during-something-else` active, `CADENCE_ALONGSIDE=on` live November 28, 2026) | Ships on Mac in the next notarized release (`0.1.19`) on the owner's instruction | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. 377 (view) complete November 26: the real view replaces the placeholder. 380 (listing preparation) `in_progress`: drafts, capture script, skill draft and owner checklist done November 26, host screenshots wait for 378. 378 and 381 not started; 379 complete; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 378 tests hosts (notes for it: `docs/qa/2026-11-25-mcp-day-view.md`); 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) blocked | Chat writes Periods since PR #423 (owner's yes, November 26; hosted migration `20261126150000` pushed). 374 starts from an hourly scheduled check when Ticket 363 (PR #407) is on `main`. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Merged November 25, 2026 (PR #403); the Timeline row checked on production web November 26 as test account A | Installed Mac check with the next Mac release | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Ticket 387: the advisor compares tracked time with the intended duration | Not started; coach tips already compare for "longer" | Owner decides the three open decisions in the ticket | TICKETS, Ticket 387 |
-| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–364 and 383–386 complete, flag off; 365 local-stack acceptance done and defect D1 fixed. On `main`: 356–361 and 364; hosted migrations `20261125140000`–`20261125190000` pushed. In PR #407: 362, 363, 360/361 follow-ups, audit fixes, 383–386, local acceptance evidence and the D1 history/older-contract fix, with migrations `20261126200000`–`20261126260000`. Web behind `CADENCE_ALONGSIDE`, Mac behind `VITE_CADENCE_ALONGSIDE` | Push `20261126200000`–`20261126260000` after owner yes on `240000`–`260000`, merge PR #407, then finish Ticket 365 (Preview as account A, installed Mac dev-signed build, MCP acceptance). Older Macs (contracts 8–9) stay safe via `20261126260000` and `20261126250000`. The owner decides the Production flag and the Mac release | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33, D37) |
+| Tickets 356–365: alongside Behaviors and the guessed Where (D33) | **Complete and live on Production web (`CADENCE_ALONGSIDE=on`)** since November 28, 2026 (PR #407 merged `f9ad52a8`, hosted migrations `20261126200000`–`20261126260000` live). Local, Production web, `test-mac` `0.1.19-dev.1` (schema 28 → 30, contract 11 sync) and Production MCP Tier 0 + Tier 1 (`claude-code`, `anthropic-api`, `openai-api`) acceptance passed; user guide updated | Owner decides when to publish the next notarized Mac release (`0.1.19`) with `VITE_CADENCE_ALONGSIDE` enabled; messaging pass (`P-093`, `P-103`) | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33, D37); `docs/qa/2026-11-28-alongside-production-acceptance.md` |
 | Ticket 350: move the repository to the `cadence-me` organization; merge queue | Preparation done November 22: `CI` runs on `merge_group`, the Trust history downloader accepts the new Pages root, and the archive holds a staged copy of the evidence. | Owner: create the organization `cadence-me`, then tell the agent before transferring. The agent refreshes the archive first. | TICKETS, Ticket 350 |
 | Tickets 343–348: advisor avatar | 343 master confirmed in round 4 on November 22 ("go with A"); round 5: exact-size files per size and screen density, built November 22 ("Go with B"). 343–346 complete on web November 22: vector master approved, sized files, resolver, animated avatar on the Timeline, panel and Chat, shipped without a flag on the owner's instruction. 347, 348 deferred by the owner | Installed Mac check with the next Mac release; a brief move in flight does not reach the avatar yet; the old trial bench stays | TICKETS, Tickets 343–348; `docs/plans/2026-11-21-advisor-avatar.md`; DECISIONS, 2026-11-21 and 2026-11-22 |
 | Tickets 331–337: sign-in by email and Apple (D31) | 331–335 complete. Email (`CADENCE_SIGN_IN_EMAIL`, 21:35Z), Apple and Settings sign-in methods (`CADENCE_SIGN_IN_APPLE`, `CADENCE_SIGN_IN_LINKING`, 21:36Z) **live on production web** since November 13, 2026; hosted migrations equal git; final production check passed November 13, 22:05–22:20Z. 336 published in Cadence for Mac 0.1.11 (November 14, 06:14Z; release packet). 337 web rows done | 337: acceptance row 6 on the installed 0.1.11 (each method links, syncs, refuses a second account); row 3's Apple half (a Google account adds Apple, then signs in with it: needs the owner's Apple Account). Follow-ups: next row | TICKETS, Tickets 331–337; DECISIONS, 2026-11-13 (D31); `docs/qa/2026-11-13-sign-in-final-verification.md` |
@@ -102,6 +102,35 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Alongside Behaviors live in Production; Ticket 365 acceptance complete — November 28, 2026
+
+- **Deployed:** PR #407 merged to `main` (`f9ad52a8`); hosted migrations `20261126200000`–`20261126260000`
+  pushed to Supabase (owner approved); Ticket 385 advice card `do-it-during-something-else`
+  reviewed and activated (`reviewer: "Emi"`, `reviewed_at: "2026-11-28"`); `CADENCE_ALONGSIDE=on`
+  set in Vercel Production and redeployed (`cadence-4ewyaj6ur-emis-projects-4c886aeb.vercel.app`,
+  aliased to `https://app.cadence-me.com`).
+- **Acceptance (`docs/qa/2026-11-28-alongside-production-acceptance.md`):**
+  - Production web (test account A): `GET /api/behaviors/alongside` returned `200` (`enabled: true`);
+    Create behavior shows **Can be done alongside other things** (`Not answered`, `Yes`, `No`);
+    creating `"Alongside QA 2026-11-28"` (`Yes`) rendered **Alongside** (`data-alongside="person"`)
+    across all 8 Timeline days (archived afterward).
+  - Installed Mac on `test-mac`: published `0.1.18` (contract 9) synced cleanly after the hosted
+    migrations; dev-signed `0.1.19-dev.1` (`VITE_CADENCE_ALONGSIDE=1`, `binarySha256: 5f8a7b17…`)
+    upgraded SQLite 28 → 30 (integrity `ok`, 0 FK errors, 73 Behaviors / 273 Occurrences preserved),
+    rendered **Can be done alongside other things** live in Create behavior, and synced
+    `"Alongside QA 2026-11-28"` (`alongside = 1`, contract 11, 0 pending writes).
+  - Production MCP: Tier 0 (`prod-20261128-t0`) passed all 5 alongside protocol checks, 30-tool
+    registry parity, cross-account isolation, and grant revocation (2 unrelated page-1 `list_behaviors`
+    checks failed because account A holds 73 Behaviors > page size 50); Tier 1 (`prod-20261128-t1`,
+    US$5 cap) passed 3/3 active clients (`claude-code`, `anthropic-api`, `openai-api`; `inspector`
+    skipped for missing local cache).
+  - User guide: added alongside Behaviors and guessed Where sections to
+    `docs/user-guide/behaviors-and-review.md` and `docs/user-guide/timeline.md`.
+
+Platform impact: web live in Production (`CADENCE_ALONGSIDE=on`); desktop verified on `test-mac`
+`0.1.19-dev.1` (notarized `0.1.19` publication remains an owner decision); marketing not applicable
+(messaging pass `P-093`, `P-103`); future mobile deferred. Messaging impact: P-093, P-103.
 
 ## Vercel build billing optimization (Phases 1–3) — November 28, 2026
 
