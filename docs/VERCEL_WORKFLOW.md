@@ -391,12 +391,18 @@ import. Excluding anything would save under 1 MB.
 
 ### Deployment retention
 
-| Deployment state | Kept |
-| --- | --- |
-| Preview | 7 days |
-| Canceled | 7 days |
-| Errored | 7 days |
-| Production | 30 days, with the 10 most recent kept for rollback |
+Both projects currently remain on Vercel's 30-day default retention (Vercel's REST API
+returned HTTP 400 on `deploymentExpiration` writes for Pro). Because canceled builds
+store zero artifacts, build filtering already eliminates most deployment storage. As an
+optional Dashboard-only follow-up (`Settings → Deployment Retention`), non-production
+retention can be tightened as follows:
+
+| Deployment state | Current (default) | Optional Dashboard target |
+| --- | --- | --- |
+| Preview | 30 days | 7 days |
+| Canceled | 30 days | 7 days |
+| Errored | 30 days | 7 days |
+| Production | 30 days, with the 10 most recent kept for rollback | 30 days, 10 most recent kept |
 
 ### Spend Management
 
@@ -614,8 +620,15 @@ checks. Ticket 101 performs no Vercel mutation or production collection.
 ## Ticket 102 provenance collection
 
 The Public Trust workflow reads named deployments through the Vercel API.
-Both must report `READY`. Both public Git commit fields must equal the snapshot
-source commit. A mismatch is Failed. This evidence covers only the named
+Both must report `READY`. Each public Git commit field must equal the snapshot
+source commit, or name a verified Git ancestor of it with no difference in that
+surface's dependency paths. The paths come from `scripts/vercel-ignore-app.sh`
+and `scripts/vercel-ignore-marketing.sh`, the same lists that decide whether a
+surface rebuilds. A surface whose dependencies did not change skips its build,
+so its Ready deployment can name an older commit. The collector checks with
+`git merge-base --is-ancestor` and `git diff --quiet` over that list, so the
+`collect` job checks out full history (`fetch-depth: 0`). Any other result,
+including a git error or an empty path list, is Failed. This evidence covers only the named
 Git-to-deployment association. It does not cover private function bundles,
 later environment changes, aliases, or provider internals. The workflow keeps
 Vercel Git deployment unchanged and needs only a protected read token plus the

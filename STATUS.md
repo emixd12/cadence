@@ -103,6 +103,30 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Vercel build billing optimization (Phases 1–3) — November 28, 2026
+
+- **Phase 1 (PR #438, merged `2b6038fc`):** path-filtered `ignoreCommand` scripts with
+  shallow-clone fetch and zero-secret opt-in previews. `cadence-marketing` moved to Basic
+  (2 vCPU). The team Spend Management budget is US$30, alert-only (pause off). Live check: 8 of
+  8 later non-web and preview pushes were canceled with zero billed CPU-minutes.
+- **Phase 2 (PR #439, merged `d463c8a8`):** root-anchored `.vercelignore` trim (1,310 of 2,785
+  files, about 33 of 76 MB). A local webpack and Turbopack benchmark kept `--webpack` until a
+  separate `.next/server` Preview check. Updated `docs/VERCEL_WORKFLOW.md`, `docs/COSTS.md`
+  (30-day baseline 15,380 Cadence CPU-minutes, US$53.83 after December 8) and `AGENTS.md`.
+- **Phase 3 (this PR):** Public Trust provenance (`scripts/collect-public-trust-evidence.mjs`,
+  `.github/workflows/public-trust-evidence.yml`) accepts a Ready deployment that names a
+  verified ancestor of the source commit with no change in that surface's ignore-script paths.
+  This covers a surface that skipped its build. The `collect` job now fetches full history.
+- **Open:** the 14-day billing measurement is due December 12, 2026. Deployment retention stays
+  at Vercel's 30-day default (REST API writes returned HTTP 400 on Pro) unless optionally
+  shortened to 7 days in the Vercel Dashboard (`Settings → Deployment Retention`). Ticket 350
+  (`cadence-me` organization and Merge Queue batching) stays owner-gated; `orgs/cadence-me`
+  does not exist.
+
+Platform impact: web and marketing deploy and Public Trust only; desktop and future mobile not
+applicable.
+Messaging impact: none.
+
 ## Cadence for Mac 0.1.18 published — November 28, 2026
 
 - **Published:** the versioned assets and `desktop-stable/latest.json` at 17:44–17:46Z on

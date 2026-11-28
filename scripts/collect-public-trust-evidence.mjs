@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
@@ -29,6 +30,52 @@ export function deploymentOwnsOrigin(value, deployment, projectId) {
   const hostname = new URL(deployment.url).hostname;
   const aliases = Array.isArray(value.alias) ? value.alias.map((item) => typeof item === "string" ? item : item?.domain).filter(Boolean) : [];
   return value.projectId === projectId && [value.url, ...aliases].includes(hostname);
+}
+
+const FULL_SHA = /^[0-9a-f]{40}$/;
+
+// Reads the PATHS=( ... ) list from a Vercel ignore script, the single source of
+// truth for which files one surface's build depends on.
+export function readIgnorePaths(scriptRelativePath, root = ROOT) {
+  const source = readFileSync(new URL(scriptRelativePath, root), "utf8");
+  const block = source.match(/^PATHS=\(\n([\s\S]*?)^\)/m);
+  if (!block) throw new Error(`${scriptRelativePath} has no PATHS list.`);
+  const paths = block[1].split("\n").map((line) => line.replace(/#.*$/, "").trim()).filter(Boolean);
+  if (!paths.length) throw new Error(`${scriptRelativePath} has an empty PATHS list.`);
+  for (const entry of paths) {
+    if (/[\s"']/.test(entry) || entry.startsWith(":")) {
+      throw new Error(`${scriptRelativePath} has an unsupported PATHS entry: ${entry}`);
+    }
+  }
+  return paths;
+}
+
+function cleanGitEnv() {
+  return Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+}
+
+function defaultRunGit(args, cwd) {
+  const result = spawnSync("git", args, { cwd, stdio: "ignore", env: cleanGitEnv() });
+  return result.error ? null : result.status;
+}
+
+// A deployment passes when it is Ready and names the source commit, or when it
+// names an ancestor of the source commit and none of the surface's dependency
+// paths differ between the two. Any other outcome, including a git error, fails.
+export function verifySurfaceProvenance({ ready, commit, sourceCommit, paths, cwd = ROOT, runGit = defaultRunGit }) {
+  const failed = { passed: false, exactMatch: false };
+  if (ready !== true || typeof commit !== "string" || typeof sourceCommit !== "string") return failed;
+  if (!FULL_SHA.test(commit) || !FULL_SHA.test(sourceCommit)) return failed;
+  if (commit === sourceCommit) return { passed: true, exactMatch: true };
+  if (!Array.isArray(paths) || paths.length === 0) return failed;
+  if (paths.some((entry) => typeof entry !== "string" || entry.trim().length === 0)) return failed;
+  try {
+    if (runGit(["merge-base", "--is-ancestor", commit, sourceCommit], cwd) !== 0) return failed;
+    if (runGit(["diff", "--quiet", commit, sourceCommit, "--", ...paths], cwd) !== 0) return failed;
+  } catch {
+    return failed;
+  }
+  return { passed: true, exactMatch: false };
 }
 
 function runJson(command, args, allowedStatuses = [0]) {
@@ -183,6 +230,12 @@ export async function readHostedMigrationBoundary({ accessToken, projectRef, fet
   return rows.map((row) => row?.version).filter((version) => typeof version === "string" && /^20\d{12}$/.test(version)).sort().at(-1) ?? null;
 }
 
+export function provenanceSummary(provenance) {
+  if (!provenance?.passed) return "The named deployments are not both Ready from or source-equivalent to the expected source commit.";
+  if (provenance.exactMatch === false) return "Both Ready deployments match or are verified source-equivalent ancestors of the expected source commit.";
+  return "Both Ready deployments name the expected source commit.";
+}
+
 async function liveFacts(input) {
   const fixture = input.fixture;
   if (!isRepositoryPagesOrigin(input.pages_origin, input.repository)) throw new Error("Pages origin does not match the named public repository.");
@@ -201,7 +254,9 @@ async function liveFacts(input) {
       inspect(input.application_deployment, process.env.VERCEL_APPLICATION_PROJECT_ID),
       inspect(input.marketing_deployment, process.env.VERCEL_MARKETING_PROJECT_ID),
     ]);
-    inspectedProvenance = { passed: application.ready && marketing.ready && application.commit === input.source_commit && marketing.commit === input.source_commit };
+    const appProv = verifySurfaceProvenance({ ...application, sourceCommit: input.source_commit, paths: readIgnorePaths("scripts/vercel-ignore-app.sh") });
+    const mktProv = verifySurfaceProvenance({ ...marketing, sourceCommit: input.source_commit, paths: readIgnorePaths("scripts/vercel-ignore-marketing.sh") });
+    inspectedProvenance = { passed: appProv.passed && mktProv.passed, exactMatch: appProv.exactMatch && mktProv.exactMatch };
   }
   const audit = fixture?.audit ?? runJson("npm", ["audit", "--omit=dev", "--json"], [0, 1]);
   const sbom = fixture?.sbom ?? runJson("npm", ["sbom", "--omit=dev", "--sbom-format=cyclonedx", "--package-lock-only"]);
@@ -255,7 +310,7 @@ async function liveFacts(input) {
   }
   const tool = (name, version = "1") => ({ name, version });
   const facts = {
-    source_to_deployment_provenance: { status: provenance?.passed ? "passed" : "failed", scope: "Both named Ready Vercel deployments and their public Git commit metadata.", tool: tool("Vercel REST API"), summary: provenance?.passed ? "Both Ready deployments name the expected source commit." : "The named deployments are not both Ready from the expected source commit." },
+    source_to_deployment_provenance: { status: provenance?.passed ? "passed" : "failed", scope: "Both named Ready Vercel deployments and their public Git commit metadata.", tool: tool("Vercel REST API"), summary: provenanceSummary(provenance) },
     production_dependency_vulnerabilities: { status: auditCounts.total === 0 && github.dependabot?.open === 0 ? "passed" : github.dependabot ? "failed" : "unavailable", scope: "Production dependencies declared by the lockfile, npm advisory data, and Dependabot status.", tool: tool("npm audit", process.env.npm_config_user_agent?.split("/")[1]?.split(" ")[0] ?? "unknown"), summary: `SBOM has ${sbomSummary.components} components with SHA-256 ${sbomSummary.sha256}; audit totals: ${auditCounts.total} (${auditCounts.critical} critical, ${auditCounts.high} high, ${auditCounts.moderate} moderate, ${auditCounts.low} low); Dependabot ${github.dependabot ? `open aggregate ${github.dependabot.open}` : "aggregate unavailable"}.`, unavailable_reason: github.dependabot ? null : "The collector could not read a complete Dependabot aggregate result." },
     code_scanning: codeScanningFact(github.code_scanning, "Configured GitHub code-scanning analyzers for the named public repository and source commit.", tool("GitHub CodeQL")),
     secret_scanning: safeCountFact(github.secret_scanning, "GitHub secret scanning and push protection for the named public repository.", tool("GitHub secret scanning")),
