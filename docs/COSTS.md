@@ -67,8 +67,9 @@ of Cadence deploys (78.0% of `cadence` and 80.3% of `cadence-marketing`).
 
 Changes made (`docs/VERCEL_WORKFLOW.md`, "Build Filtering, Previews, and Machine
 Sizing"): path-filtered Ignored Build Steps, opt-in previews, `cadence-marketing` on the
-Basic machine, 7-day retention for preview, canceled and errored deployments, and a
-US$30 alert-only Spend Management budget.
+Basic machine, and a US$30 alert-only Spend Management budget. Deployment retention stays
+at Vercel's 30-day default unless tightened to 7 days in the Vercel Dashboard UI
+(`Settings → Deployment Retention`); skipped builds store no artifacts.
 
 Target after these changes (`assumed` until measured): about US$5.36 a month of Cadence
 build spend, or about US$3.73 a month with Merge Queue batching. Total team usage then
@@ -817,7 +818,7 @@ paid call supports that readback.
   for every agent model call, the owner's starting shares and a US$25 daily breaker.
 - 2026-11-25: Ticket 367. With the Notes source on, the Daily Brief's one model call also carries up to three day notes of 280 characters and one instruction block: about 330 more input tokens at most (assumed, 4 characters per token), under US$0.0001 per brief. No new call; a quiet day still makes none.
 - 2026-11-25: Ticket 371. The Daily Brief's one model call also carries up to 8 Period labels with dates (5 covering today, 3 recently ended) and one instruction block of 606 characters, whatever the Notes source: about 500 more input tokens at most (assumed, 4 characters per token). The advisor tips call carries up to 5 Period labels with dates and one more instruction sentence: about 200 more input tokens at most (same assumption). No new call; a quiet day and a day with no tip still make none.
-- 2026-11-28: Added "Vercel build and storage usage": the measured 30-day baseline (Cadence 15,380 of the team's 16,286 Build CPU Minutes, US$31.17 billed, US$53.83 a month at the December 8 price), the build filtering and retention changes, and an assumed target of about US$5.36 a month (US$3.73 with Merge Queue batching), within the US$20 Pro credit. Re-measure on 2026-12-12. Per-user totals unchanged.
+- 2026-11-28: Added "Vercel build and storage usage": the measured 30-day baseline (Cadence 15,380 of the team's 16,286 Build CPU Minutes, US$31.17 billed, US$53.83 a month at the December 8 price), the build filtering, machine sizing and budget changes (with retention remaining at the 30-day default unless updated in the Vercel Dashboard), and an assumed target of about US$5.36 a month (US$3.73 with Merge Queue batching), within the US$20 Pro credit. Re-measure on 2026-12-12. Per-user totals unchanged.
 
 ### Tickets 213–214 production measurements — October 18, 2026
 
