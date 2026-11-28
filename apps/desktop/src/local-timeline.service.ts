@@ -6,6 +6,7 @@ import { ensureLocalOccurrencesFresh, toLocalBehaviorGraphRecord } from "./local
 import { toTimeSession } from "./local-occurrence.service";
 import { withLocalMoves } from "./local-moves.service";
 import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
+import { attachTimelinePeriods } from "@cadence/core/resolvers/period.resolver";
 import { attachTimelineSourceEvidence, resolveTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
 import { attachTimelineAlongside } from "@cadence/core/services/timeline-alongside";
 import {
@@ -62,7 +63,9 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
   const matches = (history.sourceMatches ?? []).map((match) => ({ occurrenceId: match.occurrence_id, source: match.source, state: match.state,
     activityStartAt: match.activity_start_at, activityEndAt: match.activity_end_at }));
   const evidence = resolveTimelineSourceEvidence({ timezone: profile.timezone, occurrences, latestEvents, matches });
-  const timeline = attachTimelineSourceEvidence(attachTimelineDayNotes(view, dayNotes), evidence);
+  // Ticket 374: every Period of the profile (500 at most), for day chips and label suggestions.
+  const periods = await localCommand("readPeriods", { profileId });
+  const timeline = attachTimelineSourceEvidence(attachTimelinePeriods(attachTimelineDayNotes(view, dayNotes), periods), evidence);
   if (!alongside) return { profile, behaviors, categories, timeline, alongsideViews: null };
   const facts = buildAlongsideBehaviorFacts({
     behaviors: behaviors.map((behavior) => ({ id: behavior.id, alongside: behavior.alongside,

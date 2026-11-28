@@ -109,6 +109,13 @@ are implemented. The registry is authoritative.
   default with no Settings or per-Behavior switch; matching runs after each Note save
   in the local Note action. Proposals, accepted quick-fill buttons, and local
   deterministic matching stay available offline. Linking synchronizes shortcut state without enabling cloud analysis.
+- Periods (Ticket 374, D35) use the shared `PeriodDayControls` under each Timeline date
+  and `PeriodList` on Behaviors, with the web's editor: add, edit, End today, Remove and
+  the note's own save. The writes run on the local store (SQLite schema 31), offline and
+  with or without an account. Period note chips come from the same rule as on web and are
+  not stored. Linking synchronizes Periods under account sync contract 12. Local export,
+  import and restore carry them. The Daily Brief on a linked Mac shows the hosted words,
+  which may name a Period.
 - Day note shortcuts (Ticket 292) use the shared `DayNoteShortcutSettings` in a Day note
   shortcuts drawer in General, after Categories, as on web. They follow Ticket 305: on by
   default, matched after each day note save, and gated only by the stored account switch.

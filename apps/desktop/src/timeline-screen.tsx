@@ -27,6 +27,7 @@ import type {
   TimeTrackingFormAction,
   TimelineView,
 } from "@/lib/types/timeline";
+import type { PeriodActions } from "@/lib/types/period";
 
 export type TimelineScreenProps = Readonly<{
   timeline: TimelineView;
@@ -36,6 +37,8 @@ export type TimelineScreenProps = Readonly<{
   parentSlotStatusAction?: OccurrenceFormAction;
   noteAction: OccurrenceFormAction;
   dayNoteAction?: OccurrenceFormAction;
+  /** Ticket 374: Period writes on the local store. Without them no Period control shows. */
+  periodActions?: PeriodActions;
   startTimeTrackingAction: TimeTrackingFormAction;
   stopTimeTrackingAction: TimeTrackingFormAction;
   resetTimeTrackingAction: TimeTrackingFormAction;
@@ -238,6 +241,9 @@ export function TimelineScreen({
                       shortcutsByBehavior={shortcutsByBehavior}
                       variant="needsDecisionDialog"
                       dayNote={timeline.dayNotes?.[section.localDate] ?? ""}
+                      periods={timeline.periodsByDate?.[section.localDate]}
+                      periodLabelSuggestions={timeline.periodLabelSuggestions}
+                      todayLocalDate={timeline.todayLocalDate}
                     />
                   ))}
                 </div>

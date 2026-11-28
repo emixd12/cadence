@@ -44,7 +44,7 @@ beforeEach(() => {
   mocks.command.mockImplementation(async (operation: string) => {
     if (operation === "readProfile") return { id: "owner", timezone: "America/New_York" };
     if (operation === "readBehaviorGraphs") return [graph("helmet", { title: "Red light helmet", alongside: true }), graph("pill", { title: "Pill", alongside: null })];
-    if (operation === "readCategories" || operation === "readOccurrences" || operation === "readDayNotes") return [];
+    if (operation === "readCategories" || operation === "readOccurrences" || operation === "readDayNotes" || operation === "readPeriods") return [];
     if (operation === "readOccurrenceHistory") return { statusEvents: [], timeSessions: [] };
     if (operation === "readPlaceLabels") return { settings: null, markers: [], dismissals: [],
       labels: [18, 19, 20, 21, 22, 23, 24].map((day) => label("helmet", day)) };

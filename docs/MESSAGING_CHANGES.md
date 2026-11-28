@@ -2742,3 +2742,19 @@ cite has not changed.
   that a guessed place never requests a route or a reminder.
 - **Related:** P-093.
 - **Status:** logged.
+
+## P-104: Periods on Cadence for Mac (D35)
+
+- **Change:** implemented in source November 28, 2026 (Ticket 374); it reaches people in
+  the next Mac release. Cadence for Mac shows, adds, edits, ends and removes Periods,
+  offline and linked, and synchronizes them with the account. A Mac in local mode keeps
+  Period labels and notes on the device only.
+- **Affected:** `docs/DECISIONS.md` (2026-11-25, D35); Ticket 374.
+- **Surfaces:** user guide, Privacy (data stored on the Mac and data synchronized).
+- **Conflicting current text:** `docs/user-guide/timeline.md`, "Periods", says "Cadence
+  for Mac does not show Periods yet" and lists signing in on the web as a prerequisite.
+- **Update needed:** after the Mac release that carries Ticket 374, remove that sentence
+  and describe Periods for both web and Mac; list Periods among the data a linked Mac
+  synchronizes.
+- **Related:** P-096.
+- **Status:** logged.

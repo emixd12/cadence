@@ -16,12 +16,31 @@ import {
   type PeriodRecord,
 } from "../resolvers/period.resolver";
 import { resolveNoteUpdate } from "../resolvers/status.resolver";
+import { noticeText } from "../notices";
+import type { PeriodActionState } from "../types/period";
 
 export const PERIOD_CONFLICT_MESSAGE =
   "This period changed elsewhere. Review the latest version before saving again.";
 
 export const PERIOD_LIMIT_MESSAGE =
   `You have reached the limit of ${PERIOD_LIMITS.perAccount} periods. Remove one before adding another.`;
+
+/** The sentences a person may read as they are: each names a rule or the next step. */
+const PERIOD_PERSON_MESSAGES: ReadonlySet<string> = new Set([...Object.values(PERIOD_MESSAGES), PERIOD_LIMIT_MESSAGE]);
+
+/**
+ * The action state for a failed Period write, on web and on Cadence for Mac. A stale
+ * write names the `period.conflict` notice. A broken rule keeps the service's own
+ * sentence, as does a sentence the caller lists in `alsoShown`. Any other failure gets
+ * `fallback`, so provider and store text never reaches the screen.
+ */
+export function periodErrorActionState(error: unknown, fallback: string, alsoShown: ReadonlySet<string> = new Set()): PeriodActionState {
+  const message = error instanceof Error ? error.message : "";
+  if (message === PERIOD_CONFLICT_MESSAGE) {
+    return { status: "error", noticeId: "period.conflict", message: noticeText("period.conflict") };
+  }
+  return { status: "error", message: PERIOD_PERSON_MESSAGES.has(message) || alsoShown.has(message) ? message : fallback };
+}
 
 export type PeriodWriteResult = Readonly<{
   period: PeriodRecord;

@@ -600,8 +600,9 @@ modal and no status controls.
 ### Periods (Ticket 369)
 
 A Period is a labeled range of local dates for the whole account. It is annotation
-only. `components/periods/PeriodControl.tsx` draws it on web; Cadence for Mac passes no
-Period actions until Ticket 374, so nothing renders there.
+only. `components/periods/PeriodControl.tsx` draws it on web and, since Ticket 374, on
+Cadence for Mac, where the Timeline and Behaviors screens pass local Period actions to
+the same components.
 
 - **Chips.** Under the date of every Timeline day a Period covers, including Needs
   decision day sections, each covering Period shows as a small square chip with its

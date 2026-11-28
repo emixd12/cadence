@@ -145,8 +145,10 @@ future. The label is always exported. The note follows the notes option.
 
 Import and restore read these records back through
 `packages/core/src/resolvers/behaviorlog-period.resolver.ts` and
-`packages/core/src/services/behaviorlog-period.service.ts`. The Mac's local export, import
-and restore follow in Ticket 374.
+`packages/core/src/services/behaviorlog-period.service.ts`. Cadence for Mac's local export, import
+and restore carry Periods the same way (Ticket 374): the export reads the profile's
+Periods from SQLite, and import and restore save through the local store's
+`createPeriodIfAbsent` after the main commit.
 
 - Only a review with the `app.cadence` extension `period: true` and `review_role: "user"`
   is a Period. Day-note reviews and reviews from other tools keep their own handling.

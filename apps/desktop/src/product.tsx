@@ -49,6 +49,7 @@ import { desktopSourceLinkCoordinator } from "./calendar/source-links";
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
+import { readLocalPeriodList, withPeriodNoteShortcuts, type LocalPeriodList } from "./local-period.service";
 import { dismissNoteShortcut, getNoteShortcutView, listInlineNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import type { NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
@@ -91,6 +92,8 @@ import { completedFirstLinkState, finishFirstAccountLink, finishReviewedFirstAcc
 
 type Bundle = { timeline: Awaited<ReturnType<typeof loadLocalTimeline>>;
   behaviors: Awaited<ReturnType<typeof getLocalBehaviorsPageData>>; hasImportRuns: boolean;
+  /** Ticket 374: every Period, newest first, for the Behaviors list. */
+  periodList: LocalPeriodList;
   shortcuts: { day: NoteShortcutView; accepted: Record<string, import("@cadence/core/types/note-shortcut").NoteShortcut[]>; views: Record<string, NoteShortcutView> } };
 type SyncCompletion = Readonly<{ status: SyncStatus; localCurrent: boolean }>;
 const AVAILABLE_SCREENS: DesktopScreen[] = ["timeline", "chat", "behaviors", "export", "settings"];
@@ -195,12 +198,13 @@ export function Product() {
         try {
           const timeline = await loadLocalTimeline(parameters.current.days, now, alongsideContext.current);
           if (!mounted.current || current !== revision.current) continue;
-          const [behaviors, imports, day, accepted, behaviorViews] = await Promise.all([
+          const [behaviors, imports, day, accepted, behaviorViews, periodList] = await Promise.all([
             getLocalBehaviorsPageData(timeline.profile, { ...parameters.current.analytics, now }),
             localCommand("readImportRuns", { profileId: timeline.profile.id, limit: 1 }),
             getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), DAY_NOTE_SHORTCUT_POOL_ID, now),
             listInlineNoteShortcuts(createLocalNoteShortcutStore(timeline.profile.id), now),
             Promise.all(timeline.behaviors.map(async (behavior) => [behavior.id, await getNoteShortcutView(createLocalNoteShortcutStore(timeline.profile.id), behavior.id, now)] as const)),
+            readLocalPeriodList(timeline.profile.id, now),
           ]);
           if (requestedActivation) {
             let target: NotificationTarget;
@@ -215,7 +219,7 @@ export function Product() {
             if (mounted.current && current === revision.current && activation.current?.requestKey === requestedActivation.requestKey) setNotificationTarget(target);
           }
           if (mounted.current && current === revision.current) {
-            setBundle({ timeline, behaviors, hasImportRuns: imports.length > 0, shortcuts: { day, accepted, views: Object.fromEntries(behaviorViews) } });
+            setBundle({ timeline, behaviors, periodList, hasImportRuns: imports.length > 0, shortcuts: { day, accepted: withPeriodNoteShortcuts(accepted, periodList.noteShortcuts), views: Object.fromEntries(behaviorViews) } });
             setError("");
             successful = true;
             if (syncAfterRefresh.current) {
@@ -784,6 +788,8 @@ export function Product() {
       {activeScreen === "behaviors" ? <NoteShortcutDismissProvider onDismiss={dismissShortcut}><BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
         {...occurrenceActions} {...behaviorActions} onRefresh={refresh}
         noteShortcutViews={bundle.shortcuts.views} noteShortcutAction={noteShortcutAction}
+        periods={bundle.periodList.periods} periodLabelSuggestions={bundle.periodList.labelSuggestions}
+        periodNoteShortcuts={bundle.periodList.noteShortcuts}
         alongsideViews={bundle.timeline.alongsideViews}
         sourceLinkCoordinator={sourceLinkCoordinator}
         editTarget={behaviorEditTarget}
