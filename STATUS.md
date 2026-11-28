@@ -50,7 +50,7 @@ Check the cited entry before acting on a row.
 | --- | --- | --- | --- |
 | Tickets 383–386: alongside follow-ups after the audit (D37) | 383 (web + Mac, SQLite schema 30, account sync contract 11), 384, 385 (`do-it-during-something-else` reviewed and active, 2026-11-28) and 386 complete in PR #407; hosted migrations `20261126200000`–`20261126260000` pushed November 28, 2026; PR #407 merged November 28, 2026 | Finish Ticket 365 acceptance | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. 377 (view) complete November 26: the real view replaces the placeholder. 380 (listing preparation) `in_progress`: drafts, capture script, skill draft and owner checklist done November 26, host screenshots wait for 378. 378 and 381 not started; 379 complete; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 378 tests hosts (notes for it: `docs/qa/2026-11-25-mcp-day-view.md`); 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
-| Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) `in_progress` since November 28, 2026 | Chat writes Periods since PR #423 (owner's yes, November 26; hosted migration `20261126150000` pushed). 374 builds on Ticket 363 (PR #407, merged November 28) and takes account sync contract 12 and SQLite 0031. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
+| Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) `in_progress` since November 28, 2026 | Chat writes Periods since PR #423 (owner's yes, November 26; hosted migration `20261126150000` pushed). 374: the store and sync pull request is open (contract 12, SQLite 0031; hosted migration `20261128120000` not pushed); screens, export, import and restore follow. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Merged November 25, 2026 (PR #403); the Timeline row checked on production web November 26 as test account A | Installed Mac check with the next Mac release | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
 | Ticket 387: the advisor compares tracked time with the intended duration | Not started; coach tips already compare for "longer" | Owner decides the three open decisions in the ticket | TICKETS, Ticket 387 |
 | Tickets 356–365: alongside Behaviors and the guessed Where (D33) | 356–364 and 383–386 complete, flag off; 365 local-stack acceptance done and defect D1 fixed. All on `main` since PR #407 merged November 28, 2026 (362, 363, 360/361 follow-ups, audit fixes, 383–386, local acceptance evidence and the D1 history/older-contract fix); hosted migrations `20261125140000`–`20261125190000` and `20261126200000`–`20261126260000` pushed. Web behind `CADENCE_ALONGSIDE`, Mac behind `VITE_CADENCE_ALONGSIDE` | Finish Ticket 365 (Preview as account A, installed Mac dev-signed build, MCP acceptance). Older Macs (contracts 8–9) stay safe via `20261126260000` and `20261126250000`. The owner decides the Production flag and the Mac release | TICKETS, Tickets 356–365; DECISIONS, 2026-11-25 (D33, D37) |
@@ -102,6 +102,30 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Ticket 374, first pull request: Periods in the Mac store and account sync — November 28, 2026
+
+- **Store:** SQLite schema 31 (`0031_periods.sql`). Commands `readPeriods`, `readPeriod`,
+  `createPeriod`, `createPeriodIfAbsent`, `updatePeriod` and `deletePeriod`
+  (`local_store/period.rs`): cap of 500, compare-and-set on `revision`, tombstoned delete.
+  `apps/desktop/src/local-period.service.ts` adapts them to `PeriodDataStore`.
+- **Sync:** account sync contract 12 adds kind `period` on the generic row path. A
+  removal against an edited copy and two different edits go to review; a decided edit
+  conflict takes a revision above both sides. Writer floor stays 8. Contracts 8 to 11
+  never see the kind and their writes keep hosted Periods.
+- **Hosted migration, not pushed:** `20261128120000_account_sync_periods.sql`: one
+  registry row, the snapshot and apply patches, and the cap trigger function now lets a
+  sync edit of a held Period through at 500. No drop.
+- **Verified:** native tests (the two new ones and the full suite), the resolver and
+  store tests, and five SQL smokes with the migration inside a rolled-back transaction on
+  the local database. Not run locally: `scripts/account-sync-rpc-smoke.mjs` and a clean
+  `db reset`; CI's Local Supabase rehearsal runs both.
+- **Not done:** the screens, local export, import and restore (second pull request);
+  the hosted push; a dev-signed installed check. No Period can be made on the Mac yet.
+
+Platform impact: web, the hosted sync migration only; desktop implemented for store and
+sync, screens follow; marketing not applicable; future mobile deferred. Messaging
+impact: `P-096`.
 
 ## MCP Apps: tunnel route and first Gemini run — November 28, 2026
 
