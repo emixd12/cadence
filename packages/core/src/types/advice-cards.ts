@@ -196,7 +196,7 @@ export type AdviceAudience = (typeof ADVICE_AUDIENCES)[number];
 export type AdviceCardStatus = "draft" | "active" | "withdrawn";
 
 /** Where an `open` offer's link goes (see `ADVISOR_TIP_LINK_TARGETS` in ./advisor-tips). */
-export const ADVICE_OFFER_LINK_TARGETS = ["time", "length", "where", "description", "behavior", "unmarked", "behaviors"] as const;
+export const ADVICE_OFFER_LINK_TARGETS = ["time", "length", "where", "description", "behavior", "unmarked", "behaviors", "alongside"] as const;
 export type AdviceOfferLinkTarget = (typeof ADVICE_OFFER_LINK_TARGETS)[number];
 
 /**

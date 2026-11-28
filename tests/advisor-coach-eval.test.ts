@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { COACH_EVAL_FIXTURE_IDS, coachEvalFixture, coachEvalFixtures } from "@/lib/services/advisor-eval/coach-fixtures";
 import { runCoachEval, summarizeCoachEval } from "@/lib/services/advisor-eval/coach-harness";
+import { COACH_PAIRING_EVAL_FIXTURES, runCoachPairingEval } from "@/lib/services/advisor-eval/coach-pairing-fixtures";
 import { resolveCoachSignals } from "@cadence/core/resolvers/coach-signals.resolver";
 
 // Advisor plan Phase 4, workstream 4B step 8: the coach eval's accounts and layer-1 rules,
@@ -87,5 +88,34 @@ describe("coach eval with the cards' own wording", () => {
     expect(summary.ruleBreaks).toBe(0);
     expect(summary.rejectedLines).toBeGreaterThan(0);
     expect(summary.modelTips).toBe(0);
+  });
+});
+
+describe("Ticket 362: the coach's pairing proposals, offline", () => {
+  it("covers accept, refuse and no-evidence, and every fixture keeps the layer-one rules", () => {
+    const kinds = COACH_PAIRING_EVAL_FIXTURES.map((fixture) => fixture.expect.kind);
+    expect(new Set(kinds)).toEqual(new Set(["accept", "refuse", "none"]));
+    expect(COACH_PAIRING_EVAL_FIXTURES.filter((fixture) => fixture.expect.kind === "none" && fixture.expect.reason === "no_evidence")).toHaveLength(2);
+    const results = runCoachPairingEval();
+    expect(results.flatMap((result) => result.violations.map((violation) => `${result.fixture}: ${violation.rule} ${violation.detail}`))).toEqual([]);
+  });
+
+  it("accept puts the guest at its host's time only on the days both are scheduled; No and the guards change nothing", () => {
+    const byId = new Map(runCoachPairingEval().map((result) => [result.fixture, result]));
+    expect(byId.get("accept_done_together")).toMatchObject({ after: ["Every day at 8:00 PM"], proposed: { guest: "helmet", host: "read" } });
+    expect(byId.get("accept_brief_yes_weekdays")).toMatchObject({
+      after: ["Saturday and Sunday at 7:00 AM", "Monday, Tuesday, Wednesday, Thursday and Friday at 9:30 PM"],
+      proposed: { reason: "You said Yes to Magnesium during Journal on 4 days in the last 28." },
+    });
+    expect(byId.get("refuse_answer_no")).toMatchObject({ after: ["Every day at 7:30 AM"], proposed: { guest: "helmet", host: "read" } });
+    for (const id of ["refuse_never_move", "refuse_follows_routine", "refuse_opportunity_without_schedule", "refuse_other_place", "refuse_every_other_week", "no_evidence_three_yes_days", "no_evidence_none"]) {
+      expect(byId.get(id)).toMatchObject({ proposed: null, after: null });
+    }
+  });
+
+  it("a fixture that expects nothing but gets a proposal breaks a rule", () => {
+    const [fixture] = COACH_PAIRING_EVAL_FIXTURES;
+    const [result] = runCoachPairingEval([{ ...fixture!, expect: { kind: "none", reason: "no_evidence" } }]);
+    expect(result!.violations.map((violation) => violation.rule)).toContain("proposed_without_evidence");
   });
 });

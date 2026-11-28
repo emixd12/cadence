@@ -68,10 +68,11 @@ export type AdvisorTipResearch = Readonly<{
 
 /**
  * What a tip's link opens ("Tips with one-tap changes"): a Behavior's editor on one field
- * (time, length, where, description, or the whole editor), Needs decision (unmarked), or
- * the Behaviors list.
+ * (time, length, where, description, alongside, or the whole editor), Needs decision
+ * (unmarked), or the Behaviors list. `alongside` (Ticket 385) needs migration
+ * 20261126240000 on the database: the stored `coach_tips.link_target` check lists every value.
  */
-export const ADVISOR_TIP_LINK_TARGETS = ["time", "length", "where", "description", "behavior", "unmarked", "behaviors"] as const;
+export const ADVISOR_TIP_LINK_TARGETS = ["time", "length", "where", "description", "behavior", "unmarked", "behaviors", "alongside"] as const;
 export type AdvisorTipLinkTarget = (typeof ADVISOR_TIP_LINK_TARGETS)[number];
 
 export type AdvisorTipLink = Readonly<{
@@ -90,6 +91,7 @@ const LINK_LABELS: Readonly<Record<AdvisorTipLinkTarget, string>> = {
   behavior: "Edit the Behavior",
   unmarked: "Open Needs decision",
   behaviors: "Open Behaviors",
+  alongside: "Say if it can be done alongside",
 };
 
 export function advisorTipLink(target: AdvisorTipLinkTarget, behaviorId: string | null): AdvisorTipLink {

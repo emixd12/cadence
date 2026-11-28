@@ -24,7 +24,8 @@ import { TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS, readTravelMonthSpend, reserveT
 import { readTravelPlaceCache, writeTravelPlaceCache, type TravelPlaceCacheRow } from "@/lib/db/travelPlaceCache.repo";
 import { listOccurrencesBetweenLocalDates, listOccurrencesByIds } from "@/lib/db/occurrences.repo";
 import { getProfileTimezone, listBehaviorAdvisorEstimates, listUserBehaviors } from "@/lib/db/behaviors.repo";
-import { behaviorEstimateInputHash } from "@/lib/services/brief-move-day.service";
+import { currentEstimateMinutes } from "@/lib/services/brief-move-day.service";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { projectTravelRouteDisplay, type TravelRoutesResponse } from "@/lib/services/travel-display.service";
@@ -677,28 +678,28 @@ function sameCalendarRevisions(left: readonly NormalizedExternalEvent[], right: 
   return JSON.stringify(revisions(left)) === JSON.stringify(revisions(right));
 }
 
-function validAdvisorDurationEstimates(
+/** Audit fix 1: lengths only, by the Daily Brief's own validity rule (`currentEstimateMinutes`). */
+export function validAdvisorDurationEstimates(
   behaviors: Awaited<ReturnType<typeof listUserBehaviors>>,
   rows: Awaited<ReturnType<typeof listBehaviorAdvisorEstimates>>,
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): Record<string, number> {
   if (rows.length === 0) return {};
-  const hashByBehavior = new Map(
-    behaviors
-      .filter((behavior) => behavior.active !== false && typeof behavior.title === "string")
-      .map((behavior) => [
-        behavior.id,
-        behaviorEstimateInputHash({
-          title: behavior.title,
-          description: behavior.description ?? null,
-          whereKind: behavior.where_kind ?? null,
-        }),
-      ]),
-  );
+  const personSetting = alongsideEnabled(env);
+  const byId = new Map(behaviors
+    .filter((behavior) => behavior.active !== false && typeof behavior.title === "string")
+    .map((behavior) => [behavior.id, behavior]));
   const estimates: Record<string, number> = {};
   for (const row of rows) {
-    if (row.duration_minutes != null && row.input_hash === hashByBehavior.get(row.behavior_id)) {
-      estimates[row.behavior_id] = row.duration_minutes;
-    }
+    const behavior = byId.get(row.behavior_id);
+    if (!behavior) continue;
+    const minutes = currentEstimateMinutes(row, {
+      title: behavior.title,
+      description: behavior.description ?? null,
+      whereKind: behavior.where_kind ?? null,
+      alongside: personSetting ? behavior.alongside ?? null : undefined,
+    }, personSetting);
+    if (minutes !== undefined) estimates[row.behavior_id] = minutes;
   }
   return estimates;
 }

@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  briefMoveBlocksForSubject, briefMoveItemBlocks, briefMoveOverlapSubject, briefMoveStartAllowed, checkBriefMoveSlot,
+  briefMoveBlocksForSubject, briefMoveCalendarBlocks, briefMoveItemBlocks, briefMoveOverlapSubject, briefMoveStartAllowed, checkBriefMoveSlot,
   type BriefMoveBlock, type BriefMoveCandidate, type BriefMoveInterval, type BriefMovePlanInputs,
 } from "@cadence/core/resolvers/brief-move.resolver";
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE } from "@cadence/core/types/brief-moves";
@@ -31,7 +31,8 @@ export function checkBriefLayerOne(input: BriefMovePlanInputs, lines: readonly L
   const add = (rule: BriefLayerOneRule, line: Line, detail: string) => violations.push({ rule, occurrenceId: line.occurrenceId, detail });
   const latest = input.latestStartMinute ?? BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE;
   const alongside = new Set(input.items.filter((item) => item.alongside).map((item) => item.behaviorId));
-  const calendar: BriefMoveBlock[] = input.calendarBusy.map((event) => ({ kind: "calendar", ref: event.ref, title: event.title, start: event.start, end: event.end }));
+  // Ticket 384: events keep their coarse place, so the Yes checks below see what Yes sees.
+  const calendar: BriefMoveBlock[] = briefMoveCalendarBlocks(input.calendarBusy);
   const interval = (value: Readonly<{ startAt: string; endAt: string }>): BriefMoveInterval =>
     ({ start: Temporal.Instant.from(value.startAt), end: Temporal.Instant.from(value.endAt) });
   const accepted = new Map(lines.map((line) => [line.occurrenceId, interval(line.to)]));

@@ -14,6 +14,9 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import type { EffectiveWhere } from "./effective-where.resolver";
+import type { AlongsidePairingGuesses } from "../types/brief-moves";
+import { TRAVEL_PLACE_KEY_PATTERN, travelPlaceKey } from "../services/travel-place-key";
+import { normalizeTravelPlaceText } from "../services/travel-refresh-policy";
 
 export const ALONGSIDE_SOURCES = ["person", "guess", "default"] as const;
 export type AlongsideSource = (typeof ALONGSIDE_SOURCES)[number];
@@ -65,9 +68,64 @@ export type OverlapPlace = Pick<EffectiveWhere, "kind" | "placeKey"> | null | un
 
 export type AlongsideOverlapOther = Readonly<{
   kind: "item" | "calendar" | "travel";
-  /** A Cadence item's effective Where. Calendar events carry none yet: their place is unknown. */
+  /**
+   * A Cadence item's effective Where, or a calendar event's coarse place
+   * (`calendarEventPlace`, Ticket 384). Absent: the place is unknown.
+   */
   where?: OverlapPlace;
 }>;
+
+/**
+ * Ticket 384 (D37): a calendar event's coarse place for planning. Home, or one of the
+ * person's saved places by its one-way place key. An event whose place is unknown has
+ * no value at all (absent or null), so the same-place rule allows an overlap with it.
+ * It lives for one request: it is never stored, logged or sent to a model.
+ */
+export type CalendarEventPlace = Readonly<{ kind: "home" }> | Readonly<{ kind: "place"; placeKey: string }>;
+
+/**
+ * Ticket 384: the places a calendar event's location text is compared with. Keys only:
+ * Home's place key and the saved places' keys, each `travelPlaceKey` of the person's own
+ * typed text. A saved place is a Behavior's place Where (`docs/DATA_MODEL.md`, "A saved
+ * place has no table of its own").
+ */
+export type PlanningPlaceCatalog = Readonly<{ homePlaceKey: string | null; placeKeys: readonly string[] }>;
+
+/** Keys for Home's text and the saved places' texts. Blank texts name no place. */
+export function planningPlaceCatalog(input: Readonly<{
+  homeText: string | null | undefined;
+  placeTexts: readonly (string | null | undefined)[];
+}>): PlanningPlaceCatalog {
+  const key = (text: string | null | undefined) => text && normalizeTravelPlaceText(text) ? travelPlaceKey(text) : null;
+  const homePlaceKey = key(input.homeText);
+  const placeKeys = [...new Set(input.placeTexts.map(key).filter((value): value is string => value !== null && value !== homePlaceKey))].sort();
+  return { homePlaceKey, placeKeys };
+}
+
+/**
+ * Ticket 384: the coarse place of an event's location text, by the place-key rule
+ * (`travelPlaceKey`): Home when it keys to Home's text, a saved place when it keys to a
+ * saved place's text, otherwise null (unknown). No catalog, or blank text: unknown. No
+ * geocoding: two texts name the same place only when they normalize the same.
+ */
+export function calendarEventPlace(locationText: string | null | undefined, catalog: PlanningPlaceCatalog | null | undefined): CalendarEventPlace | null {
+  if (!catalog || !locationText || !normalizeTravelPlaceText(locationText)) return null;
+  const key = travelPlaceKey(locationText);
+  if (catalog.homePlaceKey && key === catalog.homePlaceKey) return { kind: "home" };
+  return catalog.placeKeys.includes(key) ? { kind: "place", placeKey: key } : null;
+}
+
+/** Ticket 384: a coarse place as a request carried it, checked strictly; anything else is unknown (null). */
+export function parseCalendarEventPlace(value: unknown): CalendarEventPlace | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort().join();
+  if (record.kind === "home" && keys === "kind") return { kind: "home" };
+  if (record.kind === "place" && keys === "kind,placeKey" && typeof record.placeKey === "string" && TRAVEL_PLACE_KEY_PATTERN.test(record.placeKey)) {
+    return { kind: "place", placeKey: record.placeKey };
+  }
+  return null;
+}
 
 /**
  * Ticket 357 (D33): may `alongsideItem` (an alongside item) overlap `other`?
@@ -167,4 +225,23 @@ export function pickBriefAlongsideQuestion(input: Readonly<{
   const [first] = [...open].sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.startAt), Temporal.Instant.from(right.startAt))
     || left.title.localeCompare(right.title) || left.behaviorId.localeCompare(right.behaviorId));
   return { behaviorId: first!.behaviorId, title: first!.title };
+}
+
+/**
+ * Audit fix 11 (D33): which inputs of a pairing are Cadence's model guesses: the guest's
+ * alongside value (`source: "guess"`) and either side's effective Where (`source:
+ * "guess"`). Counted completion places are the person's own record, not a guess. Null
+ * when none is, so a pairing with no guess carries nothing new.
+ */
+export function alongsidePairingGuesses(guest: Readonly<{ alongsideSource?: AlongsideSource; where?: Pick<EffectiveWhere, "source"> | null }>,
+  host: Readonly<{ where?: Pick<EffectiveWhere, "source"> | null }>): AlongsidePairingGuesses | null {
+  const guesses = { alongside: guest.alongsideSource === "guess", guestWhere: guest.where?.source === "guess", hostWhere: host.where?.source === "guess" };
+  return guesses.alongside || guesses.guestWhere || guesses.hostWhere ? guesses : null;
+}
+
+/** What the one quiet guess note says: `alongside`, `where`, `both`, or null for no note. */
+export function alongsidePairingGuessNote(guesses: AlongsidePairingGuesses | null | undefined): "alongside" | "where" | "both" | null {
+  if (!guesses) return null;
+  const where = guesses.guestWhere || guesses.hostWhere;
+  return guesses.alongside && where ? "both" : guesses.alongside ? "alongside" : where ? "where" : null;
 }

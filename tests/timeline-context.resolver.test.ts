@@ -549,6 +549,24 @@ describe("resolveTimelineOccurrenceContext with an alongside item", () => {
     }
   });
 
+  // Ticket 384 (D37): a Calendar event's coarse place decides the cue for an alongside item.
+  it("shows the cue again for an event at another known place, and not at the same place", () => {
+    const office = { kind: "place" as const, placeKey: "o".repeat(43) };
+    const gym = { kind: "place" as const, placeKey: "g".repeat(43) };
+    const cue = (where: { kind: "home" } | typeof office | { kind: "anywhere" }, eventPlace?: { kind: "home" } | typeof office) =>
+      resolveTimelineOccurrenceContext({ ...base, alongside: { where }, eventPlaces: eventPlace ? new Map([["meeting", eventPlace]]) : null }).overlappingEventIds;
+    expect(cue({ kind: "home" }, office)).toEqual(["meeting"]);
+    expect(cue(office, { kind: "home" })).toEqual(["meeting"]);
+    expect(cue(gym, office)).toEqual(["meeting"]);
+    expect(cue({ kind: "home" }, { kind: "home" })).toEqual([]);
+    expect(cue(office, office)).toEqual([]);
+    expect(cue({ kind: "anywhere" }, office)).toEqual([]);
+    // Unknown place: allowed, as before Ticket 384.
+    expect(cue({ kind: "home" })).toEqual([]);
+    // An item that is not alongside cues the overlap whatever the event's place.
+    expect(resolveTimelineOccurrenceContext({ ...base, alongside: null, eventPlaces: new Map([["meeting", { kind: "home" as const }]]) }).overlappingEventIds).toEqual(["meeting"]);
+  });
+
   it("still cues travel, which an alongside item never overlaps", () => {
     const travel = {
       segments: [{ id: "route:leg-1", kind: "route" as const, startAt: "2026-09-16T16:05:00Z", endAt: "2026-09-16T16:20:00Z", sourceRefs: ["dentist"], legId: "leg-1" }],

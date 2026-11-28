@@ -4,6 +4,7 @@ import {
   normalizeBehaviorConfiguration,
   planBehaviorConfigurationChangeEvent,
   planInitialBehaviorConfigurationEvent,
+  withHistoryAlongside,
 } from "@/lib/resolvers/behavior-configuration.resolver";
 import type { BehaviorConfigurationSnapshot } from "@/lib/types/behavior-configuration-event";
 
@@ -138,10 +139,11 @@ describe("planBehaviorConfigurationChangeEvent", () => {
     ).toMatchObject({
       eventKind: "revision",
       changedFields: ["schedule_graph"],
-      previousConfiguration: normalizeBehaviorConfiguration(
+      // D33: an unanswered Behavior's snapshots carry no alongside key.
+      previousConfiguration: withHistoryAlongside(normalizeBehaviorConfiguration(
         previousConfiguration,
-      ),
-      nextConfiguration: normalizeBehaviorConfiguration(nextConfiguration),
+      ), false),
+      nextConfiguration: withHistoryAlongside(normalizeBehaviorConfiguration(nextConfiguration), false),
       effectiveLocalDate: "2026-08-14",
     });
   });
@@ -296,8 +298,61 @@ describe("Behaviors of Opportunity configuration", () => {
       configuration: dailyConfiguration({ isOpportunity: true, scheduleGraph: [] }),
       recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
     });
-    // Sub-behavior link fields (Ticket 349) follow is_opportunity.
+    // Sub-behavior link fields (Ticket 349) follow is_opportunity; an answer (Ticket 363) comes last.
     expect(baseline.changedFields.slice(-4)).toEqual(["pause", "is_opportunity", "parent_behavior_id", "inherit_parent_schedule"]);
     expect(baseline.nextConfiguration).toMatchObject({ isOpportunity: true, scheduleGraph: [] });
+    const answered = planInitialBehaviorConfigurationEvent({
+      configuration: dailyConfiguration({ isOpportunity: true, scheduleGraph: [], alongside: false }),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
+    });
+    expect(answered.changedFields.slice(-2)).toEqual(["inherit_parent_schedule", "alongside"]);
+  });
+});
+
+describe("alongside configuration (Ticket 363)", () => {
+  const plan = (previous: Partial<BehaviorConfigurationSnapshot>, next: Partial<BehaviorConfigurationSnapshot>) =>
+    planBehaviorConfigurationChangeEvent({
+      previousConfiguration: dailyConfiguration(previous),
+      nextConfiguration: dailyConfiguration(next),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "alongside_answered",
+    });
+
+  it("records a changed answer as its own field and reads an older snapshot as unanswered", () => {
+    const answered = plan({}, { alongside: true });
+    expect(answered?.changedFields).toEqual(["alongside"]);
+    expect(answered?.previousConfiguration?.alongside).toBeNull();
+    expect(answered?.nextConfiguration.alongside).toBe(true);
+    expect(plan({ alongside: true }, { alongside: false })?.changedFields).toEqual(["alongside"]);
+    expect(plan({ alongside: false }, { alongside: null })?.changedFields).toEqual(["alongside"]);
+    // A snapshot written before the field existed (no key) is unanswered: no change against null.
+    expect(plan({}, { alongside: null })).toBeNull();
+  });
+
+  // Defect D1 of the 2026-11-26 local acceptance: an unanswered Behavior leaves no trace.
+  it("leaves the answer out of an unanswered Behavior's baseline and edits", () => {
+    const baseline = planInitialBehaviorConfigurationEvent({
+      configuration: dailyConfiguration({ alongside: null }),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
+    });
+    expect(baseline.changedFields).not.toContain("alongside");
+    expect(baseline.nextConfiguration).not.toHaveProperty("alongside");
+    const edit = plan({ alongside: null }, { alongside: null, reminderOffsetMinutes: 15 });
+    expect(edit?.changedFields).toEqual(["reminder_offset_minutes"]);
+    expect(edit?.previousConfiguration).not.toHaveProperty("alongside");
+    expect(edit?.nextConfiguration).not.toHaveProperty("alongside");
+  });
+
+  it("names the answer in a baseline that has one, and carries it on both sides of an edit", () => {
+    const baseline = planInitialBehaviorConfigurationEvent({
+      configuration: dailyConfiguration({ alongside: true }),
+      recordedAt: RECORDED_AT, effectiveAt: RECORDED_AT, source: "manual", reasonCode: "behavior_created",
+    });
+    expect(baseline.changedFields.at(-1)).toBe("alongside");
+    expect(baseline.nextConfiguration.alongside).toBe(true);
+    const edit = plan({ alongside: true }, { alongside: true, reminderOffsetMinutes: 15 });
+    expect(edit?.changedFields).toEqual(["reminder_offset_minutes"]);
+    expect([edit?.previousConfiguration?.alongside, edit?.nextConfiguration.alongside]).toEqual([true, true]);
+    const cleared = plan({ alongside: false }, {});
+    expect([cleared?.previousConfiguration?.alongside, cleared?.nextConfiguration.alongside]).toEqual([false, null]);
   });
 });

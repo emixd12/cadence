@@ -100,6 +100,15 @@ describe("dismissals and state", () => {
     expect(() => parseWhereSuggestionDismissInput({ behaviorId: "behavior-1", suggestion: "anywhere", ruleVersion: "where-suggestion-rules@9" })).toThrow(PlaceLabelError);
   });
 
+  it("refuses a dismissal while off unless it is the guess the line shows (Ticket 383)", () => {
+    const off = placeLabelSettingsFromRecord(null);
+    const dismissal = parseWhereSuggestionDismissInput({ behaviorId: "behavior-1", suggestion: "home", ruleVersion: "where-suggestion-rules@1" });
+    expect(() => planWhereSuggestionDismissal({ settings: off, dismissal, dismissedAt: "2026-10-22T13:00:00Z" })).toThrow(/Completion places are off/);
+    expect(() => planWhereSuggestionDismissal({ settings: off, dismissal, dismissedAt: "2026-10-22T13:00:00Z", shownGuess: "anywhere" })).toThrow(PlaceLabelError);
+    expect(planWhereSuggestionDismissal({ settings: off, dismissal, dismissedAt: "2026-10-22T13:00:00Z", shownGuess: "home" }))
+      .toEqual({ id: "behavior-1", suggestion: "home", rule_version: "where-suggestion-rules@1", dismissed_at: "2026-10-22T13:00:00Z" });
+  });
+
   it("builds coordinate-free state from stored rows", () => {
     const state = buildPlaceLabelState({ settings: enabledRecord, homeText: "1 Home Lane", markers: [homeMarker], labels: [], dismissals: [],
       behaviors: [{ id: "behavior-1", active: true, where_kind: "home", location_text: null }], today: Temporal.PlainDate.from("2026-10-22") });

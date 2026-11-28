@@ -20,7 +20,7 @@ import { ensureBehaviorEstimates, planBriefMoveLines, readBriefMoves, readOpenBr
 import { briefOpportunitiesFor, planBriefOpportunityDay, readBriefOpportunities, saveBriefOpportunityProposals } from "./brief-opportunities.service";
 import { BRIEF_OPPORTUNITY_LINES_FEATURE } from "@cadence/core/types/brief-opportunities";
 import { BRIEF_ALONGSIDE_QUESTION_FEATURE, type BriefAlongsideQuestion } from "@cadence/core/types/brief-alongside";
-import { planBriefAlongsideQuestion, reopenBriefAlongsideQuestion } from "./brief-alongside.service";
+import { planBriefAlongsideQuestion, recordBriefAlongsideQuestionAsked, reopenBriefAlongsideQuestion } from "./brief-alongside.service";
 import { alongsideEnabled } from "./alongside-flag";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, raceBriefAbort as raceAbort, sumDailyBriefUsage, type DailyBriefCallUsage, type DailyBriefGenerator, type DailyBriefModelUsage } from "./daily-brief-consumer";
@@ -371,8 +371,11 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         if (!funded.available) throw new DailyBriefError("budget_reached", funded.retryAfterSeconds, "budget_refresh_unfunded");
       }
       signal.throwIfAborted();
+      // Ticket 384: event locations for the free-slot rule's coarse event place, in memory for this run only.
+      const eventLocations = alongsideEnabled() ? new Map<string, string>() : undefined;
       const prepared = await phase("context", () => captureLiveDailyBriefContext(caller, {
         configuration, preferences, localDate: admission.localDate, travelConclusions: attempt.travelConclusions, sourceDeadlineAt, signal, clock,
+        ...(eventLocations ? { eventLocations } : {}),
       }));
       const context = prepared.contexts[0]!;
       const assertCurrent = async () => {
@@ -411,7 +414,10 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
           ensureBehaviorEstimates(agentClient, context, estimateGenerator, signal),
           readOpenBriefConflicts(caller.client, { userId: caller.user.id, localDate: context.localDate }),
         ]);
-        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null }, now, supabase: caller.client, userId: caller.user.id });
+        const planned = await planBriefMoveLines({ context, planning: { calendarBusy: [], travelTimes: attempt.travelTimes ?? null, ...(eventLocations ? { eventLocations } : {}) },
+          now, supabase: caller.client, userId: caller.user.id,
+          // The run starts after planning (its revision depends on the plan), so evidence reads use the agent client.
+          agentClient });
         return [planned, open] as const;
       });
       signal.throwIfAborted();
@@ -468,6 +474,12 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       }, signal));
       if (!stored) throw new DailyBriefError("context_changed");
       successful = true;
+      // Ticket 360: the saved brief asked, so a later day's brief does not ask about this Behavior again. A failed write asks again later.
+      if (alongsideQuestion) {
+        await phase("alongside_asked", () => recordBriefAlongsideQuestionAsked(caller.client, caller.user.id, {
+          localDate: context.localDate, question: alongsideQuestion,
+        })).catch(() => undefined);
+      }
       const used = (admission.refreshesUsed ?? 0) + (refreshing ? 1 : 0);
       const briefing: DailyBriefing = {
         ...saved,
@@ -678,6 +690,8 @@ export function captureLiveDailyBriefContext(caller: CalendarCaller, input: Read
   sourceDeadlineAt: number;
   signal: AbortSignal;
   clock: () => Temporal.Instant;
+  /** Ticket 384: filled with the Google Calendar read's event locations, for planning only. */
+  eventLocations?: Map<string, string>;
 }>) {
   const { configuration } = input;
   return prepareAccountBriefingContexts(caller, {
@@ -691,6 +705,7 @@ export function captureLiveDailyBriefContext(caller: CalendarCaller, input: Read
     preferences: input.preferences,
     localDate: input.localDate,
     travelConclusions: { token: input.travelConclusions ?? null, secrets: readTravelConclusionsSecrets(process.env) },
+    ...(input.eventLocations ? { eventLocations: input.eventLocations } : {}),
     ...(configuration.analysis.lanes.length ? { analysis: {
       includeReminders: configuration.analysis.lanes.includes("reminder-effectiveness"),
       includeNotes: configuration.analysis.lanes.includes("notes-failure-themes"),

@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
 import { assembleBehaviorPageData, toBehaviorView } from "@cadence/core/services/behavior-views";
 import {
-  applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive,
+  answerBehaviorAlongsideQuestion, applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive,
   updateBehavior, updateBehaviorArchiveNote, type BehaviorRunAction,
 } from "@cadence/core/services/behavior.service";
 import { createBehaviorStore } from "@/lib/db/behavior-store";
@@ -138,6 +138,25 @@ export async function updateBehaviorForUser(
   invalidateBehaviorData(userId);
   await syncBehaviorGraphForUser(supabase, userId, "update");
   return updated;
+}
+
+/**
+ * Audit fixes 7 and 12: a question prompt's alongside answer (the Timeline row and the
+ * Daily Brief) through the same core writer Cadence for Mac's row uses, so it records
+ * one configuration revision with reason code `alongside_answered` and answers only an
+ * unanswered Behavior.
+ */
+export async function answerBehaviorAlongsideQuestionForUser(
+  supabase: AppSupabaseClient, userId: string,
+  input: { behaviorId: string; alongside: boolean },
+  recordedAt = new Date().toISOString(),
+) {
+  const answer = await answerBehaviorAlongsideQuestion(createBehaviorStore(supabase, userId), { ...input, recordedAt });
+  if (!answer.alreadyAnswered) {
+    invalidateBehaviorData(userId);
+    await syncBehaviorGraphForUser(supabase, userId, "update");
+  }
+  return answer;
 }
 
 function getExpectedUpdatedAtFromFormData(formData: FormData): string {

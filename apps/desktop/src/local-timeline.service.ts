@@ -7,8 +7,21 @@ import { toTimeSession } from "./local-occurrence.service";
 import { withLocalMoves } from "./local-moves.service";
 import { attachTimelineDayNotes, timelineDayNoteRange } from "@cadence/core/resolvers/day-note.resolver";
 import { attachTimelineSourceEvidence, resolveTimelineSourceEvidence } from "@cadence/core/services/timeline-source-evidence";
+import { attachTimelineAlongside } from "@cadence/core/services/timeline-alongside";
+import {
+  alongsideFormViews, alongsideQuestionBehaviorIds, alongsideRowViews, buildAlongsideBehaviorFacts,
+} from "@cadence/core/services/alongside-facts";
+import { EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS, type EffectiveWhereLabel } from "@cadence/core/resolvers/effective-where.resolver";
+import { planningPlaceCatalog, type AlongsideFormView } from "@cadence/core/resolvers/alongside.resolver";
+import type { DesktopAlongsideContext } from "./alongside";
+import type { LocalPlaceLabelRows } from "./local-place-labels.service";
 
-export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.instant()) {
+/**
+ * `alongside` (Ticket 363): the Mac's alongside context, or null when no alongside surface
+ * shows. With it, rows carry the label and the row question as on the web, built from the
+ * local answer, local completion place labels and the linked account's guesses.
+ */
+export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.instant(), alongside: DesktopAlongsideContext | null = null) {
   const profile = await localCommand("readProfile", {});
   await ensureLocalOccurrencesFresh(profile, now);
   const profileId = profile.id;
@@ -49,5 +62,40 @@ export async function loadLocalTimeline(futureDays = 7, now = Temporal.Now.insta
   const matches = (history.sourceMatches ?? []).map((match) => ({ occurrenceId: match.occurrence_id, source: match.source, state: match.state,
     activityStartAt: match.activity_start_at, activityEndAt: match.activity_end_at }));
   const evidence = resolveTimelineSourceEvidence({ timezone: profile.timezone, occurrences, latestEvents, matches });
-  return { profile, behaviors, categories, timeline: attachTimelineSourceEvidence(attachTimelineDayNotes(view, dayNotes), evidence) };
+  const timeline = attachTimelineSourceEvidence(attachTimelineDayNotes(view, dayNotes), evidence);
+  if (!alongside) return { profile, behaviors, categories, timeline, alongsideViews: null };
+  const facts = buildAlongsideBehaviorFacts({
+    behaviors: behaviors.map((behavior) => ({ id: behavior.id, alongside: behavior.alongside,
+      whereKind: behavior.where_kind ?? null, locationText: behavior.location_text ?? null })),
+    guesses: alongside.guesses, labels: await readLocalAlongsideLabels(profileId, view.todayLocalDate), localDate: view.todayLocalDate,
+  });
+  const alongsideViews: Readonly<Record<string, AlongsideFormView>> = alongsideFormViews(facts) ?? {};
+  // Ticket 384: Home's and the saved places' keys from local rows, so the shared Timeline
+  // gives each Calendar event a coarse place for its overlap cues. Nothing is stored.
+  const places = planningPlaceCatalog({ homeText: await readLocalHomeText(profileId),
+    placeTexts: behaviors.filter((behavior) => behavior.where_kind === "place").map((behavior) => behavior.location_text ?? null) });
+  return { profile, behaviors, categories, alongsideViews,
+    timeline: attachTimelineAlongside(timeline, alongsideRowViews(facts), alongsideQuestionBehaviorIds(facts), places) };
+}
+
+/** The local Home text, or null when it cannot be read (every event's place is then unknown unless saved). */
+async function readLocalHomeText(profileId: string): Promise<string | null> {
+  try {
+    const settings = await localCommand("readTravelSettings", { profileId });
+    return settings?.baseLocationText ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Completion place labels inside the evidence period, by Behavior (labels only, never positions). */
+async function readLocalAlongsideLabels(profileId: string, localDate: string): Promise<ReadonlyMap<string, EffectiveWhereLabel[]>> {
+  const first = Temporal.PlainDate.from(localDate).subtract({ days: EFFECTIVE_WHERE_EVIDENCE_PERIOD_DAYS - 1 }).toString();
+  const rows = await localCommand("readPlaceLabels", { profileId }) as LocalPlaceLabelRows;
+  const labels = new Map<string, EffectiveWhereLabel[]>();
+  for (const row of rows.labels) {
+    if (row.local_date < first || row.local_date > localDate) continue;
+    labels.set(row.behavior_id, [...(labels.get(row.behavior_id) ?? []), { label: row.label, localDate: row.local_date }]);
+  }
+  return labels;
 }

@@ -32,14 +32,18 @@ export function planInitialBehaviorConfigurationEvent(
     configuration: BehaviorConfigurationSnapshot;
   },
 ): BehaviorConfigurationEventPlan {
-  const nextConfiguration = normalizeBehaviorConfiguration(input.configuration);
+  const normalized = normalizeBehaviorConfiguration(input.configuration);
+  const answered = hasAlongsideAnswer(normalized);
 
   return createEventPlan({
     ...input,
     eventKind: "baseline",
     previousConfiguration: null,
-    nextConfiguration,
-    changedFields: [...BEHAVIOR_CONFIGURATION_CHANGED_FIELDS],
+    nextConfiguration: withHistoryAlongside(normalized, answered),
+    // D33: an unanswered Behavior's baseline does not name the answer.
+    changedFields: BEHAVIOR_CONFIGURATION_CHANGED_FIELDS.filter(
+      (field) => answered || field !== "alongside",
+    ),
   });
 }
 
@@ -64,13 +68,35 @@ export function planBehaviorConfigurationChangeEvent(
     return null;
   }
 
+  const answered = hasAlongsideAnswer(previousConfiguration)
+    || hasAlongsideAnswer(nextConfiguration);
+
   return createEventPlan({
     ...input,
     eventKind: "revision",
-    previousConfiguration,
-    nextConfiguration,
+    previousConfiguration: withHistoryAlongside(previousConfiguration, answered),
+    nextConfiguration: withHistoryAlongside(nextConfiguration, answered),
     changedFields,
   });
+}
+
+/**
+ * D33 history rule: an event carries the alongside answer only when either side has one.
+ * Then both snapshots carry it, null for an unanswered side, so an answer change shows its
+ * before and after values. Otherwise neither snapshot carries the key, so an unanswered
+ * Behavior's history reads byte for byte as it did before the setting existed. A missing
+ * key reads as unanswered.
+ */
+export function withHistoryAlongside(
+  snapshot: BehaviorConfigurationSnapshot,
+  answered: boolean,
+): BehaviorConfigurationSnapshot {
+  const { alongside, ...rest } = snapshot;
+  return answered ? { ...rest, alongside: typeof alongside === "boolean" ? alongside : null } : rest;
+}
+
+function hasAlongsideAnswer(snapshot: BehaviorConfigurationSnapshot | null | undefined): boolean {
+  return typeof snapshot?.alongside === "boolean";
 }
 
 export function normalizeBehaviorConfiguration(
@@ -101,6 +127,8 @@ export function normalizeBehaviorConfiguration(
       : null,
     isOpportunity: configuration.isOpportunity === true,
     ...normalizeParentLink(configuration),
+    // D33: older snapshots have no answer and read as unanswered.
+    alongside: typeof configuration.alongside === "boolean" ? configuration.alongside : null,
   };
 }
 
@@ -193,6 +221,9 @@ function findChangedFields(
   }
   if ((previous.inheritParentSchedule ?? false) !== (next.inheritParentSchedule ?? false)) {
     changedFields.push("inherit_parent_schedule");
+  }
+  if ((previous.alongside ?? null) !== (next.alongside ?? null)) {
+    changedFields.push("alongside");
   }
 
   return changedFields;

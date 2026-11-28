@@ -143,6 +143,27 @@ describe("chat eval alongside world (Ticket 359)", () => {
   });
 });
 
+describe("chat eval calendar event places (Ticket 384)", () => {
+  // The helmet (alongside, at Home) moves into a dinner. It is refused only when the dinner
+  // is at a saved place away from Home, as the live move check does.
+  const attempt = async (location: string | null, placeTexts: boolean) => {
+    const world = chatEvalWorld("alongside");
+    world.events.push({ id: "event-dinner", title: "Team dinner", calendar: "Work", localDate: TODAY, start: "21:00", end: "22:30", location });
+    if (placeTexts) world.placeTexts = { home: "12 Elm Street", behaviors: { [world.behaviors.find((item) => item.title === "Gym session")!.id]: "Acme Office" } };
+    const helmet = occurrence(world, "Red light helmet", TODAY);
+    const result = await createFakeExecutor(world).execute("move_occurrence_for_day",
+      { occurrence_id: helmet.id, expected_revision: `r${helmet.revision}`, start_time: "21:45" }, {});
+    return (result as { result: { outcome: string; refusal: { reason: string } | null } }).result;
+  };
+
+  it("refuses the helmet during a dinner at the office, and allows it at Home or with no known place", async () => {
+    expect(await attempt("Acme Office", true)).toMatchObject({ outcome: "refused", refusal: { reason: "calendar_busy" } });
+    expect((await attempt("12 Elm Street", true)).outcome).toBe("moved");
+    expect((await attempt("Corner Cafe", true)).outcome).toBe("moved");
+    expect((await attempt("Acme Office", false)).outcome).toBe("moved");
+  });
+});
+
 describe("chat eval scenarios and report", () => {
   it("has unique ids and a typical conversation of three questions", () => {
     expect(new Set(CHAT_SCENARIOS.map((item) => item.id)).size).toBe(CHAT_SCENARIOS.length);

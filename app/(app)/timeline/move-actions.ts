@@ -17,6 +17,8 @@ import {
   type OccurrenceMoveResult,
 } from "@/lib/services/occurrence-move.service";
 import { createClient } from "@/lib/supabase/server";
+import { alongsideEnabled } from "@/lib/services/alongside-flag";
+import { parseCalendarEventPlace } from "@cadence/core/resolvers/alongside.resolver";
 
 /**
  * The person's own per-day move, Undo and reason chip (advisor Phase 2A). These go
@@ -52,8 +54,11 @@ export type MoveActionInput = Readonly<{
   expectedRevision: string;
   /** New start, HH:MM local time on the Occurrence's date. */
   startTime: string;
-  /** Today's calendar events, as UTC instants. */
-  calendarBusy?: ReadonlyArray<Readonly<{ start: string; end: string; ref?: string }>>;
+  /**
+   * Today's calendar events, as UTC instants. `eventPlace` (Ticket 384) is the event's
+   * coarse place the Timeline computed; read only while `CADENCE_ALONGSIDE` is on.
+   */
+  calendarBusy?: ReadonlyArray<Readonly<{ start: string; end: string; ref?: string; eventPlace?: unknown }>>;
   /** Set when the move accepts an advisor proposal. */
   proposalId?: string | null;
   idempotencyKey?: string | null;
@@ -132,9 +137,12 @@ export async function keepMovedOccurrenceAction(input: Readonly<{ conflictId: st
 }
 
 function toBusy(events: MoveActionInput["calendarBusy"]) {
-  return (events ?? []).map((event) => ({
-    start: Temporal.Instant.from(event.start), end: Temporal.Instant.from(event.end), ref: event.ref,
-  }));
+  const placesOn = alongsideEnabled();
+  return (events ?? []).map((event) => {
+    // Ticket 384: a malformed place, or any place while the flag is off, is unknown.
+    const eventPlace = placesOn ? parseCalendarEventPlace(event.eventPlace) : null;
+    return { start: Temporal.Instant.from(event.start), end: Temporal.Instant.from(event.end), ref: event.ref, ...(eventPlace ? { eventPlace } : {}) };
+  });
 }
 
 async function personCaller() {

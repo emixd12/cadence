@@ -20062,7 +20062,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 357: Effective Where and the same-place overlap rule
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare).
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending. `where_guess` stays null until Ticket 359 writes it. Calendar events carry no place on the free-slot inputs, so their place is unknown. The brief still never moves an alongside item. Opportunity placements and schedule-edit conflict notices keep the earlier rule (no moving item to compare). Audit fix (November 26, 2026): schedule-edit conflict notices now follow the same-place rule from the moved item's side, flag on only.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20124,7 +20124,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 359: Advisor readers and the Where guess in the estimate call
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending (`20261125190000`). Estimate recipe 1.3, Chat prompt `chat-1.8` and coach signals `coach-signals-4` apply only with the flag on. Scope note: an exact-time opportunity add (Chat and MCP) also checks the added Behavior's side of the same-place rule. The in-consumer estimate request (workbench and evals) stays recipe 1.2; only its result now yields to the person's answer.
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; hosted migration push pending (`20261125190000`). Estimate recipe 1.3, Chat prompt `chat-1.8` and coach signals `coach-signals-4` (`coach-signals-6` since Ticket 372) apply only with the flag on. Scope note: an exact-time opportunity add (Chat and MCP) also checks the added Behavior's side of the same-place rule. The in-consumer estimate request (workbench and evals) stays recipe 1.2; only its result now yields to the person's answer.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20155,7 +20155,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 360: The agent asks whether a Behavior is alongside
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. The brief keeps one question per brief and never asks an answered Behavior again; an ignored question can return in a later brief because no "asked" record is stored.
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`. The advice card is not shipped: no reviewed source in the library covers it (`give-it-a-length` cites task-length estimates only), so `setup_gaps` carries the fact (`alongside_unanswered`, `without_alongside_answer`) without a tip. Ticket 385 adds the card `do-it-during-something-else`, a draft awaiting the owner's review. The brief keeps one question per brief and never asks an answered Behavior again. Follow-up (migration `20261126200000`): `brief_alongside_asks` records the first saved brief that asked about each Behavior (ids and a date, owner-only RLS, hosted-only), so an ignored question does not return on a later day; a refresh the same day may ask it again. The requirement's "No new table" refers to the answer, which stays `behaviors.alongside`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20187,7 +20187,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 361: Pairing for today in the Daily Brief and Chat
 
-Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration (both `reason` columns accept the new code `alongside_pairing`). Readings: "crowded" reuses the coach's `crowded_hour` threshold (3 items in a local hour, alongside items not counted) or an hour the stored signal names; `done_together` counts only when the named partner is one of today's hosts; the brief and Chat read the coach's signals through the coach agent's read-only channel. The proposal's `line.pairing` records the host offered, as history for Ticket 362, not a link. Re-check pairs a guest again when its host moved or left; Re-plan pairs it with another host. Chat skips the "helps" rule for an item the person asked about.
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`; no migration for the lines (both `reason` columns accept the new code `alongside_pairing`). Readings: "crowded" reuses the coach's `crowded_hour` threshold (3 items in a local hour, alongside items not counted) or an hour the stored signal names; `done_together` counts only when the named partner is one of today's hosts; the brief and Chat read the coach's evidence on their own agent tokens (`daily_brief`, `chat`) through `advisor_read_pairing_evidence`, which returns `done_together` pairs and `crowded_hour` hours only (follow-up migration `20261126200000`); no coach client is minted outside the coach's own jobs. The proposal's `line.pairing` records the host offered, as history for Ticket 362, not a link. Re-check pairs a guest again when its host moved or left; Re-plan pairs it with another host. Chat skips the "helps" rule for an item the person asked about.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20219,7 +20219,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 362: Pairing the schedule through the coach
 
-Status: not_started
+Status: complete November 25, 2026, off behind `CADENCE_ALONGSIDE`. Migration `20261126210000_alongside_schedule_pairing.sql` (not pushed) drops and re-adds the proposals' evidence check to accept source `alongside_pairing`, following the Nov 20 precedent, so it needs the owner's yes before a hosted push. Readings: "four different days" counts accepted Daily Brief pairing lines (status `accepted`, so Other time and Undo do not count) for the same guest and host on 4 local dates in the 28 dates ending today; `done_together` counts in either direction, with the alongside side as guest. "The days both are scheduled" is the weekdays on which both have a time, for daily-every-day and weekly-every-week schedules only, with one set time each per shared day and the same pair on every shared day; other recurrences, ranges and mixed times are refused. A step that follows its routine's schedule is refused on either side, and a guest longer than its host when both lengths are set. At most one pairing proposal per coach run. The host is re-checked when the proposal is shown and before a Yes.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20249,7 +20249,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 363: Alongside on Cadence for Mac
 
-Status: not_started
+Status: complete November 26, 2026, off behind `VITE_CADENCE_ALONGSIDE` on the Mac and `CADENCE_ALONGSIDE` on the hosted server; hosted migration `20261126220000` pending (it replaces the `changed_fields` check constraint and inserts one contract-registry row, as `20261122010000` did, so it needs the owner's yes before a hosted push). SQLite schema 29, account sync contract 10, minimum writer contract 8. Flag mechanism: a build switch that release and preview builds force off, plus, on a linked Mac, the server's answer from the new `GET /api/behaviors/alongside`, which also carries the account's current guesses (memory only). The installed check on a dev-signed build moves to Ticket 365. Scope note: configuration history records an answer change with reason code `alongside_answered` from the Mac's row question; the hosted surfaces keep `behavior_edited`. Audit fix (November 26, 2026): the web Timeline row and Daily Brief question now record `alongside_answered` too, through the same core writer; the hosted function accepts any non-empty reason code, so no migration. History fix (November 26, 2026, defect D1 of `docs/qa/2026-11-26-alongside-local-acceptance.md`): an unanswered Behavior's configuration history names the answer nowhere, flag on or off, so a flag-off deploy writes history as before; an answer change carries the answer in both snapshots and in exports; and migration `20261126260000` (not pushed; it inserts one contract-registry row and changes the projection and apply functions for older contracts, so it needs the owner's yes and must be on the database before the flag turns on) hides the answer's history from contracts 8 and 9.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20306,7 +20306,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 365: Alongside acceptance and release
 
-Status: not_started
+Status: in_progress. November 26, 2026: local-stack acceptance passed (9 of 10 cases clean, defect D1 fixed on `feat/alongside-history-fix` with `20261126260000`; evidence in `docs/qa/2026-11-26-alongside-local-acceptance.md`). Remaining: hosted Preview acceptance as test account A, installed Mac dev-signed acceptance, MCP Tier 1 acceptance, and the user guide section.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20931,7 +20931,7 @@ Messaging impact: none until a view is ticketed.
 
 ## Ticket 383: The guessed Where shows without Completion places
 
-Status: not_started
+Status: complete November 26, 2026, behind `CADENCE_ALONGSIDE` on the web and `VITE_CADENCE_ALONGSIDE` on the Mac; migrations `20261126230000` and `20261126250000` not applied or pushed. `20261126230000`'s hosted push is approved (D37); `20261126250000` inserts one contract-registry row and changes the sync projection and apply functions for older contracts, so it needs the owner's yes, and it must reach the database no later than `20261126230000`. Turning Completion places off still deletes every dismissal, guess dismissals included. Mac: SQLite schema 30 (migration 0030) admits a guess dismissal while labels are off; account sync contract 11 keeps it in the shared planner (`retainPlaceLabelInvariants`), and the server hides it from contracts 8 to 10 so Cadence for Mac 0.1.14 to 0.1.17 neither deletes it nor fails on it; minimum writer contract 8. A linked Mac shows and dismisses the hosted guess with Completion places off; local mode has none. Installed check on a dev-signed build moves to Ticket 365.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 
@@ -20953,7 +20953,7 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | `place-label.resolver.ts`, `place-labels.service.ts`, `components/travel/PlaceLabels.tsx`, migration. |
-| Desktop | Same components; `local-place-labels.service.ts`. |
+| Desktop | Same components; `local-place-labels.service.ts`; SQLite migration 0030; account sync contract 11 (planner rule and hosted migration `20261126250000`). |
 | Marketing | Not applicable: no public claim changes until the messaging pass. |
 | Future mobile | Deferred (no mobile track active); inherits the `@cadence/core` resolvers and server rules. |
 
@@ -20961,7 +20961,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 384: Calendar event places for the same-place rule
 
-Status: not_started
+Status: complete in source on `feat/alongside-384` (November 26, 2026), behind `CADENCE_ALONGSIDE`; no migration. Outlook and iCloud events stay unknown on the Daily Brief paths, whose reads never ask for a location; Chat, the Timeline cue and "Move for today" label every source. Path map: `docs/DATETIME_STRATEGY.md`, "Coarse event places".
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 
@@ -20992,7 +20992,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 385: An advice card for the alongside question
 
-Status: not_started
+Status: complete November 28, 2026. The card `do-it-during-something-else` was reviewed and activated by the owner (`status: "active"`, `reviewer: "Emi"`, `reviewed_at: "2026-11-28"`). Source kind `randomized_trial` (no field-experiment kind exists). The offer's link target `alongside` opens the Behavior form at "Can be done alongside other things" (`?edit=<id>&field=alongside`). Migration `20261126240000_alongside_tip_link_target.sql` replaces the `coach_tips.link_target` check to allow it (pushed to hosted Supabase November 28, 2026 before PR #407 merge). Smoke: `tests/sql/alongside-tip-link-target-smoke.sql`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 
@@ -21025,7 +21025,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 386: The estimate hash leaves Where out
 
-Status: not_started
+Status: complete in source November 25, 2026, on `feat/alongside-386` (not merged). No migration. Every stored estimate hash changes once on deploy, flag on or off.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 

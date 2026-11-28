@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { canSelfMoveOccurrence } from "@cadence/core/resolvers/move.resolver";
+import { calendarEventPlace, type CalendarEventPlace, type PlanningPlaceCatalog } from "@cadence/core/resolvers/alongside.resolver";
 import { formatClockTimeLabel } from "@cadence/core/services/schedule";
 import { useRefresh } from "@cadence/ui/runtime";
 import { noticeText } from "@cadence/core/notices";
@@ -26,7 +27,12 @@ import type { TimelineOccurrenceView } from "@cadence/core/types/timeline";
  * confirmation step (Undo instead), optional one-tap reasons after the move.
  */
 
-export type MoveCalendarBusy = ReadonlyArray<Readonly<{ start: string; end: string; ref?: string }>>;
+/**
+ * `eventPlace` (Ticket 384): the event's coarse place, computed on this screen from its
+ * location text and the view's `planningPlaces`. Sent only while the view carries
+ * `planningPlaces` (`CADENCE_ALONGSIDE` on); never the location text itself.
+ */
+export type MoveCalendarBusy = ReadonlyArray<Readonly<{ start: string; end: string; ref?: string; eventPlace?: CalendarEventPlace }>>;
 
 type MoveState =
   | Readonly<{ status: "moved" | "undone"; occurrenceId: string; moveId: string; effectiveStartAt: string | null; revision: string }>
@@ -116,20 +122,43 @@ const OccurrenceMovesContext = createContext<OccurrenceMovesController | null>(n
 /** Today's Calendar events, from the Day progress Timeline, for the free-slot check. */
 export const MoveCalendarEventsContext = createContext<readonly NormalizedExternalEvent[]>([]);
 
+/** Ticket 384: the Timeline view's `planningPlaces`, or null while it carries none. */
+export const MovePlanningPlacesContext = createContext<PlanningPlaceCatalog | null>(null);
+
 export function useOccurrenceMoves(): OccurrenceMovesController | null {
   return useContext(OccurrenceMovesContext);
 }
 
 export function useMoveCalendarBusy(): MoveCalendarBusy {
   const events = useContext(MoveCalendarEventsContext);
-  return useMemo(() => calendarBusyFromEvents(events), [events]);
+  const places = useContext(MovePlanningPlacesContext);
+  return useMemo(() => calendarBusyFromEvents(events, places), [events, places]);
 }
 
-/** Timed events that hold the person's time. Free, cancelled and declined ones do not. */
-export function calendarBusyFromEvents(events: readonly NormalizedExternalEvent[]): MoveCalendarBusy {
-  return events.flatMap((event) => event.kind === "timed" && !event.endUnspecified
-    && event.state !== "cancelled" && event.availability !== "free" && event.currentUserResponse !== "declined"
-    ? [{ start: event.startAt, end: event.endAt, ref: event.id }] : []);
+/**
+ * Timed events that hold the person's time. Free, cancelled and declined ones do not.
+ * With `places` (Ticket 384), an event whose location keys to Home or a saved place
+ * carries that coarse place; any other event carries none (unknown).
+ */
+export function calendarBusyFromEvents(events: readonly NormalizedExternalEvent[], places: PlanningPlaceCatalog | null = null): MoveCalendarBusy {
+  return events.flatMap((event) => {
+    if (event.kind !== "timed" || event.endUnspecified || event.state === "cancelled" || event.availability === "free"
+      || event.currentUserResponse === "declined") return [];
+    const eventPlace = calendarEventPlace(event.location, places);
+    return [{ start: event.startAt, end: event.endAt, ref: event.id, ...(eventPlace ? { eventPlace } : {}) }];
+  });
+}
+
+/** Ticket 384: each Calendar event's coarse place by event id, for the overlap cues. Empty without `places`. */
+export function calendarEventPlacesById(events: readonly NormalizedExternalEvent[], places: PlanningPlaceCatalog | null | undefined)
+  : ReadonlyMap<string, CalendarEventPlace> {
+  const byId = new Map<string, CalendarEventPlace>();
+  if (!places) return byId;
+  for (const event of events) {
+    const place = calendarEventPlace(event.location, places);
+    if (place) byId.set(event.id, place);
+  }
+  return byId;
 }
 
 /** "10:30 AM" for an instant in the person's timezone. */

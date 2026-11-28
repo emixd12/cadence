@@ -673,8 +673,10 @@ Alongside rows (Ticket 358, D33; behind `CADENCE_ALONGSIDE`): a row whose Behavi
 alongside keeps its place in the list and shows one muted line under its title from
 `alongside.row-label`: "Alongside" for the person's answer, "Alongside · a guess" when
 the value is Cadence's guess. Its Possible overlap line and Calendar highlight stop for
-overlaps `alongsideMayOverlap` allows (every Calendar event, whose place is unknown);
-travel still shows. There is no parallel-lane layout. Bench: `composite.occurrence-row`.
+overlaps `alongsideMayOverlap` allows: a Calendar event at the same place, or whose place
+is unknown (Ticket 384). They show for an event at another known place: an item at Home
+during an event whose location is a saved place, or the reverse. Travel still shows.
+There is no parallel-lane layout. Bench: `composite.occurrence-row`.
 
 Alongside question on a row (Ticket 360, D33; behind `CADENCE_ALONGSIDE`): right after a
 Completed mark that shows no Done at line, a row whose Behavior's alongside question is
@@ -682,7 +684,10 @@ open (not answered and Cadence guesses yes, `alongsideQuestionOpen`) may show th
 detail line "Done alongside other things? Yes · No", on the share of marks set in
 `MARK_DETAIL_PROMPTS.alongside` (0.5, fixed per item and day). Yes or No writes the
 Behavior's alongside setting and reads back as `alongside.answer-saved`; a refusal reads
-"Not changed." with an `alongside.answer-*` notice. One line per row at a time; Done at
+"Not changed." with an `alongside.answer-*` notice. The line answers only an unanswered
+Behavior: when another surface or device answered since the row asked, nothing is written
+and the line reads `alongside.answer-already` ("Already answered: it needs its own time.
+Change it in the Behavior.") with the stored answer. One line per row at a time; Done at
 keeps priority. The row asks only when the page passes an `alongside` mark-detail action
 (web: `recordAlongsideAnswerAction`); the Mac passes none until Ticket 363. Bench:
 `module.occurrence-mark-details` (the Red light helmet row).
@@ -695,9 +700,21 @@ today's items whose question is open (`pickBriefAlongsideQuestion`), saved with 
 brief so a reopen asks the same question while it is still open, or nothing. Yes or No
 writes the Behavior's alongside setting (`POST /api/advisor/brief/alongside`), reads back
 as `alongside.answer-saved` and redraws the Timeline; a refusal shows the inline Alert
-notice and keeps Yes · No. Only a client that sends `alongside_question_v1` (the web)
+notice and keeps Yes · No. An answer given elsewhere since the brief asked stands: the
+line writes nothing and reads `alongside.answer-already` with the stored answer. Only a client that sends `alongside_question_v1` (the web)
 gets the line; the Mac follows in Ticket 363. Advisor tips carry no alongside card (no
 reviewed source fits; `STATUS.md`).
+
+Guess note on pairings (audit fix 11, D33: "Where a guess drives a result, the UI labels
+it as a guess"; behind `CADENCE_ALONGSIDE`): a Daily Brief pairing line and an advisor
+schedule pairing proposal show one quiet `text-xs` Readable Ash note, like the length
+note, when the guest's alongside value or either side's Where comes from Cadence's model
+guess: `alongside.pairing-guess` ("Alongside is a guess", "Where is a guess" or
+"Alongside and Where are guesses"). It has no action; the Behavior form changes either
+setting. Counted completion places are the person's record, not a guess. A pairing with
+no guess, and a line stored before the note existed, show no note. The brief line hides
+it once answered, as the length note does. Benches: `module.daily-brief-moves` (pairing
+state) and `/design-system?preview=advisor&state=pairing`.
 
 ### Routine rows and Semantic Zoom (Ticket 349)
 
@@ -882,8 +899,11 @@ the flag is on and Details and Settings is open, the Behavior record's one Where
 suggestion line moves below Where in the form; it returns to the record when Details
 and Settings closes. The same line also states a guessed Where for a Behavior with
 Where Not set (`alongside.where-guess`, for example "Cadence guesses this happens at
-Home. Planning uses the guess until Where is set.") with Review Where and Dismiss. It
-rides the Completion places state, so it shows only while labels are on. Bench:
+Home. Planning uses the guess until Where is set.") with Review Where and Dismiss.
+Ticket 383 (D37): on the web the guessed line shows whether or not Completion places is
+on, and Dismiss works in both states. With labels off the line is the only part of the
+Completion places state that shows: no marker line, I'm here, marker prompt or label
+count. Cadence for Mac still shows the guessed line only while labels are on. Bench:
 `composite.behavior-form` and `composite.behavior-place-assist`.
 
 Timezone is managed in Settings and should not be shown as a separate panel in

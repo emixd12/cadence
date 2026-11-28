@@ -11,6 +11,7 @@ import { localCommand, localMutation } from "./local-store";
 import { createLocalDayNoteStore } from "./local-day-note.service";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
+import { alongsideOption, readAlongsideOption } from "./alongside";
 import { acceptedRun, applyRun, applyStoredPlan, assertFreshPreview, checkedApplyResult, object, portabilityError, portabilityNow, previewRun, readLocalBundle } from "./local-portability";
 
 export async function getLocalBehaviorLogImportPageData(profile: Profile): Promise<BehaviorLogImportPageData> {
@@ -21,7 +22,7 @@ export async function previewLocalBehaviorLogImport(profile: Profile, form: Form
   try {
     const bundle = await readLocalBundle(form, "behaviorlog_file"); const now = portabilityNow(clock);
     const snapshot = await localCommand("readImportSnapshot", { profileId: profile.id });
-    const preview = resolveBehaviorLogImportMergePreview({ files: bundle.files, existing: existingRecords(snapshot), reminderChannel: "other" });
+    const preview = resolveBehaviorLogImportMergePreview({ files: bundle.files, existing: existingRecords(snapshot, alongsideOption()), reminderChannel: "other", ...readAlongsideOption() });
     const run = previewRun(profile.id, bundle, preview, now);
     await localCommand("prepareBehaviorLogImport", { ...localMutation(profile.id, now), expectedRevision: snapshot.revision, previewRun: run, plan: null });
     const dayNotes = preview.valid ? await previewBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "import") : null;
@@ -44,9 +45,9 @@ export async function applyLocalBehaviorLogImport(profile: Profile, form: FormDa
     try { result = await applyStoredPlan(profile.id, accepted, now, mode); }
     catch (error) {
       if (!(error instanceof Error) || error.message !== "The preview has no applicable write plan.") throw error;
-      const preview = resolveBehaviorLogImportMergePreview({ files: bundle.files, existing: existingRecords(snapshot), reminderChannel: "other" }); assertFreshPreview(accepted, preview);
+      const preview = resolveBehaviorLogImportMergePreview({ files: bundle.files, existing: existingRecords(snapshot, alongsideOption()), reminderChannel: "other", ...readAlongsideOption() }); assertFreshPreview(accepted, preview);
       reviewedPreview = preview;
-      const plan = planBehaviorLogImportWrite({ snapshot, applyRun: applyRun(accepted, mode, now), now, newId: () => crypto.randomUUID(), preview, mode, interventionRulesPresent: bundle.files.some(({ path }) => path === "data/intervention_rules.jsonl") });
+      const plan = planBehaviorLogImportWrite({ snapshot, applyRun: applyRun(accepted, mode, now), now, newId: () => crypto.randomUUID(), preview, mode, ...alongsideOption(), interventionRulesPresent: bundle.files.some(({ path }) => path === "data/intervention_rules.jsonl") });
       await localCommand("prepareBehaviorLogImport", { ...localMutation(profile.id, now), expectedRevision: snapshot.revision, previewRun: accepted, plan });
       result = await applyStoredPlan(profile.id, accepted, now, mode);
     }
@@ -59,3 +60,4 @@ export async function applyLocalBehaviorLogImport(profile: Profile, form: FormDa
       applyResult: { mode, importRun: toImportRunView(applied.importRun), created: counts.created as NonNullable<BehaviorLogImportActionState["applyResult"]>["created"], mapped: counts.mapped as NonNullable<BehaviorLogImportActionState["applyResult"]>["mapped"], skipped: counts.skipped as NonNullable<BehaviorLogImportActionState["applyResult"]>["skipped"] } };
   } catch (error) { return { ...BEHAVIORLOG_IMPORT_INITIAL_STATE, status: "error", message: portabilityError(error) }; }
 }
+

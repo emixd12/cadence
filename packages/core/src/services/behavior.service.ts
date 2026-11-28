@@ -213,7 +213,8 @@ export async function updateBehavior(
     ...planBehaviorWhere(values, existing),
     ...storedRecurrence(values, values.isOpportunity ?? existing.is_opportunity === true),
     is_opportunity: values.isOpportunity ?? existing.is_opportunity === true,
-    ...(values.alongside === undefined ? {} : { alongside: values.alongside }),
+    // D33: an update without an answer keeps the stored one, so history compares like with like.
+    ...(values.alongside !== undefined ? { alongside: values.alongside } : storedAlongside(existing)),
     browser_reminder_enabled: values.browserReminderEnabled,
     email_reminder_enabled: values.emailReminderEnabled,
     reminder_offset_minutes: values.reminderOffsetMinutes,
@@ -357,6 +358,65 @@ export async function setBehaviorActive(
     reasonCode: input.active ? "behavior_restored" : "behavior_archived", newId: input.newId,
   }) : [];
   return commitBehaviorGroup(store, commit, groupCommits);
+}
+
+/**
+ * D33 (Ticket 363): one answer to "Can this be done alongside other things?", written to
+ * the Behavior's setting with one configuration revision. Every other field keeps its
+ * stored value. The same answer again writes nothing and returns the stored Behavior.
+ * Cadence for Mac's Timeline row question uses it; the hosted surfaces write through
+ * `updateBehavior`.
+ */
+export async function setBehaviorAlongside(
+  store: BehaviorDataStore,
+  input: { behaviorId: string; alongside: boolean | null; recordedAt: string; expectedUpdatedAt?: string },
+) {
+  const existing = await requireBehavior(store, input.behaviorId);
+  if ((existing.alongside ?? null) === input.alongside) return existing;
+  const schedules = toStoredBehaviorScheduleGraph(existing);
+  const expectedDefinition = { title: existing.title, description: existing.description };
+  const behavior: BehaviorFields = { ...storedBehaviorFields(existing), alongside: input.alongside };
+  const configurationEventPlan = planBehaviorConfigurationChangeEvent({
+    previousConfiguration: toBehaviorConfigurationSnapshot(existing, schedules),
+    nextConfiguration: toBehaviorConfigurationSnapshot(behavior, schedules),
+    recordedAt: input.recordedAt,
+    effectiveAt: input.recordedAt,
+    source: "manual",
+    reasonCode: BEHAVIOR_ALONGSIDE_REASON_CODE,
+  });
+  const updated = await store.updateBehaviorWithAtomicScheduleGraph({
+    behaviorId: existing.id,
+    behavior,
+    expectedDefinition,
+    expectedNormalizedDefinition: normalizeBehaviorDefinition(expectedDefinition),
+    expectedScheduleGraph: schedules,
+    expectedUpdatedAt: input.expectedUpdatedAt ?? existing.updated_at,
+    definitionEventPlan: null,
+    configurationEventPlan,
+    schedules,
+  });
+  if (!updated) throw new Error("Behavior not found.");
+  return updated;
+}
+
+/** The reason code on the configuration revision an alongside answer writes. */
+export const BEHAVIOR_ALONGSIDE_REASON_CODE = "alongside_answered";
+
+/**
+ * Audit fix 7: a question prompt's answer (the Timeline row). It answers only an
+ * unanswered Behavior: when the setting already holds the other answer (given on another
+ * surface or device since the row asked), nothing is written and `alreadyAnswered`
+ * carries the stored answer. The Behavior form changes an answer.
+ */
+export async function answerBehaviorAlongsideQuestion(
+  store: BehaviorDataStore,
+  input: { behaviorId: string; alongside: boolean; recordedAt: string },
+): Promise<Readonly<{ alongside: boolean; alreadyAnswered: boolean }>> {
+  const existing = await requireBehavior(store, input.behaviorId);
+  const stored = existing.alongside ?? null;
+  if (stored !== null && stored !== input.alongside) return { alongside: stored, alreadyAnswered: true };
+  await setBehaviorAlongside(store, { ...input, expectedUpdatedAt: existing.updated_at });
+  return { alongside: input.alongside, alreadyAnswered: false };
 }
 
 /** The four run actions on a Behavior's menu, in Chat and through MCP. */
@@ -575,7 +635,17 @@ export function toBehaviorConfigurationSnapshot(behavior: BehaviorFields, schedu
     isOpportunity: behavior.is_opportunity === true,
     parentBehaviorId: behavior.parent_behavior_id ?? null,
     inheritParentSchedule: behavior.parent_behavior_id ? behavior.inherit_parent_schedule ?? false : false,
+    // D33 (Ticket 363): the answer is part of configuration history.
+    alongside: typeof behavior.alongside === "boolean" ? behavior.alongside : null,
   };
+}
+
+/**
+ * D33: the stored answer, carried by every write built from a stored Behavior. A record
+ * read without the column (an older store) carries nothing, and its snapshots read null.
+ */
+function storedAlongside(existing: BehaviorFields): Pick<BehaviorFields, "alongside"> {
+  return "alongside" in existing && existing.alongside !== undefined ? { alongside: existing.alongside ?? null } : {};
 }
 
 function configurationRun(behavior: BehaviorFields) {
@@ -609,6 +679,7 @@ export function storedBehaviorFields(existing: BehaviorGraphRecord): BehaviorFie
     archived_at: existing.archived_at,
     archive_notes: existing.archive_notes,
     ...storedLinkFields(existing),
+    ...storedAlongside(existing),
   };
 }
 

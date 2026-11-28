@@ -1,6 +1,8 @@
 import { sha256 } from "../hash";
 import { parseArchiveNotes } from "./archive-note.resolver";
 import { NOTE_SHORTCUT_LIMITS, validateNoteShortcutState } from "./note-suggestion.resolver";
+import { WHERE_GUESS_DISMISSAL_KEYS } from "./place-label.resolver";
+import type { WhereSuggestionKey } from "../types/place-labels";
 import { travelHabitSyncJson, travelHabitsFromSyncValue } from "../services/travel-habits";
 import { legacyEndDateColumns } from "../services/behavior-run-fields";
 import { Temporal } from "@js-temporal/polyfill";
@@ -10,8 +12,8 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
 /**
  * Hosted sync shape this build understands. The server projects snapshots to it and
  * preserves fields added in later contracts. Raise it with every hosted
- * `cadence_private.account_sync_contract_additions` or `account_sync_contract_rows`
- * entry; see docs/DESKTOP_DATA_MODEL.md. Contract 4 adds the `day_notes` Note shortcut state.
+ * `cadence_private.account_sync_contract_additions`, `account_sync_contract_rows` or
+ * `account_sync_contract_row_rules` entry; see docs/DESKTOP_DATA_MODEL.md. Contract 4 adds the `day_notes` Note shortcut state.
  * Contract 5 adds the read-only connector completion kinds (Ticket 320).
  * Contract 7 replaces the Behavior `end_date` with end and pause fields (Ended and
  * Paused). It is breaking, so the server's minimum writer contract is 7 as well.
@@ -21,8 +23,17 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * Contract 9 adds the sub-behavior link fields (`parent_behavior_id`,
  * `sub_behavior_sort_order`, `inherit_parent_schedule`), depth 1. It is additive: the
  * server keeps the minimum writer contract at 8.
+ * Contract 10 adds the person's alongside answer, `behavior.alongside` (true, false or
+ * null for unanswered; D33, Ticket 363). It is additive: a contract-9 writer never sees
+ * the field and the server restores the stored answer on its writes, so the minimum
+ * writer contract stays 8.
+ * Contract 11 adds no field or kind. It receives a dismissal of a model guess (`home`,
+ * `anywhere`, `add_place`) stored while Completion places is off (D37, Ticket 383), which
+ * the server hides from contracts 8 to 10 (`account_sync_contract_row_rules`), and the
+ * planner keeps such a dismissal while labels are off. It is additive, so the minimum
+ * writer contract stays 8.
  */
-export const ACCOUNT_SYNC_CONTRACT = 9;
+export const ACCOUNT_SYNC_CONTRACT = 11;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -507,6 +518,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
       parent_behavior_id: null,
       sub_behavior_sort_order: 0,
       inherit_parent_schedule: false,
+      // Contract 10: a row saved before the alongside answer synced is unanswered.
+      alongside: null,
       ...value,
     };
     // A baseline saved before contract 7 holds end_date; it reads as the new fields.
@@ -585,6 +598,9 @@ function placeLabelConflictWinner(local: AccountSyncEntity | null, hosted: Accou
 /**
  * Matches the hosted and SQLite triggers: nothing location-derived survives while labels
  * are off, and a label needs a Completed occurrence of its Behavior and local date.
+ * Ticket 383 (D37, contract 11): a dismissal of a model guess (`home`, `anywhere`,
+ * `add_place`) is not location-derived and survives while labels are off. Turning labels
+ * off still deletes it on the side that turned them off, and the merge carries that deletion.
  */
 function retainPlaceLabelInvariants(entities: readonly AccountSyncEntity[]): AccountSyncEntity[] {
   const settings = entities.find(({ kind }) => kind === "place_label_settings");
@@ -592,7 +608,7 @@ function retainPlaceLabelInvariants(entities: readonly AccountSyncEntity[]): Acc
   const occurrences = new Map(entities.filter(({ kind }) => kind === "occurrence").map((entity) => [entity.id, entity]));
   return entities.filter((entity) => {
     if (!PLACE_LABEL_KINDS.has(entity.kind) || entity.kind === "place_label_settings") return true;
-    if (!enabled) return false;
+    if (!enabled) return entity.kind === "where_suggestion_dismissal" && WHERE_GUESS_DISMISSAL_KEYS.includes(field(entity.value, "suggestion") as WhereSuggestionKey);
     if (entity.kind !== "completion_place_label") return true;
     const occurrence = occurrences.get(entity.id);
     return Boolean(occurrence) && field(occurrence!.value, "status") === "completed"
@@ -785,6 +801,9 @@ function validateBehaviorPersistenceFields(value: Record<string, Json | undefine
     || typeof value.inherit_parent_schedule !== "boolean"
     || (parentId === null && value.inherit_parent_schedule)) {
     throw new Error("The account Behavior sub-behavior link is invalid.");
+  }
+  if (!(value.alongside === null || typeof value.alongside === "boolean")) {
+    throw new Error("The account Behavior alongside answer is invalid.");
   }
   const autoArchivedAt = value.auto_archived_at;
   if (autoArchivedAt !== null) {

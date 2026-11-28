@@ -70,7 +70,9 @@ export const BRIEF_MOVE_PAIRING_LINE: BriefMoveLine = line({
   reason: "Do it during Reading, while you're home anyway.",
   reasonCode: "alongside_pairing", anchor: { kind: "item", title: "Reading" },
   length: { minutes: 10, source: "behavior_duration", assumed: false }, otherTimes: [at("19:30"), at("21:00")],
-  pairing: { hostOccurrenceId: "occ-reading", hostBehaviorId: "beh-reading", hostTitle: "Reading", hostStartAt: at("20:00"), needs: ["done_together"] },
+  pairing: { hostOccurrenceId: "occ-reading", hostBehaviorId: "beh-reading", hostTitle: "Reading", hostStartAt: at("20:00"), needs: ["done_together"],
+    // Audit fix 11: the helmet's alongside value is Cadence's guess, so the line says so.
+    guesses: { alongside: true, guestWhere: false, hostWhere: false } },
 });
 
 export const BRIEF_MOVE_PAIRING_BRIEFING: DailyBriefing = {

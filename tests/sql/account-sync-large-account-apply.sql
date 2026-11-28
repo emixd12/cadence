@@ -87,7 +87,8 @@ begin
     if jsonb_array_length(snapshot_value -> 'entities') < 5000 then
       raise exception 'The large fixture snapshot holds only % entities', jsonb_array_length(snapshot_value -> 'entities');
     end if;
-    key_value := repeat(contract_value::text, 64);
+    -- 64 characters for any contract number (contract 10 has two digits).
+    key_value := left(repeat(contract_value::text, 64), 64);
     applied := public.apply_account_sync_plan(pg_temp.sync_payload(snapshot_value, '[]'::jsonb,
       snapshot_value -> 'entities', key_value, contract_value));
     if applied ->> 'status' <> 'applied'

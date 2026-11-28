@@ -3471,9 +3471,9 @@ The owner answered in chat on November 25, 2026, after an independent audit of T
 - **Where leaves the estimate hash (Ticket 386).** The model never receives Where, so a
   Where change no longer discards the cached length and guess. Each estimate is asked
   again once.
-- **Hosted push approved.** The owner approved pushing `20261126110000` and
-  `20261126120000` (each replaces a check constraint; the second inserts one row into
-  the private sync contract registry). `20261126120000` waits until the question about
+- **Hosted push approved.** The owner approved pushing `20261126210000` and
+  `20261126220000` (each replaces a check constraint; the second inserts one row into
+  the private sync contract registry). `20261126220000` waits until the question about
   contract-9 Mac builds and configuration history is settled.
 - **On hold.** Widening schedule pairing beyond daily and fixed-weekday schedules.
 

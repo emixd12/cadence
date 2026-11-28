@@ -1278,14 +1278,33 @@ unchanged: the new keys are Cadence extensions.
 
 The person's answer to "Can this be done alongside other things?" (`behaviors.alongside`:
 `true`, `false` or `null` for unanswered). Every rule here applies only while the server
-flag `CADENCE_ALONGSIDE` is `on`. With it off, the web export reads no alongside value
-and every format is byte-for-byte what it was before Ticket 364
-(`tests/export-import-restore-alongside.test.ts` pins a digest), and import and restore
-ignore the key.
+flag `CADENCE_ALONGSIDE` is `on` (on the Mac, its alongside build switch). With it off,
+the web export reads no alongside value, and import and restore ignore the key. For an
+account without an answer every format is then byte-for-byte what it was before Ticket
+364, configuration history included (`tests/export-import-restore-alongside.test.ts` pins
+two digests, the second computed with the code before Ticket 363's history change).
 
 - **Full JSON:** each Behavior record carries `alongside` (`true`, `false` or `null`).
-  Configuration snapshots do not carry it until Ticket 363 adds it to configuration
-  history.
+- **Configuration history (Ticket 363, defect D1):** an event that changed the answer
+  names `alongside` in `changed_fields`, and both of its snapshots carry the answer
+  (`null` for an unanswered side), so its previous and next snapshots differ. Any other
+  event that carries the answer in a stored snapshot (an edit of an answered Behavior)
+  carries it in both exported snapshots too. An unanswered Behavior's events carry no
+  `alongside` key (`docs/DATA_MODEL.md`, "Alongside setting"). This covers Full JSON's
+  `behavior_configuration_events`, the BehaviorLog raw projection
+  `raw/cadence/behavior_configuration_events.jsonl`, and the portable
+  `data/behavior_configuration_events.jsonl`, which keeps the answer under each
+  snapshot's `extensions.app.cadence.alongside`. An answer-only revision has no canonical
+  BehaviorLog field, so its portable `changed_fields` is empty and its transformation note
+  says the difference stays in the snapshot extensions.
+- **With the flag off, history names the answer nowhere:** no snapshot key and no changed
+  field. A revision whose only changed field was `alongside` is left out of every format,
+  since it changed nothing the export shows. An Occurrence of such a revision exports the
+  closest earlier kept revision of the same Behavior as its
+  `behavior_configuration_event_id`, so each kept revision's previous snapshot still
+  equals the one before it. An answered account's flag-off export is then byte for byte
+  the export of the same account had it never answered. Import and restore read no
+  history from the bundle, so both flag states round-trip (same test file).
 - **JSONL:** each `behavior` event carries `alongside`. Occurrence events are unchanged.
 - **CSV:** one `alongside` column is appended after every other column, including the
   time-tracking columns: `true`, `false`, or an empty cell when unanswered. It holds the
@@ -1301,8 +1320,8 @@ ignore the key.
 - **Restore:** a different answer makes the Behavior `replace`, and the restore payload
   carries `alongside` only when the bundle has the key. A bundle without it keeps the
   stored answer.
-- **Mac app:** the desktop export, import and restore do not read the setting until
-  Ticket 363 adds the SQLite column.
+- **Mac app:** since Ticket 363 the desktop export, import and restore follow these
+  rules with the alongside build switch in place of the flag.
 
 ### Gap for the standard
 

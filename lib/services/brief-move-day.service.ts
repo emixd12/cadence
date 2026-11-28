@@ -65,6 +65,12 @@ export type BriefMoveDay = Readonly<{
  * The inputs an estimate depends on. A different hash means the model is asked again;
  * the same hash reuses the cached length and "alongside" answer.
  *
+ * Ticket 386 (D37): only what the model receives is hashed, the title and description,
+ * plus the recipe markers below. Where is not sent, so it is not hashed: setting,
+ * changing or clearing Where keeps the cached length and guesses and asks nothing.
+ * `currentEstimate` stops reading `where_guess` while the person's Where is set. This
+ * changed every stored hash once (`v: 2`), so each Behavior was asked again one time.
+ *
  * `alongsideAsked: false` (Ticket 356) marks a length-only estimate, made while the
  * person's answer was set and the model was not asked about alongside. It hashes
  * differently, so its stored `alongside` is never read as a guess, and clearing the
@@ -75,12 +81,29 @@ export type BriefMoveDay = Readonly<{
  * flag on asks each Behavior once more, and turning it off reads only recipe 1.2 rows.
  */
 export function behaviorEstimateInputHash(
-  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind">,
+  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description">,
   options: Readonly<{ alongsideAsked?: boolean; whereAsked?: boolean }> = {},
 ): string {
-  const inputs = { v: 1, title: behavior.title.trim(), description: behavior.description?.trim() ?? "", where: behavior.whereKind ?? null };
+  const inputs = { v: 2, title: behavior.title.trim(), description: behavior.description?.trim() ?? "" };
   const asked = options.alongsideAsked === false ? { ...inputs, alongside: "not_asked" } : inputs;
   return createHash("sha256").update(JSON.stringify(options.whereAsked === true ? { ...asked, whereGuess: "asked" } : asked)).digest("hex");
+}
+
+type CachedEstimateHash = Readonly<{ input_hash: string }>;
+type EstimateBehavior = Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind" | "alongside">;
+
+/**
+ * The one validity rule for a cached estimate row. "guess": the row is current and its
+ * `alongside` is a model guess; "length_only": current, made while the person's answer
+ * was set, so only its length (and Where guess) are read; undefined: stale.
+ * Flag off: recipe 1.2 rows only. Flag on: recipe 1.3 rows only (Ticket 359).
+ */
+function estimateValidity(cached: CachedEstimateHash, behavior: EstimateBehavior, personSetting: boolean): "guess" | "length_only" | undefined {
+  if (!personSetting) return cached.input_hash === behaviorEstimateInputHash(behavior) ? "guess" : undefined;
+  if (cached.input_hash === behaviorEstimateInputHash(behavior, { whereAsked: true })) return "guess";
+  if (!alongsideGuessWanted(behavior.alongside)
+    && cached.input_hash === behaviorEstimateInputHash(behavior, { alongsideAsked: false, whereAsked: true })) return "length_only";
+  return undefined;
 }
 
 /**
@@ -89,21 +112,30 @@ export function behaviorEstimateInputHash(
  */
 export function currentEstimate(
   cached: Readonly<{ input_hash: string; duration_minutes: number | null; alongside: boolean; where_guess?: string | null }> | undefined,
-  behavior: Pick<BriefMoveBehaviorFacts, "title" | "description" | "whereKind" | "alongside">,
+  behavior: EstimateBehavior,
   personSetting: boolean,
 ): Readonly<{ minutes: number | null; alongside: boolean | null; whereGuess: string | null }> | undefined {
   if (!cached) return undefined;
-  // Flag off: recipe 1.2 rows only, and no Where guess is read.
-  if (!personSetting) return cached.input_hash === behaviorEstimateInputHash(behavior) ? { minutes: cached.duration_minutes, alongside: cached.alongside, whereGuess: null } : undefined;
-  // Flag on: recipe 1.3 rows only (Ticket 359), so every current row carries its Where guess.
-  // A Behavior whose Where the person set was not given one.
-  const whereGuess = behavior.whereKind ? null : cached.where_guess ?? null;
-  if (cached.input_hash === behaviorEstimateInputHash(behavior, { whereAsked: true })) return { minutes: cached.duration_minutes, alongside: cached.alongside, whereGuess };
-  if (!alongsideGuessWanted(behavior.alongside)
-    && cached.input_hash === behaviorEstimateInputHash(behavior, { alongsideAsked: false, whereAsked: true })) {
-    return { minutes: cached.duration_minutes, alongside: null, whereGuess };
-  }
-  return undefined;
+  const validity = estimateValidity(cached, behavior, personSetting);
+  if (!validity) return undefined;
+  // Flag off reads no Where guess. While the person's Where is set, the guess is not read;
+  // it was made from the title and description alone, so clearing Where reads it again.
+  const whereGuess = !personSetting || behavior.whereKind ? null : cached.where_guess ?? null;
+  return { minutes: cached.duration_minutes, alongside: validity === "guess" ? cached.alongside : null, whereGuess };
+}
+
+/**
+ * Audit fix 1: the cached length alone, by the same validity rule as `currentEstimate`.
+ * The Timeline and travel refresh read lengths through it, so they never see a guess or a
+ * Where: the result is a number of minutes or undefined (stale, missing or no length).
+ */
+export function currentEstimateMinutes(
+  cached: Readonly<{ input_hash: string; duration_minutes: number | null }> | undefined,
+  behavior: EstimateBehavior,
+  personSetting: boolean,
+): number | undefined {
+  if (!cached || cached.duration_minutes == null) return undefined;
+  return estimateValidity(cached, behavior, personSetting) ? cached.duration_minutes : undefined;
 }
 
 export async function readBriefMoveDay(

@@ -630,15 +630,19 @@ Hosted web, behind `CADENCE_ALONGSIDE`; the Mac follows in Ticket 363.
 2. **Use the guess.** While it is Not answered and Cadence has a guess, the form says
    so. Use the guess fills the field; Save behavior stores it. Until then planning uses
    the guess.
-3. **Guessed Where.** With Completion places on and Where Not set, the Where suggestion
-   line may state Cadence's guess of where the Behavior happens. Review Where fills
-   Where; Dismiss hides that guess and stores the existing dismissal. Planning keeps
-   using the guess.
+3. **Guessed Where.** With Where Not set, the Where suggestion line may state Cadence's
+   guess of where the Behavior happens, whether or not Completion places is on
+   (Ticket 383; Cadence for Mac only while it is on). Review Where fills Where; Dismiss
+   hides that guess and stores the existing dismissal. Planning keeps using the guess.
+   Turning Completion places off deletes every dismissal, so a dismissed guess can
+   return then.
 4. **Timeline.** An alongside row shows "Alongside", or "Alongside · a guess". It stops
    warning about Calendar overlaps; travel overlaps still show.
 5. **Cadence asks (Ticket 360).** While a Behavior is Not answered and Cadence guesses
    yes, Cadence may ask once on a surface the person is already using. One answer
-   anywhere stores the setting and closes the question everywhere:
+   anywhere stores the setting and closes the question everywhere. A question still on
+   screen after an answer elsewhere does not change it; it says "Already answered" and
+   points to the Behavior form:
    - Timeline: right after marking the item Completed (when no "Done at" line shows),
      "Done alongside other things? Yes · No".
    - Daily Brief: one line, "Can Red light helmet be done alongside other things?
@@ -1109,7 +1113,8 @@ setup (Ticket 212) links to the same Home and usual travel controls at
 4. After six labels in 60 days, a Behavior may show a Where suggestion. Review Where
    fills the form; the user saves to apply it. Dismiss hides it until six more labels.
 5. Settings deletes labels or markers on request; Turn off deletes both and every
-   dismissal. A shorter retention asks first and deletes older labels.
+   dismissal. A shorter retention asks first and deletes older labels. While labels are
+   off, only a guessed Where can be dismissed (Ticket 383).
 
 ### Leave-time question (Tickets 217 and 274)
 

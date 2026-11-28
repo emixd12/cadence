@@ -4,7 +4,7 @@ import { markLocalOccurrence, markLocalParentSlot, recordLocalDoneAt, recordLoca
 import type { MarkDetailState, OccurrenceMarkDetailActions } from "@/components/timeline/OccurrenceMarkDetails";
 import { Temporal } from "@js-temporal/polyfill";
 import {
-  applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive, updateBehavior,
+  answerBehaviorAlongsideQuestion, applyBehaviorRunAction, createBehavior, createBehaviorGroup, reorderSubBehaviors, setBehaviorActive, updateBehavior,
   updateBehaviorArchiveNote,
 } from "@cadence/core/services/behavior.service";
 import { noticeText } from "@cadence/core/notices";
@@ -27,7 +27,12 @@ import {
 } from "../../../lib/services/opportunity-placement";
 import { addLocalOpportunity, removeLocalOpportunity } from "./local-opportunity.service";
 
-export function createLocalOccurrenceActions(profileId: string, refresh: () => void) {
+/**
+ * `options.alongside` (Ticket 363): the Timeline row's "Done alongside other things?
+ * Yes · No" writes the Behavior's answer through the local store, one configuration
+ * revision, synced like any other edit. Without it no row asks.
+ */
+export function createLocalOccurrenceActions(profileId: string, refresh: () => void, options: Readonly<{ alongside?: boolean }> = {}) {
   const statusAction: OccurrenceFormAction = async (_previous, form) => {
     try {
       const nextStatus = parseOccurrenceStatus(form.get("status"));
@@ -104,6 +109,16 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
   const markDetailActions: OccurrenceMarkDetailActions = {
     doneAt: (input) => detail(() => recordLocalDoneAt(profileId, input)),
     notDoneReason: (input) => detail(() => recordLocalNotDoneReason(profileId, input)),
+    ...(options.alongside ? { alongside: async (input: Readonly<{ occurrenceId: string; behaviorId: string; alongside: boolean }>): Promise<MarkDetailState> => {
+      let outcome: string | undefined;
+      const state = await detail(async () => {
+        const now = Temporal.Now.instant();
+        const answer = await answerBehaviorAlongsideQuestion(createLocalBehaviorStore(profileId, now), { behaviorId: input.behaviorId, alongside: input.alongside, recordedAt: now.toString() });
+        // Audit fix 7: answered elsewhere (a sync, another surface) since the row asked.
+        if (answer.alreadyAnswered) outcome = noticeText("alongside.answer-already", { answer: answer.alongside ? "yes" : "no" });
+      });
+      return state.status === "saved" && outcome ? { status: "saved", outcome } : state;
+    } } : {}),
   };
   // Behaviors of Opportunity: the basket's add and Done now, and a row's Remove, on the
   // local store. A success refreshes the Timeline so the added or removed row shows.
@@ -140,7 +155,9 @@ export function localErrorMessage(error: unknown): string {
   return "Unable to save the local change. Try again.";
 }
 
-export function createLocalBehaviorActions(profile: Profile, refresh: () => void) {
+/** `options.alongside` (Ticket 363): read the Behavior form's alongside field when it is shown. */
+export function createLocalBehaviorActions(profile: Profile, refresh: () => void, options: Readonly<{ alongside?: boolean }> = {}) {
+  const readAlongside = options.alongside === true;
   const createAction: BehaviorFormAction = async (_previous, form) => {
     try {
       const now = Temporal.Now.instant();
@@ -156,7 +173,7 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
           behavior: withNativeReminderSummary(toBehaviorView(created.parent, now)) };
       }
       const categories = await localCommand("readCategories", { profileId: profile.id });
-      const values = parseBehaviorFormData(form, { mode: "create", categories });
+      const values = parseBehaviorFormData(form, { mode: "create", categories, readAlongside });
       const behavior = await createBehavior(store, {
         userId: profile.id, timezone: profile.timezone, values, recordedAt: now.toString(), newId,
       });
@@ -168,7 +185,7 @@ export function createLocalBehaviorActions(profile: Profile, refresh: () => void
     try {
       const now = Temporal.Now.instant();
       const categories = await localCommand("readCategories", { profileId: profile.id });
-      const values = parseBehaviorFormData(form, { mode: "update", categories });
+      const values = parseBehaviorFormData(form, { mode: "update", categories, readAlongside });
       const expected = form.get("expected_updated_at");
       if (typeof expected !== "string" || !expected) throw new Error("Reload this behavior before saving changes.");
       await updateBehavior(createLocalBehaviorStore(profile.id, now), {

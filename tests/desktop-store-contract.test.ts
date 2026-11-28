@@ -549,4 +549,28 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
     expect(after.markers).toEqual([]);
     expect(after.dismissals).toEqual([]);
   }, 20_000);
+  it("shows and dismisses a linked Mac's guessed Where while Completion places is off (Ticket 383)", async () => {
+    const profile = await localCommand("readProfile", {});
+    const created = await createBehavior(createLocalBehaviorStore(profile.id, NOW), {
+      userId: profile.id, timezone: profile.timezone, recordedAt: NOW.toString(), values: VALUES,
+    });
+    const changed = vi.fn();
+    const linked = createLocalPlaceLabelClient(changed, () => new Map([[created.id, "home"]]));
+    let state = await linked.load();
+    expect(state.settings.enabled).toBe(false);
+    expect(state.behaviors.find(({ behaviorId }) => behaviorId === created.id)?.suggestion).toMatchObject({ basis: "guess", key: "home" });
+    // Only the guess the line shows can be dismissed while labels are off.
+    await expect(linked.dismissSuggestion({ behaviorId: created.id, suggestion: "anywhere", ruleVersion: "where-suggestion-rules@1" })).rejects.toThrow(/off/i);
+    state = await linked.dismissSuggestion({ behaviorId: created.id, suggestion: "home", ruleVersion: "where-suggestion-rules@1" });
+    expect(state.behaviors.find(({ behaviorId }) => behaviorId === created.id)?.suggestion).toBeNull();
+    expect(changed).toHaveBeenCalledTimes(1);
+    // The row validates as the planner requires, so account sync carries it.
+    const entities = portabilityEntities(await localCommand("readImportSnapshot", { profileId: profile.id }));
+    expect(entities.filter(({ kind }) => kind === "where_suggestion_dismissal")).toMatchObject([{ id: created.id, value: { suggestion: "home" } }]);
+    expect(accountSyncFingerprint({ entities })).toMatch(/^[a-f0-9]{64}$/);
+    // Local mode has no guesses: nothing shows and nothing can be dismissed while off.
+    const local = createLocalPlaceLabelClient();
+    expect((await local.load()).behaviors.every(({ suggestion }) => suggestion === null)).toBe(true);
+    await expect(local.dismissSuggestion({ behaviorId: created.id, suggestion: "home", ruleVersion: "where-suggestion-rules@1" })).rejects.toThrow(/off/i);
+  }, 20_000);
 });

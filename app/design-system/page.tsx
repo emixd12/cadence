@@ -459,9 +459,9 @@ export default async function DesignSystemPage({
 
   if (selectedPreviewId === "advisor") {
     // Advisor plan 4E: the built advisor (placement K) on the real Timeline with synthetic data.
-    // ?state=tip|brief|proposal|checkin|trial|refused|none
+    // ?state=tip|brief|proposal|pairing|tipquestion|tiplink|checkin|trial|refused|none
     const stateParam = firstSearchParam(params?.state);
-    const states: readonly AdvisorBenchState[] = ["tip", "brief", "proposal", "tipquestion", "tiplink", "checkin", "trial", "refused", "none"];
+    const states: readonly AdvisorBenchState[] = ["tip", "brief", "proposal", "pairing", "tipquestion", "tiplink", "checkin", "trial", "refused", "none"];
     const state: AdvisorBenchState = states.find((item) => item === stateParam) ?? "tip";
     return <AdvisorBench key={state} state={state} statusAction={benchOccurrenceAction} timeAction={benchTimeTrackingAction} />;
   }

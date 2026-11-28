@@ -6,9 +6,14 @@ import {
   alongsideQuestionOpen,
   pickBriefAlongsideQuestion,
   alongsideRowView,
+  alongsideMayOverlap,
+  calendarEventPlace,
+  parseCalendarEventPlace,
+  planningPlaceCatalog,
   resolveAlongside,
   resolveRoutineBlockAlongside,
 } from "@cadence/core/resolvers/alongside.resolver";
+import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import * as compatibility from "@/lib/resolvers/alongside.resolver";
 import { collapseBriefMoveRoutines, type BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
 
@@ -181,5 +186,61 @@ describe("pickBriefAlongsideQuestion", () => {
     const at = "2026-11-25T14:00:00Z";
     expect(pickBriefAlongsideQuestion({ items: [item("b", at, true, "Pill"), item("a", at, true, "Helmet")] })?.behaviorId).toBe("a");
     expect(pickBriefAlongsideQuestion({ items: [item("b", at, true, "Pill"), item("a", at, true, "Pill")] })?.behaviorId).toBe("a");
+  });
+});
+
+// Audit fix 11 (D33): a pairing that rests on a guess is labelled as one.
+describe("alongside pairing guesses", () => {
+  it("names the guessed inputs and nothing when none is a guess", async () => {
+    const { alongsidePairingGuesses, alongsidePairingGuessNote } = await import("@cadence/core/resolvers/alongside.resolver");
+    expect(alongsidePairingGuesses({ alongsideSource: "person", where: { source: "person" } }, { where: { source: "evidence" } })).toBeNull();
+    expect(alongsidePairingGuesses({ alongsideSource: "guess", where: { source: "person" } }, { where: { source: "guess" } }))
+      .toEqual({ alongside: true, guestWhere: false, hostWhere: true });
+    expect(alongsidePairingGuessNote(null)).toBeNull();
+    expect(alongsidePairingGuessNote({ alongside: true, guestWhere: false, hostWhere: false })).toBe("alongside");
+    expect(alongsidePairingGuessNote({ alongside: false, guestWhere: false, hostWhere: true })).toBe("where");
+    expect(alongsidePairingGuessNote({ alongside: true, guestWhere: true, hostWhere: false })).toBe("both");
+  });
+});
+
+// Ticket 384 (D37): a calendar event's coarse place, from its location text and the place-key rule.
+describe("calendar event places", () => {
+  const catalog = planningPlaceCatalog({ homeText: "12 Elm Street", placeTexts: ["Acme Office, 5th floor", null, "  ", "12 elm street", "Acme Office, 5th Floor"] });
+
+  it("keys Home and the saved places, dropping blanks, duplicates and a saved place equal to Home", () => {
+    expect(catalog).toEqual({ homePlaceKey: travelPlaceKey("12 Elm Street"), placeKeys: [travelPlaceKey("Acme Office, 5th floor")] });
+    expect(planningPlaceCatalog({ homeText: null, placeTexts: [] })).toEqual({ homePlaceKey: null, placeKeys: [] });
+  });
+
+  it("labels Home, a saved place, or nothing", () => {
+    expect(calendarEventPlace("  12 ELM   street ", catalog)).toEqual({ kind: "home" });
+    expect(calendarEventPlace("acme office, 5th floor", catalog)).toEqual({ kind: "place", placeKey: travelPlaceKey("Acme Office, 5th floor") });
+    // Another text for the same building is a different key: unknown, so behavior is unchanged.
+    expect(calendarEventPlace("Acme Office", catalog)).toBeNull();
+    expect(calendarEventPlace("https://meet.example/abc", catalog)).toBeNull();
+    expect(calendarEventPlace("", catalog)).toBeNull();
+    expect(calendarEventPlace(null, catalog)).toBeNull();
+    expect(calendarEventPlace("12 Elm Street", null)).toBeNull();
+    expect(calendarEventPlace("12 Elm Street", { homePlaceKey: null, placeKeys: [] })).toBeNull();
+  });
+
+  it("reads a request's place strictly", () => {
+    const key = "a".repeat(43);
+    expect(parseCalendarEventPlace({ kind: "home" })).toEqual({ kind: "home" });
+    expect(parseCalendarEventPlace({ kind: "place", placeKey: key })).toEqual({ kind: "place", placeKey: key });
+    for (const bad of [null, undefined, "home", [], { kind: "home", placeKey: key }, { kind: "place" }, { kind: "place", placeKey: "short" },
+      { kind: "place", placeKey: key, text: "Office" }, { kind: "elsewhere" }, { kind: "unknown" }]) {
+      expect(parseCalendarEventPlace(bad)).toBeNull();
+    }
+  });
+
+  it("lets the same-place rule refuse an alongside item during an event somewhere else", () => {
+    const office = { kind: "place" as const, placeKey: "o".repeat(43) };
+    expect(alongsideMayOverlap({ where: { kind: "home" } }, { kind: "calendar", where: office })).toBe(false);
+    expect(alongsideMayOverlap({ where: { kind: "elsewhere" } }, { kind: "calendar", where: { kind: "home" } })).toBe(false);
+    expect(alongsideMayOverlap({ where: { kind: "home" } }, { kind: "calendar", where: { kind: "home" } })).toBe(true);
+    expect(alongsideMayOverlap({ where: office }, { kind: "calendar", where: office })).toBe(true);
+    expect(alongsideMayOverlap({ where: { kind: "home" } }, { kind: "calendar" })).toBe(true);
+    expect(alongsideMayOverlap({ where: { kind: "anywhere" } }, { kind: "calendar", where: office })).toBe(true);
   });
 });

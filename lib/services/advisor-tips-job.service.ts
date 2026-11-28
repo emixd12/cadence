@@ -30,7 +30,15 @@ import { createCoachSignalReads } from "@/lib/db/coach-signals.repo";
 import { listPeriodsOrNone } from "@/lib/db/periods.repo";
 import { resolveTipPeriods, tipPeriodRange, type TipPeriod } from "@cadence/core/resolvers/period.resolver";
 import { createAgentClient } from "@/lib/integrations/agent-caller";
-import { proposeBehaviorChangesForVisit, proposeTipOffers, type CoachVisitOccurrence, type TipOffer, type TipOfferOutcome } from "./behavior-change-proposals.service";
+import {
+  proposeBehaviorChangesForVisit,
+  proposeSchedulePairingsForVisit,
+  proposeTipOffers,
+  type CoachVisitOccurrence,
+  type TipOffer,
+  type TipOfferOutcome,
+} from "./behavior-change-proposals.service";
+import { alongsideEnabled } from "./alongside-flag";
 import { agentModelSetting, generateStructured, type AgentModelSetting, type AgentModelUsage } from "./agent-model";
 import { estimateCallMicrodollars, modelPrice, usageMicrodollars } from "./agent-model-pricing";
 import { readAdvisorTipsSettings, type AdvisorTipsSettings } from "./advisor-tips-settings";
@@ -363,6 +371,7 @@ function linkBehaviorFor(target: AdviceOfferLinkTarget, setup: TipSetup): string
   const active = setup.behaviors.filter((behavior) => behavior.active);
   if (target === "length") return active.find((behavior) => behavior.hasLength === false)?.id ?? null;
   if (target === "where") return active.find((behavior) => behavior.hasPlace === false)?.id ?? null;
+  if (target === "alongside") return active.find((behavior) => behavior.alongsideQuestionOpen === true)?.id ?? null;
   return null;
 }
 
@@ -461,12 +470,23 @@ const PROPOSAL_LOOKBACK_DAYS = 35;
  * five weeks of planned items and moves and store at most one proposal. Card-backed
  * candidates are not passed: today's Time-of-day gap and Never done signals name no
  * Behavior and no new time, so only repeated same-weekday moves can propose a change.
+ *
+ * Ticket 362: with `CADENCE_ALONGSIDE` on, the same run then looks for one pairing
+ * proposal (an alongside Behavior at its host's set time). With it off, nothing more is
+ * read or stored. A failed repeated-move step does not stop the pairing step.
  */
-export function hostedScheduleProposalHook(client: AppSupabaseClient, userId: string): NonNullable<TipVisitOptions["afterTips"]> {
+export function hostedScheduleProposalHook(client: AppSupabaseClient, userId: string,
+  env: Readonly<Record<string, string | undefined>> = process.env): NonNullable<TipVisitOptions["afterTips"]> {
   const reads = createCoachSignalReads(client, userId);
   return async ({ runId, localDate }) => {
-    const { occurrences, moves } = await readProposalInputs(reads, localDate);
-    await proposeBehaviorChangesForVisit(client, { userId, runId, today: localDate, occurrences, moves });
+    const moved = (async () => {
+      const { occurrences, moves } = await readProposalInputs(reads, localDate);
+      await proposeBehaviorChangesForVisit(client, { userId, runId, today: localDate, occurrences, moves });
+    })();
+    if (!alongsideEnabled(env)) return await moved;
+    const first = await moved.then(() => null, (error: unknown) => error);
+    await proposeSchedulePairingsForVisit(client, { userId, runId, today: localDate, env });
+    if (first) throw first;
   };
 }
 

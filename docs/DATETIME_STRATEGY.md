@@ -231,7 +231,8 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   completion is a Completed Occurrence before today with its sessions added together,
   as on the Timeline. The stored source name `logged_average` is unchanged; the figure
   is a median. The estimate is stored per Behavior
-  and asked again only when its title, description or kind of place changes. A Yes applies
+  and asked again only when its title or description changes (Ticket 386: Where is not
+  sent to the model, so it is not part of the estimate's input hash). A Yes applies
   the length the line showed. A correction from the person becomes the Behavior's
   default length.
 - **Gaps.** Items and calendar events keep 10 minutes on each side. An exact-time
@@ -245,23 +246,60 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   Anywhere. It may not share time with travel or with an item somewhere else; there it
   blocks like any other item, with the 10-minute gaps. Each item's place is its effective
   Where (`effective-where.resolver.ts`): the person's Where, else counted completion place
-  labels, else the cached model guess, else unknown. Calendar events carry no place on
-  the free-slot inputs, so their place is unknown. The brief's move lines never move an
+  labels, else the cached model guess, else unknown. A calendar event's place is its
+  coarse event place (below), else unknown. The brief's move lines never move an
   alongside item; when one at another place collides with an item, that item moves. Only a
   pairing line (below) moves an alongside item. A
-  moved alongside item (the Timeline's "Move for today") is checked the same way, and
-  calendar events do not block it. With the flag off, an alongside item blocks nothing
+  moved alongside item (the Timeline's "Move for today") is checked the same way: a
+  calendar event blocks it only at another known place. With the flag off, an alongside item blocks nothing
   and a moved one is blocked like any other item, as before. The effective Where is for
   planning only: routes, departure lines and leave reminders read `where_kind` alone.
   Since Ticket 359 the same rule covers the Daily Brief consumer's overlap and tight-fit
   findings with places from the day context's `planning` field, where the person's
   alongside answer outranks the run's own estimate, and an exact-time opportunity add
   (Chat and MCP), which checks the added Behavior's own side. Chat's moves already used it.
+- **Schedule-edit conflicts.** With `CADENCE_ALONGSIDE` on, `move_conflicts` follow the
+  same rule from the moved item's side (`briefMoveConflicts`): a guest paired onto its
+  host opens nothing, and an alongside item at another place collides. With the flag
+  off, an alongside item never collides, as before.
+- **Routine blocks.** A routine slot of two or more steps is one item from the lead's
+  start, lasting the sum of its steps' lengths, done one after another. Alongside steps
+  run during the other steps and add nothing. When every step is alongside, the block
+  lasts the sum of all its steps, so travel or an item elsewhere is refused while the
+  routine runs. The block's place is the one concrete place its steps share; Anywhere
+  steps defer to it, and steps at two different places leave it unknown.
 - **Calendar and travel on each request.** The device sends today's busy calendar
   events with each brief and answer request (at most 200). Travel times come as a
   signed token from the device's last travel check; the server verifies it, uses it
   for that request and stores nothing. Calendar events and travel are fixed: the
-  brief moves Cadence items around them, never the reverse.
+  brief moves Cadence items around them, never the reverse. Since the Calendar MCP
+  migration the brief and its HTTP answers ignore device-sent busy times and read
+  them on the server (`readServerBriefCalendarBusy`, or the day context's own read).
+- **Coarse event places (Ticket 384, D37).** With `CADENCE_ALONGSIDE` on, each busy
+  event that reaches the free-slot rule carries one coarse place for the same-place
+  rule: Home, a saved place's one-way key, or nothing (unknown).
+  `calendarEventPlace` (`alongside.resolver.ts`) keys the event's location text with
+  `travelPlaceKey` and compares it with the key of Home's text and the keys of the
+  place-Where Behaviors' texts (`planningPlaceCatalog`). Two texts name the same place
+  only when they normalize the same; there is no geocoding and no new provider call or
+  Calendar read. An event whose location matches neither is unknown, so the rule
+  allows the overlap as before. The label is computed where the location text already
+  is, lives for that request only, and is never stored, logged or sent to a model
+  (`tests/calendar-event-place.boundary.test.ts`):
+
+  | Path | Events from | Location text there | Label |
+  |---|---|---|---|
+  | Daily Brief lines (and their pairing lines) | The day context's own Calendar reads | Google Calendar (MCP) read: yes, kept in an in-memory sidecar by event ref, never in the context. Outlook and iCloud reads ask for no location | Google events; Outlook and iCloud unknown |
+  | Yes, Accept all, Other time, Re-plan, Re-check | `readServerBriefCalendarBusy` | Google (MCP): yes. Outlook and iCloud: not asked for (the Daily Brief never reads their locations) | Google events; Outlook and iCloud unknown |
+  | Timeline "Move for today" (web) | The device's Timeline events | Yes, on the device | Computed on the device from the view's `planningPlaces`; the request carries only `eventPlace` |
+  | Chat moves, exact-time adds and `plan_alongside_pairings` | Chat's own Calendar reads | Yes (Google MCP; Outlook and iCloud with location, as Chat already reads them) | All sources; never in a tool result |
+  | Timeline overlap cue (web and Mac) | The screen's events | Yes, on the device | Computed on the device; a refused overlap shows the cue again |
+  | Daily Brief consumer findings, brief opportunity lines | The day context | Not read there | Unknown, unchanged: the consumer builds model input, and opportunity lines apply no same-place rule |
+
+  The Timeline view carries `planningPlaces` (Home's and the saved places' keys, never
+  text) only while the flag is on and a row is alongside; the device sends an
+  `eventPlace` only when the view carried them, and the Server Action reads it only while
+  the flag is on. Calendar events stay out of pairing hosts (D33).
 - **Route lookups.** Planning makes no route lookups of its own. After a Yes the
   moved item changes the Timeline, so the normal travel route refresh on web and
   Mac runs, about two legs per moved item that has a place. That refresh recomputes
@@ -306,7 +344,8 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
     `crowded_hour` threshold, alongside items not counted) or the coach's stored
     `crowded_hour` signal names that hour; the guest runs into travel or an item somewhere
     else; or the coach's `done_together` signal names the guest with one of today's hosts.
-    A guest already inside a compatible host's time is left alone.
+    A guest already inside a compatible host's time is left alone, including a host already
+    in progress.
   - The host the `done_together` signal names comes first, then the nearest host. At most
     one pairing per guest and per host. The new time is the host's start for the guest's
     length, and it passes the same slot check Yes runs on the guest's side of the
@@ -329,6 +368,34 @@ The Daily Brief proposes moves as lines and applies one when the person answers 
   - The coach's signals are read through the coach agent's read-only channel
     (`coach_read_signals`), today's or else yesterday's, ids and hours only. Without them
     only a crowded hour or a conflict makes a pairing help.
+- **Pairing the schedule (Ticket 362, D33).** With `CADENCE_ALONGSIDE` on, the coach's
+  nightly tip run may store one base schedule proposal (Try for two weeks · Change for
+  good · No) that moves an alongside Behavior's set time to its host's. The rule is
+  `packages/core/src/resolvers/alongside-schedule-pairing.resolver.ts`; local dates only,
+  no instants, no clock.
+  - Evidence: today's stored `done_together` signal names the pair (either direction), or
+    the person said Yes to the same guest-and-host pairing line in the Daily Brief on at
+    least 4 different local dates in the 28 dates ending today (`move_proposals` rows with
+    source `daily_brief`, reason `alongside_pairing`, status `accepted`, host from
+    `line.pairing.hostBehaviorId`; Other time and undone lines do not count).
+  - Guest effectively alongside, host not; both effective Wheres known or guessed and
+    compatible under `alongsideMayOverlap`; the guest no longer than the host when both
+    lengths are set. Never for a step that follows its routine's schedule (either side),
+    an Opportunity Behavior without a schedule (either side) or a guest marked "Don't
+    suggest moving this".
+  - "The days both are scheduled": both schedule lists must be daily every day or weekly
+    every week, whose days are fixed weekdays. The shared days are the weekdays on which
+    both have a time. On each shared day the guest has one set time and the host one set
+    time, the same pair on every shared day. The guest's time moves to the host's on those
+    weekdays only; a schedule that also covers other days is split
+    (`buildChangedSchedules`), and those days keep their time. Every N days, every N
+    weeks and monthly schedules, ranges, two times on one day and times that differ by
+    weekday are refused rather than guessed.
+  - The first affected date, the trial's check-in, the 30-day No cooldown by direction and
+    the seven-day expiry are the base proposal's own rules. When the proposal is shown and
+    again before a Yes applies it, the host must still be active with the new time on every
+    changed weekday; otherwise the proposal closes as `schedule_changed`. After the change,
+    nothing links the two Behaviors: a later edit of the host does not carry the guest.
 
 ### Brief opportunity lines
 

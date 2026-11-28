@@ -100,6 +100,13 @@ describe("estimate call, flag off", () => {
     expect(sha(calls[0]!.instructions)).toBe(RECIPE_1_2_INSTRUCTIONS_SHA256);
     expect(calls[0]!.instructions).toBe(`${DURATION_ESTIMATE_INSTRUCTIONS}\n${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}`);
     for (const row of stored(fake.rpcs)) expect(Object.keys(row).sort()).toEqual(["alongside", "behavior_id", "duration_minutes", "input_hash", "model"]);
+    // Ticket 386 (D37): flag off changes by design, but only in the stored `input_hash`.
+    // The request above (instructions, variant, facts) stays recipe 1.2 byte for byte.
+    // The hash now leaves Where out, so the gym (Where set) hashes as if it had none, and
+    // no row matches the pre-386 recipe 1.2 hash, which also carried `where`.
+    const gymRow = stored(fake.rpcs).find((row) => row.behavior_id === "gym")!;
+    expect(gymRow.input_hash).toBe(behaviorEstimateInputHash({ title: "Gym session", description: "Leg day" }));
+    expect(gymRow.input_hash).not.toBe(sha(JSON.stringify({ v: 1, title: "Gym session", description: "Leg day", where: "place" })));
   });
 
   it("keeps the adapter's recipe 1.2 and Ticket 188 schemas unchanged", async () => {
@@ -140,13 +147,16 @@ describe("estimate call, flag on (recipe 1.3)", () => {
     ] });
   });
 
-  it("stores the guess, and none for a Behavior whose Where the person set", async () => {
+  it("stores the guess, also for a Behavior whose Where the person set (Ticket 386)", async () => {
     vi.stubEnv("CADENCE_ALONGSIDE", "on");
     const fake = fakeClient({ behaviors: [helmet, pill, gym] });
     await ensureBehaviorEstimates(fake.client, { localDate: DAY }, answer("home"), undefined, { userId: "user" });
     const rows = stored(fake.rpcs);
-    expect(rows.map((row) => [row.behavior_id, row.where_guess])).toEqual([["helmet", "home"], ["gym", null], ["pill", "home"]]);
-    expect(rows.find((row) => row.behavior_id === "helmet")!.input_hash).toBe(behaviorEstimateInputHash({ title: "Red light helmet", description: null, whereKind: null }, { whereAsked: true }));
+    // The request is the same with or without Where, so the gym's guess is kept for the
+    // day the person clears Where; readers skip it while Where is set.
+    expect(rows.map((row) => [row.behavior_id, row.where_guess])).toEqual([["helmet", "home"], ["gym", "home"], ["pill", "home"]]);
+    expect(rows.find((row) => row.behavior_id === "helmet")!.input_hash).toBe(behaviorEstimateInputHash({ title: "Red light helmet", description: null }, { whereAsked: true }));
+    expect(rows.find((row) => row.behavior_id === "gym")!.input_hash).toBe(behaviorEstimateInputHash({ title: "Gym session", description: "Leg day" }, { whereAsked: true }));
   });
 
   it("drops a reply whose guess is not one of the four values", () => {
@@ -160,7 +170,7 @@ describe("estimate call, flag on (recipe 1.3)", () => {
 
 describe("readBehaviorPlanningFacts", () => {
   const hash = (row: BehaviorRow, options: Readonly<{ alongsideAsked?: boolean }> = {}) =>
-    behaviorEstimateInputHash({ title: row.title, description: row.description ?? null, whereKind: row.where_kind ?? null }, { ...options, whereAsked: true });
+    behaviorEstimateInputHash({ title: row.title, description: row.description ?? null }, { ...options, whereAsked: true });
 
   it("flag off: reads nothing", async () => {
     const fake = fakeClient({ behaviors: [helmet] });

@@ -11,7 +11,7 @@ vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: 
 vi.mock("@/lib/services/behavior-length.service", async () => ({ readBehaviorLengths: (await import("./helpers/no-tracked-history")).readBehaviorLengthsWithoutHistory }));
 
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
-import { behaviorEstimateInputHash, readBriefMoveDay } from "@/lib/services/brief-move-day.service";
+import { behaviorEstimateInputHash, currentEstimateMinutes, readBriefMoveDay } from "@/lib/services/brief-move-day.service";
 import { cacheBehaviorEstimates, ensureBehaviorEstimates } from "@/lib/services/brief-moves.service";
 
 const ON = { CADENCE_ALONGSIDE: "on" };
@@ -62,7 +62,8 @@ function fakeClient(tables: Readonly<{ behaviors: BehaviorRow[]; estimates: Esti
   return { client: client as unknown as AppSupabaseClient, selects, rpcs };
 }
 
-const facts = (title: string) => ({ title, description: null, whereKind: null });
+/** The hash inputs: title and description only (Ticket 386; Where is not sent to the model). */
+const facts = (title: string) => ({ title, description: null });
 /** Flag on, estimates come from recipe 1.3 (Ticket 359), whose hash marks the Where guess as asked. */
 const WHERE = { whereAsked: true } as const;
 
@@ -167,6 +168,60 @@ describe("readBriefMoveDay effective Where (Ticket 357)", () => {
       ["pill", { kind: "home", source: "evidence" }],
       ["reading", { kind: "unknown", source: "none" }],
     ]);
+  });
+});
+
+describe("Where leaves the estimate hash (Ticket 386, D37)", () => {
+  // One row made from "Reading" with no Where: a length, an alongside guess and a Where guess.
+  const cached: EstimateRow = { behavior_id: "reading", input_hash: behaviorEstimateInputHash(facts("Reading"), WHERE), duration_minutes: 30, alongside: true, where_guess: "anywhere" };
+  const read = async (behavior: BehaviorRow, estimates: EstimateRow[] = [cached]) => {
+    mocks.occurrences = [occurrence("reading")];
+    const fake = fakeClient({ behaviors: [behavior], estimates });
+    const day = await readBriefMoveDay(fake.client, "user", DAY, { env: ON });
+    const calls: string[][] = [];
+    await cacheBehaviorEstimates({ agent: fake.client, userId: "user", localDate: DAY, day, model: "test", env: ON,
+      estimate: async (behaviors) => { calls.push(behaviors.map((item) => item.id)); return []; } });
+    return { day, calls };
+  };
+
+  it("setting or changing Where keeps the cached length and alongside guess and asks nothing", async () => {
+    for (const whereKind of ["home", "anywhere"]) {
+      const { day, calls } = await read({ id: "reading", title: "Reading", alongside: null, where_kind: whereKind });
+      expect(day.staleEstimateBehaviorIds.size).toBe(0);
+      expect(calls).toEqual([]);
+      expect(day.items[0]).toMatchObject({ alongside: true, alongsideSource: "guess" });
+      // While the person's Where is set, the cached Where guess is not read.
+      expect(day.items[0]!.where).toEqual({ kind: whereKind, source: "person" });
+    }
+  });
+
+  it("clearing Where reads the cached Where guess again, with no model call", async () => {
+    const { day, calls } = await read({ id: "reading", title: "Reading", alongside: null, where_kind: null });
+    expect(calls).toEqual([]);
+    expect(day.items[0]!.where).toEqual({ kind: "anywhere", source: "guess" });
+  });
+
+  it("the cached length reads the same with Where set, changed or cleared", () => {
+    for (const whereKind of [null, "home", "place"]) {
+      expect(currentEstimateMinutes(cached, { title: "Reading", description: null, whereKind, alongside: null }, true)).toBe(30);
+    }
+  });
+
+  it("changing the title still makes the estimate stale and asks once", async () => {
+    const { day, calls } = await read({ id: "reading", title: "Reading a novel", alongside: null, where_kind: "home" });
+    expect([...day.staleEstimateBehaviorIds]).toEqual(["reading"]);
+    expect(calls).toEqual([["reading"]]);
+    expect(day.items[0]).toMatchObject({ alongside: false, alongsideSource: "default" });
+  });
+
+  it("flag off: a Where change keeps a recipe 1.2 row current too", async () => {
+    mocks.occurrences = [occurrence("reading")];
+    const row: EstimateRow = { behavior_id: "reading", input_hash: behaviorEstimateInputHash(facts("Reading")), duration_minutes: 30, alongside: true };
+    for (const whereKind of [null, "home"]) {
+      const day = await readBriefMoveDay(fakeClient({ behaviors: [{ id: "reading", title: "Reading", alongside: null, where_kind: whereKind }], estimates: [row] }).client, "user", DAY, { env: OFF });
+      expect(day.staleEstimateBehaviorIds.size).toBe(0);
+      expect(day.items[0]).toMatchObject({ alongside: true, alongsideSource: "guess" });
+    }
   });
 });
 

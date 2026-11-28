@@ -17,7 +17,8 @@ import { ActionLink, BriefOutcome, Dot } from "./BriefMoveLines";
  * rule of its own.
  */
 
-type QuestionUi = Readonly<{ pending?: boolean; answered?: boolean | null; refusal?: string | null }>;
+/** `already`: the Behavior held the other answer, made elsewhere; `answered` is that stored answer. */
+type QuestionUi = Readonly<{ pending?: boolean; answered?: boolean | null; already?: boolean; refusal?: string | null }>;
 
 /** Answers given in this page session, per brief, so a remount keeps the outcome. */
 const answeredByQuestion = new WeakMap<BriefAlongsideQuestionData, QuestionUi>();
@@ -30,8 +31,8 @@ export function BriefAlongsideQuestion({ question, client }: Readonly<{ question
   const answer = async (alongside: boolean) => {
     setUi({ pending: true, refusal: null });
     try {
-      await client.answer({ behaviorId: question.behaviorId, alongside });
-      setUi({ answered: alongside });
+      const response = await client.answer({ behaviorId: question.behaviorId, alongside });
+      setUi(response.alreadyAnswered ? { answered: response.alongside, already: true } : { answered: alongside });
       refresh();
     } catch (error) {
       setUi({ refusal: refusalText(error) });
@@ -43,7 +44,7 @@ export function BriefAlongsideQuestion({ question, client }: Readonly<{ question
   return (
     <div className="mt-3 border-t border-line pt-2 text-sm leading-6" data-brief-alongside-question={question.behaviorId}>
       <p className="break-words [overflow-wrap:anywhere]">{noticeText("alongside.brief-question", { title: question.title })}</p>
-      {answered ? <BriefOutcome>{noticeText("alongside.answer-saved", { answer: ui.answered ? "yes" : "no" })}</BriefOutcome> : <p data-brief-alongside-actions>
+      {answered ? <BriefOutcome>{noticeText(ui.already ? "alongside.answer-already" : "alongside.answer-saved", { answer: ui.answered ? "yes" : "no" })}</BriefOutcome> : <p data-brief-alongside-actions>
         <ActionLink label="Yes" strong disabled={pending} onClick={() => void answer(true)} />
         <Dot /><ActionLink label="No" disabled={pending} onClick={() => void answer(false)} />
       </p>}

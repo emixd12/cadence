@@ -27,6 +27,9 @@ import {
   resolveWhereGuessSuggestion,
   resolveWhereSuggestion,
   savedPlaceRef,
+  shownWhereGuessKey,
+  whereSuggestionDismissible,
+  WHERE_GUESS_DISMISSAL_KEYS,
   type PlaceLabelOccurrence,
 } from "@cadence/core/resolvers/place-label.resolver";
 import { normalizeTravelPlaceText } from "@cadence/core/services/travel-refresh-policy";
@@ -351,7 +354,64 @@ describe("resolveWhereGuessSuggestion", () => {
     expect(resolvePlaceLabelState(input).behaviors.map(({ suggestion }) => suggestion)).toEqual([null, null]);
     const guessed = resolvePlaceLabelState({ ...input, whereGuesses: new Map([["b1", "home"], ["b2", "home"]]) });
     expect(guessed.behaviors.map(({ suggestion }) => suggestion?.basis ?? null)).toEqual(["guess", null]);
-    const off = resolvePlaceLabelState({ ...input, settings: { ...settings, enabled: false }, whereGuesses: new Map([["b1", "home"]]) });
-    expect(off.behaviors[0]!.suggestion).toBeNull();
+  });
+});
+
+// Ticket 383 (D37): the guessed Where shows whether or not Completion places is on.
+describe("guessed Where without Completion places", () => {
+  const rules = CURRENT_WHERE_SUGGESTION_RULES;
+  const on: PlaceLabelSettings = { enabled: true, retention: "90_days", enabledAt: "2026-10-01T00:00:00Z", markerPromptDismissedAt: null, updatedAt: "2026-10-01T00:00:00Z" };
+  const off: PlaceLabelSettings = { ...on, enabled: false, enabledAt: null };
+  const behaviors = [
+    { id: "b1", active: true, whereKind: null, locationText: null },
+    { id: "b2", active: false, whereKind: null, locationText: null },
+    { id: "b3", active: true, whereKind: "home" as const, locationText: null },
+    { id: "b4", active: true, whereKind: null, locationText: null },
+  ];
+  const today = Temporal.PlainDate.from("2026-10-22");
+  const markers = [{ ref: "home" as PlaceRef, placeKey: travelPlaceKey("1 Home Lane"), recordedAt: "2026-10-01T00:00:00Z" }];
+  const labels = Array.from({ length: 6 }, (_, index) => ({ occurrenceId: `o${index}`, behaviorId: "b4", localDate: "2026-10-20", label: "home" as const, ruleVersion: "place-label-rules@1", recordedAt: "2026-10-20T12:00:00Z" }));
+  const guesses = new Map([["b1", "home"], ["b2", "home"], ["b3", "anywhere"], ["b4", "anywhere"]]);
+  const input = { homeText: "1 Home Lane", markers, labels, dismissals: [], behaviors, today };
+
+  it("shows only the guess while labels are off, and hides markers, prompts and counts", () => {
+    const state = resolvePlaceLabelState({ ...input, settings: off, whereGuesses: guesses });
+    expect(state.behaviors.map(({ suggestion }) => suggestion ? `${suggestion.basis}:${suggestion.key}` : null))
+      .toEqual(["guess:home", null, null, "guess:anywhere"]);
+    expect(state.behaviors.every(({ markerPrompt, suggestedPlaceText }) => markerPrompt === null && suggestedPlaceText === null)).toBe(true);
+    expect({ homeMarker: state.homeMarker, placeMarkers: state.placeMarkers, labelCount: state.labelCount })
+      .toEqual({ homeMarker: null, placeMarkers: [], labelCount: 0 });
+  });
+
+  it("shows the same guess while labels are on, where a counted suggestion still comes first", () => {
+    const state = resolvePlaceLabelState({ ...input, settings: on, whereGuesses: guesses });
+    expect(state.behaviors[0]!.suggestion).toMatchObject({ basis: "guess", key: "home" });
+    expect(state.behaviors[3]!.suggestion).toMatchObject({ kind: "home", supportingCount: 6 });
+    expect(state.behaviors[3]!.suggestion?.basis).toBeUndefined();
+    expect(state.labelCount).toBe(6);
+  });
+
+  it("shows nothing without guesses (CADENCE_ALONGSIDE off), as before", () => {
+    const state = resolvePlaceLabelState({ ...input, settings: off });
+    expect(state.behaviors.every(({ suggestion, markerPrompt }) => suggestion === null && markerPrompt === null)).toBe(true);
+  });
+
+  it("hides a dismissed guess while labels are off", () => {
+    const dismissals = [{ behaviorId: "b1", suggestion: "home" as const, ruleVersion: rules.version, dismissedAt: "2026-10-21T00:00:00Z" }];
+    const state = resolvePlaceLabelState({ ...input, settings: off, dismissals, whereGuesses: guesses });
+    expect(state.behaviors[0]!.suggestion).toBeNull();
+    expect(state.behaviors[3]!.suggestion?.key).toBe("anywhere");
+  });
+
+  it("lets a dismissal through while off only for the guess the line shows", () => {
+    expect(WHERE_GUESS_DISMISSAL_KEYS).toEqual(["home", "anywhere", "add_place"]);
+    const state = resolvePlaceLabelState({ ...input, settings: off, whereGuesses: guesses });
+    expect(shownWhereGuessKey(state, "b1")).toBe("home");
+    expect(shownWhereGuessKey(state, "b3")).toBeNull();
+    expect(whereSuggestionDismissible({ settingsEnabled: false, suggestion: "home", shownGuess: "home" })).toBe(true);
+    expect(whereSuggestionDismissible({ settingsEnabled: false, suggestion: "anywhere", shownGuess: "home" })).toBe(false);
+    expect(whereSuggestionDismissible({ settingsEnabled: false, suggestion: "home", shownGuess: null })).toBe(false);
+    expect(whereSuggestionDismissible({ settingsEnabled: false, suggestion: savedPlaceRef(travelPlaceKey("Gym")), shownGuess: savedPlaceRef(travelPlaceKey("Gym")) })).toBe(false);
+    expect(whereSuggestionDismissible({ settingsEnabled: true, suggestion: savedPlaceRef(travelPlaceKey("Gym")), shownGuess: null })).toBe(true);
   });
 });

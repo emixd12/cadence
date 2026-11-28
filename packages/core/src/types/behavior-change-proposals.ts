@@ -6,6 +6,7 @@
  */
 
 import type { AdvisorTipResearch } from "./advisor-tips";
+import type { AlongsidePairingGuesses } from "./brief-moves";
 
 export const SCHEDULE_PROPOSAL_ROUTE = "/api/advisor/coach/schedule-proposal";
 
@@ -22,6 +23,12 @@ export type ScheduleProposalTip = Readonly<{
   question: string;
   research: AdvisorTipResearch | null;
 }>;
+
+/**
+ * Ticket 362: the host of a pairing proposal. `guesses` (audit fix 11): which inputs are
+ * model guesses today; present only when one is.
+ */
+export type ScheduleProposalPairing = Readonly<{ hostBehaviorId: string; hostTitle: string; guesses?: AlongsidePairingGuesses }>;
 
 export type ScheduleProposalView =
   /** Nothing to show. */
@@ -47,6 +54,12 @@ export type ScheduleProposalView =
       changeKind?: "time" | "length";
       /** Present when the question came from a tip. */
       tip?: ScheduleProposalTip | null;
+      /**
+       * Ticket 362 (D33): present when the change puts an alongside Behavior at another
+       * Behavior's set time (its host). The line and reason already name both; a client
+       * may ignore this.
+       */
+      pairing?: ScheduleProposalPairing;
     }>
   /** A trial in progress, before its check-in day. Optional for the UI to show. */
   | Readonly<{ kind: "trial"; proposalId: string; behaviorId: string; line: string; checkInDate: string }>

@@ -144,6 +144,65 @@ describe("Where suggestion line with a guessed Where", () => {
   });
 });
 
+// Ticket 383 (D37): the guessed Where line no longer depends on Completion places.
+describe("Guessed Where line with Completion places off and on", () => {
+  const ON: PlaceLabelState = {
+    settings: { enabled: true, retention: "90_days", enabledAt: "2026-10-22T12:00:00Z", markerPromptDismissedAt: null, updatedAt: "2026-10-22T12:00:00Z" },
+    homePlaceKey: "home-key", homeMarker: null, placeMarkers: [], labelCount: 3, behaviors: [],
+  };
+  const OFF: PlaceLabelState = { ...ON, settings: { ...ON.settings, enabled: false, enabledAt: null }, labelCount: 0 };
+  const guess = { ruleVersion: "where-suggestion-rules@1", kind: "anywhere" as const, key: "anywhere" as const, placeKey: null, labelCount: 0, supportingCount: 0, basis: "guess" as const };
+  const withGuess = (state: PlaceLabelState): PlaceLabelState => ({ ...state, behaviors: [{ behaviorId: "behavior-1", suggestedPlaceText: null, markerPrompt: null, suggestion: guess }] });
+  const withoutGuess = (state: PlaceLabelState): PlaceLabelState => ({ ...state, behaviors: [{ behaviorId: "behavior-1", suggestedPlaceText: null, markerPrompt: null, suggestion: null }] });
+  // The stored state after a dismissal is what every later load returns.
+  const client = (state: PlaceLabelState, dismissed: PlaceLabelState): PlaceLabelClient => {
+    let current = state;
+    return {
+    load: vi.fn(async () => current), saveSettings: vi.fn(async () => current), recordMarker: vi.fn(async () => current),
+    removeMarkers: vi.fn(async () => current), deleteLabels: vi.fn(async () => current), dismissSuggestion: vi.fn(async () => (current = dismissed)),
+    capturePlan: vi.fn(async () => null), recordLabel: vi.fn(async () => undefined), locationAllowed: vi.fn(async () => false),
+    readLocation: vi.fn(async () => ({ state: "unavailable" as const })),
+    };
+  };
+
+  for (const [name, base] of [["off", OFF], ["on", ON]] as const) {
+    it(`shows the guess and dismisses it with Completion places ${name}`, async () => {
+      const fake = client(withGuess(base), withoutGuess(base));
+      await render(<PlaceLabelProvider client={fake}><BehaviorPlaceAssist behaviorId="behavior-1" placeText={null} onReview={vi.fn()} /></PlaceLabelProvider>);
+      const line = host.querySelector("[data-where-suggestion]")!;
+      expect(line.getAttribute("data-where-suggestion-basis")).toBe("guess");
+      expect(line.textContent).toContain("Cadence guesses");
+      await act(async () => button("Dismiss").click());
+      await act(async () => { await Promise.resolve(); });
+      expect(fake.dismissSuggestion).toHaveBeenCalledWith({ behaviorId: "behavior-1", suggestion: "anywhere", ruleVersion: "where-suggestion-rules@1" });
+      expect(host.querySelector("[data-where-suggestion]")).toBeNull();
+    });
+  }
+
+  it("renders nothing with Completion places off and no guess, as with the flag off", async () => {
+    await render(<PlaceLabelProvider client={client(withoutGuess(OFF), withoutGuess(OFF))}>
+      <BehaviorPlaceAssist behaviorId="behavior-1" placeText={null} onReview={vi.fn()} /></PlaceLabelProvider>);
+    expect(host.innerHTML).toBe("");
+  });
+
+  it("puts the guess below Where in the form while off, with no marker control", async () => {
+    await render(<PlaceLabelProvider client={client(withGuess(OFF), withoutGuess(OFF))}>
+      <BehaviorForm mode="create" action={async () => ({ status: "idle", message: "" })} categories={categories}
+        whereAssist={<BehaviorPlaceAssist behaviorId="behavior-1" placeText={null} onReview={vi.fn()} />} />
+    </PlaceLabelProvider>);
+    await act(async () => { await Promise.resolve(); });
+    const where = host.querySelector('select[name="where_kind"]')!;
+    const line = host.querySelector("[data-where-suggestion]")!;
+    expect(where.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await act(async () => {
+      (where as HTMLSelectElement).value = "home";
+      where.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(host.querySelector("[data-place-marker]")).toBeNull();
+    expect(host.querySelector("[data-marker-prompt]")).toBeNull();
+  });
+});
+
 describe("Timeline row alongside label and overlap cue", () => {
   const NOW = Temporal.Instant.from("2026-09-16T15:00:00Z");
   const freshness = resolveExternalEventFreshness({ availability: "complete", refreshedAt: "2026-09-16T14:00:00Z",

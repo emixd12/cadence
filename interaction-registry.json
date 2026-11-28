@@ -314,7 +314,9 @@
         "INT-BEHAVIOR-042",
         "INT-BEHAVIOR-043",
         "INT-BEHAVIOR-044",
-        "INT-BEHAVIOR-045"
+        "INT-BEHAVIOR-045",
+        "INT-BEHAVIOR-046",
+        "INT-BEHAVIOR-047"
       ]
     },
     {
@@ -412,7 +414,9 @@
         "INT-BRIEF-010",
         "INT-TIMELINE-025",
         "INT-TIMELINE-026",
-        "INT-TIMELINE-027"
+        "INT-TIMELINE-027",
+        "INT-TIMELINE-028",
+        "INT-BRIEF-011"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -18850,7 +18854,7 @@
           "control": "Review Where"
         }
       ],
-      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form.",
+      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1. Ticket 358: with CADENCE_ALONGSIDE on, also for a Behavior with Where Not set whose current model guess is Home, Anywhere or away from home; while Details and Settings is open the line sits below Where in the form. Ticket 383: the guessed line shows whether or not Completion places is on, on the web and on a linked Cadence for Mac whose server answers enabled (local mode has no guess).",
       "success_result": "Opens Details and Settings with Where filled in and a note to save; the Behavior changes only when the user saves.",
       "failure_result": "No change is stored.",
       "effects": [
@@ -18901,9 +18905,10 @@
             "tests/place-labels.dom.test.tsx",
             "tests/place-labels.service.test.ts",
             "tests/place-label.resolver.test.ts",
-            "tests/account-sync.resolver.test.ts"
+            "tests/account-sync.resolver.test.ts",
+            "tests/desktop-store-contract.test.ts"
           ],
-          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+          "reason": "Shared Behavior list. A linked Mac shows the hosted guess with Completion places off (Ticket 383); local mode has none. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -18945,8 +18950,8 @@
           "control": "Dismiss"
         }
       ],
-      "availability": "On an active Behavior with a suggestion.",
-      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies. Ticket 358: dismissing a guessed Where stores the same dismissal and hides that guess; planning keeps using the guess.",
+      "availability": "On an active Behavior with a suggestion. Ticket 383: a guessed Where can be dismissed while Completion places is off (CADENCE_ALONGSIDE on, and on a linked Cadence for Mac with VITE_CADENCE_ALONGSIDE on and the server answering enabled); then only the guess the line shows is accepted, and the hosted trigger and SQLite migration 0030 admit only the keys home, anywhere and add_place. Account sync contract 11 carries the row; the server hides it from Mac builds on contracts 8 to 10.",
+      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies. Ticket 358: dismissing a guessed Where stores the same dismissal and hides that guess; planning keeps using the guess. Turning Completion places off still deletes every dismissal.",
       "failure_result": "Keeps the suggestion visible.",
       "effects": [
         "database_write",
@@ -18955,7 +18960,8 @@
       "risk": "low",
       "confirmation": "none",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+        "lib/services/place-labels.service.ts"
       ],
       "test_coverage": {
         "level": "direct",
@@ -18965,7 +18971,7 @@
           "tests/place-label.resolver.test.ts",
           "tests/alongside-ui.dom.test.tsx"
         ],
-        "notes": "DOM, resolver and service tests cover the dismissal and its return rule."
+        "notes": "DOM, resolver and service tests cover the dismissal and its return rule, with Completion places off and on (Ticket 383). The psql smoke tests/sql/ticket-383-where-guess-dismissal-smoke.sql covers the relaxed trigger. Account sync: tests/account-sync.resolver.test.ts (\"Ticket 383 guess dismissals while labels are off\"), native tests for migration 0030, and tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql for the contract-11 projection."
       },
       "platforms": {
         "web": {
@@ -18993,9 +18999,10 @@
             "tests/place-labels.dom.test.tsx",
             "tests/place-labels.service.test.ts",
             "tests/place-label.resolver.test.ts",
-            "tests/account-sync.resolver.test.ts"
+            "tests/account-sync.resolver.test.ts",
+            "tests/desktop-store-contract.test.ts"
           ],
-          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+          "reason": "Shared Behavior list. A linked Mac dismisses the shown guess while Completion places is off; SQLite migration 0030 admits it and account sync contract 11 carries it (Ticket 383). Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -19694,8 +19701,8 @@
           "control": "Yes or No after \"Done alongside other things?\" next to the name of a just-completed row"
         }
       ],
-      "availability": "Web Timeline with CADENCE_ALONGSIDE on, right after marking an item Completed when no Done at line shows, while the Behavior's alongside question is open (not answered, guessed yes), on the share of marks set in MARK_DETAIL_PROMPTS.alongside.",
-      "success_result": "Writes the Behavior's alongside setting (Yes true, No false) through the Behavior definition service and says it is saved. The question closes on every surface, and the row label and the Behavior form show the answer after the refresh.",
+      "availability": "Web Timeline with CADENCE_ALONGSIDE on, right after marking an item Completed when no Done at line shows, while the Behavior's alongside question is open (not answered, guessed yes), on the share of marks set in MARK_DETAIL_PROMPTS.alongside. On the Mac: Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside.",
+      "success_result": "Writes the Behavior's alongside setting (Yes true, No false) through the Behavior definition service and says it is saved. The question closes on every surface, and the row label and the Behavior form show the answer after the refresh. When another surface or device answered since the row asked, nothing is written and the line says it was already answered, with the stored answer.",
       "failure_result": "A Behavior no longer in the account, a change while saving, or a failed save shows under Not changed. Nothing changes.",
       "effects": [
         "database_write",
@@ -19733,9 +19740,18 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 363. The shared row asks only when the page passes an alongside mark-detail action and rows carry alongsideQuestion; the Mac passes neither yet."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-timeline.service.ts",
+            "packages/core/src/services/behavior.service.ts#setBehaviorAlongside"
+          ],
+          "evidence": [
+            "tests/desktop-alongside.test.ts",
+            "tests/alongside-question.dom.test.tsx"
+          ],
+          "reason": "Ticket 363: rows carry alongsideQuestion from the shared facts builder and the local markDetailActions.alongside writes the answer through setBehaviorAlongside (one configuration revision, synced). Only a linked Mac with a current yes guess asks; local mode has no guess. Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20205,8 +20221,8 @@
           "control": "Yes or No under the brief's alongside question"
         }
       ],
-      "availability": "Web Timeline with CADENCE_ALONGSIDE on, inside a ready Daily Brief whose client sent alongside_question_v1, when one of today's items has an open alongside question (not answered, guessed yes). At most one question per brief; reopening today's brief shows the same question while it is still open.",
-      "success_result": "Writes the Behavior's alongside setting through the Behavior definition service (POST /api/advisor/brief/alongside), says it is saved and redraws the Timeline. The question closes on every surface.",
+      "availability": "Web Timeline with CADENCE_ALONGSIDE on, inside a ready Daily Brief whose client sent alongside_question_v1, when one of today's items has an open alongside question (not answered, guessed yes). At most one question per brief; reopening today's brief shows the same question while it is still open. On the Mac: in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365), linked accounts only.",
+      "success_result": "Writes the Behavior's alongside setting through the Behavior definition service (POST /api/advisor/brief/alongside), says it is saved and redraws the Timeline. The question closes on every surface. When another surface or device answered since the brief asked, nothing is written and the line says it was already answered, with the stored answer.",
       "failure_result": "A Behavior no longer in the account, a change while saving, or a failed or offline request shows under the line in the alert style; Yes and No stay. Nothing changes.",
       "effects": [
         "database_write",
@@ -20247,9 +20263,16 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 363. The Mac's brief client sets no alongside transport, so it never sends alongside_question_v1 and never receives the line."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/daily-brief.ts"
+          ],
+          "evidence": [
+            "tests/desktop-alongside.test.ts",
+            "tests/alongside-question.dom.test.tsx"
+          ],
+          "reason": "Ticket 363: the Mac's brief client sets the alongside transport, so it sends alongside_question_v1 and answers on /api/advisor/brief/alongside with its session; account sync brings the answer back. The server sends the line only while CADENCE_ALONGSIDE is on. Mac build switch VITE_CADENCE_ALONGSIDE=1, off in published builds until Ticket 365."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -20629,7 +20652,7 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Open the place a tip points at: Change the set time or Set a length opens that Behavior's editor at the field; Open Needs decision opens the Needs decision list.",
+      "intent": "Open the place a tip points at: Change the set time or Set a length opens that Behavior's editor at the field; Say if it can be done alongside opens it at Can be done alongside other things (Ticket 385, while CADENCE_ALONGSIDE is on; its card awaits the owner's review); Open Needs decision opens the Needs decision list.",
       "triggers": [
         {
           "kind": "activate",
@@ -20653,7 +20676,8 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/advisor-ui.dom.test.tsx"
+          "tests/advisor-ui.dom.test.tsx",
+          "tests/advice-card-alongside.test.ts"
         ],
         "notes": "DOM checks cover the link label and the editor address it opens."
       },
@@ -21730,7 +21754,7 @@
           "control": "Can be done alongside other things"
         }
       ],
-      "availability": "In the create and edit forms on the hosted web app while CADENCE_ALONGSIDE is on. Not answered, Yes or No.",
+      "availability": "In the create and edit forms on the hosted web app while CADENCE_ALONGSIDE is on. Not answered, Yes or No. On the Mac: Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside.",
       "success_result": "Save stores behaviors.alongside (Yes true, No false, Not answered null) through the Behavior definition service. Timeline rows then show Alongside, and planning uses the answer instead of the guess.",
       "failure_result": "Any other value is refused with a field error; the draft stays.",
       "effects": [
@@ -21772,9 +21796,19 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 363. The shared form shows no alongside field until the Mac passes alongside data."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-timeline.service.ts",
+            "apps/desktop/src/alongside.ts"
+          ],
+          "evidence": [
+            "tests/desktop-alongside.test.ts",
+            "tests/alongside-ui.dom.test.tsx",
+            "tests/core-behavior.service.test.ts"
+          ],
+          "reason": "Ticket 363: the shared form gets alongsideViews and the create section's unanswered view; the local create and update actions read the field and save it through SQLite schema 29 with a configuration revision, synced at contract 10. Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -21818,7 +21852,7 @@
           "control": "Use the guess"
         }
       ],
-      "availability": "In the edit form while the setting is Not answered and a current model guess exists, with CADENCE_ALONGSIDE on.",
+      "availability": "In the edit form while the setting is Not answered and a current model guess exists, with CADENCE_ALONGSIDE on. On the Mac: Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside.",
       "success_result": "Fills the field with the guess (Yes or No) and hides the guess line; Save stores it like every other field.",
       "failure_result": "Nothing is saved until the person saves the form.",
       "effects": [
@@ -21855,9 +21889,19 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-363-alongside-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 363. The shared form shows no alongside field until the Mac passes alongside data."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/alongside.ts",
+            "apps/desktop/src/local-timeline.service.ts",
+            "app/api/behaviors/alongside/route.ts"
+          ],
+          "evidence": [
+            "tests/desktop-alongside.test.ts",
+            "tests/alongside-ui.dom.test.tsx",
+            "tests/alongside-view.service.test.ts"
+          ],
+          "reason": "Ticket 363: a linked Mac reads its current guesses from GET /api/behaviors/alongside and keeps them in memory only, so the form offers the guess as on the web. A local-only Mac has no guess and never shows the line. Cadence for Mac in a build with VITE_CADENCE_ALONGSIDE=1 (off in published builds until Ticket 365); a linked Mac also follows the server's CADENCE_ALONGSIDE through GET /api/behaviors/alongside."
         },
         "marketing": {
           "applicability": "not_applicable",

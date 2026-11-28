@@ -220,7 +220,15 @@ impl Fixture {
         if before_links {
             self.db.execute_batch(&LINK_COLUMNS.iter().map(|column| format!("ALTER TABLE behaviors ADD COLUMN {column};")).collect::<String>()).unwrap();
         }
+        // A schema before 0029 has no alongside column; it comes and goes the same way.
+        let before_alongside = self.db.prepare("SELECT alongside FROM behaviors").is_err();
+        if before_alongside {
+            self.db.execute_batch("ALTER TABLE behaviors ADD COLUMN alongside INTEGER;").unwrap();
+        }
         let result = execute(&mut self.db, serde_json::from_value(request).unwrap());
+        if before_alongside {
+            self.db.execute_batch("ALTER TABLE behaviors DROP COLUMN alongside;").unwrap();
+        }
         if before_opportunity {
             self.db.execute_batch(OPPORTUNITY_COLUMNS_DROP).unwrap();
         }
@@ -2580,6 +2588,67 @@ fn place_label_migration_adds_constrained_tables_without_touching_tracking() {
 }
 
 #[test]
+fn guess_dismissals_are_stored_and_synced_while_labels_are_off() {
+    use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let profile = fixture.profile.clone();
+    let saved = format!("saved_place:{}", "a".repeat(43));
+    let value = |suggestion: &str| json!({"id":id(1),"suggestion":suggestion,"rule_version":"where-suggestion-rules@1","dismissed_at":NOW});
+    let write = |suggestion: &str| AccountSyncWrite { kind: Kind::WhereSuggestionDismissal, id: id(1), operation: Op::Upsert, expected: None, value: Some(value(suggestion)) };
+    // Ticket 383 (migration 0030): a first-link replacement applies a web guess dismissal
+    // stored while labels are off (no settings row here).
+    let tx = fixture.db.transaction().unwrap();
+    super::sync_apply::apply_first_link(&tx, &profile, &[write("home")]).unwrap();
+    tx.commit().unwrap();
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
+    // The DataStore updates it to another guess key while off, and refuses a saved place.
+    let dismiss = |suggestion: &str| place_mutation(json!({"kind":"upsertDismissal","dismissal":{
+        "user_id":profile,"id":id(1),"suggestion":suggestion,"rule_version":"where-suggestion-rules@1","dismissed_at":NOW}}));
+    fixture.run(dismiss("add_place"), 320).unwrap();
+    assert!(fixture.run(dismiss(&saved), 321).unwrap_err().contains("constraint"));
+    // A saved-place dismissal still needs labels on, in either sync mode.
+    fixture.db.execute("DELETE FROM where_suggestion_dismissals", []).unwrap();
+    assert!(execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(&saved)] }).is_err());
+    let tx = fixture.db.transaction().unwrap();
+    assert!(super::sync_apply::apply_first_link(&tx, &profile, &[write(&saved)]).is_err());
+    drop(tx);
+    // An ordinary sync inserts a guess dismissal while off.
+    execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write("anywhere")] }).unwrap();
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
+    // Turning labels on and off again still deletes it.
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":null,
+        "next":place_settings(&profile, true),"retentionCutoff":null})), 322).unwrap();
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":NOW,
+        "next":place_settings(&profile, false),"retentionCutoff":null})), 323).unwrap();
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 0);
+    // Markers keep requiring labels on.
+    let marker = json!({"user_id":profile,"id":"home","place_key":"k".repeat(43),"latitude_e6":1,
+        "longitude_e6":2,"accuracy_meters":3,"rule_version":"place-label-rules@1","recorded_at":NOW});
+    assert!(fixture.run(place_mutation(json!({"kind":"upsertMarker","marker":marker})), 324).unwrap_err().contains("constraint"));
+}
+
+#[test]
+fn migration_0030_keeps_dismissals_and_relaxes_only_guess_keys() {
+    let mut fixture = Fixture::at_schema(29);
+    fixture.create();
+    let profile = fixture.profile.clone();
+    let insert = |db: &rusqlite::Connection, suggestion: &str| db.execute("INSERT INTO where_suggestion_dismissals VALUES(?1,?2,?3,'where-suggestion-rules@1',?4)",
+        params![id(1), profile, suggestion, NOW]);
+    // Schema 29 refuses every dismissal while labels are off.
+    assert!(insert(&fixture.db, "home").is_err());
+    fixture.db.execute("INSERT INTO place_label_settings(user_id,enabled,retention,enabled_at,updated_at) VALUES(?1,1,'90_days',?2,?2)", params![profile, NOW]).unwrap();
+    insert(&fixture.db, "home").unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
+    assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
+    fixture.db.execute("UPDATE place_label_settings SET enabled=0,enabled_at=NULL", []).unwrap();
+    fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion='anywhere'", []).unwrap();
+    assert!(fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion=?1", [format!("saved_place:{}", "a".repeat(43))]).is_err());
+    assert!(fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion='nearby'", []).is_err());
+}
+
+#[test]
 fn account_sync_applies_place_label_rows_in_dependency_order() {
     use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
     let mut fixture = Fixture::new();
@@ -2827,7 +2896,7 @@ fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
     let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
         .map(|table| (table, fixture.count(table)));
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 28);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
     for (table, count) in before {
         assert_eq!(fixture.count(table), count, "{table}");
     }
@@ -3011,6 +3080,86 @@ fn migration_0028_keeps_every_schema_27_row_standalone() {
     assert_eq!(link(&fixture, 1), (None, 0, false));
     let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
     assert!(rows.iter().all(|row| row.parent_behavior_id.is_none() && !row.inherit_parent_schedule));
+}
+
+/// D33 history rule (defect D1): TypeScript leaves the answer out of an unanswered
+/// Behavior's configuration events. The local store accepts such an event for a Behavior
+/// with no answer and stores it as planned, without adding the key.
+#[test]
+fn unanswered_configuration_history_is_stored_without_the_answer() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+    let revision = graph["revision"].clone();
+    graph.as_object_mut().unwrap().remove("revision");
+    graph["behavior"]["reminder_offset_minutes"] = json!(15);
+    graph["behavior"]["current_configuration_event_id"] = json!(id(70));
+    let mut event = create_request(&fixture.profile)["configurationEvent"].clone();
+    event["id"] = json!(id(70));
+    event["event_kind"] = json!("revision");
+    event["previous_configuration"] = configuration();
+    event["next_configuration"]["reminderOffsetMinutes"] = json!(15);
+    event["changed_fields"] = json!(["reminder_offset_minutes"]);
+    event["reason_code"] = json!("behavior_edited");
+    fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":event}), 70).unwrap();
+    assert_eq!(fixture.count("behavior_configuration_events"), 2);
+    let stored: String = fixture.db.query_row("SELECT group_concat(coalesce(previous_configuration,'') || next_configuration || changed_fields, '|') FROM behavior_configuration_events", [], |row| row.get(0)).unwrap();
+    assert!(!stored.contains("alongside"), "{stored}");
+}
+
+#[test]
+fn migration_0029_leaves_every_schema_28_behavior_unanswered() {
+    let mut fixture = Fixture::at_schema(28);
+    let profile = fixture.profile.clone();
+    fixture.db.execute("INSERT INTO behaviors(id,user_id,category_id,title,description,recurrence_rule,scheduled_time,timezone,browser_reminder_enabled,email_reminder_enabled,reminder_offset_minutes,active,created_at,updated_at,archived_at,current_configuration_event_id) VALUES(?1,?2,NULL,'Helmet',NULL,'{\"type\":\"daily\",\"interval\":1}','09:00:00','America/New_York',1,0,0,1,?3,?3,NULL,NULL)", params![id(1), profile, NOW]).unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
+    let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].alongside, None);
+    // Only unanswered, yes and no are stored.
+    assert!(fixture.db.execute("UPDATE behaviors SET alongside=2 WHERE id=?1", [id(1)]).is_err());
+}
+
+/// D33 (Ticket 363): the answer is configuration. A change needs a revision naming it whose
+/// snapshots carry the answer; a snapshot that disagrees with the row is refused.
+#[test]
+fn alongside_answer_joins_the_configuration_snapshot() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let answer = |fixture: &mut Fixture, previous: Value, next: Value, mutation: u32, event_next: Value| {
+        let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+        let revision = graph["revision"].clone();
+        graph.as_object_mut().unwrap().remove("revision");
+        graph["behavior"]["alongside"] = next;
+        graph["behavior"]["current_configuration_event_id"] = json!(id(mutation));
+        let mut event = create_request(&fixture.profile)["configurationEvent"].clone();
+        event["id"] = json!(id(mutation));
+        event["event_kind"] = json!("revision");
+        event["previous_configuration"] = event["next_configuration"].clone();
+        event["previous_configuration"]["alongside"] = previous;
+        event["next_configuration"]["alongside"] = event_next;
+        event["changed_fields"] = json!(["alongside"]);
+        event["reason_code"] = json!("alongside_answered");
+        fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":event}), mutation)
+    };
+    // A snapshot that disagrees with the row is refused.
+    let refused = answer(&mut fixture, Value::Null, json!(true), 60, json!(false)).unwrap_err();
+    assert!(refused.contains("configuration event does not match"), "{refused}");
+    answer(&mut fixture, Value::Null, json!(true), 61, json!(true)).unwrap();
+    let stored: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+    assert_eq!(stored.alongside, Some(true));
+    // The baseline snapshot had no answer: it read as unanswered, so the previous side was null.
+    answer(&mut fixture, json!(true), json!(false), 62, json!(false)).unwrap();
+    let stored: Behavior = db::by_id(&fixture.db, &fixture.profile, &id(1)).unwrap();
+    assert_eq!(stored.alongside, Some(false));
+    // Changing the answer without a revision is refused.
+    let mut graph = behavior::read_graphs(&fixture.db, &fixture.profile).unwrap()[0].clone();
+    let revision = graph["revision"].clone();
+    graph.as_object_mut().unwrap().remove("revision");
+    graph["behavior"]["alongside"] = Value::Null;
+    let silent = fixture.run(json!({"operation":"updateBehaviorGraph","graph":graph,"expectedRevision":revision,"expectedNormalizedDefinition":{"title":"Walk","description":null},"definitionEvent":null,"configurationEvent":null}), 63).unwrap_err();
+    assert!(silent.contains("requires its planned history event"), "{silent}");
 }
 
 #[test]

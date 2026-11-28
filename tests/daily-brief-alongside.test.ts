@@ -23,8 +23,9 @@ vi.mock("@/lib/services/briefing-account-context.service", () => ({
   prepareAccountBriefingContexts: mocks.prepare,
 }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: mocks.calendar }));
-const alongside = vi.hoisted(() => ({ plan: vi.fn(), reopen: vi.fn() }));
-vi.mock("@/lib/services/brief-alongside.service", () => ({ planBriefAlongsideQuestion: alongside.plan, reopenBriefAlongsideQuestion: alongside.reopen }));
+const alongside = vi.hoisted(() => ({ plan: vi.fn(), reopen: vi.fn(), asked: vi.fn() }));
+vi.mock("@/lib/services/brief-alongside.service", () => ({ planBriefAlongsideQuestion: alongside.plan, reopenBriefAlongsideQuestion: alongside.reopen,
+  recordBriefAlongsideQuestionAsked: alongside.asked }));
 import { requestInAppDailyBrief } from "@/lib/services/daily-brief.service";
 const caller = { client: {}, user: { id: "owner" } } as CalendarCaller;
 const plain = { installationId: "11111111-1111-4111-8111-111111111111", retry: false };
@@ -81,6 +82,19 @@ describe("Daily Brief alongside question", () => {
     expect(alongside.plan).toHaveBeenCalledExactlyOnceWith(caller.client, "owner", { localDate: fixture.localDate, items: day.items });
     expect(mocks.saveBrief.mock.calls[0]![1].briefing).toMatchObject({ alongsideQuestion: question });
     expect(result).toMatchObject({ state: "ready", briefing: { alongsideQuestion: question } });
+    // Recorded as asked only after the save, so a later day's brief skips this Behavior.
+    expect(alongside.asked).toHaveBeenCalledExactlyOnceWith(caller.client, "owner", { localDate: fixture.localDate, question });
+    expect(alongside.asked.mock.invocationCallOrder[0]!).toBeGreaterThan(mocks.saveBrief.mock.invocationCallOrder[0]!);
+  });
+
+  it("a failed asked write still shows the saved brief; a failed save records nothing", async () => {
+    vi.stubEnv("CADENCE_ALONGSIDE", "on");
+    alongside.asked.mockRejectedValue(new Error("write failed"));
+    expect(await requestInAppDailyBrief(caller, withQuestion, { generate, now })).toMatchObject({ state: "ready", briefing: { alongsideQuestion: question } });
+    alongside.asked.mockClear();
+    mocks.saveBrief.mockResolvedValue(false);
+    await expect(requestInAppDailyBrief(caller, withQuestion, { generate, now })).rejects.toThrow();
+    expect(alongside.asked).not.toHaveBeenCalled();
   });
 
   it("flag off, or a client that did not ask: nothing is read and the brief is as before", async () => {
@@ -89,6 +103,7 @@ describe("Daily Brief alongside question", () => {
     vi.stubEnv("CADENCE_ALONGSIDE", "on");
     const notAsked = await requestInAppDailyBrief(caller, input, { generate, now });
     expect(alongside.plan).not.toHaveBeenCalled();
+    expect(alongside.asked).not.toHaveBeenCalled();
     for (const call of mocks.saveBrief.mock.calls) expect(call[1].briefing).not.toHaveProperty("alongsideQuestion");
     for (const result of [asked, notAsked]) expect(JSON.stringify(result)).toBe(JSON.stringify(before));
   });

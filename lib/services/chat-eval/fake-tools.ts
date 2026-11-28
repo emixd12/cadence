@@ -8,7 +8,8 @@ import {
   type ChatWorld, type WorldBehavior, type WorldOccurrence, type WorldPeriod, type Weekday,
 } from "./world";
 import { CHAT_PLANNING_READS, withChatPlanning } from "../chat/chat-planning";
-import { alongsideMayOverlap } from "@cadence/core/resolvers/alongside.resolver";
+import { alongsideMayOverlap, calendarEventPlace, planningPlaceCatalog, type PlanningPlaceCatalog } from "@cadence/core/resolvers/alongside.resolver";
+import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import { NO_ALONGSIDE_PAIRING_EVIDENCE, planAlongsidePairings } from "@cadence/core/resolvers/alongside-pairing.resolver";
 import type { BriefMoveDayItem } from "@cadence/core/resolvers/brief-move.resolver";
 import { chatPairingProposal } from "../alongside-pairing.service";
@@ -592,13 +593,17 @@ function moveRecord(world: ChatWorld, item: WorldOccurrence, from: string, kind:
  */
 function busyIntervals(world: ChatWorld, except: WorldOccurrence | null): { start: number; end: number; kind: "calendar_busy" | "slot_taken"; label: string }[] {
   const planningOf = (item: WorldOccurrence) => world.alongside ? findBehavior(world, item.behaviorId)?.planning : undefined;
-  const placeOf = (item: WorldOccurrence) => ({ kind: planningOf(item)?.where ?? "unknown" as const });
+  const placeOf = (item: WorldOccurrence) => worldPlace(world, item.behaviorId, planningOf(item)?.where);
   const mover = except ? planningOf(except) : undefined;
   const moverAlongside = mover?.alongside === true;
   const sharesTime = (item: WorldOccurrence) => world.alongside && except !== null
     && ((moverAlongside && alongsideMayOverlap({ where: placeOf(except) }, { kind: "item", where: placeOf(item) }))
       || (planningOf(item)?.alongside === true && alongsideMayOverlap({ where: placeOf(item) }, { kind: "item", where: placeOf(except) })));
-  const events = world.sourcesOff.has("calendar") || (world.alongside && moverAlongside) ? [] : world.events.filter((item) => item.localDate === world.today)
+  // Ticket 384: an alongside mover is blocked only by an event at another known place.
+  const catalog = worldPlaceCatalog(world);
+  const events = world.sourcesOff.has("calendar") ? [] : world.events.filter((item) => item.localDate === world.today
+    && !(world.alongside && moverAlongside && except && alongsideMayOverlap({ where: placeOf(except) },
+      { kind: "calendar", where: calendarEventPlace(item.location, catalog) })))
     .map((item) => ({ start: minutesOf(item.start), end: minutesOf(item.end), kind: "calendar_busy" as const, label: item.title }));
   const items = world.occurrences.filter((item) => item.localDate === world.today && item.id !== except?.id && item.status === "unresolved" && !sharesTime(item)).flatMap((item) => {
     const minutes = findBehavior(world, item.behaviorId)!.durationMinutes;
@@ -641,6 +646,18 @@ function move(world: ChatWorld, input: Record<string, unknown>): ChatToolResult 
   return ok({ outcome: "moved", occurrence: occurrenceOutput(world, item), move: moveRecord(world, item, from, "move"), refusal: null });
 }
 
+/** Ticket 384: the world's Home and saved places as keys, or null when it names none. */
+function worldPlaceCatalog(world: ChatWorld): PlanningPlaceCatalog | null {
+  return world.alongside && world.placeTexts
+    ? planningPlaceCatalog({ homeText: world.placeTexts.home, placeTexts: Object.values(world.placeTexts.behaviors) }) : null;
+}
+
+/** A Behavior's Where for the same-place rule; a place carries its text's key when the world names one. */
+function worldPlace(world: ChatWorld, behaviorId: string, where: NonNullable<WorldBehavior["planning"]>["where"] | undefined) {
+  const text = where === "place" ? world.placeTexts?.behaviors[behaviorId] : undefined;
+  return { kind: where ?? "unknown" as const, ...(text ? { placeKey: travelPlaceKey(text) } : {}) };
+}
+
 /** Ticket 361: Chat's pairing tool on the world's today, through the real planner. */
 function pairings(world: ChatWorld, args: unknown): ChatToolResult {
   if (!world.alongside) return fail("not_found", "No tool named plan_alongside_pairings.");
@@ -656,11 +673,15 @@ function pairings(world: ChatWorld, args: unknown): ChatToolResult {
       scheduleKind: item.rangeEnd ? "range" as const : "exact" as const, start, end: start.add({ minutes }),
       length: { minutes, source: behavior.durationMinutes ? "behavior_duration" as const : "fallback" as const, assumed: !behavior.durationMinutes },
       alongside: planning?.alongside === true, alongsideSource: planning?.alongsideSource ?? "default",
-      where: { kind: planning?.where ?? "unknown", source: planning?.whereSource ?? "none" }, revision: `r${item.revision}`, behaviorRevision: `r${behavior.revision}`,
+      where: { ...worldPlace(world, behavior.id, planning?.where), source: planning?.whereSource ?? "none" }, revision: `r${item.revision}`, behaviorRevision: `r${behavior.revision}`,
     }];
   });
-  const calendarBusy = world.sourcesOff.has("calendar") ? [] : world.events.filter((item) => item.localDate === world.today).map((item) => ({
-    ref: item.id, start: Temporal.Instant.from(toInstant(world, item.localDate, item.start)), end: Temporal.Instant.from(toInstant(world, item.localDate, item.end)) }));
+  const catalog = worldPlaceCatalog(world);
+  const calendarBusy = world.sourcesOff.has("calendar") ? [] : world.events.filter((item) => item.localDate === world.today).map((item) => {
+    const eventPlace = calendarEventPlace(item.location, catalog);
+    return { ref: item.id, start: Temporal.Instant.from(toInstant(world, item.localDate, item.start)), end: Temporal.Instant.from(toInstant(world, item.localDate, item.end)),
+      ...(eventPlace ? { eventPlace } : {}) };
+  });
   const found = planAlongsidePairings({
     localDate: world.today, timezone: world.timezone, now: Temporal.Instant.from(nowInstant(world)), items, calendarBusy, travel: null,
     evidence: world.pairingEvidence ?? NO_ALONGSIDE_PAIRING_EVIDENCE,

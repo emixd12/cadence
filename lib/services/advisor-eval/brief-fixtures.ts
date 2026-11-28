@@ -4,6 +4,7 @@ import type { AdvisorDayContext, AdvisorOccurrence, AdvisorOccurrencePlanning } 
 import { BRIEF_MOVE_DEFAULT_LATEST_START_MINUTE, BRIEF_MOVE_FALLBACK_MINUTES, type BriefMoveLength } from "@cadence/core/types/brief-moves";
 import type { BriefMoveCalendarBusy, BriefMoveDayItem, BriefMovePlanInputs } from "@cadence/core/resolvers/brief-move.resolver";
 import type { AlongsidePairingEvidence } from "@cadence/core/resolvers/alongside-pairing.resolver";
+import type { CalendarEventPlace } from "@cadence/core/resolvers/alongside.resolver";
 import type { BriefDayNote } from "@cadence/core/resolvers/day-note.resolver";
 import { resolveBriefPeriods, type BriefPeriods, type PeriodRecord } from "@cadence/core/resolvers/period.resolver";
 import { advisorEvalFixture, type AdvisorEvalFixtureId } from "./fixtures";
@@ -20,7 +21,8 @@ export const BRIEF_EVAL_FIXTURE_VERSION = "brief-eval-2026-11-25.4";
 
 export const BRIEF_EVAL_FIXTURE_IDS = ["busy_professional", "irregular_schedule", "new_user", "heavy_mover", "daylight_saving",
   "near_midnight", "timezone_change", "mac_linked", "stale_calendar", "hidden_instructions",
-  "quiet_day", "declined_and_undone", "alongside_and_never_move", "late_evening", "alongside_places", "alongside_pairing", "day_notes", "period_active"] as const;
+  "quiet_day", "declined_and_undone", "alongside_and_never_move", "late_evening", "alongside_places", "alongside_pairing", "day_notes", "period_active",
+  "alongside_event_place"] as const;
 export type BriefEvalFixtureId = typeof BRIEF_EVAL_FIXTURE_IDS[number];
 
 export type BriefEvalExpectations = Readonly<{
@@ -80,6 +82,11 @@ type Scenario = Readonly<{
   pairingEvidence?: AlongsidePairingEvidence;
   /** Ticket 367: the person's day notes for today and the two days before it. */
   dayNotes?: readonly BriefDayNote[];
+  /**
+   * Ticket 384: busy events' coarse places, by event ref, as the server computes them from
+   * the Calendar read's location text. Unlisted events have an unknown place.
+   */
+  eventPlaces?: Readonly<Record<string, CalendarEventPlace>>;
   /** Ticket 371: the person's Periods, as days before today (`endedDaysAgo` null: ongoing). The brief's own rule picks from them. */
   periods?: readonly Readonly<{ label: string; startedDaysAgo: number; endedDaysAgo: number | null }>[];
 }>;
@@ -191,8 +198,26 @@ export function briefEvalFixture(id: BriefEvalFixtureId): BriefEvalFixture {
         eventTitles: BUSY_EVENTS,
       }, { movesOccurrences: ["occurrence_fixture_5"], keepsOccurrences: ["occurrence_fixture_10"],
         pairs: [{ guest: "occurrence_fixture_5", host: "occurrence_fixture_10" }] });
+    case "alongside_event_place":
+      // Ticket 384 (D37), flag on: Vitamins sits inside Team sync. Vitamins is taken at Home
+      // (the person's yes) and Team sync is at the office, a saved place, so the overlap is
+      // refused: the brief pairs Vitamins with Read at Home at 6 PM. With Team sync's place
+      // unknown, as before Ticket 384, nothing needs pairing.
+      return build(id, "busy_professional", "Vitamins at Home during a Team sync at the office, and a Home reading slot at 6 PM.", {
+        behaviorOf: { occurrence_fixture_1: "behavior_vitamins", occurrence_fixture_10: "behavior_reading" },
+        planning: {
+          behavior_vitamins: { alongside: true, alongsideSource: "person", where: { kind: "home", source: "person" } },
+          behavior_reading: { alongside: false, alongsideSource: "person", where: { kind: "home", source: "person" } },
+        },
+        eventPlaces: { event_busy_0: { kind: "place", placeKey: OFFICE_PLACE_KEY } },
+        eventTitles: BUSY_EVENTS,
+      }, { movesOccurrences: ["occurrence_fixture_1"], keepsOccurrences: ["occurrence_fixture_10"],
+        pairs: [{ guest: "occurrence_fixture_1", host: "occurrence_fixture_10" }] });
   }
 }
+
+/** A saved place's one-way key (43 base64url characters), standing for the office. */
+const OFFICE_PLACE_KEY = "o".repeat(43);
 
 const BUSY_EVENTS: Readonly<Record<string, string>> = { event_busy_0: "Team sync", event_busy_1: "1:1 with Sam", event_fixture: "Lunch with Alex",
   event_busy_2: "Client review", event_busy_3: "School pickup" };
@@ -264,7 +289,8 @@ export function planInputs(context: AdvisorDayContext, now: string, scenario: Sc
   const calendarBusy: BriefMoveCalendarBusy[] = context.connectors.flatMap((connector) => "events" in connector ? connector.events : [])
     .flatMap((event) => event.interval.kind === "timed" && event.availability === "busy" && event.state !== "cancelled"
       ? [{ ref: event.ref, title: scenario.eventTitles?.[event.ref] ?? "Meeting",
-        start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt) }] : []);
+        start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt),
+        ...(scenario.eventPlaces?.[event.ref] ? { eventPlace: scenario.eventPlaces[event.ref] } : {}) }] : []);
   return {
     localDate: context.localDate, timezone: context.timezone, now: Temporal.Instant.from(now), items, calendarBusy, calendar, travel: null,
     declinedToday: new Set(scenario.declinedToday ?? []), neverMoveBehaviorIds: new Set(scenario.neverMoveBehaviorIds ?? []),

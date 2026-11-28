@@ -3,7 +3,7 @@ import type { BehaviorWhereKind } from "./behavior";
 import type { BehaviorDurationEstimate } from "./day-progress";
 import type { NoticeId } from "../notices";
 import type { ParentSlotRollup } from "./sub-behavior";
-import type { AlongsideRowView } from "../resolvers/alongside.resolver";
+import type { AlongsideRowView, PlanningPlaceCatalog } from "../resolvers/alongside.resolver";
 import type { PeriodView } from "./period";
 
 export type TimelineStatus = "unresolved" | "completed" | "not_completed";
@@ -268,6 +268,13 @@ export type TimelineView = {
   daySections: TimelineDaySection[];
   /** Saved day notes by local date for the dates this view shows (Ticket 292). */
   dayNotes?: Record<string, string>;
+  /**
+   * Ticket 384 (D37): Home's and the saved places' one-way place keys, so this screen can
+   * give each Calendar event a coarse place for the same-place rule (overlap cues and
+   * "Move for today"). Set only while `CADENCE_ALONGSIDE` is on and a row is alongside.
+   * Keys only, never place text or coordinates.
+   */
+  planningPlaces?: PlanningPlaceCatalog;
   /** Ticket 369: the Periods that cover at least one shown day, in display order. Absent where Periods are unavailable. */
   periods?: PeriodView[];
   /** Ticket 369: for each shown local date a Period covers, its Periods in display order. */

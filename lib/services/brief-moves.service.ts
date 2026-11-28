@@ -5,6 +5,7 @@ import { effectiveStartInstant } from "@cadence/core/resolvers/time.resolver";
 import {
   BRIEF_MOVE_OTHER_TIMES,
   briefMoveBlocksForSubject,
+  briefMoveCalendarBlocks,
   briefMoveFreeStarts,
   briefMoveItemBlocks,
   briefMoveOverlapSubject,
@@ -62,7 +63,8 @@ import {
   DURATION_ESTIMATE_INSTRUCTIONS, DURATION_ESTIMATE_TITLE_ONLY_INSTRUCTIONS, DURATION_ESTIMATE_V1_2_INSTRUCTIONS, DURATION_ESTIMATE_V1_3_INSTRUCTIONS,
   DURATION_ESTIMATE_V1_3_LENGTH_INSTRUCTIONS,
 } from "@/lib/services/daily-brief-instructions";
-import { alongsideGuessWanted } from "@cadence/core/resolvers/alongside.resolver";
+import { alongsideGuessWanted, calendarEventPlace, type CalendarEventPlace, type PlanningPlaceCatalog } from "@cadence/core/resolvers/alongside.resolver";
+import { eventPlacesFromLocations, readPlanningPlaceCatalog } from "@/lib/services/planning-places.service";
 import { isWhereGuess, type WhereGuess } from "@cadence/core/resolvers/effective-where.resolver";
 import { alongsideEnabled } from "@/lib/services/alongside-flag";
 // Ticket 361 (D33): pairing lines, behind CADENCE_ALONGSIDE.
@@ -122,6 +124,12 @@ export type BriefMovePlanningInput = Readonly<{
   calendarBusy?: readonly BriefCalendarBusy[];
   /** The signed travel times token from the routes response. Verified here, used once. */
   travelTimes?: string | null;
+  /**
+   * Ticket 384: the day context's event locations by event ref, from the same Calendar
+   * read (`captureLiveDailyBriefContext`), so each busy event gets its coarse place. Set
+   * only while `CADENCE_ALONGSIDE` is on. Used here and dropped: never stored or sent to a model.
+   */
+  eventLocations?: ReadonlyMap<string, string>;
 }>;
 
 export type BriefServerCalendarBusyResult = Readonly<{
@@ -130,16 +138,23 @@ export type BriefServerCalendarBusyResult = Readonly<{
   googleCalendarGrantGeneration: number | null;
 }>;
 
-function busyFromExternalEvents(events: readonly NormalizedExternalEvent[]): BriefMoveCalendarBusy[] {
+/**
+ * Ticket 384: with a catalog (`CADENCE_ALONGSIDE` on), each event also gets its coarse
+ * place from the location text this read already returned. Outlook and iCloud reads here
+ * ask for no location, so their events stay unknown.
+ */
+export function busyFromExternalEvents(events: readonly NormalizedExternalEvent[], catalog: PlanningPlaceCatalog | null = null): BriefMoveCalendarBusy[] {
   const busy: BriefMoveCalendarBusy[] = [];
   for (const event of events) {
     if (event.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
       || event.currentUserResponse === "declined") continue;
+    const eventPlace = calendarEventPlace(event.location, catalog);
     busy.push({
       ref: `${event.source}:${event.calendarId}:${event.providerEventId}`,
       start: Temporal.Instant.from(event.startAt),
       end: Temporal.Instant.from(event.endAt),
       ...(event.title ? { title: event.title } : {}),
+      ...(eventPlace ? { eventPlace } : {}),
     });
   }
   return busy;
@@ -177,6 +192,8 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
   }
   if (!user) return empty;
   const caller: CalendarCaller = { client: input.supabase, user };
+  // Ticket 384: Home's and the saved places' keys, read only while CADENCE_ALONGSIDE is on.
+  const catalogRead = readPlanningPlaceCatalog(input.supabase, input.userId);
 
   const readGoogle = async (): Promise<Readonly<{ busy: BriefMoveCalendarBusy[]; generation: number | null; ok: boolean }>> => {
     if (!dailyBriefSourceAllowed(preferences, "googleCalendar") || !dailyBriefReadsGoogleCalendar(preferences) || !isGoogleCalendarAiTransportEnabled()) {
@@ -185,7 +202,7 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
     try {
       const read = await getCalendarEventsForAdvisor(caller, input.localDate, input.localDate, { ephemeralOnly: true, now: input.now });
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      return { busy: busyFromExternalEvents(snapshot.events), generation: read.connection.generation, ok: true };
+      return { busy: busyFromExternalEvents(snapshot.events, await catalogRead), generation: read.connection.generation, ok: true };
     } catch {
       return { busy: [], generation: null, ok: false };
     }
@@ -196,7 +213,7 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
     try {
       const read = await getOutlookCalendarEventsForCaller(caller, input.localDate, input.localDate);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      return busyFromExternalEvents(snapshot.events);
+      return busyFromExternalEvents(snapshot.events, await catalogRead);
     } catch {
       return [];
     }
@@ -207,7 +224,7 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
     try {
       const read = await getIcloudCalendarEventsForCaller(caller, input.localDate, input.localDate);
       const snapshot = read.result.ok ? read.result.snapshot : read.result.partialSnapshot;
-      return busyFromExternalEvents(snapshot.events);
+      return busyFromExternalEvents(snapshot.events, await catalogRead);
     } catch {
       return [];
     }
@@ -225,7 +242,9 @@ export async function readServerBriefCalendarBusy(input: Readonly<{
  * The calendar as the one rule sees it: derived from authorized AI context connectors when
  * `context` is present, or from trusted server-side / internal busy intervals when provided.
  */
-export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy?: readonly BriefCalendarBusy[] | undefined)
+export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy?: readonly BriefCalendarBusy[] | undefined,
+  /** Ticket 384: coarse places by the context's event refs. Events without one stay unknown. */
+  eventPlaces?: ReadonlyMap<string, CalendarEventPlace>)
   : Readonly<{ busy: BriefMoveCalendarBusy[]; state: "current" | "stale" | "none" }> {
   const busy: BriefMoveCalendarBusy[] = [];
   let requested = false, stale = false;
@@ -238,7 +257,9 @@ export function briefMoveCalendar(context: AdvisorDayContext | null, trustedBusy
       for (const event of connector.events) {
         if (event.interval.kind !== "timed" || event.state === "cancelled" || event.availability === "free"
           || event.currentUserResponse === "declined") continue;
-        busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt) });
+        const eventPlace = eventPlaces?.get(event.ref);
+        busy.push({ ref: event.ref, start: Temporal.Instant.from(event.interval.startAt), end: Temporal.Instant.from(event.interval.endAt),
+          ...(eventPlace ? { eventPlace } : {}) });
       }
     }
     return { busy, state: stale ? "stale" : requested ? "current" : "none" };
@@ -283,11 +304,17 @@ export async function planBriefMoveDay(input: Readonly<{
   planning: BriefMovePlanningInput;
   travelSecrets: TravelConclusionsSecrets;
   day?: BriefMoveDay;
-  /** Ticket 361: the coach's evidence for pairing lines (tests). Default: read through the coach channel. */
+  /** Ticket 361: the Daily Brief agent's own client, which reads the pairing evidence. Null or absent: no evidence. */
+  evidenceClient?: AppSupabaseClient | null;
+  /** Ticket 361: the evidence reader (tests). Default: `advisor_read_pairing_evidence` on `evidenceClient`. */
   readPairingEvidence?: PairingEvidenceReader;
 }>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
   const day = input.day ?? await readBriefMoveDay(input.supabase, input.userId, input.localDate);
-  const calendar = briefMoveCalendar(input.context, input.planning.calendarBusy);
+  // Ticket 384: event places only when the capture collected locations (CADENCE_ALONGSIDE on).
+  const eventPlaces = input.planning.eventLocations?.size
+    ? eventPlacesFromLocations(input.planning.eventLocations, await readPlanningPlaceCatalog(input.supabase, input.userId))
+    : undefined;
+  const calendar = briefMoveCalendar(input.context, input.planning.calendarBusy, eventPlaces);
   const travel = briefMoveTravel(input.planning.travelTimes, { secrets: input.travelSecrets, userId: input.userId, localDate: input.localDate, now: input.now });
   const answers = await readDayAnswers(input.supabase, input.userId, input.localDate);
   const inputs = {
@@ -300,7 +327,7 @@ export async function planBriefMoveDay(input: Readonly<{
   const plan = planBriefMoveLinesFromInputs(inputs);
   // Ticket 361: with CADENCE_ALONGSIDE on, pairing lines follow the move lines under the same cap.
   if (!alongsideEnabled() || plan.calendar === "stale") return { ...plan, day };
-  const evidence: AlongsidePairingEvidence = await (input.readPairingEvidence ?? readAlongsidePairingEvidence)(input.userId, input.localDate);
+  const evidence: AlongsidePairingEvidence = await (input.readPairingEvidence ?? readAlongsidePairingEvidence)(input.evidenceClient ?? null, input.localDate);
   return { ...plan, candidates: [...plan.candidates, ...planBriefPairingLines({ ...inputs, evidence }, plan.candidates)], day };
 }
 
@@ -315,9 +342,12 @@ export async function planBriefMoveLines(input: Readonly<{
   supabase: AppSupabaseClient;
   userId?: string;
   travelSecrets?: TravelConclusionsSecrets;
+  /** Ticket 361: the Daily Brief agent's client, for the pairing evidence. */
+  agentClient?: AppSupabaseClient | null;
 }>): Promise<BriefMovePlan & Readonly<{ day: BriefMoveDay }>> {
   return planBriefMoveDay({
     supabase: input.supabase, userId: input.userId ?? await ownUserId(input.supabase),
+    evidenceClient: input.agentClient ?? null,
     localDate: input.context.localDate, timezone: input.context.timezone,
     now: typeof input.now === "string" ? Temporal.Instant.from(input.now) : input.now,
     context: input.context, planning: input.planning,
@@ -441,10 +471,11 @@ export async function cacheBehaviorEstimates(input: Readonly<{
     // A length-only row stores false; its hash keeps it from being read as a guess.
     alongside: alongsideAsked && answer.alongside === true,
     model: input.model,
-    // Ticket 359, flag on only: the Where guess, null when the person set Where (none is
-    // needed). The database function writes null when the key is absent, so a stale
-    // guess never survives a new input hash.
-    ...(personSetting ? { where_guess: byId.get(answer.behaviorId)!.whereKind ? null : isWhereGuess(answer.whereGuess) ? answer.whereGuess : null } : {}),
+    // Ticket 359, flag on only: the Where guess. Since Ticket 386 it is stored even when the
+    // person set Where: the request is the same either way, readers skip it while Where is
+    // set, and clearing Where then reads it without another call. The database function
+    // writes null when the key is absent, so a stale guess never survives a new input hash.
+    ...(personSetting ? { where_guess: isWhereGuess(answer.whereGuess) ? answer.whereGuess : null } : {}),
   }));
   if (!rows.length) return input.day;
   const { error } = await input.agent.rpc("upsert_behavior_advisor_estimates", { p_estimates: rows });
@@ -712,6 +743,17 @@ async function answerYes(callers: BriefMoveCallers, request: Readonly<{
     return { result: await lineResult(callers.person, proposal, "refused", closedRefusal(proposal), null), replayed: false };
   }
   const line = lineFromRow(proposal);
+  // Audit fix 2: a pairing line stands only while its host is unresolved at the time it
+  // had, the check Re-check makes. Otherwise Yes would move the guest into an empty slot
+  // and record an accepted pairing that Ticket 362's four-day rule counts.
+  if (line?.pairing && alongsideEnabled()) {
+    const refusal = await pairingHostRefusal(callers.person, proposal, line.pairing);
+    if (refusal) {
+      const recorded = await recordAnswer(callers.person, { proposal, kind: request.kind, outcome: "refused", key: request.idempotencyKey,
+        refusalReason: refusal.reason, batchId: request.batchId });
+      return { result: await lineResult(callers.person, recorded.proposal, "refused", refusal, null), replayed: recorded.replayed };
+    }
+  }
   const calendar = await resolveBriefCalendarBusy(callers.person, proposal.local_date, request.context);
   const moved = await moveOccurrenceForDay(await agentCaller(callers), {
     occurrenceId: proposal.occurrence_id,
@@ -798,6 +840,30 @@ async function settleMove(callers: BriefMoveCallers, proposal: ProposalRow, move
   return { result: await lineResult(callers.person, recorded.proposal, "applied", null, moved.move.id, moved.occurrence), replayed: moved.replayed || recorded.replayed };
 }
 
+/** The refusal reason a Yes records when a pairing line's host no longer stands. */
+export const PAIRING_HOST_CHANGED_REASON = "pairing_host_changed";
+
+/**
+ * Audit fix 2: null while the pairing's host is still unresolved at the start the line
+ * named (`pairingHostStands`); otherwise the refusal, with a cause the brief already
+ * shows: the host marked ("already marked"), or moved, edited or gone ("changed").
+ */
+async function pairingHostRefusal(person: OccurrenceMoveCaller, proposal: ProposalRow,
+  pairing: NonNullable<BriefMoveLine["pairing"]>): Promise<BriefMoveRefusal | null> {
+  const day = await readBriefMoveDay(person.supabase, person.userId, proposal.local_date);
+  if (pairingHostStands(day.items, pairing)) return null;
+  const host = day.items.find((item) => item.occurrenceId === pairing.hostOccurrenceId);
+  const title = pairing.hostTitle;
+  const marked = !!host && host.status !== "unresolved";
+  return {
+    reason: PAIRING_HOST_CHANGED_REASON,
+    message: marked ? noticeText("brief-moves.refused.already-marked", { title }) : noticeText("brief-moves.refused.item-changed", { title }),
+    alternatives: [],
+    revision: day.occurrences.get(proposal.occurrence_id)?.updated_at ?? null,
+    cause: { kind: marked ? "answered_elsewhere" : "item_changed", title, changedAfterBrief: true },
+  };
+}
+
 function closedRefusal(proposal: ProposalRow): BriefMoveRefusal {
   const title = lineFromRow(proposal)?.title;
   return {
@@ -816,7 +882,7 @@ function slotView(day: BriefMoveDay, occurrenceId: string, calendarBusy: readonl
   return {
     blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, occurrenceId, positions),
-      ...calendarBusy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end, ...(event.title ? { title: event.title } : {}) })),
+      ...briefMoveCalendarBlocks(calendarBusy),
       ...travelBlocksFor(travel, occurrenceId),
     ], briefMoveOverlapSubject(day.items, occurrenceId)),
     before: stop?.beforeSeconds ?? 0,
@@ -947,6 +1013,10 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
   const travel = briefMoveTravel(request.context.travelTimes, travelInput(callers, request.localDate));
   /** Occurrence id to the line that now stands for it (null: none). */
   const outcome = new Map<string, Readonly<{ proposalId: string; line: BriefMoveLine | null }>>();
+  // Audit fix 6: the coach's evidence, read once and only when a pairing line needs it, on
+  // the Daily Brief agent's own client, so the done_together host still comes first.
+  let evidence: AlongsidePairingEvidence | undefined;
+  const pairingEvidence = async () => evidence ??= await readAlongsidePairingEvidence(await callers.agent(), request.localDate);
 
   for (const row of latest.values()) {
     if (row.status !== "proposed") continue;
@@ -969,7 +1039,7 @@ export async function recheckBriefMoves(callers: BriefMoveCallers, request: Brie
     let candidate: BriefMoveCandidate | null;
     if (pairing) {
       // The one rule pairs the guest again (the same host at its new time, or another), or the line closes.
-      candidate = repairedPairing(day, row, line, { now: person.now, calendar, travel, positions });
+      candidate = repairedPairing(day, row, line, { now: person.now, calendar, travel, positions, evidence: await pairingEvidence() });
     } else if (check.ok && !passed) {
       // The time still fits but the item changed (edited, or moved and back): the same
       // move, rebuilt from the item as it is, so Yes is not refused for a stale revision.
@@ -1029,17 +1099,19 @@ function googleProvenance(proposal: ProposalRow, serverCalendar: BriefServerCale
 /**
  * Ticket 361: a pairing line's guest paired again on the day as it is now, holding the
  * other open lines' times. The need was found when the line was written, so it is not
- * asked again. Null when no host fits.
+ * asked again; the evidence still orders the hosts. Null when no host fits.
  */
 function repairedPairing(day: BriefMoveDay, row: ProposalRow, line: BriefMoveLine, input: Readonly<{
   now: Temporal.Instant; calendar: readonly BriefMoveCalendarBusy[]; travel: BriefMoveTravelInput | null;
   positions: ReadonlyMap<string, BriefMoveInterval>; excludeHosts?: ReadonlySet<string>;
+  /** The coach's evidence, so a host the done_together signal names still comes first. */
+  evidence: AlongsidePairingEvidence;
 }>): BriefMoveCandidate | null {
   const positions = new Map(input.positions);
   positions.delete(row.occurrence_id);
   const [next] = planAlongsidePairings({
     localDate: row.local_date, timezone: line.timezone, now: input.now, items: day.items, calendarBusy: input.calendar,
-    travel: input.travel, evidence: { doneTogether: [], crowdedHours: [] }, positions,
+    travel: input.travel, evidence: input.evidence, positions,
     onlyGuests: new Set([row.occurrence_id]), requireNeed: false, limit: 1,
     ...(input.excludeHosts ? { excludeHosts: input.excludeHosts } : {}),
   });
@@ -1169,7 +1241,8 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
   // Ticket 361: Re-plan on a pairing line pairs the guest with another host, or offers nothing.
   if (old.pairing && alongsideEnabled()) {
     const candidate = repairedPairing(day, proposal, old, { now: person.now, calendar: serverCalendar.busy, travel,
-      positions: openLinePositions(latest.values()), excludeHosts: new Set([old.pairing.hostOccurrenceId]) });
+      positions: openLinePositions(latest.values()), excludeHosts: new Set([old.pairing.hostOccurrenceId]),
+      evidence: await readAlongsidePairingEvidence(await callers.agent(), proposal.local_date) });
     if (!candidate) return { line: null, replacedProposalId: proposal.id };
     const [line] = await saveBriefProposals(await callers.agent(), {
       runId: proposal.agent_run_id, localDate: proposal.local_date, refresh: false, candidates: [candidate],
@@ -1186,7 +1259,8 @@ export async function replanBriefMove(callers: BriefMoveCallers, request: BriefM
     near: Temporal.Instant.from(old.to.startAt), lengthSeconds: old.length.minutes * 60,
     blocks: briefMoveBlocksForSubject([
       ...briefMoveItemBlocks(day.items, item.occurrenceId, openLinePositions(latest.values())),
-      ...serverCalendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end })),
+      ...serverCalendar.busy.map((event) => ({ kind: "calendar" as const, ref: event.ref, start: event.start, end: event.end,
+        ...(event.eventPlace ? { eventPlace: event.eventPlace } : {}) })),
       ...travelBlocksFor(travel, item.occurrenceId),
     ], briefMoveOverlapSubject(day.items, item.occurrenceId)),
     travelBeforeSeconds: stop?.beforeSeconds, travelAfterSeconds: stop?.afterSeconds,

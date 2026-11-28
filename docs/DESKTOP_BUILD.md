@@ -772,6 +772,18 @@ Ticket 299 adds the Settings card and the Daily Brief wiring.
   `VITE_CADENCE_CHATGPT_PLAN=1 npm run desktop:dev` (or set it for the dev-signed build);
   the hosted deployment also needs `CADENCE_DAILY_BRIEF_DEVICE_MODEL`, which stays unset in
   production.
+- Ticket 363 switch (D33): the alongside setting (form field, Timeline label and row
+  question, the brief's alongside question and alongside in exports) exists only in a
+  build with `VITE_CADENCE_ALONGSIDE=1` (`apps/desktop/src/alongside.ts`). Release and
+  preview builds pin an empty value and the signing check refuses a set one, so published
+  builds stay dark until the owner turns the feature on (Ticket 365). On a linked Mac the
+  hosted `GET /api/behaviors/alongside` also decides: `enabled: false` (production with
+  `CADENCE_ALONGSIDE` off) hides every alongside surface for that account, and export,
+  BehaviorLog import and restore then leave the answer out as with the switch off. The
+  Mac reads the guesses after the account changes and after each completed
+  synchronization, otherwise at most once a minute. The column itself syncs in every
+  build (contract 10). For installed acceptance, set the switch for
+  the dev-signed build and use a hosted deployment with `CADENCE_ALONGSIDE=on`.
 - Ticket 299 flow, with the switch on, ChatGPT connected with plan usage and Settings
   reporting `deviceModelAvailable`: `POST /api/advisor/brief/device/prepare`, the plan
   model call (`chooseChatGPTPlanModel`, `generateChatGPTPlanDailyBrief`), then

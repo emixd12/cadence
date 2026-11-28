@@ -16,6 +16,7 @@ import type { OccurrenceFormAction, TimeTrackingFormAction, TimelineOccurrenceIn
 import { BRIEF_MOVE_FIXTURE_BRIEFING, fixtureBriefMoveClient } from "./brief-move-fixtures";
 import {
   ADVISOR_FIXTURE_CHECK_IN,
+  ADVISOR_FIXTURE_PAIRING_PROPOSAL,
   ADVISOR_FIXTURE_PROPOSAL,
   ADVISOR_FIXTURE_LINK_TIP,
   ADVISOR_FIXTURE_QUESTION_TIP,
@@ -28,10 +29,10 @@ import {
 
 /**
  * Advisor plan Phase 4 (4E): the built advisor (placement K) on the real Timeline, with
- * synthetic data. /design-system?preview=advisor&state=tip|brief|proposal|tipquestion|tiplink|checkin|trial|refused|none
+ * synthetic data. /design-system?preview=advisor&state=tip|brief|proposal|pairing|tipquestion|tiplink|checkin|trial|refused|none
  * The horse opens the panel; nothing is saved.
  */
-export type AdvisorBenchState = "tip" | "brief" | "proposal" | "tipquestion" | "tiplink" | "checkin" | "trial" | "refused" | "none";
+export type AdvisorBenchState = "tip" | "brief" | "proposal" | "pairing" | "tipquestion" | "tiplink" | "checkin" | "trial" | "refused" | "none";
 
 const TIMEZONE = "America/New_York";
 
@@ -70,6 +71,7 @@ const OPTIONS: Readonly<Record<AdvisorBenchState, AdvisorFixtureOptions>> = {
   tip: { tip: ADVISOR_FIXTURE_TIP },
   brief: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_TRIAL },
   proposal: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_PROPOSAL },
+  pairing: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_PAIRING_PROPOSAL },
   tipquestion: { tip: ADVISOR_FIXTURE_QUESTION_TIP, proposal: ADVISOR_FIXTURE_TIP_QUESTION },
   tiplink: { tip: ADVISOR_FIXTURE_LINK_TIP },
   checkin: { tip: ADVISOR_FIXTURE_TIP, proposal: ADVISOR_FIXTURE_CHECK_IN },

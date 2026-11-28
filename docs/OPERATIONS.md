@@ -2088,22 +2088,77 @@ before Ticket 356: planners read the cached model guess, then false, the estimat
 asks the model about alongside for every Behavior, and no web code reads
 `behaviors.alongside`. Default: off. Server-only.
 
-Turn it on only after migration `20261125140000_behavior_alongside.sql` is on the
-database: with the flag on, the move-day read selects the column. The migration is
+Turn it on only after all ten alongside migrations are on the database:
+
+1. `20261125140000_behavior_alongside.sql`
+2. `20261125150000_advisor_estimate_where_guess.sql`
+3. `20261125180000_alongside_mcp_and_portability.sql`
+4. `20261125190000_advisor_estimate_where_guess_writer.sql`
+5. `20261126200000_alongside_pairing_evidence_and_brief_asks.sql`
+6. `20261126210000_alongside_schedule_pairing.sql`
+7. `20261126220000_account_sync_alongside.sql` (before the Ticket 363 code deploys)
+8. `20261126230000_where_guess_dismissal_without_labels.sql` (Ticket 383)
+9. `20261126250000_account_sync_where_guess_dismissals.sql` (Ticket 383, Cadence for Mac)
+10. `20261126260000_account_sync_alongside_history.sql` (Ticket 363, Cadence for Mac)
+
+The seventh differs: it must reach the database before the Ticket 363 code deploys,
+whatever the flag (below). With the flag on, the move-day read selects the column. The migration is
 additive and grants nothing new, so it fits the standing approval for additive
 migrations (`docs/DECISIONS.md`, 2026-11-10) once its conditions hold. The owner turns
 the flag on in Production after Ticket 365's acceptance. Turning it off again restores
 the guess-only behavior at once; stored answers stay.
 
-The column is hosted-only until Ticket 363: account sync contract 9 leaves it out and
-a Mac write keeps the stored answer (`docs/DATA_MODEL.md`, "Alongside setting").
+The ninth must reach the database no later than the eighth. The eighth lets the web store
+a guess dismissal while Completion places is off; without the ninth, Cadence for Mac on
+account sync contracts 8 to 10 (0.1.14 to 0.1.17 and earlier builds of this branch) would
+delete that row on an ordinary sync or fail a first-link replacement on it. The ninth
+hides such rows from those contracts and registers contract 11. It must also reach the
+database before a contract-11 Mac build is used, since the server refuses an unknown
+contract. It inserts one contract-registry row and changes the projection and apply
+functions for older contracts, so it needs the owner's yes before a hosted push.
+
+The tenth must reach the database before the flag turns on, and after the ninth, whose
+registry it uses. Only with the flag on can a configuration revision name the answer.
+Cadence for Mac on account sync contracts 8 and 9 (0.1.14 to 0.1.17) would then fail every
+export on that changed field. The tenth hides the answer's history from those contracts:
+no event they read names it, a revision that changed only the answer is hidden, and a
+Behavior or Occurrence pointing at one reads as pointing at the revision before it. It
+inserts one contract-registry row and changes the projection and apply functions for
+older contracts, so it needs the owner's yes before a hosted push. Push it with the
+seventh and ninth.
+
+One more alongside migration is not needed for the flag but orders a content change:
+`20261126240000_alongside_tip_link_target.sql` (Ticket 385) lets a tip link open a
+Behavior's alongside control. It must be on the database before the advice card
+`do-it-during-something-else` is activated (status `active`, with `reviewer` and
+`reviewed_at`). While the card is a draft, no code path writes that link target. It
+replaces a check constraint, so it is not additive and the standing approval does not
+cover its hosted push; the owner approves it.
+
+Since Ticket 363 the column syncs at account sync contract 10 and is part of
+configuration history, whatever the flag (schema is schema). An unanswered Behavior's
+history names the answer nowhere: no changed field and no snapshot key, flag on or off
+(defect D1 of the 2026-11-26 local acceptance). With the flag off nothing writes an
+answer, so deploying this code with the flag off writes history byte for byte as
+before. Migration
+`20261126220000_account_sync_alongside.sql` must reach the database before a build of
+this code deploys: it replaces the `changed_fields` check constraint and inserts one
+contract-registry row, as the sub-behaviors contract did, so it needs the owner's yes
+before a hosted push. With the flag off, web code still selects the column by name
+nowhere; `GET /api/behaviors/alongside` answers `enabled: false`, and a linked Cadence for
+Mac then shows no alongside surface. The Mac's own switch is the build variable
+`VITE_CADENCE_ALONGSIDE`, which release and preview builds force empty
+(`docs/DESKTOP_BUILD.md`). See `docs/DATA_MODEL.md`, "Alongside setting".
 
 Since Ticket 364 the flag also selects the MCP contract edition and the export shape.
 With it on, the MCP endpoint, its errors and Cadence chat's tool list speak contract
 1.9.0 (`alongside` on Behaviors and Occurrences, optional on `create_behavior` and
-`update_behavior`), and Full JSON, JSONL, CSV and BehaviorLog exports carry the answer;
-BehaviorLog import and restore read it. With it off they serve contract 1.8.0 and the
-pre-364 export bytes. Turn it on only after migration
+`update_behavior`), and Full JSON, JSONL, CSV and BehaviorLog exports carry the answer,
+in configuration history too; BehaviorLog import and restore read it. With it off they
+serve contract 1.8.0 and the pre-364 export bytes for an account without an answer
+(pinned by `tests/export-import-restore-alongside.test.ts`). An answered account's
+flag-off export names the answer nowhere and leaves out revisions that changed only the
+answer (`docs/EXPORT_FORMATS.md`). Turn it on only after migration
 `20261125180000_alongside_mcp_and_portability.sql` is also on the database: it keeps
 the answer in MCP write receipts and lets import and restore store it. Without it, an
 MCP write would report the answer as null and an import or restore would drop it.

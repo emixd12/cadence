@@ -325,9 +325,6 @@ begin
     -- Server-only derived columns that the snapshot leaves out (advisor Phase 2A):
     -- effective time is derived on each device from the synced occurrence_move rows.
     and not (c.table_name = 'occurrences' and c.column_name in ('effective_start_at', 'effective_end_at'))
-    -- Hosted-only until Ticket 363 (D33): the snapshot leaves the alongside answer out and
-    -- a synced Behavior write keeps it (tests/sql/behavior-alongside-smoke.sql).
-    and not (c.table_name = 'behaviors' and c.column_name = 'alongside')
     and not exists (
       select 1 from cadence_private.account_sync_contract_additions addition
       where addition.kind = kinds ->> c.table_name and addition.field = c.column_name and addition.contract > 3
@@ -349,7 +346,10 @@ begin
   -- Contract 7 replaces the Behavior end_date with end_on, end_time and the pause fields.
   -- Contract 8 adds behaviors.is_opportunity and occurrences.origin and added_by.
   -- Contract 9 adds the sub-behavior link fields on Behaviors.
-  if cadence_private.account_sync_current_contract() <> 9 then
+  -- Contract 10 adds behaviors.alongside, the person's alongside answer (Ticket 363).
+  -- Contract 11 adds no column or kind; it shows a guess dismissal stored while labels are
+  -- off (Ticket 383, account_sync_contract_row_rules).
+  if cadence_private.account_sync_current_contract() <> 11 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
@@ -392,6 +392,33 @@ begin
       jsonb_build_object('kind', 'occurrence', 'id', 'o', 'value', jsonb_build_object('id', 'o', 'origin', 'opportunity', 'added_by', 'user'))
     )), 7) -> 'entities' <> '[{"id": "b", "kind": "behavior", "value": {"id": "b"}}, {"id": "o", "kind": "occurrence", "value": {"id": "o"}}]'::jsonb then
     raise exception 'Contract 7 projection no longer hides the contract 8 opportunity fields.';
+  end if;
+  if cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'behavior', 'id', 'b', 'value', jsonb_build_object('id', 'b', 'alongside', true))
+    )), 9) -> 'entities' -> 0 -> 'value' <> '{"id": "b"}'::jsonb then
+    raise exception 'Contract 9 projection no longer hides the contract 10 alongside answer.';
+  end if;
+  -- Contract 11: a guess dismissal is hidden from older contracts only while labels are off.
+  if cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'where_suggestion_dismissal', 'id', 'g', 'value', jsonb_build_object('id', 'g', 'suggestion', 'home')),
+      jsonb_build_object('kind', 'where_suggestion_dismissal', 'id', 's', 'value', jsonb_build_object('id', 's', 'suggestion', 'saved_place:x'))
+    )), 10) -> 'entities' <> '[{"id": "s", "kind": "where_suggestion_dismissal", "value": {"id": "s", "suggestion": "saved_place:x"}}]'::jsonb then
+    raise exception 'Contract 10 projection no longer hides a guess dismissal while labels are off.';
+  end if;
+  if jsonb_array_length(cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'place_label_settings', 'id', 'place_labels', 'value', jsonb_build_object('id', 'place_labels', 'enabled', true)),
+      jsonb_build_object('kind', 'where_suggestion_dismissal', 'id', 'g', 'value', jsonb_build_object('id', 'g', 'suggestion', 'home'))
+    )), 10) -> 'entities') <> 2 then
+    raise exception 'Contract 10 projection hides a guess dismissal while labels are on.';
+  end if;
+  if jsonb_array_length(cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'where_suggestion_dismissal', 'id', 'g', 'value', jsonb_build_object('id', 'g', 'suggestion', 'home'))
+    )), 11) -> 'entities') <> 1 then
+    raise exception 'Contract 11 projection hides a guess dismissal.';
   end if;
 end;
 $$;

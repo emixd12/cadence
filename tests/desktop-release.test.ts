@@ -63,7 +63,7 @@ describe("desktop release preparation", () => {
     const caller = { PATH: "/release/tools", CI: "false", APPLE_ID: "secret-id", APPLE_PASSWORD: "secret-password",
       APPLE_CERTIFICATE: "secret-certificate", APPLE_API_KEY_PATH: "/private/key", APPLE_SIGNING_IDENTITY: "Developer ID Application: Example",
       TAURI_SIGNING_PRIVATE_KEY: "updater-private-key", TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "updater-password", TAURI_CONFIG: "unreviewed", TAURI_BUNDLER_DMG_IGNORE_CI: "true" };
-    expect(createPreviewBuildEnvironment(caller)).toEqual({ PATH: "/release/tools", CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", VITE_CADENCE_CHATGPT_PLAN: "",
+    expect(createPreviewBuildEnvironment(caller)).toEqual({ PATH: "/release/tools", CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", VITE_CADENCE_CHATGPT_PLAN: "", VITE_CADENCE_ALONGSIDE: "",
       CADENCE_LEGACY_KEYCHAIN_QA: "1", TAURI_SIGNING_PRIVATE_KEY: "updater-private-key", TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "updater-password" });
     expect(caller.APPLE_PASSWORD).toBe("secret-password");
     const publicAuth = { VITE_SUPABASE_URL: "https://project.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test" };
@@ -107,7 +107,7 @@ describe("desktop release preparation", () => {
   it("disables Finder scripting even when the caller environment overrides CI defaults", () => {
     const caller = { CI: "false", TAURI_BUNDLER_DMG_IGNORE_CI: "true", CADENCE_LEGACY_KEYCHAIN_QA: "1", PATH: "/release/tools" };
     expect([createReleaseBuildEnvironment(caller), caller]).toEqual([
-      { CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", PATH: "/release/tools", VITE_CADENCE_CHATGPT_PLAN: "" },
+      { CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false", PATH: "/release/tools", VITE_CADENCE_CHATGPT_PLAN: "", VITE_CADENCE_ALONGSIDE: "" },
       { CI: "false", TAURI_BUNDLER_DMG_IGNORE_CI: "true", CADENCE_LEGACY_KEYCHAIN_QA: "1", PATH: "/release/tools" },
     ]);
   });
@@ -221,5 +221,8 @@ describe("desktop release preparation", () => {
     // Ticket 299: a published build never turns on the hidden ChatGPT plan feature.
     expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_CHATGPT_PLAN: "1" }).join(" ")).toContain("VITE_CADENCE_CHATGPT_PLAN");
     expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_CHATGPT_PLAN: "" })).toEqual([]);
+    // Ticket 363: nor the alongside setting, until the owner turns it on (Ticket 365).
+    expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_ALONGSIDE: "1" }).join(" ")).toContain("VITE_CADENCE_ALONGSIDE");
+    expect(validateSigningEnvironment({ ...credentials, VITE_CADENCE_ALONGSIDE: "" })).toEqual([]);
   });
 });

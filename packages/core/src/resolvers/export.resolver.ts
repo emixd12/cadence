@@ -234,10 +234,12 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
     behaviorDefinitionEvents: input.behaviorDefinitionEvents ?? [],
     behaviorById,
   });
-  const behaviorConfigurationEvents = toJsonBehaviorConfigurationEvents({
+  const configurationHistory = toJsonBehaviorConfigurationEvents({
     behaviorConfigurationEvents: input.behaviorConfigurationEvents ?? [],
     behaviorById,
+    includeAlongside,
   });
+  const behaviorConfigurationEvents = configurationHistory.events;
   const behaviorConfigurationEventById = new Map(
     behaviorConfigurationEvents.map((event) => [event.id, event]),
   );
@@ -252,6 +254,13 @@ export function resolveExportBundle(input: ResolveExportInput): ExportBundle {
         Temporal.Instant.compare(retained.scheduledForUtc, occurrence.scheduledFor) === 0
         ? { ...occurrence, timezone: retained.timezone, behaviorConfigurationEventId: retained.configurationEventId }
         : occurrence;
+    })
+    .map((occurrence) => {
+      // An occurrence of a left-out answer-only revision belongs to the revision before it.
+      const kept = occurrence.behaviorConfigurationEventId
+        ? configurationHistory.keptEventIdByOmittedId.get(occurrence.behaviorConfigurationEventId)
+        : undefined;
+      return kept ? { ...occurrence, behaviorConfigurationEventId: kept } : occurrence;
     });
   const occurrences = includedOccurrences.map((occurrence) =>
       toJsonOccurrence({
@@ -546,26 +555,52 @@ function toJsonBehaviorDefinitionEvents(input: {
     }));
 }
 
+/**
+ * D33 (Ticket 363, defect D1). With alongside included, each snapshot of an event that
+ * carries the answer, or whose changed fields name it, holds `alongside`, so an answer
+ * change exports differing snapshots. Without it, no snapshot and no changed field names
+ * the answer, and a revision that changed only the answer is left out: it changed nothing
+ * this export shows. Its occurrences then belong to the closest earlier revision of the
+ * same Behavior that is kept (`keptEventIdByOmittedId`), so the history chain stays whole.
+ * An account without an answer exports the bytes it did before the setting existed.
+ */
 function toJsonBehaviorConfigurationEvents(input: {
   behaviorConfigurationEvents: ExportBehaviorConfigurationEventInput[];
   behaviorById: Map<string, ExportBehaviorInput>;
-}): ExportJsonBehaviorConfigurationEvent[] {
-  return input.behaviorConfigurationEvents
+  includeAlongside: boolean;
+}): { events: ExportJsonBehaviorConfigurationEvent[]; keptEventIdByOmittedId: Map<string, string> } {
+  const events: ExportJsonBehaviorConfigurationEvent[] = [];
+  const keptEventIdByOmittedId = new Map<string, string>();
+  const lastKeptEventIdByBehaviorId = new Map<string, string>();
+  for (const event of input.behaviorConfigurationEvents
     .filter((event) => input.behaviorById.has(event.behaviorId))
-    .sort(compareBehaviorConfigurationEvents)
-    .map((event) => ({
+    .sort(compareBehaviorConfigurationEvents)) {
+    const changedFields = BEHAVIOR_CONFIGURATION_CHANGED_FIELDS.filter((field) =>
+      event.changedFields.includes(field) && (input.includeAlongside || field !== "alongside"),
+    );
+    const previousKept = lastKeptEventIdByBehaviorId.get(event.behaviorId);
+    if (changedFields.length === 0 && event.eventKind === "revision" && previousKept) {
+      keptEventIdByOmittedId.set(event.id, previousKept);
+      continue;
+    }
+    const alongside = input.includeAlongside && (
+      event.changedFields.includes("alongside")
+      || event.previousConfiguration?.alongside !== undefined
+      || event.nextConfiguration.alongside !== undefined
+    );
+    lastKeptEventIdByBehaviorId.set(event.behaviorId, event.id);
+    events.push({
       id: event.id,
       behavior_id: event.behaviorId,
       event_kind: event.eventKind,
       previous_configuration: event.previousConfiguration
-        ? toJsonBehaviorConfigurationSnapshot(event.previousConfiguration)
+        ? toJsonBehaviorConfigurationSnapshot(event.previousConfiguration, alongside)
         : null,
       next_configuration: toJsonBehaviorConfigurationSnapshot(
         event.nextConfiguration,
+        alongside,
       ),
-      changed_fields: BEHAVIOR_CONFIGURATION_CHANGED_FIELDS.filter((field) =>
-        event.changedFields.includes(field),
-      ),
+      changed_fields: changedFields,
       recorded_at: formatUtc(event.recordedAt),
       effective_at: formatUtc(event.effectiveAt),
       effective_local_date: event.effectiveLocalDate,
@@ -573,11 +608,14 @@ function toJsonBehaviorConfigurationEvents(input: {
       source: event.source,
       reason_code: event.reasonCode,
       created_at: event.createdAt,
-    }));
+    });
+  }
+  return { events, keptEventIdByOmittedId };
 }
 
 function toJsonBehaviorConfigurationSnapshot(
   snapshot: ExportBehaviorConfigurationEventInput["nextConfiguration"],
+  includeAlongside = false,
 ): ExportJsonBehaviorConfigurationSnapshot {
   return {
     category_id: snapshot.categoryId,
@@ -608,6 +646,7 @@ function toJsonBehaviorConfigurationSnapshot(
       parent_behavior_id: snapshot.parentBehaviorId,
       inherit_parent_schedule: snapshot.inheritParentSchedule ?? true,
     } : {}),
+    ...(includeAlongside ? { alongside: snapshot.alongside ?? null } : {}),
   };
 }
 
@@ -2384,6 +2423,8 @@ function toBehaviorLogConfigurationEvents(input: {
           parent_behavior_id: value.parent_behavior_id,
           inherit_parent_schedule: value.inherit_parent_schedule ?? false,
         } : {}),
+        // D33: present only when the export includes alongside and the event carries it.
+        ...(value.alongside === undefined ? {} : { alongside: value.alongside }),
       } },
     });
     const previous = event.previous_configuration ? snapshot(event.previous_configuration) : null;

@@ -21,8 +21,9 @@ vi.mock("@/lib/services/alongside-pairing.service", async (original) => ({
   readAlongsidePairingEvidence: mocks.evidence,
 }));
 
-import { planBriefMoveDay, recheckBriefMoves, replanBriefMove, type BriefMoveCallers } from "@/lib/services/brief-moves.service";
-import { pairingEvidenceFromSignals } from "@/lib/services/alongside-pairing.service";
+import { answerBriefMove, planBriefMoveDay, recheckBriefMoves, replanBriefMove, type BriefMoveCallers } from "@/lib/services/brief-moves.service";
+import { readAcceptedBriefPairings } from "@/lib/db/alongside-schedule-pairing.repo";
+import { pairingEvidenceFromRpc } from "@/lib/db/pairing-evidence.repo";
 import { planBriefMoveLinesFromInputs } from "@cadence/core/resolvers/brief-move.resolver";
 import {
   BRIEF_OPENING_INSTRUCTIONS, BRIEF_OPENING_PAIRING_INSTRUCTIONS, BRIEF_OPENING_PAIRING_PROMPT_REVISION, BRIEF_OPENING_SCHEMA,
@@ -128,9 +129,10 @@ afterEach(() => { vi.unstubAllEnvs(); });
 const PAIRABLE = () => [helmet(), item("reading", "20:00", 45, { title: "reading" }), item("tv", "21:30", 60, { title: "tv" })];
 
 describe("planBriefMoveDay pairing lines", () => {
+  const agentClient = { channel: "daily_brief" } as never;
   const run = (items: readonly BriefMoveDayItem[]) => planBriefMoveDay({
     supabase: fakeSupabase({}) as never, userId: USER, localDate: DAY, timezone: TZ, now: NOW, context: null, planning: {},
-    travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS, day: day(items) as never,
+    travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS, day: day(items) as never, evidenceClient: agentClient,
   });
 
   it("flag off: no pairing line and no evidence read", async () => {
@@ -142,7 +144,8 @@ describe("planBriefMoveDay pairing lines", () => {
   it("flag on: a pairing line after the move lines, from the coach's evidence", async () => {
     vi.stubEnv("CADENCE_ALONGSIDE", "on");
     const plan = await run(PAIRABLE());
-    expect(mocks.evidence).toHaveBeenCalledWith(USER, DAY);
+    // The Daily Brief agent's own client, never a coach client.
+    expect(mocks.evidence).toHaveBeenCalledWith(agentClient, DAY);
     expect(plan.candidates.map((line) => [line.occurrenceId, line.reasonCode, line.pairing?.hostOccurrenceId])).toEqual([["helmet", "alongside_pairing", "reading"]]);
   });
 
@@ -210,6 +213,96 @@ describe("Re-check and Re-plan of a pairing line", () => {
   });
 });
 
+describe("Re-check and Re-plan keep the coach's evidence (audit fix 6)", () => {
+  beforeEach(() => { vi.stubEnv("CADENCE_ALONGSIDE", "on"); });
+  const withBath = () => [...PAIRABLE(), item("bath", "19:00", 45, { title: "bath" })];
+
+  it("Re-plan prefers the host the done_together signal names over a nearer one", async () => {
+    mocks.evidence.mockResolvedValue({ doneTogether: [{ behaviorId: "b-helmet", otherBehaviorId: "b-tv" }], crowdedHours: [] });
+    const items = withBath();
+    mocks.readDay.mockResolvedValue(day(items));
+    const { callers: c } = callers({ move_proposals: [pairingRow(items)] });
+    const result = await replanBriefMove(c, { proposalId: PROPOSAL, context: { calendarBusy: [] } });
+    expect(result.line).toMatchObject({ pairing: { hostOccurrenceId: "tv" } });
+    expect(mocks.evidence).toHaveBeenCalledWith(expect.anything(), DAY);
+  });
+
+  it("Re-check pairs again with the named host when the offered one left", async () => {
+    mocks.evidence.mockResolvedValue({ doneTogether: [{ behaviorId: "b-helmet", otherBehaviorId: "b-tv" }], crowdedHours: [] });
+    const items = withBath();
+    const row = pairingRow(items);
+    mocks.readDay.mockResolvedValue(day(items.map((entry) => entry.occurrenceId === "reading" ? { ...entry, status: "completed" as const } : entry)));
+    const { callers: c } = callers({ move_proposals: [row] });
+    const { replaced } = await recheckBriefMoves(c, { localDate: DAY, context: { calendarBusy: [] }, proposalIds: [PROPOSAL] });
+    expect(replaced[0]!.line).toMatchObject({ pairing: { hostOccurrenceId: "tv" } });
+  });
+
+  it("Re-check reads no evidence when no pairing line needs repair", async () => {
+    const items = PAIRABLE();
+    mocks.readDay.mockResolvedValue(day(items));
+    const { callers: c } = callers({ move_proposals: [pairingRow(items)] });
+    await recheckBriefMoves(c, { localDate: DAY, context: { calendarBusy: [] }, proposalIds: [PROPOSAL] });
+    expect(mocks.evidence).not.toHaveBeenCalled();
+  });
+});
+
+describe("Yes and Accept all on a pairing line (audit fix 2)", () => {
+  beforeEach(() => { vi.stubEnv("CADENCE_ALONGSIDE", "on"); });
+  const context = { calendarBusy: [] };
+
+  /** The person's answer_move_proposal: a refused answer leaves the line's status as it was. */
+  function personRpc(row: Row) {
+    return vi.fn(async (name: string, args: Record<string, unknown>) => {
+      if (name !== "answer_move_proposal") throw new Error(`unexpected ${name}: no move may run`);
+      return { data: { replayed: false, proposal: { ...row, status: args.p_outcome === "refused" ? row.status : "accepted" } }, error: null };
+    });
+  }
+  function personCallers(tables: Record<string, Row[]>, rpc: ReturnType<typeof personRpc>): BriefMoveCallers {
+    const person = fakeSupabase(tables, rpc) as never;
+    return { person: { supabase: person, userId: USER, now: NOW }, agent: async () => fakeSupabase({}, agentRpc()) as never, travelSecrets: NO_TRAVEL_CONCLUSIONS_SECRETS };
+  }
+
+  it.each([
+    ["moved", (entry: BriefMoveDayItem) => ({ ...entry, start: local("20:30"), end: local("21:15") }), "reading changed after this brief was written.", "item_changed"],
+    ["completed", (entry: BriefMoveDayItem) => ({ ...entry, status: "completed" }), "reading is already marked.", "answered_elsewhere"],
+    ["archived (gone from the day)", null, "reading changed after this brief was written.", "item_changed"],
+  ] as const)("Yes is refused when the host %s, and no move runs", async (_label, change, message, cause) => {
+    const items = PAIRABLE();
+    const row = pairingRow(items);
+    const now = change ? items.map((entry) => entry.occurrenceId === "reading" ? change(entry) as BriefMoveDayItem : entry)
+      : items.filter((entry) => entry.occurrenceId !== "reading");
+    mocks.readDay.mockResolvedValue(day(now));
+    const rpc = personRpc(row);
+    const response = await answerBriefMove(personCallers({ move_proposals: [row], occurrence_moves: [] }, rpc),
+      { kind: "yes", proposalId: PROPOSAL, expectedRevision: row.expected_revision as string, context, idempotencyKey: "k-1" } as never);
+    expect(response.results[0]).toMatchObject({ outcome: "refused", refusal: { reason: "pairing_host_changed", message, cause: { kind: cause, title: "reading" } } });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("answer_move_proposal", expect.objectContaining({ p_kind: "yes", p_outcome: "refused", p_refusal_reason: "pairing_host_changed" }));
+  });
+
+  it("Accept all refuses the stale pairing line the same way", async () => {
+    const items = PAIRABLE();
+    const row = pairingRow(items);
+    mocks.readDay.mockResolvedValue(day(items.map((entry) => entry.occurrenceId === "reading" ? { ...entry, status: "completed" as const } : entry)));
+    const rpc = personRpc(row);
+    const response = await answerBriefMove(personCallers({ move_proposals: [row], occurrence_moves: [] }, rpc), {
+      kind: "accept_all", context, idempotencyKey: "k-all",
+      lines: [{ proposalId: PROPOSAL, expectedRevision: row.expected_revision as string }],
+    } as never);
+    expect(response.results.map((result) => [result.outcome, result.refusal?.reason])).toEqual([["refused", "pairing_host_changed"]]);
+    expect(rpc).toHaveBeenCalledWith("answer_move_proposal", expect.objectContaining({ p_kind: "accept_all", p_outcome: "refused" }));
+  });
+
+  it("a refused pairing line is not counted as accepted for the four-day rule", async () => {
+    const items = PAIRABLE();
+    const refused = pairingRow(items); // a refused answer leaves it "proposed"
+    const accepted = { ...pairingRow(items), id: "66666666-6666-4666-8666-666666666666", local_date: "2026-11-24", status: "accepted" };
+    const client = fakeSupabase({ move_proposals: [refused, accepted] }) as never;
+    expect(await readAcceptedBriefPairings(client, USER, { since: "2026-10-29", until: DAY }))
+      .toEqual([{ guestBehaviorId: "b-helmet", hostBehaviorId: "b-reading", localDate: "2026-11-24" }]);
+  });
+});
+
 describe("the brief's words for a pairing line", () => {
   const context = fixture as unknown as AdvisorDayContext;
   const base: BriefOpeningLine = {
@@ -240,12 +333,12 @@ describe("the brief's words for a pairing line", () => {
 });
 
 describe("pairing evidence", () => {
-  it("keeps only ids and hours from done_together and crowded_hour signals", () => {
-    expect(pairingEvidenceFromSignals([
-      { kind: "done_together", behaviorId: "b-1", facts: { other_behavior_id: "b-2", together_days: 9, pattern: "together" } },
-      { kind: "crowded_hour", behaviorId: null, facts: { hour: 19, items_in_hour: 3.4 } },
-      { kind: "crowded_hour", behaviorId: null, facts: { hour: 31 } },
-      { kind: "completion_drop", behaviorId: "b-3", facts: { other_behavior_id: "b-4" } },
-    ])).toEqual({ doneTogether: [{ behaviorId: "b-1", otherBehaviorId: "b-2" }], crowdedHours: [19] });
+  it("keeps only ids and whole hours from the function's answer", () => {
+    expect(pairingEvidenceFromRpc({
+      done_together: [{ behavior_id: "b-1", other_behavior_id: "b-2", together_days: 9 }, { behavior_id: "b-3" }, "b-4"],
+      crowded_hours: [19, 31, 7.5, "8"],
+      completion_drop: [{ behavior_id: "b-5" }],
+    })).toEqual({ doneTogether: [{ behaviorId: "b-1", otherBehaviorId: "b-2" }], crowdedHours: [19] });
+    expect(pairingEvidenceFromRpc({})).toEqual({ doneTogether: [], crowdedHours: [] });
   });
 });
