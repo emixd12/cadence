@@ -103,6 +103,22 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## MCP Apps: tunnel route and first Gemini run — November 28, 2026
+
+- **Tunnel route works:** `local-stack.mjs up --public-url <tunnel> --mcp-apps` puts a local
+  flag-on server behind a `cloudflared` URL. A scripted client completed sign-in, consent,
+  `show_day` and the view resource read through it.
+- **Gemini (consumer web, test account A):** connects through its custom connector after
+  one fix. Gemini's OAuth `state` is 1,170 characters; Cadence allowed 1,024 (Ticket 381,
+  now `in_progress`; the migration is not pushed to the hosted database). Gemini called
+  `show_day` and answered in text. It did not render the day view.
+- **Test account B's Google sign-in:** fixed in `scripts/acceptance/google-signin.mjs`
+  (passkey dialog). The preflight step is no longer an owner step.
+- **Not run:** ChatGPT web, Claude web, Claude Desktop and mobile, VS Code Copilot. The QA
+  Chrome profile is signed out of the owner's ChatGPT and Claude accounts. Tickets 375,
+  378 and 380 stay open on those hosts.
+- **Record:** `docs/qa/2026-11-28-mcp-apps-gemini-tunnel.md`.
+
 ## Vercel build billing optimization (Phases 1–3) — November 28, 2026
 
 - **Phase 1 (PR #438, merged `2b6038fc`):** path-filtered `ignoreCommand` scripts with

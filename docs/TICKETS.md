@@ -20858,7 +20858,7 @@ Messaging impact: `P-097`, `P-099`, `P-100`, `P-101`.
 
 ## Ticket 381: Host sign-in compatibility for consumer Gemini and VS Code
 
-Status: not_started
+Status: in_progress. November 28, 2026: the first Gemini run (`docs/qa/2026-11-28-mcp-apps-gemini-tunnel.md`) found one gap, outside the two this ticket predicted. Gemini sends `resource`, so that scope item is not needed. Gemini sends an OAuth `state` of 1,170 characters and Cadence allowed 1,024. The fix raises the limit to 4,096 in code and in migration `20261128060000_oauth_state_length.sql`; the security review is in the same note. With the fix on a local stack, Gemini signed in, listed 31 tools and called `show_day`. Remaining: push the migration to the hosted database, then merge; refresh-token behaviour over time on Gemini is not tested; VS Code is not run.
 
 Conditional: it starts only if Ticket 375 shows that a required host cannot complete Cadence's OAuth flow as it is.
 

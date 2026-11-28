@@ -224,6 +224,13 @@ node $S check --name $N                                     # every grant and to
 node $S down --name $N
 ```
 
+- **A real AI host (tunnel):** `up --public-url https://<name>.trycloudflare.com --mcp-apps`
+  makes a tunnel origin the issuer and turns MCP Apps on. Start
+  `cloudflared tunnel --url https://127.0.0.1:<app-port> --no-tls-verify` first to get the
+  URL. Test login stays loopback-only: sign in on `127.0.0.1` and copy that session cookie
+  to the tunnel host in the same browser. `tier0` and `tier1` do not run against a public
+  issuer. Stop the tunnel and run `down` when the host run ends. Record:
+  `docs/qa/2026-11-28-mcp-apps-gemini-tunnel.md`.
 - **Names and ports:** `<you>` is your ticket or agent tag (for example
   `cadence-accept-256`). Pick a free 10-port block for `--db-base` in 56000–56990
   (API base+1, DB base+2; avoid 57xxx and 553xx) and an app port in 4450–4459, the
