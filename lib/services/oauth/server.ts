@@ -77,6 +77,10 @@ export async function getOAuthClient(clientId: string) {
   return resolveClient(tokenEndpointClient(), clientId);
 }
 
+// Gemini's custom connector sends about 1,170 characters (Ticket 381). The database check
+// on pending_authorizations.state holds the same limit.
+export const OAUTH_STATE_MAX_LENGTH = 4096;
+
 export const pendingCookieName = (id: string) => `cadence_oauth_${id}`;
 
 async function authorize(request: Request, client: AppSupabaseClient) {
@@ -88,7 +92,7 @@ async function authorize(request: Request, client: AppSupabaseClient) {
   if (!redirectAllowed(registered.redirectUris, redirectUri)) throw new OAuthError("invalid_request");
   let state: string | null = null;
   try {
-    if (params.has("state")) state = required(params, "state", 1024);
+    if (params.has("state")) state = required(params, "state", OAUTH_STATE_MAX_LENGTH);
     if (params.get("response_type") !== "code") throw new OAuthError("unsupported_response_type");
     if (params.has("response_mode") && params.get("response_mode") !== "query") throw new OAuthError("invalid_request");
     if (params.get("resource") !== resource) throw new OAuthError("invalid_target");
