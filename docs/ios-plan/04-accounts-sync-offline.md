@@ -42,6 +42,9 @@ and an outbox, and sync when connectivity returns.
 - Creating, editing, pausing and ending Behaviors; Categories.
 - Local reminders: planning, scheduling, readback and coverage.
 - Local Export and BehaviorLog Import, in the portability engine.
+- Periods (D35): add, edit, end and remove. Account sync does not carry Periods yet
+  (contract 9 on `19d73443`); the Mac's Ticket 374 adds them, and the iPhone uses the
+  contract and SQLite migration that ticket defines.
 
 ### 2.2 Online-only, with an offline state
 
@@ -51,6 +54,7 @@ Each shows a plain offline state. None blocks tracking.
 |---|---|
 | Daily Brief, Coach tips and proposals, Chat, AI note patterns, Alongside and Where model guesses | "Needs a connection." Last delivered content stays visible where the web shows it |
 | Hosted connectors: Google, Outlook and iCloud Calendar; Hevy live refresh | Last fetched context shown with its age. No refresh |
+| Google Calendar for AI features (Calendar MCP grant, 2026-11-25), Chat travel cards, longitudinal calendar-load review | "Needs a connection." Never falls back to the Timeline REST grant |
 | Geoapify remote place search | Falls back to saved places, matched locally and instantly, plus free text |
 | Live Travel route lookups | Shows the last estimate with an offline note |
 
@@ -250,7 +254,8 @@ Hosted: Supabase, Next.js APIs
   iOS device, iOS simulator and macOS (host-side Swift tests). Release profile
   `debug = "line-tables-only"`, `strip = false`; upload symbols and keep every
   archive.
-- One schema and migration chain for desktop and iOS. On `64b78b80` the desktop
+- One schema and migration chain for desktop and iOS. On `19d73443` (unchanged since
+  `64b78b80`) the desktop
   SQLite chain ends at `0028_sub_behaviors.sql` (schema 28), and
   `ACCOUNT_SYNC_CONTRACT = 9` (`account-sync.resolver.ts:25`). CI compares
   migration hashes.
@@ -545,6 +550,7 @@ iOS track tickets them at activation.
 | Change | Web | Desktop |
 |---|---|---|
 | Incremental cursor or delta sync, with a sync contract bump | Yes | Yes |
+| Periods in account sync and SQLite (Ticket 374, blocked on Ticket 363) | Hosted functions exist | Yes |
 | `history_branch` as a reviewable conflict | Yes | Yes |
 | Uniqueness pre-pass in the planner | Yes | Yes |
 | Sync journal; `SyncCoordinator` into `packages/local-runtime` | — | Yes |
