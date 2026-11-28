@@ -218,10 +218,10 @@ Show a notice with `<Notice id="…" />` (`components/feedback/Notice.tsx`) or i
 
 | Notice | Style | Words | Where | Shown in |
 | --- | --- | --- | --- | --- |
-| `period.conflict` Says a Period was not saved, ended or removed because it changed somewhere else first; the editor then shows the latest version. | error | This period changed elsewhere. Review the latest version before saving again. | web, Mac | INT-PERIOD-002, INT-PERIOD-003, INT-PERIOD-004, `app/design-system/PeriodBench.tsx`, `components/periods/PeriodEditor.tsx`, `packages/core/src/types/period.ts`, `lib/services/period.service.ts` |
-| `period.ended` Confirms that End today set a Period's last day to today. | outcome | Period ended today. | web, Mac | INT-PERIOD-003, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `packages/core/src/types/period.ts` |
-| `period.removed` Confirms that a Period was removed. | outcome | Period removed. | web, Mac | INT-PERIOD-004, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `packages/core/src/types/period.ts` |
-| `period.saved` Confirms that a Period was added or its label, days or note were changed. | outcome | Period saved. | web, Mac | INT-PERIOD-001, INT-PERIOD-002, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `components/periods/PeriodEditor.tsx`, `packages/core/src/types/period.ts` |
+| `period.conflict` Says a Period was not saved, ended or removed because it changed somewhere else first; the editor then shows the latest version. | error | This period changed elsewhere. Review the latest version before saving again. | web, Mac | INT-PERIOD-002, INT-PERIOD-003, INT-PERIOD-004, `app/design-system/PeriodBench.tsx`, `components/periods/PeriodEditor.tsx`, `packages/core/src/types/period.ts`, `packages/core/src/services/period.service.ts` |
+| `period.ended` Confirms that End today set a Period's last day to today. | outcome | Period ended today. | web, Mac | INT-PERIOD-003, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `apps/desktop/src/local-period.service.ts`, `packages/core/src/types/period.ts` |
+| `period.removed` Confirms that a Period was removed. | outcome | Period removed. | web, Mac | INT-PERIOD-004, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `apps/desktop/src/local-period.service.ts`, `packages/core/src/types/period.ts` |
+| `period.saved` Confirms that a Period was added or its label, days or note were changed. | outcome | Period saved. | web, Mac | INT-PERIOD-001, INT-PERIOD-002, `app/(app)/timeline/actions.ts`, `app/design-system/PeriodBench.tsx`, `apps/desktop/src/local-period.service.ts`, `components/periods/PeriodEditor.tsx`, `packages/core/src/types/period.ts` |
 
 ## Reminders
 

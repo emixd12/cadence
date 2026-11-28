@@ -1,8 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import { noticeText } from "@cadence/core/notices";
 import {
-  PERIOD_MESSAGES,
   periodLabelSuggestions,
   periodsNewestFirst,
   toPeriodView,
@@ -10,8 +8,7 @@ import {
 } from "@cadence/core/resolvers/period.resolver";
 import { fixedClock, todayIn } from "@cadence/core/resolvers/time.resolver";
 import {
-  PERIOD_CONFLICT_MESSAGE,
-  PERIOD_LIMIT_MESSAGE,
+  periodErrorActionState,
   createPeriod,
   deletePeriod,
   endPeriod,
@@ -40,12 +37,8 @@ import { createClient } from "@/lib/supabase/server";
 
 const SIGN_IN_MESSAGE = "Sign in again before changing periods.";
 
-/** The sentences a person may read as they are: each names a rule or the next step. */
-const PERSON_MESSAGES: ReadonlySet<string> = new Set([
-  ...Object.values(PERIOD_MESSAGES),
-  PERIOD_LIMIT_MESSAGE,
-  SIGN_IN_MESSAGE,
-]);
+/** Shown as it is, beside the rule sentences the core service lists. */
+const ALSO_SHOWN: ReadonlySet<string> = new Set([SIGN_IN_MESSAGE]);
 
 /**
  * The action state for a failed Period write. A stale write names the
@@ -53,11 +46,7 @@ const PERSON_MESSAGES: ReadonlySet<string> = new Set([
  * other failure gets `fallback`, so provider text never reaches the screen.
  */
 export function periodErrorToActionState(error: unknown, fallback: string): PeriodActionState {
-  const message = error instanceof Error ? error.message : "";
-  if (message === PERIOD_CONFLICT_MESSAGE) {
-    return { status: "error", noticeId: "period.conflict", message: noticeText("period.conflict") };
-  }
-  return { status: "error", message: PERSON_MESSAGES.has(message) ? message : fallback };
+  return periodErrorActionState(error, fallback, ALSO_SHOWN);
 }
 
 /** What the all-Periods list on Behaviors reads. */

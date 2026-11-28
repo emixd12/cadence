@@ -17,6 +17,7 @@ import type { Profile } from "../../../lib/types/database";
 import { createLocalBehaviorStore, withNativeReminderSummary } from "./local-behavior.service";
 import { localCommand } from "./local-store";
 import { saveLocalDayNote } from "./local-day-note.service";
+import { createLocalPeriodActions } from "./local-period.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
 import { matchRepeatedNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import { DAY_NOTE_SHORTCUT_POOL_ID } from "@cadence/core/resolvers/day-note.resolver";
@@ -142,7 +143,10 @@ export function createLocalOccurrenceActions(profileId: string, refresh: () => v
   };
   return { statusAction, parentSlotStatusAction, noteAction, dayNoteAction, startTimeTrackingAction: timing("start"),
     stopTimeTrackingAction: timing("stop"), resetTimeTrackingAction: timing("reset"), markDetailActions,
-    addOpportunityAction, removeOpportunityAction };
+    addOpportunityAction, removeOpportunityAction,
+    // Ticket 374 (D35): add, edit, End today, Remove and the note's own save for Periods,
+    // from the Timeline's day headers and the Behaviors list.
+    periodActions: createLocalPeriodActions(profileId, refresh) };
 }
 
 export function localErrorMessage(error: unknown): string {

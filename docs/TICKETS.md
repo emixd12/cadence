@@ -20588,7 +20588,7 @@ Messaging impact: `P-096`.
 
 Status: in_progress
 
-Started November 28, 2026, after PR #407 put Ticket 363 on `main` (account sync contract 11, SQLite 0030). This ticket takes account sync contract 12 and SQLite 0031 (`npm run ids:next`, November 28). First pull request (store and sync), November 28: SQLite `0031_periods.sql`, the six Period store commands with the cap and tombstoned delete, `apps/desktop/src/local-period.service.ts`, account sync kind `period` at contract 12 with hosted migration `20261128120000_account_sync_periods.sql` (not pushed), the Rust kind and row struct, and the SQL and RPC smokes. Remaining: the second pull request (Timeline and Behaviors screens, local export, import and restore), the hosted push, and a dev-signed installed check. The Mac's Period actions include `saveNote`, the note's own save.
+Started November 28, 2026, after PR #407 put Ticket 363 on `main` (account sync contract 11, SQLite 0030). This ticket takes account sync contract 12 and SQLite 0031 (`npm run ids:next`, November 28). First pull request (store and sync), November 28: SQLite `0031_periods.sql`, the six Period store commands with the cap and tombstoned delete, `apps/desktop/src/local-period.service.ts`, account sync kind `period` at contract 12 with hosted migration `20261128120000_account_sync_periods.sql` (not pushed), the Rust kind and row struct, and the SQL and RPC smokes. Second pull request (screens), November 28: the Timeline and Behaviors screens pass Period data and local actions to the shared components, and local export, import and restore carry Periods. Remaining: the hosted push of `20261128120000`, a dev-signed installed check, and a Mac release, which needs the owner's instruction. The Mac's Period actions include `saveNote`, the note's own save.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
 
@@ -20612,7 +20612,7 @@ Platform impact:
 | Marketing | Not applicable. |
 | Future mobile | Deferred (no mobile track active). |
 
-Messaging impact: `P-096`.
+Messaging impact: `P-096`, `P-104`.
 
 ## Ticket 375: MCP Apps spike: resource handlers and a static view on real hosts
 

@@ -35,6 +35,11 @@ vi.mock("../apps/desktop/src/native-spike", () => ({ readNativeEvents: mocks.eve
 vi.mock("../apps/desktop/src/local-timeline.service", () => ({ loadLocalTimeline: mocks.timeline }));
 vi.mock("../apps/desktop/src/local-behaviors-read.service", () => ({ getLocalBehaviorsPageData: mocks.behaviors }));
 vi.mock("../apps/desktop/src/local-store", () => ({ localCommand: mocks.command }));
+// Ticket 374: Periods are read and written through their own service; none exist here.
+vi.mock("../apps/desktop/src/local-period.service", () => ({
+  readLocalPeriodList: async () => ({ periods: [], labelSuggestions: [], noteShortcuts: [] }),
+  createLocalPeriodActions: () => ({ save: vi.fn(), end: vi.fn(), remove: vi.fn(), saveNote: vi.fn() }),
+}));
 vi.mock("../apps/desktop/src/local-note-shortcut.service", () => ({
   createLocalNoteShortcutStore: () => ({
     userId: "11111111-1111-4111-8111-111111111111",

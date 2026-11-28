@@ -1,6 +1,17 @@
-import type { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "@js-temporal/polyfill";
 import type { PeriodCreateCommit, PeriodDataStore } from "@cadence/core/data-store";
-import { PERIOD_LIMIT_MESSAGE } from "@cadence/core/services/period.service";
+import { noticeText } from "@cadence/core/notices";
+import { periodLabelSuggestions, periodsNewestFirst, toPeriodView } from "@cadence/core/resolvers/period.resolver";
+import { fixedClock, todayIn } from "@cadence/core/resolvers/time.resolver";
+import { listPeriodNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
+import {
+  PERIOD_LIMIT_MESSAGE, createPeriod, deletePeriod, endPeriod, periodErrorActionState, savePeriodNote, updatePeriod,
+} from "@cadence/core/services/period.service";
+import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
+import type { PeriodActionState, PeriodNoticeId, PeriodView } from "@cadence/core/types/period";
+import { DEFAULT_TIMEZONE } from "@cadence/core/types/recurrence";
+import type { PeriodActions } from "../../../lib/types/period";
+import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
 import { localCommand, localMutation } from "./local-store";
 
 /**
@@ -38,4 +49,58 @@ function errorText(error: unknown): string {
   if (typeof error === "string") return error;
   if (error instanceof Error) return error.message;
   return "";
+}
+
+/** What the all-Periods list on the Behaviors screen reads, as on the web. */
+export type LocalPeriodList = Readonly<{ periods: PeriodView[]; labelSuggestions: string[]; noteShortcuts: NoteShortcut[] }>;
+
+export async function readLocalPeriodList(profileId: string, now: Temporal.Instant): Promise<LocalPeriodList> {
+  const records = await localCommand("readPeriods", { profileId });
+  return {
+    periods: periodsNewestFirst(records).map(toPeriodView),
+    labelSuggestions: periodLabelSuggestions(records),
+    noteShortcuts: await listPeriodNoteShortcuts(createLocalNoteShortcutStore(profileId), records, now),
+  };
+}
+
+/**
+ * The four Period writes for the shared Timeline and Behaviors components, on the local
+ * store. The form fields are the web's (`PeriodActions`). "End today" reads the profile
+ * timezone at the time of the write. A failure shows a rule sentence or the fallback,
+ * never store text, and no label or note is logged.
+ */
+export function createLocalPeriodActions(profileId: string, refresh: () => void): PeriodActions {
+  const store = () => createLocalPeriodStore(profileId, Temporal.Now.instant());
+  const target = (form: FormData) => ({ id: form.get("period_id"), expectedRevision: form.get("expected_revision") });
+  const run = async (write: () => Promise<unknown>, noticeId: PeriodNoticeId, fallback: string): Promise<PeriodActionState> => {
+    try {
+      await write();
+      refresh();
+      return { status: "success", noticeId, message: noticeText(noticeId) };
+    } catch (error) {
+      return periodErrorActionState(error, fallback);
+    }
+  };
+  return {
+    save: (_previous, form) => run(() => form.get("period_id")
+      ? updatePeriod(store(), { ...target(form), label: form.get("label"), startOn: form.get("start_on"), endOn: form.get("end_on"),
+        ...(form.has("note") ? { note: form.get("note") } : {}) })
+      : createPeriod(store(), { label: form.get("label"), startOn: form.get("start_on"), endOn: form.get("end_on"), note: form.get("note") }),
+    "period.saved", "Unable to save this period."),
+    end: (_previous, form) => run(async () => {
+      const now = Temporal.Now.instant();
+      const profile = await localCommand("readProfile", {});
+      return endPeriod(createLocalPeriodStore(profileId, now), { ...target(form), today: todayIn(fixedClock(now), profile.timezone || DEFAULT_TIMEZONE) });
+    }, "period.ended", "Unable to end this period."),
+    remove: (_previous, form) => run(() => deletePeriod(store(), target(form)), "period.removed", "Unable to remove this period."),
+    saveNote: async (_previous, form) => {
+      try {
+        const { period } = await savePeriodNote(store(), { id: form.get("period_id"), expectedNote: form.get("expected_note"), note: form.get("note") });
+        refresh();
+        return { status: "success", message: "", revision: period.revision };
+      } catch (error) {
+        return { status: "error", message: periodErrorActionState(error, "Unable to save this note.").message };
+      }
+    },
+  };
 }

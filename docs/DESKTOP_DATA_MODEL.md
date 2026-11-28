@@ -768,13 +768,20 @@ row changes.
    the kind and cannot write it. Their other writes keep hosted Periods
    (`tests/sql/ticket-374-period-sync-smoke.sql`). The minimum writer contract stays 8.
 6. **Snapshots.** `readImportSnapshot` (the account sync source) and
-   `readExportSnapshot` return `periods`. The screens, and local export, import and
-   restore, arrive in this ticket's second pull request.
+   `readExportSnapshot` return `periods`.
+7. **Screens and portability.** `loadLocalTimeline` attaches every Period to the
+   Timeline view (`attachTimelinePeriods`), and `readLocalPeriodList` feeds the Behaviors
+   list. `createLocalPeriodActions` gives the shared components the four writes; "End
+   today" reads the profile timezone at the time of the write. A failed write shows a
+   rule sentence, the limit or a fixed fallback, never store text. Local export passes
+   the snapshot's Periods to the shared export assembly. Local import and restore save
+   Periods through `createPeriodIfAbsent` after the main commit; a fresh restore also
+   sets the note of a matching Period, and a retry does not.
 
 Tests: `periods_create_edit_delete_with_cap_revision_and_tombstone` and
 `periods_migration_keeps_existing_rows_and_starts_empty` (native),
-`tests/local-period.service.test.ts`, and "Period synchronization (Ticket 374,
-contract 12)" in `tests/account-sync.resolver.test.ts`.
+`tests/local-period.service.test.ts`, `tests/local-period-actions.test.ts`, and "Period
+synchronization (Ticket 374, contract 12)" in `tests/account-sync.resolver.test.ts`.
 
 ## Guessed Where dismissals (Ticket 383, D37)
 
