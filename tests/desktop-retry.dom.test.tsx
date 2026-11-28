@@ -37,6 +37,7 @@ vi.mock("../apps/desktop/src/local-store", () => ({ localCommand: mocks.command 
 vi.mock("../apps/desktop/src/local-period.service", () => ({
   readLocalPeriodList: async () => ({ periods: [], labelSuggestions: [], noteShortcuts: [] }),
   createLocalPeriodActions: () => ({ save: vi.fn(), end: vi.fn(), remove: vi.fn(), saveNote: vi.fn() }),
+  withPeriodNoteShortcuts: (inline: Record<string, unknown[]>) => inline,
 }));
 vi.mock("../apps/desktop/src/local-note-shortcut.service", () => ({
   createLocalNoteShortcutStore: () => ({

@@ -49,7 +49,7 @@ import { desktopSourceLinkCoordinator } from "./calendar/source-links";
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { createLocalCategoryAction } from "./local-category.service";
 import { createLocalNoteShortcutStore } from "./local-note-shortcut.service";
-import { readLocalPeriodList, type LocalPeriodList } from "./local-period.service";
+import { readLocalPeriodList, withPeriodNoteShortcuts, type LocalPeriodList } from "./local-period.service";
 import { dismissNoteShortcut, getNoteShortcutView, listInlineNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import type { NoteShortcutView } from "@cadence/core/types/note-shortcut";
 import type { NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
@@ -219,7 +219,7 @@ export function Product() {
             if (mounted.current && current === revision.current && activation.current?.requestKey === requestedActivation.requestKey) setNotificationTarget(target);
           }
           if (mounted.current && current === revision.current) {
-            setBundle({ timeline, behaviors, periodList, hasImportRuns: imports.length > 0, shortcuts: { day, accepted, views: Object.fromEntries(behaviorViews) } });
+            setBundle({ timeline, behaviors, periodList, hasImportRuns: imports.length > 0, shortcuts: { day, accepted: withPeriodNoteShortcuts(accepted, periodList.noteShortcuts), views: Object.fromEntries(behaviorViews) } });
             setError("");
             successful = true;
             if (syncAfterRefresh.current) {

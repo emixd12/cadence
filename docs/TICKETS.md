@@ -20616,7 +20616,7 @@ Messaging impact: `P-096`, `P-104`.
 
 ## Ticket 375: MCP Apps spike: resource handlers and a static view on real hosts
 
-Status: in_progress. November 26, 2026: the local answers, the frozen `show_day` schema and the view contract are in `docs/qa/2026-11-26-mcp-apps-spike.md`, so Tickets 376 and 377 can start. The real-host answers are missing: approval prompts on view-initiated writes, the 403 step-up on a view call, and view caching, each for Claude web and ChatGPT web. Remaining steps: (1) the owner completes the four `mcp-web` preflight steps listed in the note; (2) the owner chooses how a real host reaches a flag-on server, a tunnel tool for the local stack or a configured Preview environment, because Preview has no Supabase or MCP variables today; (3) an agent runs the three checks on both hosts and adds the answers to the note. Ticket 381: no gap found for VS Code from documentation; consumer Gemini is undecided until Ticket 378 connects it. Spike code: branch `spike/mcp-apps-375`, local only.
+Status: complete. November 28, 2026: the three real-host answers for Claude web and ChatGPT web are in `docs/qa/2026-11-28-mcp-apps-claude-chatgpt.md` (no approval prompt on view writes; Claude passes a 403 to the view, ChatGPT starts re-authorization; view caching not measured and moved to Ticket 378). Earlier note, November 26, 2026: the local answers, the frozen `show_day` schema and the view contract are in `docs/qa/2026-11-26-mcp-apps-spike.md`, so Tickets 376 and 377 can start. The real-host answers are missing: approval prompts on view-initiated writes, the 403 step-up on a view call, and view caching, each for Claude web and ChatGPT web. Remaining steps: (1) the owner completes the four `mcp-web` preflight steps listed in the note; (2) the owner chooses how a real host reaches a flag-on server, a tunnel tool for the local stack or a configured Preview environment, because Preview has no Supabase or MCP variables today; (3) an agent runs the three checks on both hosts and adds the answers to the note. Ticket 381: no gap found for VS Code from documentation; consumer Gemini is undecided until Ticket 378 connects it. Spike code: branch `spike/mcp-apps-375`, local only.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: `docs/plans/2026-11-25-mcp-apps-expansion.md`, package B and section 7.
 
@@ -20742,7 +20742,7 @@ Messaging impact: `P-097`, `P-098`.
 
 ## Ticket 378: MCP Apps acceptance on the required hosts
 
-Status: not_started
+Status: in_progress. November 28, 2026: first manual runs. Claude web and ChatGPT web render the day view and accept writes from it (`docs/qa/2026-11-28-mcp-apps-claude-chatgpt.md`). Gemini connects after Ticket 381's fix, calls `show_day` and shows text only (`docs/qa/2026-11-28-mcp-apps-gemini-tunnel.md`). Remaining: Claude Desktop, Claude mobile and VS Code Copilot; the acceptance harness and run ledger for these cases; parent-slot and conflict cases on a real host.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D36. Plan: package E and section 6.
 

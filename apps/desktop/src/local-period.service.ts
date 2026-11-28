@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { PeriodCreateCommit, PeriodDataStore } from "@cadence/core/data-store";
 import { noticeText } from "@cadence/core/notices";
-import { periodLabelSuggestions, periodsNewestFirst, toPeriodView } from "@cadence/core/resolvers/period.resolver";
+import { PERIOD_NOTE_SHORTCUT_KEY, periodLabelSuggestions, periodsNewestFirst, toPeriodView } from "@cadence/core/resolvers/period.resolver";
 import { fixedClock, todayIn } from "@cadence/core/resolvers/time.resolver";
 import { listPeriodNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import {
@@ -61,6 +61,16 @@ export async function readLocalPeriodList(profileId: string, now: Temporal.Insta
     labelSuggestions: periodLabelSuggestions(records),
     noteShortcuts: await listPeriodNoteShortcuts(createLocalNoteShortcutStore(profileId), records, now),
   };
+}
+
+/**
+ * The Timeline's shortcut map with the Period note chips under their own key, as the
+ * web's `listInlineNoteShortcutsForCurrentUser` builds it. No chips, no key.
+ */
+export function withPeriodNoteShortcuts(
+  inline: Record<string, NoteShortcut[]>, periodNotes: readonly NoteShortcut[],
+): Record<string, NoteShortcut[]> {
+  return periodNotes.length > 0 ? { ...inline, [PERIOD_NOTE_SHORTCUT_KEY]: [...periodNotes] } : inline;
 }
 
 /**

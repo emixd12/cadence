@@ -10,7 +10,9 @@ vi.mock("../apps/desktop/src/local-note-shortcut.service", () => ({
   createLocalNoteShortcutStore: (profileId: string) => ({ userId: profileId, readStates: async () => [] }),
 }));
 
-import { createLocalPeriodActions, readLocalPeriodList } from "../apps/desktop/src/local-period.service";
+import { createLocalPeriodActions, readLocalPeriodList, withPeriodNoteShortcuts } from "../apps/desktop/src/local-period.service";
+import { PERIOD_NOTE_SHORTCUT_KEY } from "@cadence/core/resolvers/period.resolver";
+import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { noticeText } from "@cadence/core/notices";
 import { PERIOD_LIMIT_MESSAGE } from "@cadence/core/services/period.service";
 
@@ -96,5 +98,12 @@ describe("local Period actions (Ticket 374)", () => {
     expect(list.labelSuggestions).toEqual(["Trip", "Sick"]);
     expect(list.noteShortcuts).toEqual([]);
     expect(localCommand).toHaveBeenCalledWith("readPeriods", { profileId: "profile-1" });
+  });
+
+  it("adds Period note chips to the Timeline shortcut map under their own key", () => {
+    const chip = { id: "chip-1" } as unknown as NoteShortcut;
+    const inline = { "behavior-1": [chip] };
+    expect(withPeriodNoteShortcuts(inline, [])).toBe(inline);
+    expect(withPeriodNoteShortcuts(inline, [chip])).toEqual({ "behavior-1": [chip], [PERIOD_NOTE_SHORTCUT_KEY]: [chip] });
   });
 });
