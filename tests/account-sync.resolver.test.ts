@@ -1528,3 +1528,73 @@ describe("the alongside answer (contract 10, Ticket 363)", () => {
       .toThrow("alongside answer is invalid");
   });
 });
+
+describe("Period synchronization (Ticket 374, contract 12)", () => {
+  const periodId = "37400000-0000-4000-8000-000000000001";
+  const period = (overrides: Record<string, Json> = {}, id = periodId): AccountSyncEntity => ({ kind: "period", id, value: {
+    id, label: "Sick", start_on: "2026-11-03", end_on: "2026-11-09", note: null, revision: 1,
+    created_at: "2026-11-03T12:00:00Z", updated_at: "2026-11-03T12:00:00Z", ...overrides } });
+
+  it("sends a Period made on one side to the other, with its id", () => {
+    expect(plan(empty, snapshot([period()]), empty).hostedWrites).toEqual([expect.objectContaining({ kind: "period", id: periodId, operation: "upsert", expected: null })]);
+    const fromWeb = plan(empty, empty, snapshot([period({ end_on: null })]));
+    expect(fromWeb.localWrites).toMatchObject([{ kind: "period", id: periodId, operation: "upsert", value: { end_on: null } }]);
+    expect(fromWeb.hostedWrites).toEqual([]);
+  });
+
+  it("carries a one-sided edit and a removal against an unchanged copy", () => {
+    const base = snapshot([period()]);
+    const edited = period({ label: "Flu", note: "Stayed home", revision: 2, updated_at: "2026-11-04T12:00:00Z" });
+    expect(plan(base, snapshot([edited]), base).hostedWrites).toMatchObject([{ kind: "period", operation: "upsert", value: { label: "Flu", revision: 2 } }]);
+    expect(plan(base, base, snapshot([edited])).localWrites).toMatchObject([{ kind: "period", operation: "upsert", value: { note: "Stayed home" } }]);
+    expect(plan(base, empty, base).hostedWrites).toMatchObject([{ kind: "period", id: periodId, operation: "delete" }]);
+    expect(plan(base, base, empty).localWrites).toMatchObject([{ kind: "period", id: periodId, operation: "delete" }]);
+    expect(plan(base, empty, empty)).toMatchObject({ localWrites: [], hostedWrites: [], conflicts: [] });
+  });
+
+  it("asks for review when a removal meets an edit, and when both sides edit", () => {
+    const base = snapshot([period()]);
+    const edited = period({ label: "Flu", revision: 2, updated_at: "2026-11-04T12:00:00Z" });
+    expect(plan(base, empty, snapshot([edited])).conflicts).toMatchObject([{ kind: "period", id: periodId, reason: "delete_vs_update" }]);
+    expect(plan(base, snapshot([edited]), empty).conflicts).toMatchObject([{ kind: "period", id: periodId, reason: "delete_vs_update" }]);
+    const other = period({ label: "Cold", revision: 2, updated_at: "2026-11-05T12:00:00Z" });
+    expect(plan(base, snapshot([edited]), snapshot([other])).conflicts).toMatchObject([{ kind: "period", reason: "concurrent_update" }]);
+    // Both sides made the same edit: no conflict and nothing to write.
+    expect(plan(base, snapshot([edited]), snapshot([edited]))).toMatchObject({ localWrites: [], hostedWrites: [], conflicts: [] });
+  });
+
+  it("raises the revision above both sides when a reviewed edit conflict is decided", () => {
+    const baseline = snapshot([period()]);
+    const local = snapshot([period({ label: "Flu", revision: 2, updated_at: "2026-11-04T12:00:00Z" })]);
+    const hosted = snapshot([period({ label: "Cold", revision: 4, updated_at: "2026-11-05T12:00:00Z" })]);
+    const review = plan(baseline, local, hosted);
+    for (const choice of ["local", "hosted"] as const) {
+      const reviewed = resolveReviewedAccountSync({ baseline, local, hosted, reviewedFingerprints: review.fingerprints, decisions: [{ kind: "period", id: periodId, choice }] });
+      const merged = reviewed.mergedEntities.find(({ kind }) => kind === "period")?.value;
+      expect(merged).toMatchObject({ label: choice === "local" ? "Flu" : "Cold", revision: 5 });
+      expect(reviewed.localWrites).toMatchObject([{ kind: "period", operation: "upsert", value: { revision: 5 } }]);
+      expect(reviewed.hostedWrites).toMatchObject([{ kind: "period", operation: "upsert", value: { revision: 5 } }]);
+    }
+  });
+
+  it("keeps or removes the Period as decided when a removal met an edit", () => {
+    const baseline = snapshot([period()]);
+    const hosted = snapshot([period({ label: "Flu", revision: 2, updated_at: "2026-11-04T12:00:00Z" })]);
+    const review = plan(baseline, empty, hosted);
+    const keep = resolveReviewedAccountSync({ baseline, local: empty, hosted, reviewedFingerprints: review.fingerprints, decisions: [{ kind: "period", id: periodId, choice: "hosted" }] });
+    expect(keep.localWrites).toMatchObject([{ kind: "period", operation: "upsert", value: { label: "Flu", revision: 2 } }]);
+    expect(keep.hostedWrites).toEqual([]);
+    const remove = resolveReviewedAccountSync({ baseline, local: empty, hosted, reviewedFingerprints: review.fingerprints, decisions: [{ kind: "period", id: periodId, choice: "local" }] });
+    expect(remove.hostedWrites).toMatchObject([{ kind: "period", operation: "delete" }]);
+  });
+
+  it("refuses a row outside the synced shape or the table rules without naming its text", () => {
+    const bad = (overrides: Record<string, Json>) => () => plan(empty, empty, snapshot([period(overrides)]));
+    expect(bad({ later_field: true })).toThrow("Update Cadence before synchronizing periods.");
+    for (const overrides of [{ label: " Sick" }, { label: "" }, { label: "a".repeat(61) }, { label: "Si\nck" }, { end_on: "2026-11-02" },
+      { start_on: "2026-02-30" }, { note: " " }, { note: "n".repeat(2001) }, { revision: 0 }, { updated_at: "yesterday" }] as Record<string, Json>[]) {
+      expect(bad(overrides)).toThrow("The synced period is invalid.");
+    }
+    expect(() => plan(empty, empty, snapshot([period({}, "not-a-uuid")]))).toThrow("Update Cadence before synchronizing periods.");
+  });
+});

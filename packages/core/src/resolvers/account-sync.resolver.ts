@@ -8,7 +8,7 @@ import { legacyEndDateColumns } from "../services/behavior-run-fields";
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
-export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note", "behavior_source_link", "occurrence_source_match", "occurrence_move"] as const;
+export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal", "day_note", "behavior_source_link", "occurrence_source_match", "occurrence_move", "period"] as const;
 /**
  * Hosted sync shape this build understands. The server projects snapshots to it and
  * preserves fields added in later contracts. Raise it with every hosted
@@ -32,8 +32,13 @@ export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "sc
  * the server hides from contracts 8 to 10 (`account_sync_contract_row_rules`), and the
  * planner keeps such a dismissal while labels are off. It is additive, so the minimum
  * writer contract stays 8.
+ * Contract 12 adds the `period` kind: a labeled range of local dates for the whole account
+ * (D35, Ticket 374). It uses the generic three-way merge: a removal against an unchanged
+ * copy propagates, and a removal against an edited copy is a conflict for review. The
+ * server hides the kind from contracts 8 to 11 and keeps hosted Periods on their writes.
+ * It is additive, so the minimum writer contract stays 8.
  */
-export const ACCOUNT_SYNC_CONTRACT = 11;
+export const ACCOUNT_SYNC_CONTRACT = 12;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -149,6 +154,16 @@ export function resolveReviewedAccountSync(input: Readonly<{
       && protectedOccurrences.has(conflict.id)
       && ((decision.choice === "local" && conflict.local === null) || (decision.choice === "hosted" && conflict.hosted === null))) {
       throw new Error("An Occurrence with a Note, status history, tracked time, or resolved status cannot be deleted during synchronization.");
+    }
+    // Ticket 374: a Period edited on both sides keeps the chosen content under a revision
+    // above both, so no copy ever sees its revision fall or repeat with other content.
+    const localPeriod = conflict.kind === "period" ? local.get(key) : undefined, hostedPeriod = conflict.kind === "period" ? hosted.get(key) : undefined;
+    if (localPeriod && hostedPeriod && decision.choice !== "both") {
+      const chosen = decision.choice === "hosted" ? hostedPeriod : localPeriod;
+      const revision = Math.min(2_147_483_647, Math.max(Number((localPeriod.value as Record<string, Json>).revision), Number((hostedPeriod.value as Record<string, Json>).revision)) + 1);
+      const raised: AccountSyncEntity = { ...chosen, value: { ...(chosen.value as Record<string, Json>), revision } };
+      local.set(key, raised); hosted.set(key, raised);
+      continue;
     }
     if (decision.choice === "hosted") { replace(local, key, hosted.get(key) ?? null); carryParents(local, hosted, key); }
     else if (decision.choice === "local") { replace(hosted, key, local.get(key) ?? null); carryParents(hosted, local, key); }
@@ -540,6 +555,7 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
   }
   if (PLACE_LABEL_KINDS.has(entity.kind)) validatePlaceLabelRow(entity.kind, entity.id, value);
   if (entity.kind === "day_note") validateDayNoteRow(entity.id, value);
+  if (entity.kind === "period") validatePeriodRow(entity.id, value);
   if (entity.kind === "occurrence_move") validateOccurrenceMoveRow(entity.id, value);
   else if (READ_ONLY_KINDS.has(entity.kind)) validateConnectorRow(entity.kind, entity.id, value);
   return { kind: entity.kind, id: entity.id, value };
@@ -692,6 +708,30 @@ function validateDayNoteRow(id: string, value: Json): void {
     || !instant(value.created_at) || !instant(value.updated_at)) {
     throw new Error("The synced day note is invalid.");
   }
+}
+
+const PERIOD_FIELDS = ["id", "label", "start_on", "end_on", "note", "revision", "created_at", "updated_at"] as const;
+
+/**
+ * Mirrors the hosted and SQLite `periods` table checks (Ticket 374). The synced shape is
+ * exact, so a later field stops an older build with "Update Cadence" before it can drop it.
+ * The messages never carry the label or the note.
+ */
+function validatePeriodRow(id: string, value: Json): void {
+  const instant = (item: Json | undefined) => { try { return typeof item === "string" && Boolean(Temporal.Instant.from(item)); } catch { return false; } };
+  const date = (item: Json | undefined) => { try { return typeof item === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item) && Temporal.PlainDate.from(item, { overflow: "reject" }).toString() === item; } catch { return false; } };
+  if (!value || Array.isArray(value) || typeof value !== "object" || value.id !== id || !SYNC_UUID.test(id)
+    || Object.keys(value).length !== PERIOD_FIELDS.length || !PERIOD_FIELDS.every((name) => name in value)) {
+    throw new Error("Update Cadence before synchronizing periods.");
+  }
+  const { label, note, start_on: startOn, end_on: endOn } = value;
+  const trimSpaces = (text: string) => text.replace(/^ +| +$/g, "");
+  const valid = typeof label === "string" && label === trimSpaces(label) && [...label].length >= 1 && [...label].length <= 60 && !/[\r\n]/.test(label)
+    && date(startOn) && (endOn === null || (date(endOn) && (endOn as string) >= (startOn as string)))
+    && (note === null || (typeof note === "string" && trimSpaces(note) !== "" && [...note].length <= 2000))
+    && Number.isInteger(value.revision) && (value.revision as number) >= 1 && (value.revision as number) <= 2_147_483_647
+    && instant(value.created_at) && instant(value.updated_at);
+  if (!valid) throw new Error("The synced period is invalid.");
 }
 
 /**

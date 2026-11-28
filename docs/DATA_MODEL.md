@@ -2971,6 +2971,22 @@ with a new id. There is no soft-delete column and no tombstone: account sync pla
 delete as "in the saved baseline, absent on one side", which needs no deleted row on the
 server. Account deletion removes Periods through the `profiles` cascade.
 
+**Account sync (Ticket 374).** Migration `20261128120000_account_sync_periods.sql`
+registers `(12, 'period', null, null)` in
+`cadence_private.account_sync_contract_additions`, so account sync contract 12 carries
+the kind `period`: every column except `user_id`. `account_sync_snapshot()` reads the
+owner's rows, and `apply_account_sync_plan` validates, locks, upserts and deletes them on
+the generic UUID row path, with a compare-and-set on the whole row. The table checks
+still apply to a synced row. Contracts 8 to 11 never see the kind and cannot write it;
+their other writes keep hosted Periods. The minimum writer contract stays 8. The same
+migration replaces the cap trigger function for one case: account sync writes with
+`insert ... on conflict (id) do update`, and Postgres fires a `before insert` trigger
+before it finds the conflict, so the function now lets through a row whose id the
+account already holds. That is an edit, not a new Period. A new id meets the same count
+as before, for every writer. Cadence for Mac stores Periods in SQLite schema 31
+(`docs/DESKTOP_DATA_MODEL.md`, "Periods"). Smoke:
+`tests/sql/ticket-374-period-sync-smoke.sql`.
+
 Ticket 368 added no entry point. Migration: `20261126130000_periods.sql`; local check
 `tests/sql/periods.sql`. `periods` and the three functions are in the RLS smoke lists
 (`scripts/supabase-rls-smoke.mjs`).

@@ -335,6 +335,18 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
+
+  // Contract 12 adds the period kind (Ticket 374); contracts 8 to 11 never see it.
+  const beforePeriod = await readSnapshot(clients[0], 11);
+  const savedPeriod = await applied(clients[0].rpc("create_period", { p_label: "Account sync smoke", p_start_on: "2026-09-01", p_end_on: null, p_note: null }));
+  assert(Array.isArray(savedPeriod) && savedPeriod.length === 1, "period saved for contract 12");
+  const c12 = await readSnapshot(clients[0], 12);
+  assert(c12.entities.some((row) => row.kind === "period" && row.id === savedPeriod[0].id && row.value.label === "Account sync smoke"
+    && row.value.end_on === null && !("user_id" in row.value)), "contract 12 shows periods");
+  for (const contract of [8, 9, 10, 11]) assert(!(await readSnapshot(clients[0], contract)).entities.some((row) => row.kind === "period"), `contract ${contract} omits periods`);
+  assert((await readSnapshot(clients[0], 11)).fingerprint === beforePeriod.fingerprint, "a period leaves the contract 11 fingerprint unchanged");
+  assert(!(await readSnapshot(clients[1], 12)).entities.some((row) => row.kind === "period"), "periods stay with their owner");
+  assert(c12.fingerprint === entityDigest(c12.entities), "contract 12 fingerprint covers its projection");
   console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection, the contract 8 writer floor and opportunity fields, the contract 4 day-note shortcut pool, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, the contract 9 reorder without configuration history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);

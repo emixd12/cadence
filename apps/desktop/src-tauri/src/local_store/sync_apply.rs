@@ -32,6 +32,7 @@ pub enum AccountSyncEntityKind {
     BehaviorSourceLink,
     OccurrenceSourceMatch,
     OccurrenceMove,
+    Period,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -81,6 +82,7 @@ pub fn validate_snapshot(profile: &str, entities: &[AccountSyncEntity]) -> db::R
             AccountSyncEntityKind::BehaviorSourceLink => { decode_row::<BehaviorSourceLink>(value)?; }
             AccountSyncEntityKind::OccurrenceSourceMatch => { decode_row::<OccurrenceSourceMatch>(value)?; }
             AccountSyncEntityKind::OccurrenceMove => { decode_row::<OccurrenceMove>(value)?; }
+            AccountSyncEntityKind::Period => { super::period::validate(&decode_row::<Period>(value)?)?; }
         }
     }
     Ok(())
@@ -256,6 +258,8 @@ fn apply_mode(
             AccountSyncEntityKind::OccurrenceMove => {
                 row_write::<OccurrenceMove>(db, profile, write, false, false)?
             }
+            // Ticket 374: the generic row path. The hosted trigger holds the cap of 500.
+            AccountSyncEntityKind::Period => row_write::<Period>(db, profile, write, false, false)?,
         }
     }
     link_sub_behaviors(db, profile, writes)
@@ -548,6 +552,12 @@ fn validate_write(
         AccountSyncEntityKind::OccurrenceMove => {
             validate_row_write::<OccurrenceMove>(db, profile, write, false, false)
         }
+        AccountSyncEntityKind::Period => {
+            if let (AccountSyncOperation::Upsert, Some(value)) = (write.operation, write.value.as_ref()) {
+                super::period::validate(&decode_row::<Period>(owned_value(profile, value)?)?)?;
+            }
+            validate_row_write::<Period>(db, profile, write, false, false)
+        }
     }
 }
 
@@ -748,6 +758,8 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         AccountSyncEntityKind::BehaviorSourceLink | AccountSyncEntityKind::OccurrenceSourceMatch => 13,
         // Advisor Phase 2B: read-only move records follow their Behavior.
         AccountSyncEntityKind::OccurrenceMove => 14,
+        // Ticket 374: Periods reference only the profile.
+        AccountSyncEntityKind::Period => 15,
     };
     let rank = if write.operation == AccountSyncOperation::Delete {
         u8::MAX - parent_first

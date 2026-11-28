@@ -210,6 +210,7 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "completion_place_label", snapshot.completionPlaceLabels ?? []);
   add(entities, "where_suggestion_dismissal", snapshot.whereSuggestionDismissals ?? []);
   add(entities, "day_note", snapshot.dayNotes ?? []);
+  add(entities, "period", snapshot.periods ?? []);
   add(entities, "behavior_source_link", snapshot.sourceLinks ?? []);
   add(entities, "occurrence_source_match", snapshot.sourceMatches ?? []);
   add(entities, "occurrence_move", snapshot.occurrenceMoves ?? []);

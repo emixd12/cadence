@@ -9,6 +9,7 @@ mod import_write;
 mod note_shortcut;
 mod occurrence;
 mod opportunity;
+mod period;
 mod place_labels;
 mod recovery;
 mod reminder;
@@ -314,6 +315,18 @@ pub enum Request {
         start_local_date: String,
         end_local_date: String,
     },
+    /// Ticket 374: every Period, or with both dates those with a day in the range.
+    ReadPeriods {
+        profile_id: String,
+        #[serde(default)]
+        start_local_date: Option<String>,
+        #[serde(default)]
+        end_local_date: Option<String>,
+    },
+    ReadPeriod {
+        profile_id: String,
+        period_id: String,
+    },
     ReadSyncState {
         profile_id: String,
     },
@@ -547,6 +560,44 @@ pub enum Request {
         note: Option<String>,
         #[serde(default)]
         used_shortcut: Option<bool>,
+    },
+    CreatePeriod {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        new_id: String,
+        label: String,
+        start_on: String,
+        end_on: Option<String>,
+        note: Option<String>,
+    },
+    CreatePeriodIfAbsent {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        new_id: String,
+        label: String,
+        start_on: String,
+        end_on: Option<String>,
+        note: Option<String>,
+    },
+    UpdatePeriod {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        period_id: String,
+        expected_revision: i64,
+        label: String,
+        start_on: String,
+        end_on: Option<String>,
+        note: Option<String>,
+    },
+    DeletePeriod {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        period_id: String,
+        expected_revision: i64,
     },
     CommitNoteShortcutState {
         profile_id: String,
@@ -788,6 +839,21 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
         } => {
             db::owner(&tx, profile_id)?;
             day_note::read(&tx, profile_id, start_local_date, end_local_date)?
+        }
+        Request::ReadPeriods {
+            profile_id,
+            start_local_date,
+            end_local_date,
+        } => {
+            db::owner(&tx, profile_id)?;
+            period::read(&tx, profile_id, start_local_date, end_local_date)?
+        }
+        Request::ReadPeriod {
+            profile_id,
+            period_id,
+        } => {
+            db::owner(&tx, profile_id)?;
+            period::get(&tx, profile_id, period_id)?
         }
         Request::ReadOccurrence {
             profile_id,
@@ -1044,6 +1110,63 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             note,
             used_shortcut == &Some(true),
         ),
+        Request::CreatePeriod {
+            profile_id,
+            now,
+            new_id,
+            label,
+            start_on,
+            end_on,
+            note,
+            ..
+        } => period::create(
+            db,
+            profile_id,
+            now,
+            new_id,
+            &period::Fields { label, start_on, end_on, note },
+        ),
+        Request::CreatePeriodIfAbsent {
+            profile_id,
+            now,
+            new_id,
+            label,
+            start_on,
+            end_on,
+            note,
+            ..
+        } => period::create_if_absent(
+            db,
+            profile_id,
+            now,
+            new_id,
+            &period::Fields { label, start_on, end_on, note },
+        ),
+        Request::UpdatePeriod {
+            profile_id,
+            now,
+            period_id,
+            expected_revision,
+            label,
+            start_on,
+            end_on,
+            note,
+            ..
+        } => period::update(
+            db,
+            profile_id,
+            now,
+            period_id,
+            *expected_revision,
+            &period::Fields { label, start_on, end_on, note },
+        ),
+        Request::DeletePeriod {
+            profile_id,
+            mutation_id,
+            now,
+            period_id,
+            expected_revision,
+        } => period::delete(db, profile_id, mutation_id, now, period_id, *expected_revision),
         Request::CommitNoteShortcutState {
             profile_id,
             now,
@@ -1220,6 +1343,30 @@ impl Request {
                 ..
             }
             | Self::SaveDayNote {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::CreatePeriod {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::CreatePeriodIfAbsent {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::UpdatePeriod {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::DeletePeriod {
                 profile_id,
                 mutation_id,
                 now,

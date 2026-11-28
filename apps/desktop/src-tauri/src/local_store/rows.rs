@@ -632,6 +632,26 @@ impl StoredRow for DayNote {
     const BOOL_COLUMNS: &'static [&'static str] = &[];
 }
 
+/// Ticket 374 (D35): a labeled range of local dates for the whole account.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Period {
+    pub id: String,
+    pub user_id: String,
+    pub label: String,
+    pub start_on: String,
+    pub end_on: Option<String>,
+    pub note: Option<String>,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+impl StoredRow for Period {
+    const TABLE: &'static str = "periods";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &[];
+}
+
 /// Ticket 320: a read-only copy of a hosted source link. Account sync is its only writer.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]

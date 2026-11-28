@@ -2640,7 +2640,7 @@ fn migration_0030_keeps_dismissals_and_relaxes_only_guess_keys() {
     fixture.db.execute("INSERT INTO place_label_settings(user_id,enabled,retention,enabled_at,updated_at) VALUES(?1,1,'90_days',?2,?2)", params![profile, NOW]).unwrap();
     insert(&fixture.db, "home").unwrap();
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 31);
     assert_eq!(fixture.count("where_suggestion_dismissals"), 1);
     fixture.db.execute("UPDATE place_label_settings SET enabled=0,enabled_at=NULL", []).unwrap();
     fixture.db.execute("UPDATE where_suggestion_dismissals SET suggestion='anywhere'", []).unwrap();
@@ -2896,7 +2896,7 @@ fn opportunity_migration_rebuilds_tables_and_keeps_every_row_and_child() {
     let before = ["behaviors", "behavior_schedules", "behavior_schedule_slots", "occurrences", "occurrence_status_events", "mutation_outbox", "behavior_configuration_events"]
         .map(|table| (table, fixture.count(table)));
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 31);
     for (table, count) in before {
         assert_eq!(fixture.count(table), count, "{table}");
     }
@@ -3113,7 +3113,7 @@ fn migration_0029_leaves_every_schema_28_behavior_unanswered() {
     let profile = fixture.profile.clone();
     fixture.db.execute("INSERT INTO behaviors(id,user_id,category_id,title,description,recurrence_rule,scheduled_time,timezone,browser_reminder_enabled,email_reminder_enabled,reminder_offset_minutes,active,created_at,updated_at,archived_at,current_configuration_event_id) VALUES(?1,?2,NULL,'Helmet',NULL,'{\"type\":\"daily\",\"interval\":1}','09:00:00','America/New_York',1,0,0,1,?3,?3,NULL,NULL)", params![id(1), profile, NOW]).unwrap();
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
-    assert_eq!(db::schema_version(&fixture.db).unwrap(), 30);
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 31);
     let rows = db::owned::<Behavior>(&fixture.db, &profile).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].alongside, None);
@@ -3367,4 +3367,115 @@ fn marking_completed_auto_stops_running_time_session_only_on_completed_transitio
     fixture.run(status_request(&profile, "unresolved", Some(94), "completed", 95, "2026-08-31T14:19:00Z"), 507).unwrap();
     let clamped: OccurrenceTimeSession = db::by_id(&fixture.db, &profile, &id(93)).unwrap();
     assert_eq!(clamped.stopped_at.as_deref(), Some("2026-08-31T14:20:00Z"));
+}
+
+#[test]
+fn periods_create_edit_delete_with_cap_revision_and_tombstone() {
+    use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
+    let mut fixture = Fixture::new();
+    let profile = fixture.profile.clone();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 31);
+    let create = |operation: &str, new_id: u32, label: &str, start: &str, end: Option<&str>| {
+        json!({"operation":operation,"newId":id(new_id),"label":label,"startOn":start,"endOn":end,"note":null})
+    };
+    let read = |db: &mut rusqlite::Connection, request: Value| execute(db, serde_json::from_value(request).unwrap()).unwrap();
+
+    // Create, then the same natural key through createPeriodIfAbsent adds nothing.
+    let sick = fixture.run(create("createPeriod", 700, "Sick", "2026-08-03", Some("2026-08-09")), 600).unwrap();
+    assert_eq!(sick["revision"], 1);
+    let again = fixture.run(create("createPeriodIfAbsent", 701, "Sick", "2026-08-03", Some("2026-08-09")), 601).unwrap();
+    assert_eq!(again["created"], false);
+    assert_eq!(again["period"]["id"], id(700));
+    // Ongoing matches ongoing only.
+    let ongoing = fixture.run(create("createPeriodIfAbsent", 702, "Sick", "2026-08-03", None), 602).unwrap();
+    assert_eq!(ongoing["created"], true);
+    assert_eq!(fixture.run(create("createPeriodIfAbsent", 703, "Sick", "2026-08-03", None), 603).unwrap()["created"], false);
+    assert_eq!(fixture.count("periods"), 2);
+
+    // Invalid rows are refused: untrimmed label, a line break, an end before the start.
+    assert!(fixture.run(create("createPeriod", 704, " Sick", "2026-08-03", None), 604).is_err());
+    assert!(fixture.run(create("createPeriod", 704, "Si\nck", "2026-08-03", None), 605).is_err());
+    assert!(fixture.run(create("createPeriod", 704, "Trip", "2026-08-03", Some("2026-08-02")), 606).is_err());
+    assert!(fixture.db.execute(
+        "INSERT INTO periods(id,user_id,label,start_on,end_on,note,revision,created_at,updated_at) VALUES(?1,?2,'Trip','2026-08-03','2026-08-02',NULL,1,?3,?3)",
+        params![id(704), profile, NOW],
+    ).is_err());
+
+    // A ranged read returns Periods with a day inside the range; an ongoing one has no end.
+    let ranged = read(&mut fixture.db, json!({"operation":"readPeriods","profileId":profile,"startLocalDate":"2026-08-10","endLocalDate":"2026-08-20"}));
+    assert_eq!(ranged.as_array().unwrap().len(), 1);
+    assert_eq!(ranged[0]["id"], id(702));
+    assert_eq!(read(&mut fixture.db, json!({"operation":"readPeriods","profileId":profile})).as_array().unwrap().len(), 2);
+    assert!(execute(&mut fixture.db, serde_json::from_value(json!({"operation":"readPeriods","profileId":profile,"startLocalDate":"2026-08-10"})).unwrap()).is_err());
+
+    // Update compares the revision; an unchanged write keeps it.
+    let update = |revision: i64, label: &str, note: Option<&str>| json!({"operation":"updatePeriod","periodId":id(700),
+        "expectedRevision":revision,"label":label,"startOn":"2026-08-03","endOn":"2026-08-09","note":note});
+    assert_eq!(fixture.run(update(1, "Sick", None), 607).unwrap()["revision"], 1);
+    let edited = fixture.run(update(1, "Flu", Some("Stayed home")), 608).unwrap();
+    assert_eq!(edited["revision"], 2);
+    assert_eq!(edited["created_at"], sick["created_at"]);
+    assert!(fixture.run(update(1, "Cold", None), 609).unwrap().is_null());
+    assert_eq!(read(&mut fixture.db, json!({"operation":"readPeriod","profileId":profile,"periodId":id(700)}))["label"], "Flu");
+    assert!(read(&mut fixture.db, json!({"operation":"readPeriod","profileId":profile,"periodId":id(799)})).is_null());
+
+    // Delete compares the revision, removes the row and leaves a tombstone.
+    let delete = |revision: i64| json!({"operation":"deletePeriod","periodId":id(700),"expectedRevision":revision});
+    assert!(fixture.run(delete(1), 610).unwrap().is_null());
+    assert_eq!(fixture.run(delete(2), 611).unwrap(), json!(id(700)));
+    assert_eq!(fixture.count("periods"), 1);
+    let tombstones: i64 = fixture.db.query_row("SELECT count(*) FROM tombstones WHERE entity_type='periods' AND entity_id=?1", [id(700)], |row| row.get(0)).unwrap();
+    assert_eq!(tombstones, 1);
+
+    // The cap: 500 Periods per profile, for both create commands.
+    fixture.db.execute("DELETE FROM periods", []).unwrap();
+    for number in 0..500u32 {
+        fixture.db.execute(
+            "INSERT INTO periods(id,user_id,label,start_on,end_on,note,revision,created_at,updated_at) VALUES(?1,?2,?3,'2026-01-01',NULL,NULL,1,?4,?4)",
+            params![id(10_000 + number), profile, format!("P{number}"), NOW],
+        ).unwrap();
+    }
+    assert_eq!(fixture.run(create("createPeriod", 705, "One more", "2026-08-03", None), 612).unwrap_err(), super::period::LIMIT_MESSAGE);
+    assert_eq!(fixture.run(create("createPeriodIfAbsent", 705, "One more", "2026-08-03", None), 613).unwrap_err(), super::period::LIMIT_MESSAGE);
+    // An existing natural key still answers at the cap.
+    assert_eq!(fixture.run(create("createPeriodIfAbsent", 705, "P7", "2026-01-01", None), 614).unwrap()["created"], false);
+    assert_eq!(fixture.count("periods"), 500);
+    fixture.db.execute("DELETE FROM periods", []).unwrap();
+
+    // Account sync: validate, insert, update and delete through the generic row path.
+    // Planned rows carry instants in the canonical six-digit form.
+    let synced_at = "2026-08-30T12:00:00.000000Z";
+    let value = |label: &str, revision: i64| json!({"id":id(720),"label":label,"start_on":"2026-08-03","end_on":null,"note":null,
+        "revision":revision,"created_at":synced_at,"updated_at":synced_at});
+    let entity = |value: Value| -> sync_apply::AccountSyncEntity { serde_json::from_value(json!({"kind":"period","id":id(720),"value":value})).unwrap() };
+    sync_apply::validate_snapshot(&profile, &[entity(value("Trip", 1))]).unwrap();
+    assert!(sync_apply::validate_snapshot(&profile, &[entity(value(" Trip", 1))]).is_err());
+    assert!(sync_apply::validate_snapshot(&profile, &[entity(json!({"id":id(720),"label":"Trip","start_on":"2026-08-03","end_on":null,"note":null,
+        "revision":1,"created_at":NOW,"updated_at":NOW,"later_field":true}))]).unwrap_err().contains("Update Cadence"));
+    let write = |operation: Op, expected: Option<Value>, next: Option<Value>| AccountSyncWrite { kind: Kind::Period, id: id(720), operation, expected, value: next };
+    execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(Op::Upsert, None, Some(value("Trip", 1)))] }).unwrap();
+    assert_eq!(fixture.count("periods"), 1);
+    assert!(execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(Op::Upsert, Some(value("Trip", 1)), Some(value("Tr\nip", 2)))] }).is_err());
+    execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(Op::Upsert, Some(value("Trip", 1)), Some(value("Travel", 2)))] }).unwrap();
+    assert_eq!(db::by_id::<Period>(&fixture.db, &profile, &id(720)).unwrap().label, "Travel");
+    assert!(execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(Op::Delete, Some(value("Trip", 1)), None)] }).is_err());
+    execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![write(Op::Delete, Some(value("Travel", 2)), None)] }).unwrap();
+    assert_eq!(fixture.count("periods"), 0);
+
+    // The export and sync snapshots carry Periods.
+    fixture.run(create("createPeriod", 730, "Sick", "2026-08-03", None), 615).unwrap();
+    let snapshot = read(&mut fixture.db, json!({"operation":"readImportSnapshot","profileId":profile}));
+    assert_eq!(snapshot["periods"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn periods_migration_keeps_existing_rows_and_starts_empty() {
+    let mut fixture = Fixture::at_schema(30);
+    fixture.create();
+    assert!(fixture.db.prepare("SELECT 1 FROM periods").is_err());
+    let behaviors = fixture.count("behaviors");
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(db::schema_version(&fixture.db).unwrap(), 31);
+    assert_eq!(fixture.count("behaviors"), behaviors);
+    assert_eq!(fixture.count("periods"), 0);
 }
