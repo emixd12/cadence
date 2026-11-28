@@ -3654,7 +3654,8 @@ Migration `20261018170000_oauth_authorization_requests.sql` adds private
 `pending_authorizations`. This is pre-login protocol state, not a user-owned
 tracking table. It stores a random request UUID, SHA-256 browser-secret hash,
 client ID, exact redirect URI, S256 challenge, resource, requested tracking
-scopes, `offline_access`, client state, and a ten-minute expiry. RLS is enabled;
+scopes, `offline_access`, client state (up to 4,096 characters since migration
+`20261128060000_oauth_state_length.sql`, Ticket 381; 1,024 before), and a ten-minute expiry. RLS is enabled;
 no API role has direct table access. Expired rows are removed at creation and by
 `oauth_purge_expired`. A request becomes account-bound only through explicit
 consent with the signed-in user's database client.

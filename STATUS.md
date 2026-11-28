@@ -153,7 +153,7 @@ impact: `P-096`.
   `show_day` and the view resource read through it.
 - **Gemini (consumer web, test account A):** connects through its custom connector after
   one fix. Gemini's OAuth `state` is 1,170 characters; Cadence allowed 1,024 (Ticket 381,
-  now `in_progress`; the migration is not pushed to the hosted database). Gemini called
+  now `in_progress`; the migration was pushed to the hosted database on November 28, 2026). Gemini called
   `show_day` and answered in text. It did not render the day view.
 - **Test account B's Google sign-in:** fixed in `scripts/acceptance/google-signin.mjs`
   (passkey dialog). The preflight step is no longer an owner step.
