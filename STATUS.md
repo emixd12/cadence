@@ -103,6 +103,22 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## MCP Apps: day view works in Claude web and ChatGPT web — November 28, 2026
+
+- **Claude web and ChatGPT web:** both render the "Cadence day" view from a local flag-on
+  server behind a tunnel. A status change from inside the view reached Cadence on both
+  hosts, with no approval prompt. A note saved from the view passed on Claude.
+- **Write without the scope:** Claude returns the 403 to the view, which turns read-only
+  with "Reconnect to allow changes". ChatGPT opens its own sign-in dialog; the view shows
+  no notice there.
+- **Ticket 375 complete; Ticket 378 `in_progress`.** Not run: Claude Desktop, Claude mobile,
+  VS Code Copilot, and the acceptance harness with a run ledger.
+- **Ticket 381:** the `state` limit fix is merged (PR #442) and its migration is on the
+  hosted database. Gemini against production is not verified.
+- **claude.ai "Cadence QA" connector:** reconnected as test account A. The MCP preflight
+  reports no owner steps.
+- **Record:** `docs/qa/2026-11-28-mcp-apps-claude-chatgpt.md`.
+
 ## Ticket 374, first pull request: Periods in the Mac store and account sync — November 28, 2026
 
 - **Store:** SQLite schema 31 (`0031_periods.sql`). Commands `readPeriods`, `readPeriod`,
