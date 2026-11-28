@@ -316,7 +316,10 @@
         "INT-BEHAVIOR-044",
         "INT-BEHAVIOR-045",
         "INT-BEHAVIOR-046",
-        "INT-BEHAVIOR-047"
+        "INT-BEHAVIOR-047",
+        "INT-PERIOD-002",
+        "INT-PERIOD-003",
+        "INT-PERIOD-004"
       ]
     },
     {
@@ -416,7 +419,11 @@
         "INT-TIMELINE-026",
         "INT-TIMELINE-027",
         "INT-TIMELINE-028",
-        "INT-BRIEF-011"
+        "INT-BRIEF-011",
+        "INT-PERIOD-001",
+        "INT-PERIOD-002",
+        "INT-PERIOD-003",
+        "INT-PERIOD-004"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -23435,9 +23442,19 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-period.service.ts#createLocalPeriodActions",
+            "components/periods/PeriodControl.tsx#PeriodDayControls"
+          ],
+          "evidence": [
+            "tests/local-period-actions.test.ts",
+            "tests/local-period.service.test.ts"
+          ],
+          "reason": "Shared Period controls with local actions (Ticket 374). The native store writes through SQLite migration 0031 with the cap of 500 and a compare-and-set on the revision (Rust test periods_create_edit_delete_with_cap_revision_and_tombstone). Account sync contract 12 carries Periods. Installed-app acceptance is recorded separately."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -23563,9 +23580,19 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-period.service.ts#createLocalPeriodActions",
+            "components/periods/PeriodControl.tsx#PeriodDayControls"
+          ],
+          "evidence": [
+            "tests/local-period-actions.test.ts",
+            "tests/local-period.service.test.ts"
+          ],
+          "reason": "Shared Period controls with local actions (Ticket 374). The native store writes through SQLite migration 0031 with the cap of 500 and a compare-and-set on the revision (Rust test periods_create_edit_delete_with_cap_revision_and_tombstone). Account sync contract 12 carries Periods. Installed-app acceptance is recorded separately."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -23673,9 +23700,19 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-period.service.ts#createLocalPeriodActions",
+            "components/periods/PeriodControl.tsx#PeriodDayControls"
+          ],
+          "evidence": [
+            "tests/local-period-actions.test.ts",
+            "tests/local-period.service.test.ts"
+          ],
+          "reason": "Shared Period controls with local actions (Ticket 374). The native store writes through SQLite migration 0031 with the cap of 500 and a compare-and-set on the revision (Rust test periods_create_edit_delete_with_cap_revision_and_tombstone). Account sync contract 12 carries Periods. Installed-app acceptance is recorded separately."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -23797,9 +23834,19 @@
         },
         "desktop": {
           "applicability": "applicable",
-          "status": "planned",
-          "follow_up": "docs/TICKETS.md#ticket-374-periods-on-cadence-for-mac",
-          "reason": "Follow-up: Ticket 374. Until then the Mac passes no Period actions, so the shared controls render nothing there (tests/period-control.dom.test.tsx)."
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/timeline-screen.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "apps/desktop/src/local-actions.ts",
+            "apps/desktop/src/local-period.service.ts#createLocalPeriodActions",
+            "components/periods/PeriodControl.tsx#PeriodDayControls"
+          ],
+          "evidence": [
+            "tests/local-period-actions.test.ts",
+            "tests/local-period.service.test.ts"
+          ],
+          "reason": "Shared Period controls with local actions (Ticket 374). The native store writes through SQLite migration 0031 with the cap of 500 and a compare-and-set on the revision (Rust test periods_create_edit_delete_with_cap_revision_and_tombstone). Account sync contract 12 carries Periods. Installed-app acceptance is recorded separately."
         },
         "marketing": {
           "applicability": "not_applicable",

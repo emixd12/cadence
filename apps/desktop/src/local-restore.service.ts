@@ -10,6 +10,9 @@ import type { BehaviorLogRestoreActionState, BehaviorLogRestorePageData } from "
 import { BEHAVIORLOG_RESTORE_INITIAL_STATE } from "../../../lib/types/behaviorlog-restore-ui";
 import { localCommand, localMutation } from "./local-store";
 import { createLocalDayNoteStore } from "./local-day-note.service";
+import { createLocalPeriodStore } from "./local-period.service";
+import { applyBehaviorLogPeriods, previewBehaviorLogPeriods } from "@cadence/core/services/behaviorlog-period.service";
+import { withBehaviorLogPeriodMessage } from "@cadence/core/resolvers/behaviorlog-period.resolver";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
 import { acceptedRun, applyRun, applyStoredPlan, assertFreshPreview, checkedApplyResult, object, portabilityError, portabilityNow, previewRun, readLocalBundle } from "./local-portability";
@@ -28,7 +31,9 @@ export async function previewLocalBehaviorLogRestore(profile: Profile, form: For
     const run = previewRun(profile.id, bundle, preview, now);
     await localCommand("prepareBehaviorLogImport", { ...localMutation(profile.id, now), expectedRevision: snapshot.revision, previewRun: run, plan: null });
     const dayNotes = preview.valid ? await previewBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore") : null;
-    return { status: "previewed", message: preview.valid ? withBehaviorLogDayNoteMessage("BehaviorLog restore preview ready.", dayNotes, "preview") : "BehaviorLog restore preview found validation errors.", upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview, previewRun: view(run), applyResult: null };
+    // Ticket 374: how many Periods will be added, already exist, or do not fit.
+    const periods = preview.valid ? await previewBehaviorLogPeriods(createLocalPeriodStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore") : null;
+    return { status: "previewed", message: preview.valid ? withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("BehaviorLog restore preview ready.", dayNotes, "preview"), periods, "preview") : "BehaviorLog restore preview found validation errors.", upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview, previewRun: view(run), applyResult: null };
   } catch (error) { return { ...BEHAVIORLOG_RESTORE_INITIAL_STATE, status: "error", message: portabilityError(error) }; }
 }
 export async function applyLocalBehaviorLogRestore(profile: Profile, form: FormData, clock?: Temporal.Instant): Promise<BehaviorLogRestoreActionState> {
@@ -55,6 +60,9 @@ export async function applyLocalBehaviorLogRestore(profile: Profile, form: FormD
     const applied = checkedApplyResult(result);
     // Ticket 292: day notes save after the import commits, one compare-and-set save per date.
     const dayNotes = await applyBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore", { replaceDifferent: !applied.alreadyApplied });
-    return { status: "applied", message: withBehaviorLogDayNoteMessage("BehaviorLog restore applied.", dayNotes, "applied"), upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview: reviewedPreview, previewRun: view(accepted), applyResult: { importRun: view(applied.importRun), appliedCounts: Object.fromEntries(Object.entries(object(applied.result)).filter((entry): entry is [string, number] => typeof entry[1] === "number")) } };
+    // Ticket 374: a fresh restore adds missing Periods and sets the note of a matching one
+    // when the bundle carries it; a retry only adds missing Periods, so a note edited since stays.
+    const periods = await applyBehaviorLogPeriods(createLocalPeriodStore(profile.id, Temporal.Instant.from(now)), bundle.files, "restore", { setNotes: !applied.alreadyApplied });
+    return { status: "applied", message: withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("BehaviorLog restore applied.", dayNotes, "applied"), periods, "applied"), upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview: reviewedPreview, previewRun: view(accepted), applyResult: { importRun: view(applied.importRun), appliedCounts: Object.fromEntries(Object.entries(object(applied.result)).filter((entry): entry is [string, number] => typeof entry[1] === "number")) } };
   } catch (error) { return { ...BEHAVIORLOG_RESTORE_INITIAL_STATE, status: "error", message: portabilityError(error) }; }
 }

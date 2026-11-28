@@ -9,6 +9,9 @@ import type { BehaviorLogImportActionState, BehaviorLogImportPageData } from "..
 import { BEHAVIORLOG_IMPORT_INITIAL_STATE, toImportRunView } from "../../../lib/types/behaviorlog-import-ui";
 import { localCommand, localMutation } from "./local-store";
 import { createLocalDayNoteStore } from "./local-day-note.service";
+import { createLocalPeriodStore } from "./local-period.service";
+import { applyBehaviorLogPeriods, previewBehaviorLogPeriods } from "@cadence/core/services/behaviorlog-period.service";
+import { withBehaviorLogPeriodMessage } from "@cadence/core/resolvers/behaviorlog-period.resolver";
 import { applyBehaviorLogDayNotes, previewBehaviorLogDayNotes } from "@cadence/core/services/behaviorlog-day-note.service";
 import { withBehaviorLogDayNoteMessage } from "@cadence/core/resolvers/behaviorlog-day-note.resolver";
 import { alongsideOption, readAlongsideOption } from "./alongside";
@@ -26,7 +29,9 @@ export async function previewLocalBehaviorLogImport(profile: Profile, form: Form
     const run = previewRun(profile.id, bundle, preview, now);
     await localCommand("prepareBehaviorLogImport", { ...localMutation(profile.id, now), expectedRevision: snapshot.revision, previewRun: run, plan: null });
     const dayNotes = preview.valid ? await previewBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "import") : null;
-    return { status: "previewed", message: preview.valid ? withBehaviorLogDayNoteMessage("BehaviorLog preview ready.", dayNotes, "preview") : "BehaviorLog preview found validation errors.", upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview, previewRun: toImportRunView(run), capabilities: resolveBehaviorLogImportCapabilities(preview), applyResult: null };
+    // Ticket 374: how many Periods will be added, already exist, or do not fit.
+    const periods = preview.valid ? await previewBehaviorLogPeriods(createLocalPeriodStore(profile.id, Temporal.Instant.from(now)), bundle.files, "import") : null;
+    return { status: "previewed", message: preview.valid ? withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("BehaviorLog preview ready.", dayNotes, "preview"), periods, "preview") : "BehaviorLog preview found validation errors.", upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview, previewRun: toImportRunView(run), capabilities: resolveBehaviorLogImportCapabilities(preview), applyResult: null };
   } catch (error) { return { ...BEHAVIORLOG_IMPORT_INITIAL_STATE, status: "error", message: portabilityError(error) }; }
 }
 export async function applyLocalBehaviorLogImport(profile: Profile, form: FormData, clock?: Temporal.Instant): Promise<BehaviorLogImportActionState> {
@@ -56,7 +61,10 @@ export async function applyLocalBehaviorLogImport(profile: Profile, form: FormDa
     const counts = object(applied.result);
     // Ticket 292: day notes save after the import commits, one compare-and-set save per date.
     const dayNotes = await applyBehaviorLogDayNotes(createLocalDayNoteStore(profile.id, Temporal.Instant.from(now)), bundle.files, "import");
-    return { status: "applied", message: withBehaviorLogDayNoteMessage("BehaviorLog import applied.", dayNotes, "applied"), upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview: reviewedPreview, previewRun: toImportRunView(accepted), capabilities,
+    // Ticket 374: Periods also save after the import commits. Import adds a Period no
+    // stored Period matches and never changes a stored one. The step never throws.
+    const periods = await applyBehaviorLogPeriods(createLocalPeriodStore(profile.id, Temporal.Instant.from(now)), bundle.files, "import");
+    return { status: "applied", message: withBehaviorLogPeriodMessage(withBehaviorLogDayNoteMessage("BehaviorLog import applied.", dayNotes, "applied"), periods, "applied"), upload: { fileName: bundle.fileName, fileSize: bundle.fileSize }, archiveFingerprint: bundle.archiveFingerprint, preview: reviewedPreview, previewRun: toImportRunView(accepted), capabilities,
       applyResult: { mode, importRun: toImportRunView(applied.importRun), created: counts.created as NonNullable<BehaviorLogImportActionState["applyResult"]>["created"], mapped: counts.mapped as NonNullable<BehaviorLogImportActionState["applyResult"]>["mapped"], skipped: counts.skipped as NonNullable<BehaviorLogImportActionState["applyResult"]>["skipped"] } };
   } catch (error) { return { ...BEHAVIORLOG_IMPORT_INITIAL_STATE, status: "error", message: portabilityError(error) }; }
 }

@@ -22,7 +22,7 @@ it("passes the synced source matches to the Timeline row evidence", async () => 
   };
   mocks.command.mockImplementation(async (operation: string) => {
     if (operation === "readProfile") return { id: "owner", timezone: "America/New_York" };
-    if (operation === "readBehaviorGraphs" || operation === "readCategories" || operation === "readOccurrences" || operation === "readDayNotes") return [];
+    if (operation === "readBehaviorGraphs" || operation === "readCategories" || operation === "readOccurrences" || operation === "readDayNotes" || operation === "readPeriods") return [];
     if (operation === "readOccurrenceHistory") return { statusEvents: [], timeSessions: [], sourceMatches: [match] };
     throw new Error(operation);
   });

@@ -14,7 +14,7 @@ export type PeriodNoteFormAction = (
 
 /**
  * The Period writes a screen may offer (Ticket 369). Web passes Server Actions;
- * Cadence for Mac will pass its local actions (Ticket 374). FormData:
+ * Cadence for Mac passes its local actions (Ticket 374). FormData:
  * - `save`: `label`, `start_on`, `end_on` (empty means ongoing) and `note`; an edit
  *   adds `period_id` and `expected_revision`.
  * - `end` ("End today") and `remove`: `period_id` and `expected_revision`.
