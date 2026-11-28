@@ -167,6 +167,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "guess_dismissal_without_labels",
         include_str!("../../migrations/0030_guess_dismissal_without_labels.sql"),
     ),
+    (
+        31,
+        "periods",
+        include_str!("../../migrations/0031_periods.sql"),
+    ),
 ];
 
 /// Migrations that rebuild a table other tables reference. SQLite ignores the foreign-key

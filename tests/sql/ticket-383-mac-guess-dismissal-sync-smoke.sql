@@ -114,8 +114,8 @@ declare
   dismissal jsonb;
   applied jsonb;
 begin
-  if cadence_private.account_sync_current_contract() <> 11 then
-    raise exception 'Expected account sync contract 11, found %.', cadence_private.account_sync_current_contract();
+  if cadence_private.account_sync_current_contract() < 11 then
+    raise exception 'Expected account sync contract 11 or later, found %.', cadence_private.account_sync_current_contract();
   end if;
 
   -- Contract 11 sees the row; contracts 8 to 10 do not, and their fingerprints agree with

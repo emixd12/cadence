@@ -82,7 +82,7 @@ the lengths (`docs/DATA_MODEL.md`, "Periods").
 
 | ID | Rule | Value | Where | Decided | What to look at |
 |---|---|---|---|---|---|
-| PER-01 | Periods one account can hold, for every writer | 500 | `PERIOD_LIMITS.perAccount`; trigger `periods_enforce_account_cap` in `supabase/migrations/20261126130000_periods.sql` | Periods plan (D35), section 1 | The Period count per account; whether anyone comes near 500 |
+| PER-01 | Periods one account can hold, for every writer | 500 | `PERIOD_LIMITS.perAccount`; trigger `periods_enforce_account_cap` in `supabase/migrations/20261126130000_periods.sql` (since `20261128120000`, an account sync edit of a Period the account already holds is not counted as a new one); on Cadence for Mac `MAX_PER_PROFILE` in `apps/desktop/src-tauri/src/local_store/period.rs` | Periods plan (D35), section 1 | The Period count per account; whether anyone comes near 500 |
 | PER-02 | Label length | 1 to 60 characters, one line | `PERIOD_LIMITS.labelCharacters`, `normalizePeriodLabel`; check `periods_label_valid` | Periods plan (D35), section 1 | Labels at or near 60 characters |
 | PER-03 | Note length | 2,000 characters, as for a day note | `PERIOD_LIMITS.noteCharacters`, `normalizePeriodNote`; check `periods_note_valid` | Periods plan (D35), section 1 | Notes at or near the limit |
 | PER-04 | "End today" applies | first day today or earlier, and ongoing or last day after today | `resolvePeriodEndState` | Periods plan (D35), section 1 | Periods whose last day was later edited by hand to an earlier date |

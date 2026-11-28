@@ -180,6 +180,8 @@ export type PortabilitySnapshot = {
   whereSuggestionDismissals?: (import("./place-labels").WhereSuggestionDismissalRecord & { user_id: string })[];
   /** Ticket 292 rows, with the local owner column. Older snapshots omit them. */
   dayNotes?: (import("../resolvers/day-note.resolver").DayNoteRecord)[];
+  /** Ticket 374: the account's Periods, for account sync on Cadence for Mac. */
+  periods?: (import("../resolvers/period.resolver").PeriodRecord)[];
 };
 export type PortabilityRowWrite<T> = { expected: T | null; next: T };
 export type LocalImportWritePlan = {

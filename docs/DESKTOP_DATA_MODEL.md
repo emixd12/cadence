@@ -283,6 +283,7 @@ The final app must obtain its own permission and reconcile actual OS readback.
 | `occurrence_sync_state` | Versioned local generation freshness and covered local-date range |
 | `reminder_deliveries` | Existing browser/email contract and import provenance, without provider delivery |
 | `native_reminder_state`, `native_reminder_coverage` | Desired native requests, retained cancellation intent, and explicit coverage receipts |
+| `periods` | Labeled ranges of local dates for the whole profile (Ticket 374); annotation only, capped at 500 by the store commands |
 | `behaviorlog_import_runs`, `behaviorlog_import_record_mappings` | Current preview/apply metadata, accepted preview links, and record provenance |
 | `imported_notes`, `imported_interventions` | Current passive imported context; no implicit reminder delivery |
 | `behavior_revisions` | Native monotonic graph revision, outside the portable Behavior Row |
@@ -730,6 +731,50 @@ become unanswered; no row is lost from schema 28.
 5. Exports and BehaviorLog import and restore carry the stored answer only with the
    Mac's alongside build switch on (`VITE_CADENCE_ALONGSIDE=1`), as the web does with
    `CADENCE_ALONGSIDE` on (Ticket 364).
+
+## Periods (Ticket 374, D35)
+
+SQLite schema 31 (`apps/desktop/src-tauri/migrations/0031_periods.sql`) adds `periods`,
+mirroring hosted `public.periods`: `id`, `user_id`, `label` (1 to 60 characters, one
+line, no space at either end), `start_on`, nullable `end_on` on or after `start_on`,
+nullable `note` of 1 to 2,000 characters, `revision` and the two instants. Primary key
+`(user_id, id)`; index `(user_id, start_on)`. The table starts empty and no existing
+row changes.
+
+1. **Commands** (`local_store/period.rs`): `readPeriods` (every Period, or with both
+   dates those with a day inside the range), `readPeriod`, `createPeriod`,
+   `createPeriodIfAbsent`, `updatePeriod` and `deletePeriod`. Each write is one
+   transaction with its outbox entry. `createPeriod` and `createPeriodIfAbsent` refuse
+   a 501st Period with the words of `PERIOD_LIMIT_MESSAGE`. `createPeriodIfAbsent`
+   returns an existing Period with the same label, first day and last day (ongoing
+   matches ongoing) unchanged. `updatePeriod` and `deletePeriod` compare `revision`
+   and return null on a mismatch; an unchanged update keeps the revision.
+   `deletePeriod` removes the row and records a tombstone.
+   `apps/desktop/src/local-period.service.ts` adapts the commands to the shared
+   `PeriodDataStore`, so `@cadence/core/services/period.service` runs unchanged.
+2. **Account sync contract 12.** `ACCOUNT_SYNC_CONTRACT = 12` adds the entity kind
+   `period` with the exact fields above, less `user_id`. It uses the generic three-way
+   merge: a removal against an unchanged copy propagates; a removal against an edited
+   copy, and two different edits, are conflicts for review. When a reviewed conflict
+   between two edits is decided, the kept content takes a revision one above both
+   sides. The synced shape is exact, so a later field stops this build with "Update
+   Cadence before synchronizing periods." Error messages never carry a label or a note.
+3. **The cap in sync.** The local sync apply path does not count. The hosted trigger
+   refuses a merge that would pass 500 Periods; the Mac then shows the sync error and
+   keeps its rows.
+4. **First link.** A local Period makes the first link use the private import path, so
+   the Period keeps its id, revision and note.
+5. **Older builds.** Contracts 8 to 11 (Cadence for Mac 0.1.14 to 0.1.17) never read
+   the kind and cannot write it. Their other writes keep hosted Periods
+   (`tests/sql/ticket-374-period-sync-smoke.sql`). The minimum writer contract stays 8.
+6. **Snapshots.** `readImportSnapshot` (the account sync source) and
+   `readExportSnapshot` return `periods`. The screens, and local export, import and
+   restore, arrive in this ticket's second pull request.
+
+Tests: `periods_create_edit_delete_with_cap_revision_and_tombstone` and
+`periods_migration_keeps_existing_rows_and_starts_empty` (native),
+`tests/local-period.service.test.ts`, and "Period synchronization (Ticket 374,
+contract 12)" in `tests/account-sync.resolver.test.ts`.
 
 ## Guessed Where dismissals (Ticket 383, D37)
 

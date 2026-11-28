@@ -14,7 +14,8 @@ const DEFAULT_TIMEZONE = "America/New_York";
 export function firstLinkIncludesTravel(snapshot: AccountSyncSnapshot): boolean {
   return snapshot.entities.some(({ kind, value }) => {
     // BehaviorLog import does not restore day notes (Ticket 292), so they also need the private path.
-    if (kind === "place_label_settings" || kind === "place_marker" || kind === "completion_place_label" || kind === "where_suggestion_dismissal" || kind === "day_note") return true;
+    // A Period (Ticket 374) keeps its id, revision and note only on the private path.
+    if (kind === "place_label_settings" || kind === "place_marker" || kind === "completion_place_label" || kind === "where_suggestion_dismissal" || kind === "day_note" || kind === "period") return true;
     const row = object(value);
     // Learned travel habits (Ticket 217) have a revision once anything was learned.
     if (kind === "profile") return !!(row.travel_enabled || row.base_location_text || row.travel_mode ||
@@ -84,5 +85,7 @@ export function hasRecognizedLocalData(snapshot: PortabilitySnapshot & { reminde
     (snapshot.noteShortcutStates?.length ?? 0) > 0 ||
     (snapshot.placeLabelSettings?.length ?? 0) > 0 ||
     // A day note row, even a cleared one, is local data the hydrate path would drop (Ticket 292).
-    (snapshot.dayNotes?.length ?? 0) > 0;
+    (snapshot.dayNotes?.length ?? 0) > 0 ||
+    // A Period is local data the hydrate path would drop (Ticket 374).
+    (snapshot.periods?.length ?? 0) > 0;
 }

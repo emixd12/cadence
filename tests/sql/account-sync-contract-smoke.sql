@@ -49,6 +49,16 @@ declare
         "revision",
         "updated_at"
     ],
+    "periods": [
+        "created_at",
+        "end_on",
+        "id",
+        "label",
+        "note",
+        "revision",
+        "start_on",
+        "updated_at"
+    ],
     "behaviors": [
         "active",
         "archive_notes",
@@ -312,7 +322,7 @@ $frozen$::jsonb;
     "place_label_settings": "place_label_settings", "place_markers": "place_marker",
     "completion_place_labels": "completion_place_label", "where_suggestion_dismissals": "where_suggestion_dismissal",
     "day_notes": "day_note", "behavior_source_links": "behavior_source_link",
-    "occurrence_source_matches": "occurrence_source_match"
+    "occurrence_source_matches": "occurrence_source_match", "periods": "period"
   }'::jsonb;
   unregistered text;
   missing_default text;
@@ -349,7 +359,8 @@ begin
   -- Contract 10 adds behaviors.alongside, the person's alongside answer (Ticket 363).
   -- Contract 11 adds no column or kind; it shows a guess dismissal stored while labels are
   -- off (Ticket 383, account_sync_contract_row_rules).
-  if cadence_private.account_sync_current_contract() <> 11 then
+  -- Contract 12 adds the period kind (Ticket 374).
+  if cadence_private.account_sync_current_contract() <> 12 then
     raise exception 'Update the frozen list and ACCOUNT_SYNC_CONTRACT for contract %', cadence_private.account_sync_current_contract();
   end if;
   if cadence_private.project_account_sync_snapshot(
@@ -419,6 +430,19 @@ begin
       jsonb_build_object('kind', 'where_suggestion_dismissal', 'id', 'g', 'value', jsonb_build_object('id', 'g', 'suggestion', 'home'))
     )), 11) -> 'entities') <> 1 then
     raise exception 'Contract 11 projection hides a guess dismissal.';
+  end if;
+  -- Contract 12: the period kind is hidden from every older contract.
+  if jsonb_array_length(cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'period', 'id', 'p', 'value', jsonb_build_object('id', 'p', 'label', 'Sick'))
+    )), 11) -> 'entities') <> 0 then
+    raise exception 'Contract 11 projection shows a Period.';
+  end if;
+  if jsonb_array_length(cadence_private.project_account_sync_snapshot(
+    jsonb_build_object('schemaVersion', 1, 'userId', gen_random_uuid(), 'fingerprint', '', 'entities', jsonb_build_array(
+      jsonb_build_object('kind', 'period', 'id', 'p', 'value', jsonb_build_object('id', 'p', 'label', 'Sick'))
+    )), 12) -> 'entities') <> 1 then
+    raise exception 'Contract 12 projection hides a Period.';
   end if;
 end;
 $$;

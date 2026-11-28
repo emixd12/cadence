@@ -12,6 +12,7 @@ import type {
 } from "@cadence/core/data-store";
 import type { AccountSyncEntity, AccountSyncWrite } from "@cadence/core/resolvers/account-sync.resolver";
 import type { DayNoteRecord } from "@cadence/core/resolvers/day-note.resolver";
+import type { PeriodRecord } from "@cadence/core/resolvers/period.resolver";
 import type { NoteShortcutContext, NoteShortcutState } from "@cadence/core/types/note-shortcut";
 import type { TravelHabits, TravelSettings } from "@cadence/core/types/travel";
 
@@ -36,6 +37,7 @@ export type LocalBehaviorGraph = {
 };
 type Owned = { profileId: string };
 export type Mutation = Owned & { mutationId: string; now: string };
+type PeriodFields = { label: string; startOn: string; endOn: string | null; note: string | null };
 export type NativeReminderRow = {
   user_id: string; id: string; occurrence_id: string; request_id: string; fire_at: string;
   title: string; body: string; status: "planned" | "scheduled" | "cancelled" | "failed" | "delivered";
@@ -113,6 +115,8 @@ export type LocalCommandMap = {
       timeSessions: OccurrenceTimeSession[]; nativeReminders: NativeReminderRow[];
       importedNotes: PortabilityNoteRow[]; importedInterventions: PortabilityInterventionRow[];
       importRuns: PortabilityImportRunRow[]; importMappings: PortabilityMappingRow[]; dayNotes: DayNoteRecord[];
+      /** Ticket 374: every Period of the profile; the export picks those in its range. */
+      periods: PeriodRecord[];
       occurrenceMoves: OccurrenceMoveRecord[] };
   };
   readProfile: { input: Record<string, never>; result: Profile };
@@ -191,6 +195,17 @@ export type LocalCommandMap = {
     input: Mutation & { newId: string; localDate: string; expectedNote: string | null; note: string | null };
     result: DayNoteRecord | null;
   };
+  /** Ticket 374: every Period, or with both dates those with a day inside the range. */
+  readPeriods: { input: Owned & { startLocalDate?: string; endLocalDate?: string }; result: PeriodRecord[] };
+  readPeriod: { input: Owned & { periodId: string }; result: PeriodRecord | null };
+  /** Fails with the Period limit message when the profile holds 500 Periods. */
+  createPeriod: { input: Mutation & PeriodFields & { newId: string }; result: PeriodRecord };
+  /** Adds the Period unless one with the same label, first day and last day exists. */
+  createPeriodIfAbsent: { input: Mutation & PeriodFields & { newId: string }; result: { period: PeriodRecord; created: boolean } };
+  /** Null when the Period is gone or its revision differs. */
+  updatePeriod: { input: Mutation & PeriodFields & { periodId: string; expectedRevision: number }; result: PeriodRecord | null };
+  /** The deleted id, or null when the Period is gone or its revision differs. */
+  deletePeriod: { input: Mutation & { periodId: string; expectedRevision: number }; result: string | null };
   startTimeSession: { input: Mutation & { session: OccurrenceTimeSession }; result: OccurrenceTimeSession | null };
   stopTimeSession: { input: Mutation & { occurrenceId: string; sessionId: string; stoppedAt: string }; result: OccurrenceTimeSession | null };
   resetTimeSessions: {
