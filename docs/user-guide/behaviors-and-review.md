@@ -206,6 +206,43 @@ work in Tab order. Use arrow keys inside selects and number fields and Space on
 weekday checkboxes. At high zoom or on mobile, recurrence, detail, and time
 columns stack; labels remain adjacent to their fields.
 
+## Set whether a Behavior can be done alongside other things
+
+**Prerequisites:** A create or **Details and Settings** form is open on a server
+where alongside Behaviors are enabled.
+
+1. Open **Can be done alongside other things** and choose **Yes**, **No**, or
+   **Not answered**.
+2. When a Behavior is **Not answered** and Cadence has a model guess (for
+   example, **Cadence guesses Yes. Planning uses the guess until you choose.**),
+   choose **Use the guess** to fill the select with that answer, or choose your
+   own value directly.
+3. When **Where** is **Not set** and Cadence has a guessed place (for example,
+   **Cadence guesses this happens at Home. Planning uses the guess until Where
+   is set.**), choose **Review Where** to set a place or **Dismiss** to hide
+   the guess. This line appears whether or not **Completion places** is on; GPS
+   markers and completion counts still require **Completion places**.
+4. Choose **Save behavior** to persist the answer.
+
+**Result and persistence:** **Yes** lets Cadence schedule or move the Behavior
+during another Behavior at the same place (or at **Anywhere**), while still
+refusing overlaps with items at another known place or during travel. **No**
+keeps the Behavior in its own time slot. Saving an answer records a
+configuration-history revision, syncs across linked devices, and appears in
+exports when enabled. Model guesses are never exported.
+
+**Recovery or undo:** Open **Details and Settings**, change **Can be done
+alongside other things** to **No** or **Not answered**, and choose **Save
+behavior**, or choose **Cancel** before saving.
+
+**Privacy and safety:** Your answer is stored account data. When an alongside
+Behavior is unanswered, Cadence uses its guess only for planning and labels it
+**Alongside · a guess** on Timeline until you choose.
+
+**Keyboard and mobile:** Tab from **Where** reaches **Can be done alongside
+other things**, then **Use the guess** when a guess is shown. Press Enter on
+**Use the guess** to apply the guessed value to the draft.
+
 ## Save, reset, or update a Behavior draft
 
 **Prerequisites:** A create or edit form is open.

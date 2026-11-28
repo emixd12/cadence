@@ -103,6 +103,31 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Cadence for Mac 0.1.19 published; Alongside live on web and Mac — November 28, 2026
+
+- **Published (06:51–06:54Z):** versioned assets, `desktop-stable/latest.json`, atomic
+  `Cadence_aarch64.dmg` swap, and `desktop-preview/latest.json` on the owner's instruction after
+  Ticket 374 (`17768afa`) cleared `INT-PERIOD-001`–`004` desktop parity.
+- **Included:** Alongside Behaviors and guessed Where (`CADENCE_ALONGSIDE=on` live in Production
+  web; `VITE_CADENCE_ALONGSIDE=1` enabled in published Mac builds; schema 29–30, contracts 10–11;
+  Ticket 385 card `do-it-during-something-else` active), Periods on Mac (Ticket 374, schema 31,
+  contract 12), and Tracked-time length (Ticket 366).
+- **Checks:** `release.mjs check`, `build` (Apple notarization `03d4df93-7da2-45af-83e8-8ddbc8aa88c5`,
+  stapled), standalone `verify` (14 checks), Minisign verification (`version:0.1.19`), real-updater
+  upgrade on `test-mac` (`0.1.19-dev.1` → `0.1.19`, schema 30 → 31, integrity `ok`, 0 FK errors,
+  0 pending writes, launch sync at `06:53:06Z`), public readback of all 7 URLs, quarantined
+  public DMG Gatekeeper + `syspolicy_check distribution`, plus Ticket 365 Production web,
+  `test-mac`, and Production MCP Tier 0 + Tier 1 (`claude-code`, `anthropic-api`, `openai-api`
+  3/3 pass) acceptance.
+- **Evidence:** `docs/qa/2026-11-28-desktop-0.1.19-release-packet.md` and
+  `docs/qa/2026-11-28-alongside-production-acceptance.md`; user guide updated in
+  `docs/user-guide/behaviors-and-review.md` and `docs/user-guide/timeline.md`.
+
+Platform impact: web live in Production (`CADENCE_ALONGSIDE=on`); desktop published (`0.1.19` on
+`desktop-stable` and `desktop-preview` feeds, version-free `Cadence_aarch64.dmg`); marketing
+download link points at `Cadence_aarch64.dmg` (messaging pass `P-093`, `P-103`); future mobile
+deferred. Messaging impact: P-093, P-103.
+
 ## Ticket 374, second pull request: Periods on the Mac's screens — November 28, 2026
 
 - **Screens:** the Mac Timeline shows Period chips under each date and "Add period" on
