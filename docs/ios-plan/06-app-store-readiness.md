@@ -138,9 +138,12 @@ Medical and Measurements Behaviors from model input).
       excluded.
 - [ ] **Agent.** Show a native consent sheet before the first transmission to
       the model (guideline 5.1.2(i)). It names OpenAI, lists the data sent
-      (Behavior names, schedules, history; Calendar and Notes only when enabled;
-      Chat messages), states retention, says how to revoke, labels output as
-      AI-generated, and says "not medical advice".
+      (Behavior names, schedules, history; day notes and Period labels and dates;
+      Calendar and Notes only when enabled; Chat messages), states retention,
+      says how to revoke, labels output as AI-generated, and says "not medical
+      advice". It mirrors web's live Privacy text (P-090): Google Calendar
+      reaches AI features only through the separate Calendar MCP grant, and
+      event text passes Google Cloud Model Armor before the model sees it.
 - [ ] **Agent.** Ask again when the data sources expand. Revocation stops all
       AI features until approved again.
 - [ ] **Owner.** Primary category **Productivity**. No Health & Fitness secondary
@@ -162,7 +165,7 @@ None is used for tracking.
 | Email Address | Account |
 | Name | Apple returns it on first authorization; Google profile |
 | User ID | Account |
-| Other User Content | Behaviors, Notes, statuses, timing, Daily Brief and Chat payloads |
+| Other User Content | Behaviors, Notes, day notes, Periods, statuses, timing, Daily Brief and Chat payloads |
 | Health & Fitness | Declare while the default Medical, Measurements and Fitness categories remain; they invite health data |
 | Precise Location | While Using the App: Travel and completion place labels |
 | IP address (in server logs) | Declare per Apple's guidance |

@@ -931,7 +931,7 @@
     {
       "id": "do-it-during-something-else",
       "revision": 1,
-      "status": "draft",
+      "status": "active",
       "advice": "Tying one activity to another done at the same time, such as an audiobook kept for the gym, helped people go more often at first; the effect faded over time.",
       "applies_when": [
         {
@@ -966,8 +966,8 @@
         "kind": "open",
         "target": "alongside"
       },
-      "reviewed_at": null,
-      "reviewer": null
+      "reviewed_at": "2026-11-28",
+      "reviewer": "Emi"
     }
   ]
 }

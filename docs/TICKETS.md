@@ -20992,7 +20992,7 @@ Messaging impact: `P-103`.
 
 ## Ticket 385: An advice card for the alongside question
 
-Status: complete in code November 25, 2026, awaiting the owner's card review. The card `do-it-during-something-else` ships with `status: "draft"` and no `reviewer` or `reviewed_at`, so the matcher and the tip run skip it. Source kind `randomized_trial` (no field-experiment kind exists). The offer's link target `alongside` opens the Behavior form at "Can be done alongside other things" (`?edit=<id>&field=alongside`). Migration `20261126240000_alongside_tip_link_target.sql` replaces the `coach_tips.link_target` check to allow it; it is not additive, so its hosted push needs the owner's yes, and it must be on the database before the card is activated. Smoke: `tests/sql/alongside-tip-link-target-smoke.sql`.
+Status: complete November 28, 2026. The card `do-it-during-something-else` was reviewed and activated by the owner (`status: "active"`, `reviewer: "Emi"`, `reviewed_at: "2026-11-28"`). Source kind `randomized_trial` (no field-experiment kind exists). The offer's link target `alongside` opens the Behavior form at "Can be done alongside other things" (`?edit=<id>&field=alongside`). Migration `20261126240000_alongside_tip_link_target.sql` replaces the `coach_tips.link_target` check to allow it (pushed to hosted Supabase November 28, 2026 before PR #407 merge). Smoke: `tests/sql/alongside-tip-link-target-smoke.sql`.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside follow-ups after the audit (D37)".
 

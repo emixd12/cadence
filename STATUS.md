@@ -48,7 +48,7 @@ Check the cited entry before acting on a row.
 
 | Ticket or area | State | Next action or blocker | Source |
 | --- | --- | --- | --- |
-| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 (web + Mac, SQLite schema 30, account sync contract 11), 384, 385 (draft card) and 386 complete in PR #407 | Owner yes for hosted push of `20261126240000`, `20261126250000` and `20261126260000` (`20261126200000`–`20261126230000` already covered/approved); owner review to activate Ticket 385 draft card `do-it-during-something-else` | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
+| Tickets 383–386: alongside follow-ups after the audit (D37) | 383 (web + Mac, SQLite schema 30, account sync contract 11), 384, 385 (`do-it-during-something-else` reviewed and active, 2026-11-28) and 386 complete in PR #407; hosted migrations `20261126200000`–`20261126260000` pushed November 28, 2026 | Merge PR #407 and finish Ticket 365 acceptance | TICKETS, Tickets 383–386; DECISIONS, 2026-11-25 (D37) |
 | Tickets 375–382: MCP Apps, the "Cadence day" view (D36) | 375 (spike) `in_progress`: local answers done and the `show_day` schema frozen November 26, 2026; real-host answers missing. 376 (server) complete November 26 behind `CADENCE_MCP_APPS`, off in production, no migration. 377 (view) complete November 26: the real view replaces the placeholder. 380 (listing preparation) `in_progress`: drafts, capture script, skill draft and owner checklist done November 26, host screenshots wait for 378. 378 and 381 not started; 379 complete; 382 (later views) `deferred` | 375: the owner's four `mcp-web` preflight steps and a way for Claude and ChatGPT to reach a flag-on server, then three checks on each host. 378 tests hosts (notes for it: `docs/qa/2026-11-25-mcp-day-view.md`); 379 (consent 500) any time; production flag, listings and public copy wait for the marketing site overhaul (Ticket 246) | TICKETS, Tickets 375–382; `docs/qa/2026-11-26-mcp-apps-spike.md`; `docs/plans/2026-11-25-mcp-apps-expansion.md`; DECISIONS, 2026-11-25 (D36) |
 | Tickets 367–374: Periods, and day notes and Periods in the Daily Brief (D35) | 367–373 complete and live on web November 26, 2026; hosted migrations `20261126130000`, `20261126135000` and `20261126140000` pushed; 374 (Mac) blocked | Chat writes Periods since PR #423 (owner's yes, November 26; hosted migration `20261126150000` pushed). 374 starts from an hourly scheduled check when Ticket 363 (PR #407) is on `main`. Not yet done: a look at `/timeline` and `/behaviors` in a browser against a database, a live MCP client run, a live brief | TICKETS, Tickets 367–374; `docs/plans/2026-11-25-periods.md`; STATUS, "Periods: Tickets 367–373 — November 26, 2026" |
 | Ticket 366: tracked time decides a Behavior's length from 3 tracked completions (D34) | Merged November 25, 2026 (PR #403); the Timeline row checked on production web November 26 as test account A | Installed Mac check with the next Mac release | TICKETS, Ticket 366; DECISIONS, 2026-11-25 (D34) |
@@ -73,7 +73,7 @@ Check the cited entry before acting on a row.
 | Mac leave reminders for newly added Calendar events | PR #198 in 0.1.10; installed run on November 12 inconclusive (event too close to plan a reminder) | Rerun on the test Mac with an event at least two hours ahead | STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026" |
 | Updater key rotation and new Developer ID identity | 0.1.10 published November 12, 05:29–05:33Z, with the rotated key and new identity; 0.1.9 and earlier install it by hand once | Renew the certificate before December 11, 2027. PR #241 and PR #243 shipped dormant in 0.1.11 after ordinary installed acceptance | DECISIONS, 2026-11-11; STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026"; release packet, "PR review follow-up" |
 | Ticket 325: release credential backup and restore | Identity, notarization-password and updater backups verified November 12; API-key backup and checks recorded as passed in `dd4cb67b`; notarization uses the API key (0.1.10) | Certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026"; 0.1.10 release packet |
-| Cadence for Mac 0.1.17 | Published November 26, 2026, 00:32–00:43Z (November 25 EST): schema 28, contract 9, PR #398 Google Calendar dual-grant Settings and `purpose=ai_mcp` broker; real-updater upgrade (`0.1.15` → `0.1.17`), same-schema check, Calendar callback replay and public readback passed on `test-mac` | Defect: **Connect Google Calendar for AI** fails on the Mac because `pending-ai-calendar-state` is missing from `ALLOWED_KEYS` in `apps/desktop/src-tauri/src/auth.rs`; the fix needs a ticket and a Mac release. 1-hour session renewal and revoked-session check for `@supabase/supabase-js` 2.119.0 still deferred from 0.1.15; macOS 14 not tested | `docs/qa/2026-11-25-desktop-0.1.17-release-packet.md` |
+| Cadence for Mac 0.1.18 | Published November 28, 2026, 05:14Z: hotfix on the 0.1.17 base carrying PR #432 only, so **Connect Google Calendar for AI** now opens the Google OAuth flow; schema 28, contract 9. Real-updater upgrade (`0.1.17` → `0.1.18`), same-schema check, sign-in and Calendar callback replays, the live connect check and public readback passed on `test-mac` | Session renewal and revoked-session check not run: the trigger applies, but the diff touches only the Keychain allow-list and calendar cleanup, so the owner should confirm the exception. It has stayed deferred since 0.1.15. macOS 14 not tested. The Google AI Calendar client shows the unverified-app warning until Ticket 245. Later `main` work, such as Ticket 366, waits for the next Mac release | `docs/qa/2026-11-26-desktop-0.1.18-release-packet.md`; 0.1.17: `docs/qa/2026-11-25-desktop-0.1.17-release-packet.md` |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
@@ -103,6 +103,48 @@ Check the cited entry before acting on a row.
 
 ## Recent entries
 
+## Vercel build billing optimization (Phases 1–3) — November 28, 2026
+
+- **Phase 1 (PR #438, merged `2b6038fc`):** path-filtered `ignoreCommand` scripts with
+  shallow-clone fetch and zero-secret opt-in previews. `cadence-marketing` moved to Basic
+  (2 vCPU). The team Spend Management budget is US$30, alert-only (pause off). Live check: 8 of
+  8 later non-web and preview pushes were canceled with zero billed CPU-minutes.
+- **Phase 2 (PR #439, merged `d463c8a8`):** root-anchored `.vercelignore` trim (1,310 of 2,785
+  files, about 33 of 76 MB). A local webpack and Turbopack benchmark kept `--webpack` until a
+  separate `.next/server` Preview check. Updated `docs/VERCEL_WORKFLOW.md`, `docs/COSTS.md`
+  (30-day baseline 15,380 Cadence CPU-minutes, US$53.83 after December 8) and `AGENTS.md`.
+- **Phase 3 (this PR):** Public Trust provenance (`scripts/collect-public-trust-evidence.mjs`,
+  `.github/workflows/public-trust-evidence.yml`) accepts a Ready deployment that names a
+  verified ancestor of the source commit with no change in that surface's ignore-script paths.
+  This covers a surface that skipped its build. The `collect` job now fetches full history.
+- **Open:** the 14-day billing measurement is due December 12, 2026. Deployment retention stays
+  at Vercel's 30-day default (REST API writes returned HTTP 400 on Pro) unless optionally
+  shortened to 7 days in the Vercel Dashboard (`Settings → Deployment Retention`). Ticket 350
+  (`cadence-me` organization and Merge Queue batching) stays owner-gated; `orgs/cadence-me`
+  does not exist.
+
+Platform impact: web and marketing deploy and Public Trust only; desktop and future mobile not
+applicable.
+Messaging impact: none.
+
+## Cadence for Mac 0.1.18 published — November 28, 2026
+
+- **Published:** the versioned assets and `desktop-stable/latest.json` at 17:44–17:46Z on
+  November 27. The version-free `Cadence_aarch64.dmg` and `desktop-preview/latest.json` moved at
+  05:14Z on November 28, after `test-mac` checks passed. Owner instruction: November 27.
+- **Fix:** PR #432 adds `pending-ai-calendar-state` to the Mac Keychain allow-list. On installed
+  0.1.18, **Connect Google Calendar for AI** opened the Google OAuth page instead of "could not
+  start connecting". The agent closed the tab without consent, so no grant was made.
+- **Checks:** the real updater moved `test-mac` from 0.1.17 to 0.1.18. The same-schema check
+  found no lost rows and 0 secret findings; `launchSyncChanges` was
+  `{"account_sync_baselines":1,"sync_cursors":1}`. Sign-in and Calendar callback replays showed
+  their notices and changed no connection. All 7 public URLs read back with matching SHA-256.
+  Minisign and the quarantined public DMG checks passed.
+- **Not run:** the session renewal and revoked-session check (see the open-work row).
+
+Platform impact: desktop only (release); web, marketing and future mobile not applicable.
+Messaging impact: none.
+
 ## Alongside history fix: an unanswered Behavior leaves no trace (defect D1, Ticket 363) — November 26, 2026
 
 Branch `feat/alongside-history-fix` (main plus the unmerged alongside feature). Fixes D1 of
@@ -130,172 +172,3 @@ Branch `feat/alongside-history-fix` (main plus the unmerged alongside feature). 
 Platform impact: web and hosted database implemented; desktop follows through the shared
 planner (no SQLite change, schema 30); marketing not applicable; future mobile inherits the
 planner rule. Messaging impact: none.
-
-## Ticket 385 complete in code: an advice card for the alongside question — November 26, 2026
-
-Branch `feat/alongside-385`. Closes the advisor-tip gap Ticket 360 recorded: `setup_gaps`'s
-`alongside_unanswered` now has a card, awaiting the owner's review.
-
-- **Card:** `do-it-during-something-else` in `packages/core/src/data/advice-library.json`
-  (library version `2026-11-25.1`), resting on Milkman, Minson and Volpp (2014), kind
-  `randomized_trial`, strength limited. Behavior-scoped rule on `alongside_unanswered`
-  (coach-signals version 4, so only with `CADENCE_ALONGSIDE` on). Ships as `draft` with no
-  `reviewer` or `reviewed_at`: the matcher and the tip run skip it, and no tip shows.
-- **Link:** new tip link target `alongside` opens the Behavior form at "Can be done
-  alongside other things" (`?edit=<id>&field=alongside`); an account-wide tip picks the
-  first Behavior whose question is open.
-- **Migration:** `20261126240000_alongside_tip_link_target.sql` replaces the
-  `coach_tips.link_target` check to allow `alongside`. Not applied locally; not additive,
-  so the hosted push needs the owner's yes. It must be on the database before the card is
-  activated. Smoke: `tests/sql/alongside-tip-link-target-smoke.sql` (not run).
-- **To activate:** push the migration, then set the card's `status` to `active` and fill
-  `reviewer` and `reviewed_at` (owner only).
-
-Platform impact: web implemented; desktop not applicable (tips come from the hosted server;
-the Mac opens the same shared form field); marketing not applicable; future mobile inherits
-the resolvers. Messaging impact: P-103.
-
-## Ticket 384 complete in source: calendar event places — November 26, 2026
-
-- **Rule:** with `CADENCE_ALONGSIDE` on, each busy calendar event that reaches the free-slot
-  rule carries Home, a saved place's key or nothing (unknown), from its location text by
-  `travelPlaceKey` (`calendarEventPlace`, `planningPlaceCatalog` in `alongside.resolver.ts`).
-  An alongside item is refused during an event at another known place; the Timeline cue
-  shows again for those overlaps only. Calendar events stay out of pairing hosts.
-- **Paths:** Daily Brief lines (Google MCP read, in-memory location sidecar), its answers
-  (`readServerBriefCalendarBusy`, Google MCP), Chat (all sources), the web Timeline's "Move
-  for today" and the web and Mac overlap cues (on the device, from the view's
-  `planningPlaces` keys). Outlook and iCloud stay unknown on the Daily Brief paths: those reads
-  ask for no location. Map: `docs/DATETIME_STRATEGY.md`, "Coarse event places".
-- **Privacy:** no storage, logging, model input or MCP result carries the label, the keys or
-  a location (`tests/calendar-event-place.boundary.test.ts`). Flag off: no new read, and
-  request bodies and outputs are unchanged. No migration, no provider call, no new
-  dependency. Not run in a browser or on an installed Mac.
-
-Platform impact: web implemented; desktop overlap cue through the shared Timeline and
-`local-timeline.service.ts` (the Mac offers no "Move for today" and its brief uses the hosted
-routes); marketing not applicable; future mobile inherits the resolvers. Messaging impact: P-103.
-
-## Ticket 383 Mac complete: guessed Where dismissals sync while Completion places is off — November 26, 2026
-
-Branch `feat/alongside-383mac`, on the alongside branch with Ticket 383's web part.
-
-- **Hazard confirmed by test:** before this change the shared planner deleted a hosted guess
-  dismissal stored while labels were off (an ordinary sync planned a hosted delete), and the
-  schema-29 SQLite trigger refused it (a first-link replacement would fail).
-- **Mac:** SQLite schema 30 (`0030_guess_dismissal_without_labels.sql`) admits `home`,
-  `anywhere` and `add_place` dismissals while labels are off. A linked Mac shows the hosted
-  guessed Where and dismisses the shown guess with Completion places off; local mode has none.
-- **Sync:** account sync contract 11. `retainPlaceLabelInvariants` keeps a guess dismissal
-  while labels are off; turning labels off still deletes every dismissal. Hosted migration
-  `20261126250000_account_sync_where_guess_dismissals.sql` (not applied or pushed) hides such
-  rows from contracts 8 to 10 (Cadence for Mac 0.1.14 to 0.1.17), keeps them out of those
-  contracts' apply results, and lets their own dismissal replace a hidden one. It inserts one
-  registry row and changes the projection and apply functions for older contracts: it needs
-  the owner's yes, and must reach the database no later than `20261126230000`. Minimum writer
-  contract stays 8.
-- **Verification:** resolver, native, store-contract and SQL fixtures
-  (`tests/sql/ticket-383-mac-guess-dismissal-sync-smoke.sql`) against a scratch database
-  with every migration, and the full check list in AGENTS.md. The web fixture
-  `tests/sql/ticket-383-where-guess-dismissal-smoke.sql` expected a check violation where
-  the trigger raises first; fixed.
-
-Platform impact: web unchanged; desktop implemented (installed check in Ticket 365); marketing
-not applicable; future mobile inherits the planner. Messaging impact: P-103.
-
-## Ticket 386 complete in source: the estimate hash leaves Where out — November 25, 2026
-
-- **Hash:** `behaviorEstimateInputHash` hashes the title, description and the recipe
-  markers only (`v: 2`). Setting, changing or clearing Where keeps the cached length and
-  alongside guess and makes no model call. A title or description change still asks again.
-- **Where guess:** `cacheBehaviorEstimates` now stores the model's Where guess also when
-  the person set Where. `currentEstimate` skips it while Where is set; clearing Where reads
-  it again with no call. The request bytes are unchanged, flag on or off.
-- **One-time cost:** every stored hash changes once, so each Behavior is asked again one
-  time: one request per brief for up to 40 Behaviors with the flag off, at most two with it
-  on (`docs/COSTS.md`). No compatibility path for old hashes (D37). No migration.
-
-Platform impact: web implemented; desktop not applicable (estimates are hosted); marketing
-not applicable; future mobile inherits the server rules. Messaging impact: none.
-
-## Ticket 366 checked on production; Ticket 387 filed — November 26, 2026
-
-- **Checked:** on production web as test account A, "Read 20 pages" with 3 tracked completions
-  reads "Usually 1m 5s · Based on 3 tracked completions · Intended 30m 0s" and offers no
-  "Set intended duration". A Behavior with no tracked completion reads "Intended: 30m 0s".
-  The three 1-minute completions (November 23 to 25) stay on account A for the Mac check.
-- **Not checked:** the length tip in a browser; Cadence for Mac, which gets the change in its
-  next release.
-- **Docs:** `docs/RULES_REGISTER.md` gains rows for six rule sets (ANA, SIG, PROP, SLOT, TRV,
-  CON) and names seven sets still unlisted. Ticket 387 is filed, not started.
-
-Platform impact: none (docs and one code comment). Messaging impact: none.
-
-## Periods: Chat writes and editor polish — November 26, 2026
-
-- **Chat writes Periods (Ticket 370 follow-up, PR #423).** The owner said yes to migration
-  `20261126150000_chat_period_actions.sql`, which drops and re-adds
-  `chat_actions_kind_check`. Pushed to hosted November 26; read back: the constraint is
-  validated and lists `period`. CI `verify` and the Local Supabase rehearsal passed.
-- **Period editor polish (Ticket 369, owner's request).** Label uses the standard
-  underlined field, now one constant in `lib/ui/field-classes.ts`. First day and Last day
-  are compact and side by side, with "Still going" or Clear beside Last day. Note is the
-  shared field: `NoteField`, taken out of `components/notes/NoteEditor.tsx`. An existing
-  Period's note saves on its own through `NoteEditor`, `savePeriodNoteAction` and
-  `savePeriodNote` (compare-and-set on the note, no new migration); Save stores label and
-  days and names the revision the note save returned. Period note chips come from
-  `repeatedNoteLineProposals`, the rule Occurrence and day notes use, and are not stored.
-- **Not done:** kept, edited or dismissed Period note shortcuts
-  (`docs/FUTURE_UPDATES.md`, "Stored Period note shortcuts").
-- **Ticket 374:** still blocked on Ticket 363 (draft PR #407). An hourly scheduled check
-  starts it when #407 is on `main`.
-- **Verification:** the eight required checks passed locally with Node 24. The editor was
-  seen on the `/design-system` bench (`module.period-control`) in headless Chrome at
-  1100px and 390px. Not run: the real `/timeline` and `/behaviors` pages against a
-  database, Dagger.
-
-Platform impact: web implemented; desktop follow-up Ticket 374 (the shared components
-change, but the Mac passes no Period actions yet); marketing not applicable; future
-mobile inherits the core rule and service. Messaging impact: none.
-
-## Ticket 380: MCP Apps listing preparation, nothing published — November 26, 2026
-
-- **In progress.** Nothing was submitted, listed or published. No provider form was
-  opened. No credential or reviewer account is in the repository. No Privacy, Terms,
-  Trust or marketing text changed.
-- **Drafts, unpublished:** `docs/qa/mcp-directory-submission.md` gains five screenshot
-  prompts, the CSP statement, reviewer cases V1 to V5, Google's form facts, and the
-  checklist "Deferred owner steps for MCP Apps" (input file and messaging entry per
-  step). Its Google-only sign-in text is corrected in five places.
-- **Capture script:** `scripts/acceptance/listing-capture.mjs`. Bench mode ran: five
-  PNGs, 1436 pixels wide, each with a prompt sidecar, in the git-ignored
-  `.local/listing-captures/`. They are labelled bench captures, not listing screenshots.
-  Host mode is tested against a stub page only.
-- **Skill draft:** `integrations/drafts/skills/daily-check-in/SKILL.md` names `show_day`.
-  The published copies are unchanged. New acceptance scenario
-  `skill-check-in-view-unconfirmed`; the runner now counts `show_day` as a read.
-- **Remaining, after Ticket 378:** host captures of the five shots, a prompt change if a
-  client does not call `show_day` for it, and the owner's look at each image.
-- **Found, not tested:** Google recommends an unchanged refresh token on refresh and
-  Cadence rotates it; Google asks for an SVG logo and the repository has PNG only.
-- **Verification:** `dagger check --cadence` passed 11 of 11; `npm run test:web-client`
-  passed (84 tests); `node scripts/check-plugins.mjs` passed. Not run: any real client.
-
-Platform impact: web (docs, acceptance tooling, an unpackaged draft); desktop and future
-mobile not applicable; marketing waits for Ticket 246. Messaging: `P-097`, `P-099`,
-`P-100`, `P-101`; statuses of `P-097` and `P-100` updated.
-
-## Ticket 377 complete: the "Cadence day" MCP Apps view — November 26, 2026
-
-- **Built:** `packages/mcp-views` (Preact, `ext-apps`, one HTML file) and the generated
-  `lib/mcp/apps/day-view-html.ts`. `npm run mcp-views:build` writes it; `npm run test`
-  rebuilds it and fails on any byte difference. Sizes: `docs/qa/2026-11-25-mcp-day-view.md`.
-- **View:** one day; rows with Completed, Not Completed and Note; parent slots collapsed;
-  the day note; Needs decision as a count line. Writes carry the displayed precondition
-  and an idempotency key. Words: notices catalog `day-view.json`. Interactions
-  `INT-DAYVIEW-001` to `004`. Bench: `/design-system?preview=mcp-day-view`.
-- **Verified:** tests on the shipped bundle with no network; writes through `basic-host`.
-- **Not verified:** a real host (Ticket 378).
-
-Platform impact: web implemented; desktop not applicable; marketing waits for Ticket 246;
-future mobile deferred. Messaging: `P-097`, `P-098`.

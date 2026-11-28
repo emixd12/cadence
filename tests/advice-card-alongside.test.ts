@@ -11,14 +11,13 @@ import type { TipHistory, TipToWrite } from "@/lib/db/advisor-tips.repo";
 import { chooseTipMatches, visitAdvisorTips, withOffers, type TipSetup, type TipVisitPort } from "@/lib/services/advisor-tips-job.service";
 import { advisorLinkAction, behaviorEditHref, parseBehaviorEditTarget } from "@/lib/ui/advisor";
 
-// Ticket 385 (D37): the alongside advice card ships as a draft. It shows no tip until the
-// owner reviews it, and its link target needs migration 20261126240000 on the database
-// first, so no code path may write link_target 'alongside' while the card is a draft.
+// Ticket 385 (D37): the alongside advice card was reviewed and activated by the owner
+// (2026-11-28), with migration 20261126240000 allowing link_target 'alongside'.
 
 const CARD_ID = "do-it-during-something-else";
 const TODAY = "2026-11-25";
 const shipped = ADVICE_CARDS.find((card) => card.id === CARD_ID)!;
-const reviewed: AdviceCard = { ...shipped, status: "active", reviewer: "Test reviewer", reviewed_at: "2026-11-25" };
+const draftCopy: AdviceCard = { ...shipped, status: "draft", reviewer: null, reviewed_at: null };
 
 const ACCOUNT: AdviceAccountFacts = {
   account_age_days: 60, active_behaviors: 2, behaviors_with_window: 0, behaviors_with_set_time: 2,
@@ -64,9 +63,9 @@ function tipPort(): { port: TipVisitPort; written: TipToWrite[] } {
 }
 
 describe("the alongside advice card as shipped", () => {
-  it("is a valid draft with no review recorded", () => {
+  it("is an active, owner-reviewed card", () => {
     expect(parseAdviceLibrary(document).cards.find((card) => card.id === CARD_ID)).toEqual(shipped);
-    expect(shipped).toMatchObject({ status: "draft", reviewer: null, reviewed_at: null, revision: 1, audience: "any_account" });
+    expect(shipped).toMatchObject({ status: "active", reviewer: "Emi", reviewed_at: "2026-11-28", revision: 1, audience: "any_account" });
     expect(shipped.offer).toEqual({ kind: "open", target: "alongside" });
     expect(shipped.applies_when).toEqual([{ signal: "setup_gaps", scope: "behavior", facts: [{ fact: "alongside_unanswered", op: "eq", value: true }] }]);
   });
@@ -84,48 +83,49 @@ describe("the alongside advice card as shipped", () => {
     const raw = structuredClone(document) as { cards: Record<string, unknown>[] };
     const card = raw.cards.find((entry) => entry.id === CARD_ID)!;
     card.status = "active";
+    card.reviewer = null;
+    card.reviewed_at = null;
     expect(() => parseAdviceLibrary(raw)).toThrow(`card ${CARD_ID} is active without a review`);
   });
 
-  it("never matches while it is a draft", () => {
-    const matches = matchAdviceCards({ cards: ADVICE_CARDS, signals: [OPEN, ACCOUNT_ROW], account: ACCOUNT, today: TODAY });
+  it("never matches when marked as a draft", () => {
+    const matches = matchAdviceCards({ cards: [draftCopy], signals: [OPEN, ACCOUNT_ROW], account: ACCOUNT, today: TODAY });
     expect(matches.map((match) => match.card.id)).not.toContain(CARD_ID);
   });
 
-  it("produces no tip row, so nothing writes link_target 'alongside' before migration 20261126240000", async () => {
-    // The shipped library and the default statuses, as the scheduled run uses them.
+  it("produces a tip row with link_target 'alongside' when active, and none when draft", async () => {
+    const activeRun = tipPort();
+    await visitAdvisorTips(activeRun.port, { setting: SETTING, maxPerDay: 3 });
+    expect(activeRun.written.find((tip) => tip.cardId === CARD_ID)).toMatchObject({ behaviorId: "b-stretch", linkTarget: "alongside", linkBehaviorId: "b-stretch" });
+
     const draftRun = tipPort();
-    await visitAdvisorTips(draftRun.port, { setting: SETTING, maxPerDay: 3 });
+    await visitAdvisorTips(draftRun.port, { setting: SETTING, maxPerDay: 3, cards: ADVICE_CARDS.map((card) => card.id === CARD_ID ? draftCopy : card) });
     expect(draftRun.written.map((tip) => tip.cardId)).not.toContain(CARD_ID);
     expect(draftRun.written.map((tip) => tip.linkTarget)).not.toContain("alongside");
-    // The same run with the card reviewed writes that tip, so the check above is not vacuous.
-    const reviewedRun = tipPort();
-    await visitAdvisorTips(reviewedRun.port, { setting: SETTING, maxPerDay: 3, cards: ADVICE_CARDS.map((card) => card.id === CARD_ID ? reviewed : card) });
-    expect(reviewedRun.written.find((tip) => tip.cardId === CARD_ID)).toMatchObject({ behaviorId: "b-stretch", linkTarget: "alongside", linkBehaviorId: "b-stretch" });
   });
 });
 
-describe("the alongside advice card once reviewed (a copy marked active)", () => {
+describe("the alongside advice card matching and linking", () => {
   it("matches only a Behavior whose alongside question is open", () => {
-    const matches = matchAdviceCards({ cards: [reviewed], signals: [OPEN, ANSWERED, VERSION_3, ACCOUNT_ROW], account: ACCOUNT, today: TODAY });
+    const matches = matchAdviceCards({ cards: [shipped], signals: [OPEN, ANSWERED, VERSION_3, ACCOUNT_ROW], account: ACCOUNT, today: TODAY });
     expect(matches.map((match) => [match.card.id, match.behaviorId])).toEqual([[CARD_ID, "b-stretch"]]);
     expect(matches[0]!.factIds).toEqual(["setup_gaps:b-stretch:alongside_unanswered"]);
-    expect(matchAdviceCards({ cards: [reviewed], signals: [ANSWERED, VERSION_3, ACCOUNT_ROW], account: ACCOUNT, today: TODAY })).toEqual([]);
+    expect(matchAdviceCards({ cards: [shipped], signals: [ANSWERED, VERSION_3, ACCOUNT_ROW], account: ACCOUNT, today: TODAY })).toEqual([]);
   });
 
   it("fills its lines with the Behavior's title", () => {
-    for (const seed of quipSeedsFor(reviewed, "b-stretch")) {
+    for (const seed of quipSeedsFor(shipped, "b-stretch")) {
       expect(fillQuipSeed(seed, { behavior: "Stretch", facts: OPEN.facts })).toMatch(/^.*Stretch.*\.$/);
     }
   });
 
   it("links to the Behavior's alongside control", async () => {
-    const { chosen } = chooseTipMatches({ localDate: TODAY, signals: [OPEN], setup: SETUP, history: NO_HISTORY, cards: [reviewed], statuses: ["active"], maxPerDay: 3 });
+    const { chosen } = chooseTipMatches({ localDate: TODAY, signals: [OPEN], setup: SETUP, history: NO_HISTORY, cards: [shipped], statuses: ["active"], maxPerDay: 3 });
     const tip: TipToWrite = { text: "A line.", cardId: CARD_ID, cardRevision: 1, behaviorId: "b-stretch", factIds: [], factValues: {}, source: "seed" };
-    const [withLink] = await withOffers({}, { runId: "r", localDate: TODAY, tips: [tip], matches: chosen, setup: SETUP, cards: [reviewed] });
+    const [withLink] = await withOffers({}, { runId: "r", localDate: TODAY, tips: [tip], matches: chosen, setup: SETUP, cards: [shipped] });
     expect(withLink).toMatchObject({ proposalId: null, linkTarget: "alongside", linkBehaviorId: "b-stretch" });
     // An account-wide tip with this target picks the Behavior whose question is open.
-    const [accountWide] = await withOffers({}, { runId: "r", localDate: TODAY, tips: [{ ...tip, behaviorId: null }], matches: [], setup: SETUP, cards: [reviewed] });
+    const [accountWide] = await withOffers({}, { runId: "r", localDate: TODAY, tips: [{ ...tip, behaviorId: null }], matches: [], setup: SETUP, cards: [shipped] });
     expect(accountWide).toMatchObject({ linkTarget: "alongside", linkBehaviorId: "b-stretch" });
 
     const link = advisorTipLink("alongside", "0e385000-0000-4000-8000-000000000010");

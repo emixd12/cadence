@@ -37,7 +37,7 @@ Read from the repository on November 25, 2026. Recheck at activation.
 | Fact | Value | Source |
 |---|---|---|
 | Bundle identifier | `app.cadence.desktop` | `apps/desktop/src-tauri/tauri.conf.json` |
-| Version in source | `0.1.16`; `0.1.15` published November 24, 2026 | `tauri.conf.json`; `STATUS.md` |
+| Version in source | `0.1.17`, published November 26, 2026 (schema 28, contract 9) | `tauri.conf.json`; `STATUS.md` |
 | Minimum macOS | 14.0 declared and compiled; macOS 14 runtime untested (owner-deferred) | `tauri.conf.json`; `AGENTS.md` |
 | Architecture | Apple silicon only (`aarch64`) | `docs/DESKTOP_RELEASE.md` |
 | Team ID | `HK26VT477G` | `apps/desktop/src-tauri/Entitlements.plist` |
@@ -52,6 +52,7 @@ Read from the repository on November 25, 2026. Recheck at activation.
 | Data location | `app_data_dir()`: `cadence.sqlite3`, `calendar-cache.sqlite3`, the old spike database | `lib.rs` |
 | Sign-in | Google, email and Apple through the hosted web flow (Ticket 336, Mac 0.1.11, November 14, 2026). Not native `ASAuthorizationAppleIDProvider` | `STATUS.md`; D31 |
 | ChatGPT plan | Mac connects one ChatGPT account; tokens in Keychain (D27, Tickets 294–300) | `AGENTS.md` |
+| Google Calendar for AI | `purpose=ai_mcp` broker through the hosted web flow and `cadence://` (0.1.17). Its pending connect state moves to Keychain in PR #432, merged after 0.1.17 and not yet released. Recheck under the sandbox's Keychain group | `STATUS.md`; PR #398, PR #432 |
 
 ## 3. Build variant (`IOS-MAS-1`)
 

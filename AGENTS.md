@@ -891,6 +891,9 @@ Implement in small vertical slices.
   long-lived branch. Use a `/design-system` bench (it returns 404 in
   production) or a flag that is off in production. The horse avatar trial is
   the example.
+- Vercel skips automatic Preview builds (`ignoreCommand`); CI builds every PR. To get a
+  Preview, name the branch `preview/*` or put `[vercel preview]`, `[vercel preview app]`
+  or `[vercel preview marketing]` in the commit message. `[vercel force]` forces any build.
 - After a merge, remove your worktree and local branch. GitHub deletes merged PR
   branches. The session-start hook deletes local branches whose remote branch
   is gone. Never delete another session's worktree or uncommitted work without

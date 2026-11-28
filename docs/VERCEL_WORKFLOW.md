@@ -147,6 +147,8 @@ the Supabase project owner accepts that operational tradeoff.
 
 ```json
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "bash scripts/vercel-ignore-app.sh",
   "crons": [
     {
       "path": "/api/reminders/process",
@@ -163,10 +165,18 @@ the Supabase project owner accepts that operational tradeoff.
     {
       "path": "/api/connectors/completions/process",
       "schedule": "7,22,37,52 * * * *"
+    },
+    {
+      "path": "/api/advisor/coach/signals/process",
+      "schedule": "41 * * * *"
     }
   ]
 }
 ```
+
+The file also sets `"ignoreCommand": "bash scripts/vercel-ignore-app.sh"`; see
+"Build Filtering, Previews, and Machine Sizing". `tests/vercel-ignore.test.ts`
+asserts the five crons and the `ignoreCommand`.
 
 The connector completion job (Ticket 321, D28.5) runs every 15 minutes at minutes
 7, 22, 37 and 52, off the top of the hour as Hevy asks of pollers. It accepts only
@@ -225,8 +235,9 @@ Normal production deployment is via the Git integration:
 **Trust marketing-ID refresh (launch gate, or the owner's instruction).** Set the
 application's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` to the live
 marketing deployment ID, then redeploy the application deployment
-(`vercel redeploy <app-deployment> --target production`). Both projects rebuild on
-every `main` push, so the stored value stops naming the live marketing deployment,
+(`vercel redeploy <app-deployment> --target production`). The marketing project
+rebuilds on every `main` push that touches its inputs, so the stored value stops naming
+the live marketing deployment,
 and Trust checks read Stale until the app is redeployed and new evidence is
 collected. Before launch, run it once and automate it (`docs/OPERATIONS.md`,
 "Public-product operations").
@@ -278,6 +289,125 @@ token, payload, secret, or user data.
 The final check temporarily set only the bounded canary variable, then removed
 it. No lasting Vercel domain, environment variable, secret, billing, plan,
 project, or installed integration changed.
+
+## Build Filtering, Previews, and Machine Sizing
+
+Both projects skip builds that cannot change their output. The cost baseline and
+targets are in `docs/COSTS.md`, "Vercel build and storage usage".
+
+### Ignored Build Step
+
+Each project runs an Ignored Build Step before it builds. Exit 0 skips the build and
+uses no build minutes; exit 1 runs it.
+
+| Project | Config | `ignoreCommand` | Runs from |
+| --- | --- | --- | --- |
+| `cadence` | `vercel.json` | `bash scripts/vercel-ignore-app.sh` | repository root |
+| `cadence-marketing` | `apps/marketing/vercel.json` | `bash ../../scripts/vercel-ignore-marketing.sh` | `apps/marketing` |
+
+Each script holds a `PATHS=( ... )` list of every file its build reads. It runs
+`git diff --quiet <base> <head> -- "${PATHS[@]}"` and builds only when a listed path
+changed.
+
+- Production compares `VERCEL_GIT_COMMIT_SHA` with `VERCEL_GIT_PREVIOUS_SHA`, the last
+  deployed commit. Vercel clones shallowly, so the script fetches a missing base commit
+  with `git fetch --depth=1 origin <sha>`. A two-dot diff compares the two trees and
+  needs no history between them.
+- The script fails open. It builds when the base SHA is empty, cannot be fetched, or
+  `git diff` errors.
+- A manual Redeploy of the same commit always builds, in Production and in Preview.
+- `tests/vercel-ignore.test.ts` walks the static import graph of both builds and fails
+  when a file a build imports sits outside its script's `PATHS`. When you add an import
+  from outside `app/`, `components/`, `lib/`, `packages/` or `public/`, add the file to
+  `scripts/vercel-ignore-app.sh`. When the marketing site imports a new file from
+  outside `apps/marketing/`, add it to `scripts/vercel-ignore-marketing.sh`.
+- Docs-only, desktop-only, test-only, script-only and workflow-only `main` pushes build
+  neither project.
+
+### Opt-in previews
+
+Automatic Preview builds are off. GitHub Actions builds every pull request (`verify`),
+so a Vercel Preview is needed only to see a deployed page. No secret or dashboard
+change is needed to request one:
+
+- Name the branch `preview/<anything>`. Each push builds the project whose paths it
+  changed, diffed against the last preview or the `main` merge-base.
+- Or add `[vercel preview]` to the head commit message on any branch. It also builds
+  only the projects whose paths changed.
+- `[vercel preview app]` or `[vercel preview marketing]` builds that one project's
+  Preview even if none of its paths changed.
+- `[vercel force]` builds both projects on any branch, `main` included.
+
+Markers match case-insensitively. On `main` the preview markers have no effect, so a
+squash-merge body that quotes them builds nothing extra.
+
+### Upload filter (`.vercelignore`)
+
+`.vercelignore` drops non-runtime folders from CLI uploads (`vercel deploy`): the desktop
+app except its `package.json`, `load-tests/`, `integrations/`, `supabase/`, `assets/`,
+agent and CI configuration, large `docs/` subfolders, `tests/sql/`,
+`tests/acceptance-web-client/` and top-level test files. Every added pattern starts with `/`,
+because `.vercelignore` follows `.gitignore` syntax and a bare `supabase/` would also
+drop `lib/supabase/`. The file must never ignore `apps/marketing/`,
+`docs/ontology/briefing-workbench.json`, `design-system.{manifest,surfaces,usage}.json`,
+`tests/fixtures/` or `scripts/vercel-ignore-*.sh`. `apps/desktop/package.json` stays
+because `npm ci` expects every workspace the lockfile names. `tests/vercel-ignore.test.ts`
+checks every listed build input against the file with `git check-ignore`.
+
+Measured 2026-11-28: the filter keeps 1,310 of 2,785 tracked files, about 33 MB of
+76 MB. A copy of only the kept files passed `npm ci`, `npm run build` and
+`npm run marketing:build`. Whether Vercel also applies the file to Git deployments is
+not verified here; the rehearsal shows both builds pass either way.
+
+### Bundler benchmark
+
+Measured 2026-11-28 on the owner's Mac (Apple M5 Max, 18 cores, Node 24.22.2,
+Next.js 16.4.6), with `.next` removed before each cold run:
+
+| Build | Cold | Warm | Compile step | `.next` | `.next/cache` | `.next/server` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `next build --webpack` (current `npm run build`) | 27 s | 23 s | 8.8 s | 524 MB (578 MB warm) | 504 MB (560 MB warm) | 12 MB |
+| `next build` (Turbopack) | 17 s | 16 s | 3.7 s | 282 MB | 159 MB | 118 MB |
+
+Turbopack built with zero errors and zero warnings and listed the same 102 route
+lines. The TypeScript step (about 12 s) is the same under both bundlers, so the gain is
+in compilation. The build stays on `--webpack` for now. Switching is its own pull
+request: a `[vercel preview app]` deployment, a runtime smoke of the timeline, auth,
+MCP and cron routes, and a check of the function sizes, because Turbopack's
+`.next/server` is about ten times larger. These times are local; Vercel's 4-vCPU
+machine will be slower in absolute terms.
+
+`outputFileTracingExcludes` is not set. The webpack build's function traces reach
+7.7 MB of files in total (5.8 MB of it `.next/server`, 1.5 MB `next`), and the only
+repository files outside the source roots are the JSON files the bench and notices
+import. Excluding anything would save under 1 MB.
+
+### Build machines
+
+| Project | Machine | Rate |
+| --- | --- | --- |
+| `cadence` | Standard, 4 vCPU | Billed per build minute; see `docs/COSTS.md` |
+| `cadence-marketing` | Basic, 2 vCPU | US$0.007 per minute |
+
+### Deployment retention
+
+Both projects currently remain on Vercel's 30-day default retention (Vercel's REST API
+returned HTTP 400 on `deploymentExpiration` writes for Pro). Because canceled builds
+store zero artifacts, build filtering already eliminates most deployment storage. As an
+optional Dashboard-only follow-up (`Settings → Deployment Retention`), non-production
+retention can be tightened as follows:
+
+| Deployment state | Current (default) | Optional Dashboard target |
+| --- | --- | --- |
+| Preview | 30 days | 7 days |
+| Canceled | 30 days | 7 days |
+| Errored | 30 days | 7 days |
+| Production | 30 days, with the 10 most recent kept for rollback | 30 days, 10 most recent kept |
+
+### Spend Management
+
+The team has a US$30 Spend Management budget with alerts only. Hard pause stays off,
+because a pause would also stop the other projects on the team.
 
 ## Production Smoke QA
 
@@ -354,9 +484,9 @@ Policy reference:
 ## Launch spend and traffic controls
 
 Vercel's Spend Management, Firewall, DDoS, and WAF pricing documentation was
-rechecked on 2026-08-01. The current team plan, Spend Management setting,
-threshold, notification recipients, webhook, and pause posture remain
-unverified. Read-only project discovery found 14 projects in the team,
+rechecked on 2026-08-01. As of 2026-11-28, the team plan is Pro and the Spend Management
+budget is verified at US$30 alert-only (50%/75%/100%, no pause, no webhook; see
+"Spend Management" above); notification recipients remain unverified. Read-only project discovery found 14 projects in the team,
 including the Cadence app and marketing projects. Store project identifiers and
 the unrelated project inventory only in private operator notes.
 
@@ -490,8 +620,15 @@ checks. Ticket 101 performs no Vercel mutation or production collection.
 ## Ticket 102 provenance collection
 
 The Public Trust workflow reads named deployments through the Vercel API.
-Both must report `READY`. Both public Git commit fields must equal the snapshot
-source commit. A mismatch is Failed. This evidence covers only the named
+Both must report `READY`. Each public Git commit field must equal the snapshot
+source commit, or name a verified Git ancestor of it with no difference in that
+surface's dependency paths. The paths come from `scripts/vercel-ignore-app.sh`
+and `scripts/vercel-ignore-marketing.sh`, the same lists that decide whether a
+surface rebuilds. A surface whose dependencies did not change skips its build,
+so its Ready deployment can name an older commit. The collector checks with
+`git merge-base --is-ancestor` and `git diff --quiet` over that list, so the
+`collect` job checks out full history (`fetch-depth: 0`). Any other result,
+including a git error or an empty path list, is Failed. This evidence covers only the named
 Git-to-deployment association. It does not cover private function bundles,
 later environment changes, aliases, or provider internals. The workflow keeps
 Vercel Git deployment unchanged and needs only a protected read token plus the

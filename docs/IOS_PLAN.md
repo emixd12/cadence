@@ -5,7 +5,7 @@ Covers the iPhone app, the Apple Watch app and the Mac App Store listing.
 - **Status:** Running blueprint. Not authorized for implementation. No iOS code, real
   ticket or ticket number exists. Mobile and Mac App Store work stay out of scope in
   `AGENTS.md` until the owner activates the track.
-- **Synced through:** `64b78b80` (`origin/main`, November 25, 2026).
+- **Synced through:** `19d73443` (`origin/main`, November 27, 2026).
 - **Refresh schedule:** Every other day via `.claude/skills/ios-plan-sync/SKILL.md`
   (Claude Opus 5.5 High).
 
@@ -20,7 +20,7 @@ or deploys, and use plan-local `IOS-` step IDs (not real ticket numbers).
 
 | Module | What it covers |
 |---|---|
-| [01-port-map.md](ios-plan/01-port-map.md) | 1:1 mobile-web screen and flow port map (all 5 tabs, Onboarding/Login, every web feature through Nov 25, 2026), SwiftUI idioms, iPhone width sizing, standing port rules and co-development transition |
+| [01-port-map.md](ios-plan/01-port-map.md) | 1:1 mobile-web screen and flow port map (all 5 tabs, Onboarding/Login, every web feature through Nov 27, 2026), SwiftUI idioms, iPhone width sizing, standing port rules and co-development transition |
 | [02-iphone-native.md](ios-plan/02-iphone-native.md) | Pre-packaged v1.0 iPhone-only features: active-timer & default-on upcoming Live Activities (with Completed/Not Completed + Routine card), full Siri/Shortcuts/Spotlight, Widgets & Controls (Mac sharing off), Notifications & When-In-Use Location, plus the Future iPhone-Specific Roadmap |
 | [03-apple-watch.md](ios-plan/03-apple-watch.md) | What Watch gets automatically in v1.0 (mirrored notifications, Live Activities, iPhone Controls) and the v1.1 dedicated Watch app (Today, Needs decision, offline Completed/Not Completed, Timer, **voice-dictated quick Notes**, Complications, Smart Stack) |
 | [04-accounts-sync-offline.md](ios-plan/04-accounts-sync-offline.md) | Sign-in required on first launch + full offline non-AI tracking once signed in, Apple/Google/Email sign-in, shared TS core + Rust SQLite store, CloudKit/SwiftData evaluation gate, incremental sync-path architecture, command contract, in-app deletion and performance budgets |
@@ -92,7 +92,31 @@ These rules keep every-other-day refreshes automatic and low-noise:
 
 ## 4. Open Questions Inbox
 
-**Current open product questions: 0.** All 19 prior open decisions from the October/November
+**Current open product questions: 1.**
+
+### Q3. Periods on Siri, Shortcuts and Spotlight (opened 2026-11-27)
+
+- **Web change:** Periods (D35, Tickets 367–373, live on web November 26, 2026). The
+  person labels a range of days for the whole account, such as "Sick". Chat and MCP
+  clients can create, edit and end a Period, but not remove one.
+- **iOS surface:** Siri, App Shortcuts and Spotlight. The locked v1.0 Siri set (Section
+  2, item 4) predates Periods and does not name them.
+- **Options:**
+  1. **Add two intents, index nothing (recommended).** "Start a period in Cadence"
+     (asks for a label, starts today, no last day) and "End {label} today in Cadence".
+     No remove intent, matching the MCP rule. Spotlight never indexes Period labels,
+     because labels such as "Sick" can be sensitive. No Widget, Live Activity or Watch
+     surface.
+  2. **App only in v1.0.** Periods work only inside the Timeline and Behaviors screens.
+     Siri and Shortcuts add them later, if asked.
+  3. **Full set.** Option 1 plus a "What periods are active?" query and Spotlight
+     results for Period labels.
+- **Until answered:** the blueprint follows option 2 (`ios-plan/02-iphone-native.md`,
+  Section 2.2).
+
+### Resolved
+
+All 19 prior open decisions from the October/November
 18 plan—plus the two Mac/iOS App Store identifier questions (Q1: separate iPhone/Watch
 `app.cadence.ios` and Mac `app.cadence.desktop` listings; Q2: one shared
 `app.cadence.desktop` bundle ID across both Mac channels)—were resolved on November 25,
@@ -110,25 +134,29 @@ Section 3.)*
 
 ## 5. Parity Snapshot
 
-Source: `interaction-registry.json`, updated `2026-11-21`. Total interaction intents:
-**232** (up from 194 on 2026-11-13). Mobile status: **187 deferred**, **45 not
-applicable**, **0 implemented**.
+Source: `interaction-registry.json`, updated `2026-11-26`. Total interaction intents:
+**244** (up from 232 on 2026-11-21). Mobile status: **199 deferred**, **45 not
+applicable**, **0 implemented**. New since the last sync: Periods (4), alongside answers
+(4) and the "Cadence day" MCP Apps view (4). The four `mcp_day_view` intents are rendered
+by Claude and ChatGPT mobile apps, not by the Cadence iPhone app
+(`ios-plan/01-port-map.md`, Section 11).
 
 | Surface | Deferred (iOS target) | Not applicable |
 |---|---|---|
-| Timeline | 43 | 11 |
-| Behaviors | 47 | 1 |
+| Timeline | 49 | 11 |
+| Behaviors | 49 | 1 |
 | Settings | 42 | 27 |
 | Export and import | 20 | 0 |
 | Marketing | 11 | 2 |
 | App shell | 9 | 1 |
 | Chat | 5 | 0 |
+| MCP day view | 4 | 0 |
 | Login | 4 | 0 |
 | Public legal | 3 | 0 |
 | Onboarding | 2 | 0 |
 | Development login | 1 | 0 |
 | OAuth consent | 0 | 3 |
-| **Total** | **187** | **45** |
+| **Total** | **199** | **45** |
 
 ---
 
@@ -137,30 +165,30 @@ applicable**, **0 implemented**.
 Web work is never asked to close an iOS prerequisite; refreshes record progress when web
 or Mac work closes one naturally.
 
-| Prerequisite | State (2026-11-25) | Evidence |
+| Prerequisite | State (2026-11-27) | Evidence |
 |---|---|---|
-| Xcode 27 | Done | `xcodebuild -version`: 27.2 on owner's Mac (checked Nov 18; simulator runtimes not rechecked) |
-| CI exists for a later iOS job | Done | `.github/workflows/ci.yml` + 4 workflows (`merge_group` ready) |
+| Xcode 27 | Done (not rechecked Nov 27) | `xcodebuild -version`: 27.2 on owner's Mac (checked Nov 18; simulator runtimes not rechecked) |
+| CI exists for a later iOS job | Done | `.github/workflows/ci.yml` + 4 workflows (`merge_group` ready); rechecked Nov 27 |
 | Sign in with Apple on web | Done | D31; live Nov 13, 2026 |
-| Sign in with Apple on Mac | Done (published) | Shipped in Cadence for Mac 0.1.11 (Nov 14); Ticket 337 Apple-linking check remains open |
+| Sign in with Apple on Mac | Done (published) | Shipped in Cadence for Mac 0.1.11 (Nov 14); current release 0.1.17 (Nov 26); Ticket 337 Apple-linking check not rechecked |
 | Native Sign in with Apple (iOS) | Open | Planned for v1.0 (`IOS-203`) |
-| Apple token revocation | Partly | `lib/services/apple-sign-in.service.ts` + migration `20261113200000` exist; not reviewed against iOS deletion flow |
-| Public AI disclosure | Appears done | `apps/marketing/src/data/routes.ts` names OpenAI; full pre-launch messaging pass in Ticket 246 |
+| Apple token revocation | Partly | `lib/services/apple-sign-in.service.ts` + migration `20261113200000` exist (rechecked Nov 27); not reviewed against iOS deletion flow; `L-025` open |
+| Public AI disclosure | Appears done | `apps/marketing/src/data/routes.ts` names OpenAI; Privacy names the Calendar MCP grant and Model Armor (`P-090`, live); day notes and Periods in AI input still to disclose (`P-095`, `P-096`); full pass in Ticket 246 |
 | Command contract (`expectedStatus` / `expectedNote` / `commandId`) | Partly | `occurrence.service.ts` accepts `expectedStatus` and `expectedLatestEventId`, and `packages/core/src/data-store.ts:111–125` already supports `expectedNote`; `commandId` replay is pending (`IOS-190c`) |
-| Code-point comparisons in core | Open | **102** `localeCompare`/`toLocaleLowerCase` uses in `packages/core/src` (was 83 on Nov 18, 66 in Oct) |
+| Code-point comparisons in core | Open | **105** `localeCompare`/`toLocaleLowerCase` uses in `packages/core/src` (was 102 on Nov 25, 83 on Nov 18, 66 in Oct) |
 | Locale-aware time display | Open | `formatClockTimeLabel` still in `packages/core/src/services/schedule.ts` |
 | `history_branch` as reviewable conflict | Open | `packages/core/src/resolvers/account-sync.resolver.ts:1000–1002` still throws "branched status history" |
 | Temporal polyfill on native BigInt | Not rechecked | Recheck in `IOS-189a` |
-| Shared store crate and C FFI | Open | No `crates/` directory; no `rust-toolchain.toml` (Mac SQLite now at schema 28, sync contract 9) |
-| `packages/local-runtime` | Open | `packages/` holds `core` and `ui` only |
+| Shared store crate and C FFI | Open | No `crates/` directory; no `rust-toolchain.toml` (Mac SQLite still at schema 28, sync contract 9; Periods add a bump in Ticket 374) |
+| `packages/local-runtime` | Open | `packages/` holds `core`, `mcp-views` (MCP Apps view, Ticket 377) and `ui` |
 | `.gitignore` Xcode & signing patterns | Open | None of the Xcode/signing patterns are in `.gitignore` |
-| Desktop signing files out of repo | Open | Two untracked files remain in `apps/desktop/signing/` in owner's checkout |
-| Completion-chime provenance | Open | No record; two untracked Xbox sound files remain in `public/sounds/` in owner's checkout |
-| Calendar identity decoupling | Open / needs review | `same_account_required` still enforced in `lib/services/google-calendar-oauth.ts:60`; D31 linking may cover Apple users once verified |
+| Desktop signing files out of repo | Open | Two files remain in `apps/desktop/signing/` in owner's checkout (rechecked Nov 27) |
+| Completion-chime provenance | Open | No record; the two Xbox sound files remain in `public/sounds/` in owner's checkout (rechecked Nov 27) |
+| Calendar identity decoupling | Open / needs review | `same_account_required` still enforced in `lib/services/google-calendar-oauth.ts:60` and `:122`; D31 linking may cover Apple users once verified |
 | Organization membership & D-U-N-S | Unknown | No record on `main`; owner approved upgrade (see `06-app-store-readiness.md`) |
 | App Store title/subtitle & trademark | Unknown | Owner approved scoping subtitle + clearance (see `06-app-store-readiness.md`) |
 | Test hardware (iPhones & Watches) | Unknown | No record on `main` (see `06-app-store-readiness.md`) |
-| App Store Connect API key | Partly | D29.4 created one for notarization; Developer-role reuse for iOS/MAS not checked |
+| App Store Connect API key | Partly (not rechecked Nov 27) | D29.4 created one for notarization; Developer-role reuse for iOS/MAS not checked |
 | Age rating (18+) & state age signals | Open | Planned for v1.0 (`IOS-209`) |
 
 ---
@@ -185,6 +213,7 @@ re-read Apple docs. Recheck these at activation:
 
 | Date | Synced through | Changes |
 |---|---|---|
+| 2026-11-27 | `19d73443` | Reviewed 31 merged PRs. Periods (D35) into Timeline, Behaviors, Chat, Export and offline (follows Ticket 374's sync shape). D34 intended-duration line and editor field. Alongside row label, mark and Daily Brief questions; D37 guessed-Where note. Google Calendar dual grant (Timeline & Travel, AI via Calendar MCP), Chat travel cards, longitudinal review opt-in. AI consent and privacy label list day notes, Periods and Model Armor. MCP Apps day view marked host-rendered. Mac 0.1.17 facts. Registry 244 intents (199 deferred); `localeCompare` 105. New Open Question Q3 (Periods on Siri and Spotlight). |
 | 2026-11-25 | `64b78b80` | **Modular blueprint launch (Owner planning pass, Rounds 1–3).** Replaced single-file October baseline with this hub + 7 focused modules under `docs/ios-plan/`. Folded in all web features merged Nov 18–25 (Advisor Coach/Chat/Avatar/Speech Pill, Routines & Semantic Zoom, Opportunity Basket, Alongside Behaviors D33, Ended/Paused Behaviors, Auto-stop Timer, Note Shortcuts revamp & Auto-save Closure, Geoapify Place Search, Persisted Connector Activity). Redrew v1.0 around accounts + offline tracking + Live Activities (Completed/Not Completed) + full Siri/Shortcuts/Spotlight, v1.1 around Watch (with voice Notes), dual Mac App Store + DMG distribution, US-first 18+ launch, and every-other-day refresh cadence. Recounted registry (232 intents; 187 deferred) and prerequisites (`localeCompare` now 102). |
 | 2026-11-18 | `1f80c1c3` | Owner answers recorded: accounts in the first release, CloudKit and SwiftData to be evaluated, every web addition in iOS scope, Mac App Store listing joins the plan, activation on owner's instruction with no feature list. Cursor unchanged. |
 | 2026-11-18 | `1f80c1c3` | Restored October 15 proposal from tag `archive/advisor-analysis-wip-2026-10-22` (`985b6862`). Renamed proposed ticket numbers 188–211 to plan-local `IOS-` IDs. Added Part A. Corrected ten stale lines in Part B. |
