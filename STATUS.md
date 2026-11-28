@@ -73,7 +73,7 @@ Check the cited entry before acting on a row.
 | Mac leave reminders for newly added Calendar events | PR #198 in 0.1.10; installed run on November 12 inconclusive (event too close to plan a reminder) | Rerun on the test Mac with an event at least two hours ahead | STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026" |
 | Updater key rotation and new Developer ID identity | 0.1.10 published November 12, 05:29–05:33Z, with the rotated key and new identity; 0.1.9 and earlier install it by hand once | Renew the certificate before December 11, 2027. PR #241 and PR #243 shipped dormant in 0.1.11 after ordinary installed acceptance | DECISIONS, 2026-11-11; STATUS, "Cadence for Mac 0.1.10 notarized — November 12, 2026"; release packet, "PR review follow-up" |
 | Ticket 325: release credential backup and restore | Identity, notarization-password and updater backups verified November 12; API-key backup and checks recorded as passed in `dd4cb67b`; notarization uses the API key (0.1.10) | Certificate-renewal spike | DECISIONS, 2026-11-11 (D29); TICKETS, Ticket 325; STATUS, "Ticket 325: live backups verified — November 12, 2026"; 0.1.10 release packet |
-| Cadence for Mac 0.1.17 | Published November 26, 2026, 00:32–00:43Z (November 25 EST): schema 28, contract 9, PR #398 Google Calendar dual-grant Settings and `purpose=ai_mcp` broker; real-updater upgrade (`0.1.15` → `0.1.17`), same-schema check, Calendar callback replay and public readback passed on `test-mac` | Defect: **Connect Google Calendar for AI** fails on the Mac because `pending-ai-calendar-state` is missing from `ALLOWED_KEYS` in `apps/desktop/src-tauri/src/auth.rs`; the fix needs a ticket and a Mac release. 1-hour session renewal and revoked-session check for `@supabase/supabase-js` 2.119.0 still deferred from 0.1.15; macOS 14 not tested | `docs/qa/2026-11-25-desktop-0.1.17-release-packet.md` |
+| Cadence for Mac 0.1.18 | Published November 28, 2026, 05:14Z: hotfix on the 0.1.17 base carrying PR #432 only, so **Connect Google Calendar for AI** now opens the Google OAuth flow; schema 28, contract 9. Real-updater upgrade (`0.1.17` → `0.1.18`), same-schema check, sign-in and Calendar callback replays, the live connect check and public readback passed on `test-mac` | Session renewal and revoked-session check not run: the trigger applies, but the diff touches only the Keychain allow-list and calendar cleanup, so the owner should confirm the exception. It has stayed deferred since 0.1.15. macOS 14 not tested. The Google AI Calendar client shows the unverified-app warning until Ticket 245. Later `main` work, such as Ticket 366, waits for the next Mac release | `docs/qa/2026-11-26-desktop-0.1.18-release-packet.md`; 0.1.17: `docs/qa/2026-11-25-desktop-0.1.17-release-packet.md` |
 | Ticket 285: installed Mac acceptance | Run November 6–7, including Calendar-event activation on published 0.1.9 | Closure not stated: unclear — see source; user guide line for `P-027` still to add | TICKETS, Ticket 285; STATUS, "Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026" |
 | Ticket 284: web acceptance with the real clock | Evidence recorded, awaiting verification; seven findings fixed on `travel-wave6` (merged as PR #196 per `git log`) | Verification of the evidence and fixes; Ticket 283 Outlook or iCloud routed event not checked (no test connector) | TICKETS, Ticket 284; STATUS, "Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026" |
 | Travel revamp Tickets 260–283 | Merged as PRs #189–#194 and #196, November 5–7, 2026; live on web; Mac parts released in 0.1.9; hosted equals git, so the 275–277 migrations are applied; TICKETS reconciled November 11, 2026 | Release acceptance continues under Tickets 165, 284 and 285; production setting of `CADENCE_LEAVE_REMINDER_JOB` not checked | TICKETS, Tickets 260–283; STATUS, "Ledger cleanup — November 11, 2026" |
@@ -102,6 +102,24 @@ Check the cited entry before acting on a row.
 | Operations (grouped): Tickets 091, 104, 105, 128 | 091 and 105 in progress; 104 and 128 blocked; reconciled October 27 | 104: operator diagnostics or an authorized route test; 105: verify deployed browser-push delivery after the reviewed web-push 4.0.0 upgrade; 128: a revised candidate needs a new measured gate | TICKETS, Tickets 091, 104, 105, 128 |
 
 ## Recent entries
+
+## Cadence for Mac 0.1.18 published — November 28, 2026
+
+- **Published:** the versioned assets and `desktop-stable/latest.json` at 17:44–17:46Z on
+  November 27. The version-free `Cadence_aarch64.dmg` and `desktop-preview/latest.json` moved at
+  05:14Z on November 28, after `test-mac` checks passed. Owner instruction: November 27.
+- **Fix:** PR #432 adds `pending-ai-calendar-state` to the Mac Keychain allow-list. On installed
+  0.1.18, **Connect Google Calendar for AI** opened the Google OAuth page instead of "could not
+  start connecting". The agent closed the tab without consent, so no grant was made.
+- **Checks:** the real updater moved `test-mac` from 0.1.17 to 0.1.18. The same-schema check
+  found no lost rows and 0 secret findings; `launchSyncChanges` was
+  `{"account_sync_baselines":1,"sync_cursors":1}`. Sign-in and Calendar callback replays showed
+  their notices and changed no connection. All 7 public URLs read back with matching SHA-256.
+  Minisign and the quarantined public DMG checks passed.
+- **Not run:** the session renewal and revoked-session check (see the open-work row).
+
+Platform impact: desktop only (release); web, marketing and future mobile not applicable.
+Messaging impact: none.
 
 ## Ticket 366 checked on production; Ticket 387 filed — November 26, 2026
 
