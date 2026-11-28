@@ -83,6 +83,17 @@ items around them. Answer with the text links under the line:
 - **Stop suggesting moves for** *item* appears after you have said No to the same item on
   several days. The brief then stops suggesting moves for it.
 
+When alongside Behaviors are enabled, Timeline rows for an alongside item show
+**Alongside** (or **Alongside · a guess** while unanswered). After you mark an
+unanswered item **Completed**, its row may occasionally ask **Done alongside
+other things? Yes · No**; answering saves the setting and closes the question on
+other surfaces. The Daily Brief may also ask about one unanswered Behavior per
+brief, or suggest booking an alongside item during another same-place Behavior
+for today; **Yes** applies an ordinary move for today only, and moving the host
+later leaves the paired item where it is. After you accept the same pairing on
+four days in 28 (or complete both together), a schedule question may offer to
+move the alongside Behavior's schedule to that time.
+
 "30 min is a guess · set length" means Cadence does not know how long the item takes.
 Choose **set length** to enter its usual length; the line is planned again with it. Each time the brief opens,
 Cadence checks its lines against your Timeline as it is now. If a suggested time was taken
