@@ -155,6 +155,14 @@ export async function signIn({ slot, password, otpSeed, port = DEFAULT_DEBUG_POR
   const { context, detach } = await attachProfile({ profileDir, port });
   const page = await context.newPage();
   try {
+    // Google offers a passkey first. Chrome's own passkey dialog then covers the page and
+    // "Try another way" never reaches the method list. An empty virtual authenticator
+    // keeps that dialog closed, so the password and authenticator steps stay reachable.
+    const cdp = await context.newCDPSession(page).catch(() => null);
+    if (cdp) {
+      await cdp.send('WebAuthn.enable').catch(() => {});
+      await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true } }).catch(() => {});
+    }
     if (await accountSignedIn(context, email)) return { slot, state: 'already-signed-in' };
     if (!password) throw new SignInStop('password-missing');
     const seed = otpSeed ? parseOtpSeed(otpSeed) : null;

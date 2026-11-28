@@ -20249,7 +20249,7 @@ Messaging impact: `P-093`.
 
 ## Ticket 363: Alongside on Cadence for Mac
 
-Status: complete November 26, 2026, off behind `VITE_CADENCE_ALONGSIDE` on the Mac and `CADENCE_ALONGSIDE` on the hosted server; hosted migration `20261126220000` pending (it replaces the `changed_fields` check constraint and inserts one contract-registry row, as `20261122010000` did, so it needs the owner's yes before a hosted push). SQLite schema 29, account sync contract 10, minimum writer contract 8. Flag mechanism: a build switch that release and preview builds force off, plus, on a linked Mac, the server's answer from the new `GET /api/behaviors/alongside`, which also carries the account's current guesses (memory only). The installed check on a dev-signed build moves to Ticket 365. Scope note: configuration history records an answer change with reason code `alongside_answered` from the Mac's row question; the hosted surfaces keep `behavior_edited`. Audit fix (November 26, 2026): the web Timeline row and Daily Brief question now record `alongside_answered` too, through the same core writer; the hosted function accepts any non-empty reason code, so no migration. History fix (November 26, 2026, defect D1 of `docs/qa/2026-11-26-alongside-local-acceptance.md`): an unanswered Behavior's configuration history names the answer nowhere, flag on or off, so a flag-off deploy writes history as before; an answer change carries the answer in both snapshots and in exports; and migration `20261126260000` (not pushed; it inserts one contract-registry row and changes the projection and apply functions for older contracts, so it needs the owner's yes and must be on the database before the flag turns on) hides the answer's history from contracts 8 and 9.
+Status: complete November 26, 2026, off behind `VITE_CADENCE_ALONGSIDE` on the Mac and `CADENCE_ALONGSIDE` on the hosted server; hosted migration `20261126220000` pushed November 28, 2026 with the owner's yes (it replaces the `changed_fields` check constraint and inserts one contract-registry row, as `20261122010000` did). SQLite schema 29, account sync contract 10, minimum writer contract 8. Flag mechanism: a build switch that release and preview builds force off, plus, on a linked Mac, the server's answer from the new `GET /api/behaviors/alongside`, which also carries the account's current guesses (memory only). The installed check on a dev-signed build moves to Ticket 365. Scope note: configuration history records an answer change with reason code `alongside_answered` from the Mac's row question; the hosted surfaces keep `behavior_edited`. Audit fix (November 26, 2026): the web Timeline row and Daily Brief question now record `alongside_answered` too, through the same core writer; the hosted function accepts any non-empty reason code, so no migration. History fix (November 26, 2026, defect D1 of `docs/qa/2026-11-26-alongside-local-acceptance.md`): an unanswered Behavior's configuration history names the answer nowhere, flag on or off, so a flag-off deploy writes history as before; an answer change carries the answer in both snapshots and in exports; and migration `20261126260000` (pushed November 28, 2026 with the owner's yes; it inserts one contract-registry row and changes the projection and apply functions for older contracts) hides the answer's history from contracts 8 and 9.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, "Alongside Behaviors and the guessed Where (D33)".
 
@@ -20586,9 +20586,9 @@ Messaging impact: `P-096`.
 
 ## Ticket 374: Periods on Cadence for Mac
 
-Status: blocked
+Status: in_progress
 
-Blocked November 26, 2026: Ticket 363 (account sync contract 10, SQLite 0029) is in draft PR #407, which conflicts with `main`. This ticket takes the next contract and SQLite numbers after it. An hourly scheduled check ("Start Ticket 374 (Periods on Mac) when #407 lands") starts this ticket once Ticket 363 is on `main`. The Mac's Period actions include `saveNote`, the note's own save.
+Started November 28, 2026, after PR #407 put Ticket 363 on `main` (account sync contract 11, SQLite 0030). This ticket takes account sync contract 12 and SQLite 0031 (`npm run ids:next`, November 28). The Mac's Period actions include `saveNote`, the note's own save.
 
 Owner decision: `docs/DECISIONS.md`, 2026-11-25, D35. Plan: section 10.
 
@@ -20858,7 +20858,7 @@ Messaging impact: `P-097`, `P-099`, `P-100`, `P-101`.
 
 ## Ticket 381: Host sign-in compatibility for consumer Gemini and VS Code
 
-Status: not_started
+Status: in_progress. November 28, 2026: the first Gemini run (`docs/qa/2026-11-28-mcp-apps-gemini-tunnel.md`) found one gap, outside the two this ticket predicted. Gemini sends `resource`, so that scope item is not needed. Gemini sends an OAuth `state` of 1,170 characters and Cadence allowed 1,024. The fix raises the limit to 4,096 in code and in migration `20261128060000_oauth_state_length.sql`; the security review is in the same note. With the fix on a local stack, Gemini signed in, listed 31 tools and called `show_day`. The migration was pushed to the hosted database on November 28, 2026, with the owner's approval, before the code merged. Remaining: refresh-token behaviour over time on Gemini is not tested; VS Code is not run.
 
 Conditional: it starts only if Ticket 375 shows that a required host cannot complete Cadence's OAuth flow as it is.
 

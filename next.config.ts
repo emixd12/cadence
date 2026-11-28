@@ -2,7 +2,15 @@ import type { NextConfig } from "next";
 
 const STATIC_ASSET_CACHE = "public, max-age=86400, stale-while-revalidate=604800";
 
+// Development only: extra hosts that may load dev-server assets, for a local stack behind a
+// tunnel (`local-stack.mjs up --public-url`). `next build` and `next start` ignore it.
+const devAllowedOrigins = (process.env.CADENCE_DEV_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((host) => host.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
+  ...(devAllowedOrigins.length > 0 ? { allowedDevOrigins: devAllowedOrigins } : {}),
   transpilePackages: ["@cadence/core", "@cadence/ui"],
   experimental: {
     // Keep framework checks on the compiler API; standalone typecheck uses TypeScript 7.

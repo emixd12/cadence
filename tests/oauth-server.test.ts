@@ -69,7 +69,7 @@ describe("OAuth HTTP routes", () => {
     [{ code_challenge_method: "plain" }, "invalid_request"], [{ code_challenge: "short" }, "invalid_request"],
     [{ response_type: "token" }, "unsupported_response_type"], [{ response_mode: "fragment" }, "invalid_request"],
     [{ resource: `${issuer}/wrong` }, "invalid_target"], [{ scope: "cadence.read unknown" }, "invalid_scope"],
-    [{ scope: "cadence.behaviors.write" }, "invalid_scope"], [{ state: "x".repeat(1025) }, "invalid_request"],
+    [{ scope: "cadence.behaviors.write" }, "invalid_scope"], [{ state: "x".repeat(4097) }, "invalid_request"],
   ])("returns safe authorization errors with iss: %j", async (input, error) => {
     const response = await authorize(authRequest(input));
     const url = new URL(response.headers.get("location")!);

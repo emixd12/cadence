@@ -292,7 +292,7 @@ async function exec({ name, argv }) {
   child.once('close', (code) => process.exit(code ?? 1));
 }
 
-async function up({ name, dbBase, appPort, repo }) {
+async function up({ name, dbBase, appPort, repo, publicUrl = null, mcpApps = false }) {
   if (existsSync(stateFile(name))) fail(`${name} is already up (${stateFile(name)}); run down first`);
   if (!existsSync(join(repo, 'supabase', 'config.toml')) || !existsSync(join(repo, 'node_modules', 'next'))) fail('run from a worktree root that has supabase/ and node_modules (npm ci)');
   for (const env of ['.env.local', '.env.development.local']) if (existsSync(join(repo, env))) fail(`${env} exists in this checkout; use a clean worktree so no real secret loads into the app`);
@@ -343,17 +343,23 @@ async function up({ name, dbBase, appPort, repo }) {
 
   makeTls(join(work, 'tls'));
   const status = JSON.parse(execFileSync(SUPABASE, ['status', '--workdir', work, '-o', 'json'], { cwd: '/tmp', encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
-  const issuer = `https://127.0.0.1:${appPort}`;
+  const local = `https://127.0.0.1:${appPort}`;
+  // --public-url: a tunnel (for example cloudflared) forwards this HTTPS origin to the app, so a real
+  // AI host can reach it. The issuer and the MCP resource then use the public origin. Test login
+  // still answers only on 127.0.0.1, and Supabase stays on loopback.
+  const issuer = publicUrl ?? local;
   const appEnv = {
     NEXT_PUBLIC_SUPABASE_URL: status.API_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY || status.ANON_KEY,
     SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY, CADENCE_MCP_ENABLED: 'true', CADENCE_OAUTH_ISSUER: issuer,
     CADENCE_ENABLE_TEST_LOGIN: '1', CADENCE_INTEGRATION_JWT_SIGNING_KEY: readFileSync(join(work, 'supabase', 'signing_keys.json'), 'utf8').trim(),
     NEXT_TELEMETRY_DISABLED: '1',
+    ...(mcpApps ? { CADENCE_MCP_APPS: 'true' } : {}),
+    ...(publicUrl ? { CADENCE_DEV_ALLOWED_ORIGINS: new URL(publicUrl).hostname } : {}),
   };
   const runner = {
     CADENCE_LOCAL_SUPABASE_URL: status.API_URL, CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY: appEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     CADENCE_ACCEPT_ISSUER: issuer, CADENCE_ACCEPT_CA_FILE: join(work, 'tls', 'ca.pem'), CADENCE_ACCEPT_DB_URL: status.DB_URL,
-    CADENCE_ACCEPT_WORKDIR: work,
+    CADENCE_ACCEPT_WORKDIR: work, CADENCE_ACCEPT_LOCAL_ORIGIN: local,
   };
   writeFileSync(join(work, 'runner.env'), `${Object.entries(runner).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join('\n')}\n`, { mode: 0o600 });
 
@@ -363,9 +369,10 @@ async function up({ name, dbBase, appPort, repo }) {
   writeFileSync(join(work, 'app.pid'), String(appPid));
   const ca = readFileSync(join(work, 'tls', 'ca.pem'));
   let code = 0;
-  for (let i = 0; i < 60 && code !== 200; i += 1) { await sleep(3_000); code = await httpsStatus(`${issuer}/.well-known/oauth-authorization-server`, ca); }
-  if (code !== 200) fail(`app did not answer discovery on ${issuer} (last status ${code}); see app.log in the workdir`);
-  say(`app ${issuer} (MCP on, test login on)`);
+  for (let i = 0; i < 60 && code !== 200; i += 1) { await sleep(3_000); code = await httpsStatus(`${local}/.well-known/oauth-authorization-server`, ca); }
+  if (code !== 200) fail(`app did not answer discovery on ${local} (last status ${code}); see app.log in the workdir`);
+  say(`app ${local} (MCP on, test login on${mcpApps ? ', MCP Apps on' : ''})`);
+  if (publicUrl) say(`issuer ${publicUrl} (public; tier0 and tier1 need a loopback issuer and do not run against it)`);
   say(`next: node .claude/skills/mcp-acceptance/local-stack.mjs tier0 --name ${name} (then tier1, check, down)`);
 }
 
@@ -419,6 +426,7 @@ if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[
   const { positionals, values } = parseArgs({ allowPositionals: true, options: {
     name: { type: 'string', default: 'cadence-accept-run' }, 'db-base': { type: 'string', default: '56150' }, 'app-port': { type: 'string', default: '4450' },
     run: { type: 'string' }, scenario: { type: 'string', default: 'read-write' }, client: { type: 'string', default: 'all' }, account: { type: 'string', default: 'A' },
+    'public-url': { type: 'string' }, 'mcp-apps': { type: 'boolean', default: false },
   } });
   const [command, ...rest] = positionals;
   const name = values.name;
@@ -427,7 +435,14 @@ if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[
   const appPort = Number(values['app-port']);
   if (!Number.isInteger(dbBase) || dbBase < 56000 || dbBase > 56990 || dbBase % 10 !== 0) fail('--db-base must be a multiple of 10 in 56000–56990 (57xxx is avoided, 553xx is Emi’s stack)');
   if (!Number.isInteger(appPort) || appPort < 4400 || appPort > 4499) fail('--app-port must be in 4400–4499 (4321–4330 belong to live runs)');
-  if (command === 'up') await up({ name, dbBase, appPort, repo: process.cwd() });
+  let publicUrl = null;
+  if (values['public-url']) {
+    let parsed = null;
+    try { parsed = new URL(values['public-url']); } catch { /* reported below */ }
+    if (!parsed || parsed.protocol !== 'https:' || parsed.pathname !== '/' || parsed.search || parsed.hash) fail('--public-url must be an https origin with no path, for example https://<name>.trycloudflare.com');
+    publicUrl = parsed.origin;
+  }
+  if (command === 'up') await up({ name, dbBase, appPort, repo: process.cwd(), publicUrl, mcpApps: values['mcp-apps'] });
   else if (command === 'down') await down({ name });
   else if (command === 'status') await status({ name });
   else if (command === 'check') check({ name });
