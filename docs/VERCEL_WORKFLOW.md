@@ -30,7 +30,7 @@ Verified on 2026-06-08 with the Vercel plugin:
 - Team ID: `team_BxWfRYU1gqrl6Ba6t7Vm3wp1`
 - Project ID: `prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs`
 - Framework: Next.js
-- Repository: `emixd12/cadence`
+- Repository: `cadence-me/cadence`
 - Production branch: `main`
 - Repository root/build entrypoint: `.`
 - Node runtime setting: `24.x`
@@ -48,7 +48,7 @@ The public Astro marketing site is deployed separately:
 
 - Project: `cadence-marketing`
 - Current production alias: `https://cadence-marketing-two.vercel.app`
-- Git repository: `emixd12/cadence`
+- Git repository: `cadence-me/cadence`
 - Production branch: `main`
 - Workspace root: `apps/marketing`
 - Build command: `npm run marketing:build`
@@ -223,7 +223,7 @@ curl -X POST \
 
 Normal production deployment is via the Git integration:
 
-1. Push `main` to `emixd12/cadence`.
+1. Push `main` to `cadence-me/cadence`.
 2. Confirm the production deployment is `READY`.
 3. Confirm deployment metadata points at the intended commit.
 4. Inspect build logs for warnings or failures.

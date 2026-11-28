@@ -31,7 +31,7 @@ describe("marketing base layout", () => {
 
     expect(site).toContain('label: "Download for Mac"');
     expect(site).toContain(
-      '"https://github.com/emixd12/cadence/releases/download/desktop-stable/Cadence_aarch64.dmg"',
+      '"https://github.com/cadence-me/cadence/releases/download/desktop-stable/Cadence_aarch64.dmg"',
     );
     expect(site).not.toMatch(/Cadence_\d+\.\d+\.\d+[^/"]*_aarch64\.dmg/);
     expect(site).not.toContain("releases/download/desktop-preview/");

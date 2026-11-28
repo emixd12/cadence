@@ -45,7 +45,7 @@ describe("desktop release preparation", () => {
     const preview = createPreviewOverlay(base, { ...env, CADENCE_UPDATER_ENDPOINT: UPDATER_QA_ENDPOINT }, "0.1.1-preview.46");
     expect(validatePreviewConfiguration(base, preview)).toEqual([]);
     for (const endpoint of [UPDATER_QA_ENDPOINT.replace("https:", "http:"), `${UPDATER_QA_ENDPOINT}?other=1`,
-      UPDATER_QA_ENDPOINT.replace("20260928", "20260929"), UPDATER_QA_ENDPOINT.replace("emixd12/", "another-owner/")]) {
+      UPDATER_QA_ENDPOINT.replace("20260928", "20260929"), UPDATER_QA_ENDPOINT.replace("cadence-me/", "another-owner/")]) {
       expect(validatePreviewConfiguration(base, createPreviewOverlay(base, { ...env, CADENCE_UPDATER_ENDPOINT: endpoint }, "0.1.1-preview.46")).length).toBeGreaterThan(0);
     }
   });

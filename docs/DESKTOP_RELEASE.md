@@ -1,11 +1,13 @@
 # Desktop release
 
-Since October 8, 2026 (Ticket 186), the source repository is `emixd12/cadence`
-(same repository ID) and the preview feed is
-`https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json`.
-Installed clients keep their original `habit-tracking-app` endpoints; GitHub
-redirects them, and feed, archive and signature checks pass through the old URLs.
-Do not create a repository named `habit-tracking-app`: that would end the redirects.
+Since the transfer under Ticket 350, the source repository is `cadence-me/cadence`.
+It is the same repository (same ID) as `emixd12/cadence` and, before October 8, 2026
+(Ticket 186), `emixd12/habit-tracking-app`. The preview feed is
+`https://github.com/cadence-me/cadence/releases/download/desktop-preview/latest.json`.
+Installed clients keep the endpoints they were built with; GitHub redirects them, and
+feed, archive and signature checks pass through the old URLs. Do not create a
+repository named `cadence` or `habit-tracking-app` under `emixd12`: that would end the
+redirects.
 Historical release observations below retain their original names and URLs.
 Evidence: `docs/qa/cadence-project-rename.md`.
 
@@ -154,7 +156,7 @@ The packet discloses uncommitted build inputs and
 the mismatch with the proposed baseline tag's automatic source archive.
 
 September 28 controlled updater preparation adds one exact QA feed to preview
-validation: `https://github.com/emixd12/cadence/releases/download/desktop-updater-qa-20260928/latest.json`.
+validation: `https://github.com/cadence-me/cadence/releases/download/desktop-updater-qa-20260928/latest.json`.
 The local `0.1.1-preview.46` source uses that endpoint, ad hoc signing, legacy
 Keychain storage, and the existing persistent updater key. Its intended target is
 the unchanged notarized rc.3. The staged packet lives under ignored
@@ -816,11 +818,11 @@ as rollback copies.
    ```bash
    T="$(mktemp -d)"
    cp -p Cadence_V_aarch64.dmg "$T/Cadence_aarch64.next.dmg"
-   gh release upload desktop-stable "$T/Cadence_aarch64.next.dmg" --repo emixd12/cadence
-   gh api repos/emixd12/cadence/releases/tags/desktop-stable \
+   gh release upload desktop-stable "$T/Cadence_aarch64.next.dmg" --repo cadence-me/cadence
+   gh api repos/cadence-me/cadence/releases/tags/desktop-stable \
      --jq '.assets[] | select(.name | startswith("Cadence_aarch64")) | "\(.id) \(.name) \(.digest)"'
-   gh api -X DELETE repos/emixd12/cadence/releases/assets/<old id>
-   gh api -X PATCH repos/emixd12/cadence/releases/assets/<new id> -f name=Cadence_aarch64.dmg
+   gh api -X DELETE repos/cadence-me/cadence/releases/assets/<old id>
+   gh api -X PATCH repos/cadence-me/cadence/releases/assets/<new id> -f name=Cadence_aarch64.dmg
    ```
 
    Avoid `gh release upload --clobber` here: it deletes the old asset before uploading,
@@ -829,7 +831,7 @@ as rollback copies.
 6. Read back from the public URLs: the SHA-256 of every new asset, including the
    version-free DMG; both feed versions; the feed signature against the downloaded
    archive with the persistent updater key; and check 2 on a quarantined download of
-   `https://github.com/emixd12/cadence/releases/download/desktop-stable/Cadence_aarch64.dmg`.
+   `https://github.com/cadence-me/cadence/releases/download/desktop-stable/Cadence_aarch64.dmg`.
    Repeat until GitHub serves the new bytes.
 7. Record the results in the packet and `STATUS.md`.
 
@@ -930,7 +932,7 @@ Production publication requires the owner's release instruction. Passing the
 local helper does not publish or satisfy Ticket 115.
 
 Signed builds use the stable feed
-`https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json`,
+`https://github.com/cadence-me/cadence/releases/download/desktop-stable/latest.json`,
 chosen by the owner on October 19, 2026. Supply it as `CADENCE_UPDATER_ENDPOINT`.
 Previews keep the `desktop-preview` feed. At publication, that feed also names the
 signed release, so preview users can move to it. `0.1.5` is the published stable
