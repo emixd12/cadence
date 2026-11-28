@@ -4,7 +4,8 @@
 --   - contract 12 reads Periods and may insert, edit and delete them;
 --   - contracts 8 to 11 never see them, cannot write the kind, and their other writes
 --     keep hosted Periods;
---   - at the cap of 500, contract 12 still edits a Period it holds and cannot add one;
+--   - at the cap of 500, contract 12 still edits a Period it holds, cannot add one, and
+--     can remove one and add another in the same plan;
 --   - a Period id owned by another account is refused.
 -- Everything rolls back.
 \set ON_ERROR_STOP on
@@ -262,6 +263,22 @@ begin
     raise exception 'Account sync passed the cap of 500 Periods.';
   exception when sqlstate '54000' then null;
   end;
+  -- A plan that removes one Period and adds another applies at the cap.
+  stored := pg_temp.entity(snapshot, 'period', mac);
+  perform public.apply_account_sync_plan(pg_temp.sync_payload(12, snapshot,
+    jsonb_build_array(
+      jsonb_build_object('kind', 'period', 'id', mac, 'operation', 'delete', 'expected', stored),
+      jsonb_build_object('kind', 'period', 'id', extra, 'operation', 'upsert', 'expected', null, 'value', value)),
+    pg_temp.merged(snapshot, jsonb_build_array(
+      jsonb_build_object('kind', 'period', 'id', mac, 'value', null),
+      jsonb_build_object('kind', 'period', 'id', extra, 'value', value))),
+    repeat('5', 64)));
+  if exists (select 1 from public.periods where id = mac::uuid)
+    or not exists (select 1 from public.periods where id = extra::uuid)
+    or (select count(*) from public.periods where user_id = '37410000-0000-4000-8000-000000000001') <> 500
+  then
+    raise exception 'A removal and an addition in one plan did not apply at the cap.';
+  end if;
   begin
     perform public.create_period('Extra', '2026-11-03', null, null);
     raise exception 'create_period passed the cap of 500 Periods.';

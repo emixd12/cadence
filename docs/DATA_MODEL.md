@@ -2983,7 +2983,8 @@ migration replaces the cap trigger function for one case: account sync writes wi
 `insert ... on conflict (id) do update`, and Postgres fires a `before insert` trigger
 before it finds the conflict, so the function now lets through a row whose id the
 account already holds. That is an edit, not a new Period. A new id meets the same count
-as before, for every writer. Cadence for Mac stores Periods in SQLite schema 31
+as before, for every writer. The apply step also runs a plan's Period removals before its
+upserts, so a plan that removes one Period and adds another fits at 500. Cadence for Mac stores Periods in SQLite schema 31
 (`docs/DESKTOP_DATA_MODEL.md`, "Periods"). Smoke:
 `tests/sql/ticket-374-period-sync-smoke.sql`.
 

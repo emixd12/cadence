@@ -12,7 +12,9 @@
 -- before it finds the conflict. Without the change, an account holding 500 Periods
 -- could not synchronize an edit of one of them. A row whose id the account already
 -- holds is an update, not a new Period, so the trigger lets it through. Every other
--- writer inserts a new id and meets the same count as before.
+-- writer inserts a new id and meets the same count as before. For the same reason the
+-- apply step runs a plan's Period removals before its upserts, so a plan that removes one
+-- Period and adds another fits at 500.
 --
 -- No drop, no constraint or trigger replacement, no write to a user table. The
 -- registry row is configuration in cadence_private.
@@ -88,6 +90,25 @@ begin
   end if;
   definition := replace(definition, anchor, $patch$when 'day_note' then 20
       when 'period' then 21 end,$patch$);
+
+  -- The apply step writes upserts before deletes. A plan that removes one Period and adds
+  -- another for an account at 500 would meet the cap before its removal ran, so planned
+  -- Period removals run first. Every write was validated and locked above; the later
+  -- delete loop finds these rows gone.
+  anchor := $a$  -- Apply inserts and updates in parent-before-child order.$a$;
+  if (length(definition) - length(replace(definition, anchor, ''))) / length(anchor) <> 1 then
+    raise exception 'Account sync apply order changed unexpectedly.';
+  end if;
+  definition := replace(definition, anchor, $patch$  -- Ticket 374: planned Period removals first, so a removal and an addition fit under the cap.
+  delete from public.periods period
+  where period.user_id = current_user_id
+    and period.id::text in (
+      select planned ->> 'id'
+      from jsonb_array_elements(sync_payload #> '{plan,writes}') planned
+      where planned ->> 'kind' = 'period' and planned ->> 'operation' = 'delete'
+    );
+
+$patch$ || anchor);
 
   execute definition;
 end
